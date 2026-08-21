@@ -1,0 +1,61 @@
+import { NextResponse } from "next/server";
+import { prisma } from "@/lib/db/prisma";
+
+export async function GET(request: Request) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const propertyId = searchParams.get("propertyId");
+    const stationId = searchParams.get("stationId");
+
+    if (!propertyId) {
+      return NextResponse.json({ error: "propertyId is required" }, { status: 400 });
+    }
+
+    const kots = await prisma.kOT.findMany({
+      where: {
+        propertyId,
+        ...(stationId ? { stationId } : {}),
+        status: { in: ["QUEUED", "PREPARING", "READY"] },
+      },
+      include: {
+        order: {
+          include: {
+            table: true,
+            stay: { include: { primaryGuest: true } },
+          },
+        },
+        station: true,
+        lines: {
+          include: {
+            orderItem: true,
+          },
+        },
+      },
+      orderBy: { firedAt: "asc" },
+    });
+
+    return NextResponse.json(kots);
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}
+
+export async function PATCH(request: Request) {
+  try {
+    const body = await request.json();
+    const { kotId, status } = body; // QUEUED, PREPARING, READY, COMPLETED
+
+    const updateData: any = { status };
+    if (status === "PREPARING") updateData.acceptedAt = new Date();
+    if (status === "READY") updateData.readyAt = new Date();
+
+    const kot = await prisma.kOT.update({
+      where: { id: kotId },
+      data: updateData,
+    });
+
+    return NextResponse.json(kot);
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 400 });
+  }
+}

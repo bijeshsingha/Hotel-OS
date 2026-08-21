@@ -1,0 +1,1380 @@
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// ----------------------------------------------------
+// Tenancy & Identity
+// ----------------------------------------------------
+
+model Organization {
+  id          String   @id @default(cuid())
+  legalName   String
+  displayName String
+  pan         String?
+  address     String?  // JSON string
+  status      String   @default("ACTIVE") // TRIAL, ACTIVE, SUSPENDED, ARCHIVED
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  properties  Property[]
+  memberships Membership[]
+  guests      Guest[]
+}
+
+model Property {
+  id              String   @id @default(cuid())
+  organizationId  String
+  code            String
+  legalName       String
+  displayName     String
+  gstin           String?
+  stateCode       String?  // e.g. "18" for Assam, "17" for Meghalaya
+  address         String?
+  phone           String?
+  email           String?
+  timezone        String   @default("Asia/Kolkata")
+  currency        String   @default("INR")
+  checkinTime     String   @default("14:00")
+  checkoutTime    String   @default("11:00")
+  auditCutoff     String   @default("03:00")
+  businessDate    String   // YYYY-MM-DD
+  status          String   @default("ACTIVE")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  organization    Organization @relation(fields: [organizationId], references: [id])
+  propertyGrants  PropertyGrant[]
+  roomTypes       RoomType[]
+  rooms           Room[]
+  ratePlans       RatePlan[]
+  taxProfiles     TaxProfile[]
+  documentSequences DocumentSequence[]
+  chargeCodes     ChargeCode[]
+  paymentMethods  PaymentMethod[]
+  outlets         Outlet[]
+  reservations    Reservation[]
+  stays           Stay[]
+  folios          Folio[]
+  invoices        Invoice[]
+  creditNotes     CreditNote[]
+  operationalDays OperationalDay[]
+  maintenanceIssues MaintenanceIssue[]
+  inventoryItems  InventoryItem[]
+  inventoryLocations InventoryLocation[]
+  stockMovements  StockMovement[]
+  notifications   Notification[]
+  orders          Order[]
+  auditLogs       AuditLog[]
+  metricSnapshots MetricSnapshot[]
+  guestRegistrations GuestRegistration[]
+
+  @@unique([organizationId, code])
+}
+
+model User {
+  id          String   @id @default(cuid())
+  name        String
+  email       String   @unique
+  phone       String?
+  status      String   @default("ACTIVE") // INVITED, ACTIVE, SUSPENDED, REVOKED
+  lastLoginAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  memberships Membership[]
+  sessions    UserSession[]
+}
+
+model Membership {
+  id             String   @id @default(cuid())
+  userId         String
+  organizationId String
+  status         String   @default("ACTIVE")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user           User         @relation(fields: [userId], references: [id])
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  propertyGrants PropertyGrant[]
+
+  @@unique([userId, organizationId])
+}
+
+model PropertyGrant {
+  id           String   @id @default(cuid())
+  membershipId String
+  propertyId   String
+  roleId       String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  membership   Membership @relation(fields: [membershipId], references: [id])
+  property     Property   @relation(fields: [propertyId], references: [id])
+  role         Role       @relation(fields: [roleId], references: [id])
+
+  @@unique([membershipId, propertyId, roleId])
+}
+
+model Role {
+  id          String   @id @default(cuid())
+  code        String   @unique // ORG_OWNER, ADMIN_GM, FD_MGR, FD_AGENT, HK_SUP, HK_ATT, FNB_MGR, WAITER, KITCHEN, MAINT_SUP, TECH, ACCT, VIEWER, SUPPORT
+  name        String
+  description String?
+  scopeType   String   @default("PROPERTY") // ORG, PROPERTY
+  builtIn     Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  permissions   RolePermission[]
+  propertyGrants PropertyGrant[]
+}
+
+model Permission {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  description String?
+  sensitivity String   @default("NORMAL") // NORMAL, SENSITIVE
+
+  roles       RolePermission[]
+}
+
+model RolePermission {
+  id           String     @id @default(cuid())
+  roleId       String
+  permissionId String
+
+  role         Role       @relation(fields: [roleId], references: [id])
+  permission   Permission @relation(fields: [permissionId], references: [id])
+
+  @@unique([roleId, permissionId])
+}
+
+model PermissionOverride {
+  id           String    @id @default(cuid())
+  userId       String
+  propertyId   String
+  permissionCode String
+  effect       String    @default("ALLOW") // ALLOW, DENY
+  expiresAt    DateTime?
+  reason       String?
+  createdAt    DateTime  @default(now())
+}
+
+model UserSession {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  revokedAt DateTime?
+  device    String?
+  createdAt DateTime  @default(now())
+
+  user      User      @relation(fields: [userId], references: [id])
+}
+
+// ----------------------------------------------------
+// Property Configuration & Master Data
+// ----------------------------------------------------
+
+model RoomType {
+  id             String   @id @default(cuid())
+  organizationId String
+  propertyId     String
+  code           String
+  name           String
+  capacity       Int      @default(2)
+  extraCapacity  Int      @default(1)
+  baseOccupancy  Int      @default(2)
+  bedType        String   @default("King")
+  amenities      String?  // JSON array
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  property       Property @relation(fields: [propertyId], references: [id])
+  rooms          Room[]
+  rateVersions   RatePlanVersion[]
+
+  @@unique([propertyId, code])
+}
+
+model Room {
+  id             String   @id @default(cuid())
+  organizationId String
+  propertyId     String
+  roomTypeId     String
+  number         String
+  name           String?
+  floor          Int      @default(1)
+  wing           String?
+  sortOrder      Int      @default(0)
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  property       Property   @relation(fields: [propertyId], references: [id])
+  roomType       RoomType   @relation(fields: [roomTypeId], references: [id])
+  roomState      RoomState?
+  assignments    RoomAssignment[]
+  blocks         RoomBlock[]
+  hkTasks        HousekeepingTask[]
+  maintenanceIssues MaintenanceIssue[]
+
+  @@unique([propertyId, number])
+}
+
+model RatePlan {
+  id                 String   @id @default(cuid())
+  organizationId     String
+  propertyId         String
+  code               String
+  name               String
+  mealPlan           String   @default("EP") // EP (Room Only), CP (Breakfast), MAP (Breakfast + Dinner), AP (All meals)
+  cancellationPolicy String?
+  priority           Int      @default(1)
+  active             Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  property           Property @relation(fields: [propertyId], references: [id])
+  versions           RatePlanVersion[]
+
+  @@unique([propertyId, code])
+}
+
+model RatePlanVersion {
+  id             String   @id @default(cuid())
+  ratePlanId     String
+  roomTypeId     String
+  effectiveFrom  String   // YYYY-MM-DD
+  effectiveTo    String?  // YYYY-MM-DD
+  daysMask       String   @default("1111111") // Mon-Sun active
+  pricingJson    String   // { basePrice: number, extraAdult: number, extraChild: number }
+  taxProfileId   String?
+  inclusionsJson String?
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now())
+
+  ratePlan       RatePlan @relation(fields: [ratePlanId], references: [id])
+  roomType       RoomType @relation(fields: [roomTypeId], references: [id])
+}
+
+model TaxProfile {
+  id                 String   @id @default(cuid())
+  organizationId     String
+  propertyId         String
+  name               String
+  supplyType         String   @default("ACCOMMODATION") // ACCOMMODATION, RESTAURANT, SERVICE, GOODS
+  sacHsn             String   // e.g. "996311" for room, "996331" for food
+  componentRatesJson String   // { cgst: 6, sgst: 6, igst: 12 } or { cgst: 9, sgst: 9, igst: 18 } or { cgst: 2.5, sgst: 2.5, igst: 5 }
+  inclusive          Boolean  @default(false)
+  effectiveFrom      String   // YYYY-MM-DD
+  effectiveTo        String?
+  premisesTreatment  String?  // specified_premises_opt_in
+  itcNote            String?
+  version            Int      @default(1)
+  active             Boolean  @default(true)
+  createdAt          DateTime @default(now())
+
+  property           Property @relation(fields: [propertyId], references: [id])
+}
+
+model DocumentSequence {
+  id             String   @id @default(cuid())
+  organizationId String
+  propertyId     String
+  documentType   String   // INVOICE, CREDIT_NOTE, RECEIPT, KOT, ORDER, RESERVATION
+  scopeKey       String   @default("PROPERTY")
+  financialYear  String   // e.g. "2026-2027"
+  prefix         String   // e.g. "INV-2627-", "CN-2627-", "KOT-", "REC-"
+  nextValue      Int      @default(1)
+  padding        Int      @default(4)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  property       Property @relation(fields: [propertyId], references: [id])
+
+  @@unique([propertyId, documentType, scopeKey, financialYear])
+}
+
+model ChargeCode {
+  id             String   @id @default(cuid())
+  organizationId String
+  propertyId     String
+  code           String
+  name           String
+  category       String   // ROOM, FB, LAUNDRY, MINIBAR, MISC, ADJUSTMENT
+  revenueGroup   String   // ROOM_REVENUE, FB_REVENUE, OTHER_REVENUE
+  taxProfileId   String?
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now())
+
+  property       Property @relation(fields: [propertyId], references: [id])
+
+  @@unique([propertyId, code])
+}
+
+model PaymentMethod {
+  id                String   @id @default(cuid())
+  organizationId    String
+  propertyId        String
+  code              String   // CASH, CARD, UPI, BANK_TRANSFER, OTA_VCC, DIRECT_BILL
+  name              String
+  kind              String   // CASH, CARD, DIGITAL, CREDIT
+  referenceRequired Boolean  @default(false)
+  supportsRefund    Boolean  @default(true)
+  active            Boolean  @default(true)
+  createdAt         DateTime @default(now())
+
+  property          Property @relation(fields: [propertyId], references: [id])
+
+  @@unique([propertyId, code])
+}
+
+model Outlet {
+  id                    String   @id @default(cuid())
+  organizationId        String
+  propertyId            String
+  code                  String
+  name                  String
+  type                  String   @default("RESTAURANT") // RESTAURANT, BAR, ROOM_SERVICE, TAKEAWAY
+  supportedModes        String   @default("DINE_IN,TAKEAWAY,ROOM_SERVICE")
+  serviceChargePolicyId String?
+  active                Boolean  @default(true)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  property              Property @relation(fields: [propertyId], references: [id])
+  tables                DiningTable[]
+  categories            MenuCategory[]
+  kitchenStations       KitchenStation[]
+  orders                Order[]
+  shifts                POSShift[]
+
+  @@unique([propertyId, code])
+}
+
+model DiningTable {
+  id             String   @id @default(cuid())
+  organizationId String
+  propertyId     String
+  outletId       String
+  section        String   @default("Main Dining")
+  name           String   // Table 1, Table 2, T-01
+  capacity       Int      @default(4)
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now())
+
+  outlet         Outlet   @relation(fields: [outletId], references: [id])
+  orders         Order[]
+
+  @@unique([outletId, name])
+}
+
+model MenuCategory {
+  id             String   @id @default(cuid())
+  organizationId String
+  propertyId     String
+  outletId       String
+  name           String   // Breakfast, Snacks, Chinese Starters, Main Course Veg, etc.
+  servicePeriod  String   @default("ALL_DAY") // BREAKFAST, A_LA_CARTE, ALL_DAY
+  availableFrom  String?  // e.g. "08:00"
+  availableUntil String?  // e.g. "11:00"
+  sortOrder      Int      @default(0)
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now())
+
+  outlet         Outlet   @relation(fields: [outletId], references: [id])
+  items          MenuItem[]
+}
+
+model MenuItem {
+  id              String   @id @default(cuid())
+  organizationId  String
+  propertyId      String
+  categoryId      String
+  code            String
+  name            String
+  description     String?
+  portionSize     String?  // "8PC", "2pcs", "1Pc", "6PC"
+  isVeg           Boolean  @default(true)
+  servicePeriod   String   @default("ALL_DAY") // BREAKFAST, A_LA_CARTE, ALL_DAY
+  availableFrom   String?  // "08:00"
+  availableUntil  String?  // "11:00"
+  prepTimeMinutes Int      @default(40)
+  spicyLevel      Int      @default(0)
+  tags            String?  // "Chef Special", "Must Try", "Assam Special"
+  active          Boolean  @default(true)
+  inventoryItemId String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  category       MenuCategory @relation(fields: [categoryId], references: [id])
+  variants       MenuItemVariant[]
+  modifierGroups ModifierGroup[]
+
+  @@unique([categoryId, code])
+}
+
+model MenuItemVariant {
+  id                     String   @id @default(cuid())
+  menuItemId             String
+  name                   String   @default("Standard") // Full, Half, Regular, Large
+  sku                    String?
+  price                  Float    // stored in primary units e.g. 350.00
+  taxProfileId           String?
+  stationId              String?
+  serviceChargeEligible  Boolean  @default(true)
+  active                 Boolean  @default(true)
+  createdAt              DateTime @default(now())
+
+  menuItem               MenuItem @relation(fields: [menuItemId], references: [id])
+  station                KitchenStation? @relation(fields: [stationId], references: [id])
+}
+
+model ModifierGroup {
+  id             String   @id @default(cuid())
+  organizationId String
+  propertyId     String
+  menuItemId     String
+  name           String   // Spice Level, Preparation, Dressing
+  minSelect      Int      @default(0)
+  maxSelect      Int      @default(1)
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now())
+
+  menuItem       MenuItem @relation(fields: [menuItemId], references: [id])
+  modifiers      Modifier[]
+}
+
+model Modifier {
+  id              String   @id @default(cuid())
+  modifierGroupId String
+  name            String
+  priceDelta      Float    @default(0)
+  taxProfileId    String?
+  active          Boolean  @default(true)
+  createdAt       DateTime @default(now())
+
+  group           ModifierGroup @relation(fields: [modifierGroupId], references: [id])
+}
+
+model KitchenStation {
+  id             String   @id @default(cuid())
+  organizationId String
+  propertyId     String
+  outletId       String
+  code           String   // KITCHEN_MAIN, TANDOOR, BAR, DESSERT
+  name           String
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now())
+
+  outlet         Outlet   @relation(fields: [outletId], references: [id])
+  variants       MenuItemVariant[]
+  kots           KOT[]
+  printerRoutes  PrinterRoute[]
+
+  @@unique([outletId, code])
+}
+
+model PrinterRoute {
+  id                String   @id @default(cuid())
+  organizationId    String
+  propertyId        String
+  stationId         String
+  agentId           String?
+  printerName       String
+  paperWidth        Int      @default(80) // 80mm or 58mm
+  copies            Int      @default(1)
+  fallbackStationId String?
+  active            Boolean  @default(true)
+  createdAt         DateTime @default(now())
+
+  station           KitchenStation @relation(fields: [stationId], references: [id])
+}
+
+// ----------------------------------------------------
+// Guests, Reservations & Stays
+// ----------------------------------------------------
+
+model Guest {
+  id             String   @id @default(cuid())
+  organizationId String
+  name           String
+  phone          String?
+  email          String?
+  dob            String?
+  nationality    String   @default("Indian")
+  addressJson    String?  // { street, city, state, postalCode, country }
+  gstin          String?
+  companyName    String?
+  preferences    String?  // High floor, extra pillows, quiet room
+  consentFlags   String?  // { marketing: true, whatsapp: true }
+  riskNote       String?  // Blacklist or VIP note
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  documents      GuestDocument[]
+  reservations   Reservation[]
+  stays          Stay[]
+}
+
+model GuestDocument {
+  id                String   @id @default(cuid())
+  guestId           String
+  propertyId        String
+  documentType      String   // AADHAAR, PASSPORT, DRIVING_LICENSE, VOTER_ID, PAN
+  last4             String
+  issuerCountry     String   @default("India")
+  expiresOn         String?
+  objectKey         String?
+  metadataEncrypted String?
+  retentionUntil    DateTime?
+  createdAt         DateTime @default(now())
+
+  guest             Guest    @relation(fields: [guestId], references: [id])
+}
+
+model Reservation {
+  id              String   @id @default(cuid())
+  organizationId  String
+  propertyId      String
+  confirmationNo  String   // RES-2627-0001
+  primaryGuestId  String
+  arrivalDate     String   // YYYY-MM-DD
+  departureDate   String   // YYYY-MM-DD
+  status          String   @default("CONFIRMED") // DRAFT, TENTATIVE, CONFIRMED, PARTIALLY_CHECKED_IN, CHECKED_IN, COMPLETED, CANCELLED, NO_SHOW
+  source          String   @default("DIRECT") // DIRECT, PHONE, WALK_IN, OTA, CORPORATE, WEBSITE
+  channelRef      String?
+  guaranteeType   String   @default("CREDIT_CARD") // CREDIT_CARD, ADVANCE_DEPOSIT, COMPANY_BILLING, NON_GUARANTEED
+  notes           String?
+  totalSnapshot   Float    @default(0)
+  groupKey        String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  property        Property @relation(fields: [propertyId], references: [id])
+  primaryGuest    Guest    @relation(fields: [primaryGuestId], references: [id])
+  rooms           ReservationRoom[]
+  deposits        Deposit[]
+  notesHistory    ReservationNote[]
+
+  @@unique([propertyId, confirmationNo])
+}
+
+model ReservationRoom {
+  id              String   @id @default(cuid())
+  reservationId   String
+  roomTypeId      String
+  assignedRoomId  String?
+  adults          Int      @default(2)
+  children        Int      @default(0)
+  status          String   @default("CONFIRMED") // HELD, CONFIRMED, CHECKED_IN, CANCELLED, NO_SHOW, COMPLETED
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  reservation     Reservation @relation(fields: [reservationId], references: [id])
+  nights          ReservationNight[]
+  stays           Stay[]
+}
+
+model ReservationNight {
+  id                 String   @id @default(cuid())
+  reservationRoomId  String
+  serviceDate        String   // YYYY-MM-DD
+  ratePlanVersionId  String?
+  baseAmount         Float
+  discountAmount     Float    @default(0)
+  taxableAmount      Float
+  taxAmount          Float
+  totalAmount        Float
+  snapshotJson       String?  // { ratePlanName, taxRate, mealPlan }
+  createdAt          DateTime @default(now())
+
+  reservationRoom    ReservationRoom @relation(fields: [reservationRoomId], references: [id])
+
+  @@unique([reservationRoomId, serviceDate])
+}
+
+model ReservationNote {
+  id            String   @id @default(cuid())
+  reservationId String
+  category      String   @default("GENERAL") // GENERAL, FRONT_DESK, BILLING, SPECIAL_REQUEST
+  text          String
+  visibility    String   @default("INTERNAL") // INTERNAL, GUEST
+  authorId      String?
+  createdAt     DateTime @default(now())
+
+  reservation   Reservation @relation(fields: [reservationId], references: [id])
+}
+
+model Stay {
+  id                 String    @id @default(cuid())
+  organizationId     String
+  propertyId         String
+  reservationRoomId  String?
+  primaryGuestId     String
+  status             String    @default("IN_HOUSE") // DUE_IN, IN_HOUSE, DUE_OUT, CHECKED_OUT, CANCELLED
+  arrivalAt          DateTime  @default(now())
+  expectedDepartureAt DateTime
+  actualDepartureAt  DateTime?
+  adults             Int       @default(2)
+  children           Int       @default(0)
+  folioId            String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  property           Property        @relation(fields: [propertyId], references: [id])
+  primaryGuest       Guest           @relation(fields: [primaryGuestId], references: [id])
+  reservationRoom    ReservationRoom? @relation(fields: [reservationRoomId], references: [id])
+  roomAssignments    RoomAssignment[]
+  stayGuests         StayGuest[]
+  folio              Folio?
+  orders             Order[]
+}
+
+model StayGuest {
+  id           String    @id @default(cuid())
+  stayId       String
+  guestId      String
+  role         String    @default("COMPANION") // PRIMARY, COMPANION
+  checkedInAt  DateTime  @default(now())
+  checkedOutAt DateTime?
+
+  stay         Stay      @relation(fields: [stayId], references: [id])
+}
+
+model RoomAssignment {
+  id           String    @id @default(cuid())
+  stayId       String
+  roomId       String
+  startsAt     DateTime  @default(now())
+  endsAt       DateTime?
+  moveReason   String?
+  rateHandling String?   @default("RETAIN_RATE") // RETAIN_RATE, APPLY_NEW_RATE
+  createdAt    DateTime  @default(now())
+
+  stay         Stay      @relation(fields: [stayId], references: [id])
+  room         Room      @relation(fields: [roomId], references: [id])
+}
+
+model GuestRegistration {
+  id                         String    @id @default(cuid())
+  organizationId             String
+  propertyId                 String
+  registrationNo             String    // GRC-2627-0101
+  status                     String    @default("PENDING_REVIEW") // PENDING_REVIEW, CHECKED_IN, REJECTED
+
+  // Primary Guest Details
+  fullName                   String
+  age                        Int?
+  gender                     String?   // Male, Female, Other
+  nationality                String    @default("Indian")
+  fatherSpouseName           String?
+  arrivalDateTime            String    // YYYY-MM-DD HH:mm
+  expectedDepartureDate      String?   // YYYY-MM-DD
+  preAssignedRoom            String?
+
+  // Address Details
+  streetAddress              String?
+  city                       String?
+  state                      String?
+  pinZipCode                 String?
+  country                    String    @default("India")
+
+  // Travel & Referral Details
+  arrivedFrom                String?
+  goingTo                    String?
+  purposeOfVisit             String?   // Tourism / Holiday, Business / Work, Medical, Transit, Other
+  referralChannel            String?   // Google Search / Maps, MakeMyTrip, Booking.com, Recommendation, Walk-in, Social Media, etc.
+
+  // Contact & Vehicle
+  mobilePhone                String
+  alternatePhone             String?
+  email                      String?
+  driverName                 String?
+  vehicleNumber              String?
+
+  // Accompanying Co-Guests JSON: [{ name, age, gender, relation, idType, idLast4 }]
+  coGuestsJson               String?
+
+  // Government ID Details & Photo Base64 / URL
+  idDocumentType             String?   // AADHAAR, PASSPORT, DRIVING_LICENSE, VOTER_ID
+  idDocumentNumber           String?
+  idPhotoUrl                 String?   // Base64 Data URL or capture
+  foreignPassportDetailsJson String?   // { passportNo, visaNo, visaExpiry, portOfArrival }
+
+  // Terms & Signature
+  signatureDataUrl           String?   // Base64 PNG signature canvas
+  termsAccepted              Boolean   @default(true)
+  signedAt                   DateTime  @default(now())
+
+  // PMS Fulfillment & Assignment
+  assignedRoomId             String?
+  assignedRoomNumber         String?
+  stayId                     String?
+  guestId                    String?
+  depositAmount              Float     @default(0)
+  processedByUserId          String?
+  processedAt                DateTime?
+  internalNotes              String?
+
+  createdAt                  DateTime  @default(now())
+  updatedAt                  DateTime  @updatedAt
+
+  property                   Property  @relation(fields: [propertyId], references: [id])
+
+  @@unique([propertyId, registrationNo])
+}
+
+model RoomBlock {
+  id                 String    @id @default(cuid())
+  organizationId     String
+  propertyId         String
+  roomId             String
+  type               String    @default("OUT_OF_ORDER") // OUT_OF_ORDER, OUT_OF_SERVICE, MAINTENANCE, MANAGEMENT_HOLD
+  startsAt           DateTime
+  endsAt             DateTime?
+  status             String    @default("ACTIVE") // ACTIVE, RELEASED, CANCELLED
+  reason             String
+  maintenanceIssueId String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  room               Room      @relation(fields: [roomId], references: [id])
+}
+
+// ----------------------------------------------------
+// Housekeeping & Maintenance
+// ----------------------------------------------------
+
+model RoomState {
+  id                 String   @id @default(cuid())
+  organizationId     String
+  propertyId         String
+  roomId             String   @unique
+  occupancyStatus    String   @default("VACANT") // VACANT, OCCUPIED
+  housekeepingStatus String   @default("CLEAN")  // DIRTY, CLEANING, CLEAN, INSPECTED, PICKUP, DND
+  sellabilityStatus  String   @default("SELLABLE") // SELLABLE, OUT_OF_ORDER, OUT_OF_SERVICE, BLOCKED
+  dndUntil           DateTime?
+  lastChangedAt      DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  room               Room     @relation(fields: [roomId], references: [id])
+}
+
+model RoomStateHistory {
+  id               String   @id @default(cuid())
+  organizationId   String
+  propertyId       String
+  roomId           String
+  fromOccupancy    String
+  toOccupancy      String
+  fromHousekeeping String
+  toHousekeeping   String
+  fromSellability  String
+  toSellability    String
+  reason           String?
+  sourceType       String?  // CHECK_IN, CHECK_OUT, HK_COMPLETE, HK_INSPECT, MAINT_BLOCK
+  sourceId         String?
+  actorId          String?
+  happenedAt       DateTime @default(now())
+}
+
+model HousekeepingTask {
+  id                  String   @id @default(cuid())
+  organizationId      String
+  propertyId          String
+  roomId              String
+  stayId              String?
+  type                String   @default("CHECKOUT_CLEAN") // CHECKOUT_CLEAN, STAYOVER_SERVICE, DEEP_CLEAN, TURNDOWN, TOUCHUP
+  priority            String   @default("NORMAL") // LOW, NORMAL, HIGH, URGENT
+  assigneeId          String?
+  dueAt               DateTime?
+  status              String   @default("OPEN") // OPEN, ASSIGNED, IN_PROGRESS, COMPLETED, FAILED_INSPECTION, CANCELLED
+  checklistTemplateId String?
+  checklistResultJson String?
+  notes               String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  room                Room     @relation(fields: [roomId], references: [id])
+  events              HKTaskEvent[]
+}
+
+model HKChecklistTemplate {
+  id             String   @id @default(cuid())
+  organizationId String
+  propertyId     String
+  name           String   // Departure Clean Checklist, Stayover Checklist
+  roomTypeId     String?
+  itemsJson      String   // Array of { id, text, mandatory }
+  version        Int      @default(1)
+  createdAt      DateTime @default(now())
+}
+
+model HKTaskEvent {
+  id                  String   @id @default(cuid())
+  taskId              String
+  eventType           String   // CLAIMED, STARTED, COMPLETED, INSPECTED_PASSED, INSPECTED_FAILED, REOPENED
+  notes               String?
+  checklistResultJson String?
+  photosJson          String?
+  actorId             String?
+  happenedAt          DateTime @default(now())
+
+  task                HousekeepingTask @relation(fields: [taskId], references: [id])
+}
+
+model MaintenanceIssue {
+  id             String   @id @default(cuid())
+  organizationId String
+  propertyId     String
+  issueNo        String   // MNT-0001
+  roomId         String?
+  locationText   String?  // "Lobby Washroom", "Room 304 AC"
+  assetText      String?  // "Daikin 1.5T AC", "Geyser"
+  category       String   @default("PLUMBING") // PLUMBING, ELECTRICAL, HVAC, CARPENTRY, APPLIANCE, CIVIL
+  priority       String   @default("NORMAL") // LOW, NORMAL, HIGH, URGENT
+  status         String   @default("REPORTED") // REPORTED, TRIAGED, ASSIGNED, IN_PROGRESS, ON_HOLD, RESOLVED, VERIFIED, CLOSED, REOPENED, CANCELLED
+  reporterId     String?
+  assigneeId     String?
+  slaDueAt       DateTime?
+  description    String
+  resolution     String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  property       Property @relation(fields: [propertyId], references: [id])
+  room           Room?    @relation(fields: [roomId], references: [id])
+  events         MaintenanceEvent[]
+}
+
+model MaintenanceEvent {
+  id         String   @id @default(cuid())
+  issueId    String
+  type       String   // TRIAGED, ASSIGNED, WORK_LOGGED, PAUSED, RESOLVED, VERIFIED
+  note       String?
+  photosJson String?
+  partsText  String?
+  actorId    String?
+  happenedAt DateTime @default(now())
+
+  issue      MaintenanceIssue @relation(fields: [issueId], references: [id])
+}
+
+// ----------------------------------------------------
+// POS & KOT
+// ----------------------------------------------------
+
+model POSShift {
+  id             String    @id @default(cuid())
+  organizationId String
+  propertyId     String
+  outletId       String
+  openedById     String
+  closedById     String?
+  openedAt       DateTime  @default(now())
+  closedAt       DateTime?
+  openingCash    Float     @default(0)
+  expectedCash   Float     @default(0)
+  actualCash     Float     @default(0)
+  variance       Float     @default(0)
+  status         String    @default("OPEN") // OPEN, CLOSED
+  createdAt      DateTime  @default(now())
+
+  outlet         Outlet    @relation(fields: [outletId], references: [id])
+  orders         Order[]
+}
+
+model Order {
+  id              String   @id @default(cuid())
+  organizationId  String
+  propertyId      String
+  orderNo         String   // ORD-0001
+  outletId        String
+  shiftId         String?
+  mode            String   @default("DINE_IN") // DINE_IN, TAKEAWAY, ROOM_SERVICE
+  tableId         String?
+  stayId          String?
+  customerName    String?
+  customerContact String?
+  covers          Int      @default(2)
+  waiterId        String?
+  status          String   @default("OPEN") // DRAFT, OPEN, KOT_SENT, PARTIALLY_READY, READY, BILLED, POSTED_TO_ROOM, PAID, VOIDED, CANCELLED
+  totalsSnapshot  String?  // { subtotal, tax, discount, total }
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  property        Property    @relation(fields: [propertyId], references: [id])
+  outlet          Outlet      @relation(fields: [outletId], references: [id])
+  table           DiningTable? @relation(fields: [tableId], references: [id])
+  stay            Stay?       @relation(fields: [stayId], references: [id])
+  shift           POSShift?   @relation(fields: [shiftId], references: [id])
+  items           OrderItem[]
+  kots            KOT[]
+  bills           POSBill[]
+}
+
+model OrderItem {
+  id           String   @id @default(cuid())
+  orderId      String
+  menuItemId   String?
+  variantId    String?
+  nameSnapshot String
+  qty          Int      @default(1)
+  unitPrice    Float
+  discount     Float    @default(0)
+  tax          Float    @default(0)
+  total        Float
+  stationId    String?
+  status       String   @default("DRAFT") // DRAFT, SENT, PREPARING, READY, SERVED, CANCEL_REQUESTED, CANCELLED
+  notes        String?
+  course       String?  @default("MAIN") // STARTER, MAIN, DESSERT, BEVERAGE
+  seat         Int?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  order        Order    @relation(fields: [orderId], references: [id])
+  kotLines     KOTLine[]
+}
+
+model KOT {
+  id             String    @id @default(cuid())
+  organizationId String
+  propertyId     String
+  kotNo          String    // KOT-0001
+  orderId        String
+  stationId      String
+  status         String    @default("QUEUED") // QUEUED, PRINTED, ACKNOWLEDGED, PREPARING, READY, COMPLETED, CANCELLED, PRINT_FAILED
+  firedAt        DateTime  @default(now())
+  acceptedAt     DateTime?
+  readyAt        DateTime?
+  printStatus    String    @default("PRINTED") // QUEUED, PRINTED, FAILED
+  reprintCount   Int       @default(0)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  order          Order          @relation(fields: [orderId], references: [id])
+  station        KitchenStation @relation(fields: [stationId], references: [id])
+  lines          KOTLine[]
+}
+
+model KOTLine {
+  id            String   @id @default(cuid())
+  kotId         String
+  orderItemId   String
+  qty           Int
+  action        String   @default("NEW") // NEW, CANCEL
+  notesSnapshot String?
+  createdAt     DateTime @default(now())
+
+  kot           KOT       @relation(fields: [kotId], references: [id])
+  orderItem     OrderItem @relation(fields: [orderItemId], references: [id])
+}
+
+model POSBill {
+  id                 String   @id @default(cuid())
+  organizationId     String
+  propertyId         String
+  billNo             String   // BILL-0001
+  orderId            String
+  customerSnapshot   String?
+  subtotal           Float
+  discountTotal      Float    @default(0)
+  serviceChargeTotal Float    @default(0)
+  taxTotal           Float    @default(0)
+  roundingTotal      Float    @default(0)
+  totalAmount        Float
+  status             String   @default("UNPAID") // UNPAID, PAID, POSTED_TO_ROOM, VOIDED
+  invoiceId          String?
+  folioChargeId      String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  order              Order    @relation(fields: [orderId], references: [id])
+}
+
+// ----------------------------------------------------
+// Folio, Payments & India GST Billing
+// ----------------------------------------------------
+
+model Folio {
+  id             String   @id @default(cuid())
+  organizationId String
+  propertyId     String
+  stayId         String   @unique
+  status         String   @default("OPEN") // OPEN, LOCKED, INVOICED, CLOSED, REOPENED
+  currency       String   @default("INR")
+  openedAt       DateTime @default(now())
+  closedAt       DateTime?
+  balance        Float    @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  property       Property @relation(fields: [propertyId], references: [id])
+  stay           Stay     @relation(fields: [stayId], references: [id])
+  windows        FolioWindow[]
+  entries        FolioEntry[]
+  deposits       Deposit[]
+  payments       Payment[]
+}
+
+model FolioWindow {
+  id                     String   @id @default(cuid())
+  folioId                String
+  name                   String   @default("Guest Window") // Guest Window, Corporate Window
+  windowNumber           Int      @default(1)
+  payerType              String   @default("GUEST") // GUEST, COMPANY
+  guestOrCompanySnapshot String?  // { name, gstin, address }
+  status                 String   @default("OPEN") // OPEN, LOCKED, INVOICED, CLOSED
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  folio                  Folio    @relation(fields: [folioId], references: [id])
+  entries                FolioEntry[]
+  invoices               Invoice[]
+}
+
+model FolioEntry {
+  id                String   @id @default(cuid())
+  organizationId    String
+  propertyId        String
+  folioId           String
+  folioWindowId     String
+  serviceDate       String   // YYYY-MM-DD
+  postedAt          DateTime @default(now())
+  type              String   @default("CHARGE") // CHARGE, PAYMENT, REFUND, ADJUSTMENT, TRANSFER
+  chargeCode        String   // ROOM_TARIFF, RESTAURANT_FOOD, LAUNDRY, MINIBAR, SERVICE_CHARGE
+  description       String
+  qty               Int      @default(1)
+  unitAmount        Float
+  taxableAmount     Float
+  taxComponentsJson String   // { cgstRate: 6, cgstAmount: 120, sgstRate: 6, sgstAmount: 120, igstRate: 0, igstAmount: 0 }
+  totalAmount       Float
+  sourceType        String?  // PMS_NIGHTLY_CHARGE, POS_ORDER, MANUAL_CHARGE, PAYMENT_RECEIPT
+  sourceId          String?
+  reversalOfId      String?
+  transferOfId      String?
+  status            String   @default("POSTED") // POSTED, REVERSED, TRANSFERRED
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  folio             Folio       @relation(fields: [folioId], references: [id])
+  folioWindow       FolioWindow @relation(fields: [folioWindowId], references: [id])
+}
+
+model Deposit {
+  id              String   @id @default(cuid())
+  organizationId  String
+  propertyId      String
+  reservationId   String?
+  folioId         String?
+  paymentId       String
+  originalAmount  Float
+  availableAmount Float
+  status          String   @default("AVAILABLE") // AVAILABLE, APPLIED, REFUNDED
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  reservation     Reservation? @relation(fields: [reservationId], references: [id])
+  folio           Folio?       @relation(fields: [folioId], references: [id])
+}
+
+model Payment {
+  id             String    @id @default(cuid())
+  organizationId String
+  propertyId     String
+  receiptNo      String    // REC-0001
+  folioId        String?
+  orderId        String?
+  reservationId  String?
+  amount         Float
+  method         String    // CASH, CARD, UPI, BANK_TRANSFER, OTA_VCC, DIRECT_BILL
+  reference      String?   // UPI UTR, Card Auth Code, Transaction ID
+  payerSnapshot  String?   // { name, phone, gstin }
+  status         String    @default("SUCCEEDED") // PENDING, SUCCEEDED, FAILED, VOIDED, PARTIALLY_REFUNDED, REFUNDED
+  receivedAt     DateTime  @default(now())
+  idempotencyKey String?   @unique
+  createdById    String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  folio          Folio?    @relation(fields: [folioId], references: [id])
+  allocations    PaymentAllocation[]
+  refunds        Refund[]
+}
+
+model PaymentAllocation {
+  id                  String   @id @default(cuid())
+  paymentId           String
+  folioWindowId       String?
+  invoiceId           String?
+  amount              Float
+  allocatedAt         DateTime @default(now())
+  reversedByPaymentId String?
+
+  payment             Payment  @relation(fields: [paymentId], references: [id])
+}
+
+model Refund {
+  id             String   @id @default(cuid())
+  organizationId String
+  propertyId     String
+  refundNo       String   // REF-0001
+  paymentId      String
+  amount         Float
+  method         String
+  reference      String?
+  reason         String
+  status         String   @default("SUCCEEDED") // REQUESTED, APPROVED, PROCESSING, SUCCEEDED, FAILED, REJECTED
+  approvedById   String?
+  providerRef    String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  payment        Payment  @relation(fields: [paymentId], references: [id])
+}
+
+model Invoice {
+  id                String   @id @default(cuid())
+  organizationId    String
+  propertyId        String
+  invoiceNo         String   // INV-2627-0001
+  invoiceSeries     String   @default("INV-2627")
+  financialYear     String   // 2026-2027
+  folioWindowId     String?
+  posBillId         String?
+  issuedAt          DateTime @default(now())
+  businessDate      String   // YYYY-MM-DD
+  supplierSnapshot  String   // { legalName, gstin, stateCode, address, pan }
+  recipientSnapshot String   // { name, gstin, address, stateCode }
+  subtotal          Float
+  taxTotal          Float
+  rounding          Float    @default(0)
+  totalAmount       Float
+  status            String   @default("ISSUED") // DRAFT, ISSUED, CANCELLED, CREDITED
+  irn               String?
+  ackNo             String?
+  ackDate           String?
+  signedQr          String?
+  documentHash      String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  property          Property     @relation(fields: [propertyId], references: [id])
+  folioWindow       FolioWindow? @relation(fields: [folioWindowId], references: [id])
+  lines             InvoiceLine[]
+  creditNotes       CreditNote[]
+
+  @@unique([propertyId, invoiceSeries, invoiceNo])
+}
+
+model InvoiceLine {
+  id                     String   @id @default(cuid())
+  invoiceId              String
+  sourceEntryIds         String?  // JSON array of FolioEntry IDs
+  description            String
+  sacHsn                 String   // e.g. 996311 or 996331
+  qty                    Int      @default(1)
+  unit                   String   @default("NIGHT") // NIGHT, PORTION, UNIT
+  taxableAmount          Float
+  discountAmount         Float    @default(0)
+  componentTaxRatesJson  String   // { cgstRate: 6, cgstAmount: 60, sgstRate: 6, sgstAmount: 60, igstRate: 0, igstAmount: 0 }
+  totalAmount            Float
+  createdAt              DateTime @default(now())
+
+  invoice                Invoice  @relation(fields: [invoiceId], references: [id])
+}
+
+model CreditNote {
+  id                String   @id @default(cuid())
+  organizationId    String
+  propertyId        String
+  creditNoteNo      String   // CN-2627-0001
+  financialYear     String
+  invoiceId         String
+  issuedAt          DateTime @default(now())
+  reason            String
+  recipientSnapshot String
+  taxSnapshot       String
+  totalAmount       Float
+  status            String   @default("ISSUED")
+  createdAt         DateTime @default(now())
+
+  property          Property @relation(fields: [propertyId], references: [id])
+  invoice           Invoice  @relation(fields: [invoiceId], references: [id])
+  lines             CreditNoteLine[]
+}
+
+model CreditNoteLine {
+  id             String   @id @default(cuid())
+  creditNoteId   String
+  invoiceLineId  String
+  taxableAmount  Float
+  taxAmount      Float
+  totalAmount    Float
+  createdAt      DateTime @default(now())
+
+  creditNote     CreditNote @relation(fields: [creditNoteId], references: [id])
+}
+
+// ----------------------------------------------------
+// Operational Day & Night Audit
+// ----------------------------------------------------
+
+model OperationalDay {
+  id             String    @id @default(cuid())
+  organizationId String
+  propertyId     String
+  businessDate   String    // YYYY-MM-DD
+  status         String    @default("OPEN") // OPEN, CLOSING, CLOSED, REOPENED
+  openedAt       DateTime  @default(now())
+  closedAt       DateTime?
+  openedById     String?
+  closedById     String?
+  overridesJson  String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  property       Property  @relation(fields: [propertyId], references: [id])
+  auditRuns      NightAuditRun[]
+
+  @@unique([propertyId, businessDate])
+}
+
+model NightAuditRun {
+  id                 String   @id @default(cuid())
+  organizationId     String
+  propertyId         String
+  operationalDayId   String
+  status             String   @default("COMPLETED") // IN_PROGRESS, COMPLETED, FAILED
+  checklistSnapshot  String   // { openArrivals: 0, openDepartures: 0, openKots: 0, unpostedCharges: 0 }
+  totalsSnapshot     String   // { roomsSold: 35, occupancy: 72.9, roomRev: 145000, fbRev: 32000, totalTaxes: 21240 }
+  startedById        String?
+  completedById      String?
+  startedAt          DateTime @default(now())
+  completedAt        DateTime?
+
+  operationalDay     OperationalDay @relation(fields: [operationalDayId], references: [id])
+}
+
+model MetricSnapshot {
+  id             String   @id @default(cuid())
+  organizationId String
+  propertyId     String
+  businessDate   String   // YYYY-MM-DD
+  metricCode     String   // OCCUPANCY_PCT, ADR, REVPAR, ROOM_REVENUE, FB_REVENUE, GROSS_REVENUE, TOTAL_TAX, NET_RECEIPTS, OUTSTANDING_FOLIO
+  dimensionsJson String?  // { roomType: "DELUXE" }
+  value          Float
+  calculatedAt   DateTime @default(now())
+
+  property       Property @relation(fields: [propertyId], references: [id])
+
+  @@unique([propertyId, businessDate, metricCode])
+}
+
+// ----------------------------------------------------
+// Inventory Hooks
+// ----------------------------------------------------
+
+model InventoryItem {
+  id             String   @id @default(cuid())
+  organizationId String
+  propertyId     String
+  code           String   // LIN-001, TOIL-001, BEV-001
+  name           String
+  category       String   // LINEN, TOILETRIES, CLEANING, FOOD_SUPPLY, BEVERAGES
+  unit           String   @default("PCS") // PCS, BOTTLES, KG, LITRES
+  reorderLevel   Float    @default(10)
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  property       Property @relation(fields: [propertyId], references: [id])
+  movements      StockMovement[]
+
+  @@unique([propertyId, code])
+}
+
+model InventoryLocation {
+  id             String   @id @default(cuid())
+  organizationId String
+  propertyId     String
+  code           String   // MAIN_STORE, HK_STORE, RESTAURANT_BAR, KITCHEN_STORE
+  name           String
+  type           String   @default("WAREHOUSE")
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now())
+
+  property       Property @relation(fields: [propertyId], references: [id])
+
+  @@unique([propertyId, code])
+}
+
+model StockMovement {
+  id             String   @id @default(cuid())
+  organizationId String
+  propertyId     String
+  itemId         String
+  type           String   // PURCHASE_IN, TRANSFER, CONSUMPTION, ADJUSTMENT, REVERSAL
+  qty            Float
+  fromLocationId String?
+  toLocationId   String?
+  sourceId       String?  // KOT ID or Adjustment ID
+  sourceType     String?
+  reversalOfId   String?
+  reason         String?
+  happenedAt     DateTime @default(now())
+  actorId        String?
+  createdAt      DateTime @default(now())
+
+  property       Property      @relation(fields: [propertyId], references: [id])
+  item           InventoryItem @relation(fields: [itemId], references: [id])
+}
+
+// ----------------------------------------------------
+// Notifications, Audit Log & Outbox
+// ----------------------------------------------------
+
+model Notification {
+  id              String   @id @default(cuid())
+  organizationId  String
+  propertyId      String
+  recipientUserId String
+  type            String   // ARRIVAL_ROOM_NOT_READY, KOT_READY, URGENT_MAINTENANCE, PENDING_DEPARTURE, AUDIT_DUE
+  title           String
+  body            String
+  targetJson      String?  // { type: "ROOM", id: "..." }
+  readAt          DateTime?
+  expiresAt       DateTime?
+  createdAt       DateTime @default(now())
+
+  property        Property @relation(fields: [propertyId], references: [id])
+}
+
+model AuditLog {
+  id               String   @id @default(cuid())
+  organizationId   String
+  propertyId       String
+  actorId          String?
+  actorName        String?
+  effectiveActorId String?
+  action           String   // RESERVATION_CREATE, CHECK_IN, ROOM_MOVE, KOT_FIRE, FOLIO_CHARGE, INVOICE_ISSUE, NIGHT_AUDIT_CLOSE
+  targetType       String   // RESERVATION, STAY, ROOM, ORDER, FOLIO, INVOICE, OPERATIONAL_DAY
+  targetId         String
+  reason           String?
+  beforeJson       String?
+  afterJson        String?
+  ipAddress        String?
+  userAgent        String?
+  occurredAt       DateTime @default(now())
+
+  property         Property @relation(fields: [propertyId], references: [id])
+}
