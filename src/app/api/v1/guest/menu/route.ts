@@ -6,10 +6,13 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     let propertyId = searchParams.get("propertyId");
 
+    const allProperties = await prisma.property.findMany({
+      select: { id: true, code: true, displayName: true, legalName: true, address: true, phone: true, email: true },
+      orderBy: { createdAt: "asc" },
+    });
+
     if (!propertyId) {
-      const defaultProperty = await prisma.property.findFirst({
-        where: { code: "GUW-01" },
-      });
+      const defaultProperty = allProperties.find((p) => p.code === "GUW-01") || allProperties[0];
       propertyId = defaultProperty?.id || "";
     }
 
@@ -102,7 +105,33 @@ export async function GET(request: Request) {
       serviceMessage = "Kitchen Closed for the night. Opens at 08:00 AM.";
     }
 
-    const outlet = property.outlets[0];
+    // Always ensure shared restaurant menu from Ambarish Restaurant
+    let outlet = property.outlets[0];
+    let categories = outlet?.categories || [];
+
+    if (categories.length === 0) {
+      const fallbackOutlet = await prisma.outlet.findFirst({
+        where: { name: { contains: "Ambarish Restaurant" } },
+        include: {
+          categories: {
+            where: { active: true },
+            orderBy: { sortOrder: "asc" },
+            include: {
+              items: {
+                where: { active: true },
+                include: {
+                  variants: { where: { active: true } },
+                },
+              },
+            },
+          },
+        },
+      });
+      if (fallbackOutlet) {
+        outlet = fallbackOutlet as any;
+        categories = fallbackOutlet.categories;
+      }
+    }
 
     // Build rich room list with active in-house stay and folio details
     const inHouseRooms = property.rooms.map((r) => {
@@ -134,6 +163,7 @@ export async function GET(request: Request) {
     return NextResponse.json({
       property: {
         id: property.id,
+        code: property.code,
         name: property.displayName || "Hotel Ambarish Grand Residency",
         legalName: property.legalName,
         address: property.address || "M.D. Shah Road, Paltan Bazar, Guwahati, Assam",
@@ -142,6 +172,7 @@ export async function GET(request: Request) {
         receptionExtension: "555",
         roomServiceExtension: "9",
       },
+      allProperties,
       timeStatus: {
         kolkataTime: kolkataTimeString,
         isBreakfastActive,
@@ -153,8 +184,9 @@ export async function GET(request: Request) {
       },
       outlet: {
         id: outlet?.id,
-        name: outlet?.name,
-        categories: outlet?.categories || [],
+        name: "Ambarish Restaurant & Room Dining",
+        description: "Shared culinary kitchen serving Hotel Ambarish & Hotel Divine View",
+        categories: categories,
       },
       rooms: inHouseRooms,
     });

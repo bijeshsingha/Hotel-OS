@@ -1578,47 +1578,56 @@ export default function PMSFrontDeskPage() {
             </p>
 
             {/* Generated QR Code SVG */}
-            <div className="p-3.5 rounded-xl bg-white mx-auto inline-block shadow-lg border border-zinc-200">
-              <img
-                src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(
-                  networkInfo?.checkinNetworkUrl || "http://192.168.0.19:3000/checkin"
-                )}`}
-                alt="Self Check-in QR"
-                className="w-44 h-44"
-              />
-            </div>
+            {(() => {
+              const baseCheckinUrl = networkInfo?.checkinNetworkUrl || "http://192.168.0.19:3000/checkin";
+              const propCheckinUrl = activeProperty?.id
+                ? `${baseCheckinUrl}?propertyId=${activeProperty.id}`
+                : baseCheckinUrl;
+              return (
+                <>
+                  <div className="p-3.5 rounded-xl bg-white mx-auto inline-block shadow-lg border border-zinc-200">
+                    <img
+                      src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(
+                        propCheckinUrl
+                      )}`}
+                      alt="Self Check-in QR"
+                      className="w-44 h-44"
+                    />
+                  </div>
 
-            {/* Wi-Fi URL Box */}
-            <div className="space-y-1 text-left">
-              <div className="text-[10px] font-mono uppercase text-emerald-400 font-semibold flex items-center justify-between">
-                <span>Wi-Fi Network URL</span>
-                <span>Port 3000</span>
-              </div>
-              <div className="p-2 rounded bg-zinc-900 border border-zinc-800 font-mono text-[11px] text-zinc-200 select-all break-all">
-                {networkInfo?.checkinNetworkUrl || "http://192.168.0.19:3000/checkin"}
-              </div>
-            </div>
+                  {/* Wi-Fi URL Box */}
+                  <div className="space-y-1 text-left">
+                    <div className="text-[10px] font-mono uppercase text-emerald-400 font-semibold flex items-center justify-between">
+                      <span>{activeProperty?.displayName || "Hotel"} Kiosk Wi-Fi URL</span>
+                      <span>Port 3000</span>
+                    </div>
+                    <div className="p-2 rounded bg-zinc-900 border border-zinc-800 font-mono text-[11px] text-zinc-200 select-all break-all">
+                      {propCheckinUrl}
+                    </div>
+                  </div>
 
-            <div className="pt-1 flex gap-2">
-              <button
-                onClick={() => {
-                  const url = networkInfo?.checkinNetworkUrl || "http://192.168.0.19:3000/checkin";
-                  navigator.clipboard.writeText(url);
-                  alert(`Copied Wi-Fi URL: ${url}`);
-                }}
-                className="flex-1 rounded-md bg-zinc-800 hover:bg-zinc-700 py-2 text-xs font-medium text-zinc-200 transition"
-              >
-                Copy Wi-Fi Link
-              </button>
-              <a
-                href={networkInfo?.checkinNetworkUrl || "/checkin"}
-                target="_blank"
-                rel="noreferrer"
-                className="flex-1 rounded-md bg-zinc-100 hover:bg-white py-2 text-xs font-semibold text-zinc-950 transition text-center"
-              >
-                Open Kiosk
-              </a>
-            </div>
+                  <div className="pt-1 flex gap-2">
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(propCheckinUrl);
+                        alert(`Copied Wi-Fi URL for ${activeProperty?.displayName}: ${propCheckinUrl}`);
+                      }}
+                      className="flex-1 rounded-md bg-zinc-800 hover:bg-zinc-700 py-2 text-xs font-medium text-zinc-200 transition"
+                    >
+                      Copy Wi-Fi Link
+                    </button>
+                    <a
+                      href={activeProperty?.id ? `/checkin?propertyId=${activeProperty.id}` : "/checkin"}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex-1 rounded-md bg-zinc-100 hover:bg-white py-2 text-xs font-semibold text-zinc-950 transition text-center"
+                    >
+                      Open Kiosk
+                    </a>
+                  </div>
+                </>
+              );
+            })()}
           </div>
         </div>
       )}

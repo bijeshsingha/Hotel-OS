@@ -90,9 +90,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "No active property found" }, { status: 404 });
     }
 
-    // Generate unique Registration / GRC Number
+    // Generate unique Registration / GRC Number scoped to property
+    const propCode = prop.code === "GUW-01" ? "AMB" : prop.code === "HDW" || prop.code === "HDV-01" ? "HDV" : prop.code;
     const regCount = await prisma.guestRegistration.count({ where: { propertyId: prop.id } });
-    const regNo = `GRC-2627-${String(regCount + 101).padStart(4, "0")}`;
+    const regNo = `GRC-${propCode}-2627-${String(regCount + 101).padStart(4, "0")}`;
 
     const registration = await prisma.guestRegistration.create({
       data: {

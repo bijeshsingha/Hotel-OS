@@ -94,11 +94,11 @@ export function AppHeader() {
         <div className="flex items-center gap-2">
           {/* Guest Portal Link */}
           <a
-            href="/order?room=201"
+            href={activeProperty?.id ? `/order?propertyId=${activeProperty.id}` : "/order"}
             target="_blank"
             rel="noopener noreferrer"
             className="hidden md:flex items-center gap-1.5 rounded-md bg-amber-500/10 border border-amber-500/30 px-2.5 py-1.5 text-xs text-amber-300 hover:bg-amber-500/20 transition font-medium"
-            title="Open In-Room Guest Dining QR Portal"
+            title="Open In-Room Guest Dining QR Portal for active property"
           >
             <span className="h-1.5 w-1.5 rounded-full bg-amber-400 animate-pulse" />
             <span>Guest Dining Portal ↗</span>
