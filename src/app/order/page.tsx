@@ -72,12 +72,17 @@ function GuestOrderContent() {
 
       // Auto-populate room and guest name from database
       if (data?.rooms && data.rooms.length > 0) {
-        let selected = initialRoom
-          ? data.rooms.find((r: any) => String(r.number) === String(initialRoom))
+        const targetNo = initialRoom ? String(initialRoom).trim().toLowerCase() : "";
+        let selected = targetNo
+          ? data.rooms.find((r: any) => String(r.number).trim().toLowerCase() === targetNo && r.guestName) ||
+            data.rooms.find((r: any) => String(r.number).trim().toLowerCase() === targetNo)
           : null;
         if (!selected) {
-          // Default to first in-house occupied room from database
-          selected = data.rooms.find((r: any) => r.isOccupied) || data.rooms[0];
+          // Default to first in-house occupied room with a guest name from database
+          selected =
+            data.rooms.find((r: any) => r.isOccupied && r.guestName) ||
+            data.rooms.find((r: any) => r.isOccupied) ||
+            data.rooms[0];
         }
         if (selected) {
           setRoomNumber(selected.number);
@@ -100,14 +105,14 @@ function GuestOrderContent() {
   // Auto-sync guest name from database whenever roomNumber changes
   useEffect(() => {
     if (!menuData?.rooms || !roomNumber) return;
-    const found = menuData.rooms.find(
-      (r: any) => String(r.number).trim().toLowerCase() === String(roomNumber).trim().toLowerCase()
-    );
-    if (found) {
-      if (found.guestName) {
-        setCustomerName(found.guestName);
-        if (found.guestPhone) setCustomerPhone(found.guestPhone);
-      }
+    const targetNo = String(roomNumber).trim().toLowerCase();
+    const found =
+      menuData.rooms.find((r: any) => String(r.number).trim().toLowerCase() === targetNo && r.guestName) ||
+      menuData.rooms.find((r: any) => String(r.number).trim().toLowerCase() === targetNo);
+
+    if (found && found.guestName) {
+      setCustomerName(found.guestName);
+      if (found.guestPhone) setCustomerPhone(found.guestPhone);
     }
   }, [roomNumber, menuData]);
 

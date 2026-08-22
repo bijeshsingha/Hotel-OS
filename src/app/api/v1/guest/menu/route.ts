@@ -133,8 +133,8 @@ export async function GET(request: Request) {
       }
     }
 
-    // Build rich room list with active in-house stay and folio details
-    const inHouseRooms = property.rooms.map((r) => {
+    // 1. Build room list for current property
+    const currentPropertyRooms = property.rooms.map((r) => {
       const activeAssignment = r.assignments[0];
       const stay = activeAssignment?.stay;
       const guest = stay?.primaryGuest;
@@ -151,6 +151,8 @@ export async function GET(request: Request) {
         number: r.number,
         floor: r.floor,
         roomTypeName: r.roomType?.name || "Standard Room",
+        propertyId: property.id,
+        propertyName: property.displayName,
         stayId: stay?.id || null,
         folioId: folio?.id || null,
         guestName: guest?.name || null,
@@ -159,6 +161,65 @@ export async function GET(request: Request) {
         currentFolioBalance,
       };
     });
+
+    // 2. Fetch all other active in-house assignments across the entire shared restaurant ecosystem
+    const otherOccupiedAssignments = await prisma.roomAssignment.findMany({
+      where: {
+        endsAt: null,
+        stay: { status: "IN_HOUSE" },
+        room: { propertyId: { not: property.id } },
+      },
+      include: {
+        room: {
+          include: {
+            property: true,
+            roomType: true,
+          },
+        },
+        stay: {
+          include: {
+            primaryGuest: true,
+            folio: {
+              include: {
+                windows: { include: { entries: true } },
+                payments: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    const otherOccupiedRooms = otherOccupiedAssignments.map((a) => {
+      const r = a.room;
+      const stay = a.stay;
+      const guest = stay.primaryGuest;
+      const folio = stay.folio;
+
+      const totalCharges =
+        folio?.windows?.flatMap((w) => w.entries).reduce((sum, e) => sum + e.totalAmount, 0) || 0;
+      const totalPayments =
+        folio?.payments?.reduce((sum, p) => sum + p.amount, 0) || 0;
+      const currentFolioBalance = Math.round((totalCharges - totalPayments) * 100) / 100;
+
+      return {
+        id: r.id,
+        number: r.number,
+        floor: r.floor,
+        roomTypeName: r.roomType?.name || "Standard Room",
+        propertyId: r.propertyId,
+        propertyName: r.property?.displayName || "Partner Hotel",
+        stayId: stay.id,
+        folioId: folio?.id || null,
+        guestName: guest?.name || null,
+        guestPhone: guest?.phone || null,
+        isOccupied: true,
+        currentFolioBalance,
+      };
+    });
+
+    // Combine current property rooms with other occupied rooms so guest lookup always resolves
+    const inHouseRooms = [...currentPropertyRooms, ...otherOccupiedRooms];
 
     return NextResponse.json({
       property: {
