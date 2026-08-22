@@ -70,13 +70,19 @@ function GuestOrderContent() {
       const data = await res.json();
       setMenuData(data);
 
-      // If initial room provided, auto-select and auto-populate
-      if (initialRoom && data.rooms) {
-        const found = data.rooms.find((r: any) => String(r.number) === String(initialRoom));
-        if (found) {
-          setRoomNumber(found.number);
-          if (found.guestName) setCustomerName(found.guestName);
-          if (found.guestPhone) setCustomerPhone(found.guestPhone);
+      // Auto-populate room and guest name from database
+      if (data?.rooms && data.rooms.length > 0) {
+        let selected = initialRoom
+          ? data.rooms.find((r: any) => String(r.number) === String(initialRoom))
+          : null;
+        if (!selected) {
+          // Default to first in-house occupied room from database
+          selected = data.rooms.find((r: any) => r.isOccupied) || data.rooms[0];
+        }
+        if (selected) {
+          setRoomNumber(selected.number);
+          setCustomerName(selected.guestName || "");
+          setCustomerPhone(selected.guestPhone || "");
           setShowWelcomeModal(false);
         }
       }
@@ -90,6 +96,20 @@ function GuestOrderContent() {
   useEffect(() => {
     loadMenu(queryPropertyId);
   }, [queryPropertyId]);
+
+  // Auto-sync guest name from database whenever roomNumber changes
+  useEffect(() => {
+    if (!menuData?.rooms || !roomNumber) return;
+    const found = menuData.rooms.find(
+      (r: any) => String(r.number).trim().toLowerCase() === String(roomNumber).trim().toLowerCase()
+    );
+    if (found) {
+      if (found.guestName) {
+        setCustomerName(found.guestName);
+        if (found.guestPhone) setCustomerPhone(found.guestPhone);
+      }
+    }
+  }, [roomNumber, menuData]);
 
   // Update clock
   useEffect(() => {
@@ -812,24 +832,31 @@ function GuestOrderContent() {
             <form onSubmit={handlePlaceOrder} className="space-y-3 text-xs">
               <div className="grid grid-cols-2 gap-2.5">
                 <div>
-                  <label className="text-zinc-400 font-medium">Room Number</label>
+                  <label className="text-zinc-300 font-semibold flex items-center justify-between">
+                    <span>Room Number</span>
+                  </label>
                   <input
                     type="text"
                     required
                     value={roomNumber}
                     onChange={(e) => setRoomNumber(e.target.value)}
                     placeholder="e.g. 201"
-                    className="mt-1 w-full rounded-lg bg-zinc-900 border border-zinc-800 px-3 py-1.5 text-zinc-100 font-semibold focus:outline-none focus:border-zinc-700"
+                    className="mt-1 w-full rounded-lg bg-[#18181b] border border-zinc-700 px-3 py-2 text-white font-bold text-xs focus:outline-none focus:border-white focus:ring-1 focus:ring-zinc-600 transition placeholder-zinc-500"
                   />
                 </div>
                 <div>
-                  <label className="text-zinc-400 font-medium">Guest Name (Auto-Synced)</label>
+                  <label className="text-zinc-300 font-semibold flex items-center justify-between">
+                    <span>Guest Name</span>
+                    {customerName && (
+                      <span className="text-[10px] text-emerald-400 font-mono font-medium">● Synced</span>
+                    )}
+                  </label>
                   <input
                     type="text"
                     value={customerName}
                     onChange={(e) => setCustomerName(e.target.value)}
                     placeholder="Guest Name"
-                    className="mt-1 w-full rounded-lg bg-zinc-900 border border-zinc-800 px-3 py-1.5 text-zinc-100 focus:outline-none focus:border-zinc-700"
+                    className="mt-1 w-full rounded-lg bg-[#18181b] border border-zinc-700 px-3 py-2 text-white font-bold text-xs focus:outline-none focus:border-white focus:ring-1 focus:ring-zinc-600 transition placeholder-zinc-500"
                   />
                 </div>
               </div>
