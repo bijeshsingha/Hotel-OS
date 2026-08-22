@@ -11,14 +11,10 @@ import {
   ArrowRight,
   Sun,
   Moon,
-  Upload,
   Camera,
   MapPin,
   Phone,
   Clock,
-  User,
-  Shield,
-  FileText,
 } from "lucide-react";
 
 interface PropertySummary {
@@ -43,7 +39,7 @@ function CheckInKioskInner() {
   const searchParams = useSearchParams();
   const queryPropertyId = searchParams.get("propertyId") || "";
 
-  const [theme, setTheme] = useState<"dark" | "light">("dark");
+  const [theme, setTheme] = useState<"dark" | "light">("light");
   const [selectedProperty, setSelectedProperty] = useState<PropertySummary | null>(null);
   const [propertyRooms, setPropertyRooms] = useState<RoomOption[]>([]);
   const [loading, setLoading] = useState(true);
@@ -394,9 +390,9 @@ function CheckInKioskInner() {
 
   if (loading) {
     return (
-      <div className={`min-h-screen ${isDark ? "bg-[#09090b] text-zinc-100" : "bg-[#fcfcfd] text-zinc-900"} flex items-center justify-center`}>
-        <div className="flex items-center gap-3 text-sm text-zinc-400 font-mono">
-          <div className="h-4 w-4 rounded-full border-2 border-zinc-400 border-t-transparent animate-spin" />
+      <div className={`min-h-screen ${isDark ? "bg-[#09090b] text-white" : "bg-[#f4f4f5] text-zinc-950"} flex items-center justify-center`}>
+        <div className="flex items-center gap-3 text-sm font-mono font-medium">
+          <div className={`h-5 w-5 rounded-full border-2 ${isDark ? "border-white" : "border-zinc-900"} border-t-transparent animate-spin`} />
           <span>Loading Check-In Kiosk...</span>
         </div>
       </div>
@@ -406,45 +402,47 @@ function CheckInKioskInner() {
   // SUCCESS SCREEN
   if (submitSuccess) {
     return (
-      <div className={`min-h-screen ${isDark ? "bg-[#09090b] text-zinc-100" : "bg-[#f8f9fa] text-zinc-900"} flex items-center justify-center p-4 sm:p-6 transition-colors`}>
-        <div className={`w-full max-w-lg rounded-2xl ${isDark ? "bg-[#121215] border border-zinc-800" : "bg-white border border-zinc-200 shadow-xl"} p-8 text-center space-y-6`}>
-          <div className="inline-flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-            <CheckCircle2 className="h-7 w-7" />
+      <div className={`min-h-screen ${isDark ? "bg-[#09090b] text-white" : "bg-[#f4f4f5] text-zinc-950"} flex items-center justify-center p-4 sm:p-6 transition-colors`}>
+        <div className={`w-full max-w-lg rounded-2xl ${isDark ? "bg-[#121215] border border-zinc-800" : "bg-white border border-zinc-300 shadow-xl"} p-8 text-center space-y-6`}>
+          <div className="inline-flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
+            <CheckCircle2 className="h-8 w-8" />
           </div>
 
           <div className="space-y-1.5">
-            <div className="text-[11px] font-mono tracking-widest uppercase text-zinc-400">
+            <div className={`text-xs font-mono uppercase tracking-widest font-bold ${isDark ? "text-zinc-400" : "text-zinc-600"}`}>
               {selectedProperty?.displayName}
             </div>
-            <h1 className="text-xl font-bold tracking-tight">Check-In Confirmed</h1>
-            <p className={`text-xs ${isDark ? "text-zinc-400" : "text-zinc-600"}`}>
-              Your registration card has been submitted to the front desk.
+            <h1 className={`text-2xl font-black tracking-tight ${isDark ? "text-white" : "text-zinc-950"}`}>
+              Check-In Confirmed
+            </h1>
+            <p className={`text-xs font-medium ${isDark ? "text-zinc-400" : "text-zinc-600"}`}>
+              Your registration card has been submitted directly to the front desk.
             </p>
           </div>
 
-          <div className={`rounded-xl ${isDark ? "bg-[#18181b] border border-zinc-800/80" : "bg-zinc-50 border border-zinc-200"} p-5 text-left font-mono space-y-3 text-xs`}>
+          <div className={`rounded-xl ${isDark ? "bg-[#18181b] border border-zinc-800" : "bg-zinc-50 border border-zinc-300"} p-5 text-left font-mono space-y-3 text-xs`}>
             <div className={`flex justify-between border-b ${isDark ? "border-zinc-800" : "border-zinc-200"} pb-2.5`}>
-              <span className={isDark ? "text-zinc-400" : "text-zinc-500"}>GRC Document #</span>
-              <span className="font-bold text-zinc-100">{submitSuccess.registrationNo}</span>
+              <span className={`font-semibold ${isDark ? "text-zinc-400" : "text-zinc-600"}`}>GRC Document #</span>
+              <span className={`font-black text-sm ${isDark ? "text-white" : "text-zinc-950"}`}>{submitSuccess.registrationNo}</span>
             </div>
             <div className="flex justify-between">
-              <span className={isDark ? "text-zinc-400" : "text-zinc-500"}>Guest Name</span>
-              <span className="font-semibold text-zinc-100">{submitSuccess.fullName}</span>
+              <span className={`font-semibold ${isDark ? "text-zinc-400" : "text-zinc-600"}`}>Guest Name</span>
+              <span className={`font-bold ${isDark ? "text-white" : "text-zinc-950"}`}>{submitSuccess.fullName}</span>
             </div>
             <div className="flex justify-between">
-              <span className={isDark ? "text-zinc-400" : "text-zinc-500"}>Arrival Date & Time</span>
-              <span className="text-zinc-200">{submitSuccess.arrivalDateTime}</span>
+              <span className={`font-semibold ${isDark ? "text-zinc-400" : "text-zinc-600"}`}>Arrival Date & Time</span>
+              <span className={`font-bold ${isDark ? "text-zinc-200" : "text-zinc-900"}`}>{submitSuccess.arrivalDateTime}</span>
             </div>
             {submitSuccess.preAssignedRoom && (
               <div className="flex justify-between">
-                <span className={isDark ? "text-zinc-400" : "text-zinc-500"}>Requested Room</span>
-                <span className="text-emerald-400 font-semibold">Room {submitSuccess.preAssignedRoom}</span>
+                <span className={`font-semibold ${isDark ? "text-zinc-400" : "text-zinc-600"}`}>Requested Room</span>
+                <span className="text-emerald-600 dark:text-emerald-400 font-bold">Room {submitSuccess.preAssignedRoom}</span>
               </div>
             )}
           </div>
 
-          <div className={`p-4 rounded-xl ${isDark ? "bg-[#18181b] text-zinc-300 border border-zinc-800" : "bg-zinc-100 text-zinc-800 border border-zinc-200"} text-xs leading-relaxed`}>
-            Please show this confirmation at reception to receive your sanitized room key.
+          <div className={`p-4 rounded-xl ${isDark ? "bg-[#18181b] text-zinc-200 border border-zinc-800" : "bg-zinc-100 text-zinc-900 border border-zinc-300"} text-xs font-medium leading-relaxed`}>
+            Please show this confirmation screen at the reception counter to receive your room key card.
           </div>
 
           <button
@@ -453,10 +451,10 @@ function CheckInKioskInner() {
               setSubmitSuccess(null);
               clearSignature();
             }}
-            className={`w-full rounded-xl py-3.5 text-xs font-semibold transition ${
+            className={`w-full rounded-xl py-3.5 text-xs font-bold transition shadow-md ${
               isDark
-                ? "bg-zinc-100 text-zinc-950 hover:bg-white"
-                : "bg-zinc-900 text-white hover:bg-zinc-800"
+                ? "bg-white text-zinc-950 hover:bg-zinc-200"
+                : "bg-zinc-950 text-white hover:bg-zinc-800"
             }`}
           >
             Start New Check-In
@@ -466,36 +464,36 @@ function CheckInKioskInner() {
     );
   }
 
-  const inputStyles = `w-full rounded-lg px-3.5 py-2.5 text-xs transition focus:outline-none focus:ring-1 ${
+  const inputStyles = `w-full rounded-lg px-3.5 py-2.5 text-xs transition font-medium focus:outline-none focus:ring-2 ${
     isDark
-      ? "bg-[#18181b] border border-zinc-800 text-zinc-100 placeholder-zinc-500 focus:border-zinc-600 focus:ring-zinc-600"
-      : "bg-white border border-zinc-300 text-zinc-900 placeholder-zinc-400 focus:border-zinc-900 focus:ring-zinc-900"
+      ? "bg-[#18181b] border border-zinc-700 text-white placeholder-zinc-500 focus:border-white focus:ring-zinc-600"
+      : "bg-white border border-zinc-300 text-zinc-950 placeholder-zinc-400 focus:border-zinc-950 focus:ring-zinc-950/20"
   }`;
 
   const cardStyles = `rounded-2xl p-6 transition ${
     isDark
-      ? "bg-[#121215] border border-zinc-800/80"
-      : "bg-white border border-zinc-200 shadow-sm"
+      ? "bg-[#121215] border border-zinc-800"
+      : "bg-white border border-zinc-300 shadow-sm"
   }`;
 
-  const labelStyles = `block text-xs font-medium mb-1.5 ${
-    isDark ? "text-zinc-300" : "text-zinc-700"
+  const labelStyles = `block text-xs font-bold mb-1.5 ${
+    isDark ? "text-zinc-200" : "text-zinc-900"
   }`;
 
-  const sectionHeaderStyles = `text-xs font-mono uppercase tracking-widest font-semibold pb-3 mb-4 border-b flex items-center justify-between ${
-    isDark ? "text-zinc-400 border-zinc-800/80" : "text-zinc-600 border-zinc-200"
+  const sectionHeaderStyles = `text-xs font-mono uppercase tracking-widest font-black pb-3 mb-4 border-b flex items-center justify-between ${
+    isDark ? "text-zinc-200 border-zinc-800" : "text-zinc-950 border-zinc-300"
   }`;
 
   return (
-    <div className={`min-h-screen ${isDark ? "bg-[#09090b] text-zinc-100" : "bg-[#f8f9fa] text-zinc-900"} py-8 px-4 sm:px-6 transition-colors`}>
+    <div className={`min-h-screen ${isDark ? "bg-[#09090b] text-white" : "bg-[#f4f4f5] text-zinc-950"} py-8 px-4 sm:px-6 transition-colors`}>
       <div className="max-w-2xl mx-auto space-y-6">
         {/* Top Header */}
-        <div className="flex items-center justify-between pb-4 border-b border-zinc-800">
+        <div className={`flex items-center justify-between pb-4 border-b ${isDark ? "border-zinc-800" : "border-zinc-300"}`}>
           <div>
-            <div className="text-[10px] font-mono uppercase tracking-widest text-zinc-400">
+            <div className={`text-[11px] font-mono uppercase tracking-widest font-bold ${isDark ? "text-zinc-400" : "text-zinc-600"}`}>
               Self-Service Check-In
             </div>
-            <h1 className="text-lg sm:text-xl font-bold tracking-tight mt-0.5 text-zinc-100">
+            <h1 className={`text-xl sm:text-2xl font-black tracking-tight mt-0.5 ${isDark ? "text-white" : "text-zinc-950"}`}>
               {selectedProperty?.displayName || "Hotel Check-In"}
             </h1>
           </div>
@@ -503,21 +501,21 @@ function CheckInKioskInner() {
           <button
             type="button"
             onClick={() => setTheme(isDark ? "light" : "dark")}
-            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium border transition ${
+            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold border transition ${
               isDark
-                ? "bg-[#18181b] border-zinc-800 text-zinc-300 hover:bg-zinc-800"
-                : "bg-white border-zinc-200 text-zinc-700 hover:bg-zinc-100 shadow-sm"
+                ? "bg-[#18181b] border-zinc-700 text-zinc-200 hover:bg-zinc-800"
+                : "bg-white border-zinc-300 text-zinc-950 hover:bg-zinc-100 shadow-sm"
             }`}
             title="Toggle theme"
           >
             {isDark ? (
               <>
-                <Sun className="h-3.5 w-3.5 text-zinc-400" />
+                <Sun className="h-3.5 w-3.5 text-amber-400" />
                 <span>Light</span>
               </>
             ) : (
               <>
-                <Moon className="h-3.5 w-3.5 text-zinc-600" />
+                <Moon className="h-3.5 w-3.5 text-zinc-800" />
                 <span>Dark</span>
               </>
             )}
@@ -527,16 +525,16 @@ function CheckInKioskInner() {
         {/* Hotel Details Card */}
         <div className={cardStyles}>
           <div className="space-y-2">
-            <h2 className="text-base font-bold text-zinc-100">
+            <h2 className={`text-base font-black ${isDark ? "text-white" : "text-zinc-950"}`}>
               {selectedProperty?.displayName}
             </h2>
             {selectedProperty?.address && (
-              <p className={`text-xs flex items-start gap-1.5 ${isDark ? "text-zinc-400" : "text-zinc-600"}`}>
-                <MapPin className="h-3.5 w-3.5 shrink-0 mt-0.5 opacity-70" />
+              <p className={`text-xs font-medium flex items-start gap-1.5 ${isDark ? "text-zinc-300" : "text-zinc-700"}`}>
+                <MapPin className="h-3.5 w-3.5 shrink-0 mt-0.5 opacity-80" />
                 <span>{selectedProperty.address}</span>
               </p>
             )}
-            <div className="flex flex-wrap gap-4 pt-1 text-xs text-zinc-400 font-mono">
+            <div className={`flex flex-wrap gap-4 pt-1 text-xs font-mono font-medium ${isDark ? "text-zinc-300" : "text-zinc-700"}`}>
               {selectedProperty?.phone && (
                 <span className="flex items-center gap-1">
                   <Phone className="h-3 w-3" /> Reception: {selectedProperty.phone}
@@ -555,19 +553,19 @@ function CheckInKioskInner() {
           <div className={cardStyles}>
             <div className={sectionHeaderStyles}>
               <span>01. Primary Guest Information</span>
-              <span className="text-[10px] lowercase opacity-60">required *</span>
+              <span className="text-[10px] font-mono lowercase opacity-70 font-normal">required *</span>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className={labelStyles}>Full Name *</label>
+                <label className={labelStyles}>Full Name (Block Letters) *</label>
                 <input
                   type="text"
                   required
                   value={formData.fullName}
                   onChange={(e) => setFormData({ ...formData, fullName: e.target.value.toUpperCase() })}
                   placeholder="e.g. ANUPAM ROY"
-                  className={`${inputStyles} uppercase font-semibold`}
+                  className={`${inputStyles} uppercase font-bold`}
                 />
               </div>
 
@@ -654,17 +652,23 @@ function CheckInKioskInner() {
                   className={`${inputStyles} font-mono`}
                 />
                 {propertyRooms.length > 0 && (
-                  <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                    <span className="text-[11px] text-zinc-400">Available Rooms:</span>
+                  <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+                    <span className={`text-[11px] font-bold ${isDark ? "text-zinc-400" : "text-zinc-600"}`}>
+                      Available Rooms:
+                    </span>
                     {propertyRooms.slice(0, 8).map((r) => (
                       <button
                         key={r.id}
                         type="button"
                         onClick={() => setFormData({ ...formData, preAssignedRoom: r.number })}
-                        className={`rounded-md px-2 py-0.5 text-[11px] font-mono border transition ${
+                        className={`rounded-md px-2 py-1 text-[11px] font-mono border transition ${
                           formData.preAssignedRoom === r.number
-                            ? "bg-white text-zinc-950 font-bold border-white"
-                            : "bg-[#18181b] border-zinc-800 text-zinc-300 hover:border-zinc-700"
+                            ? isDark
+                              ? "bg-white text-zinc-950 font-bold border-white"
+                              : "bg-zinc-950 text-white font-bold border-zinc-950"
+                            : isDark
+                            ? "bg-[#18181b] border-zinc-700 text-zinc-200 hover:border-zinc-500"
+                            : "bg-zinc-100 border-zinc-300 text-zinc-900 hover:bg-zinc-200 font-medium"
                         }`}
                       >
                         {r.number}
@@ -679,7 +683,7 @@ function CheckInKioskInner() {
           {/* 2. Residential Address */}
           <div className={cardStyles}>
             <div className={sectionHeaderStyles}>
-              <span>02. Residential Address</span>
+              <span>02. Permanent Residential Address</span>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -800,21 +804,21 @@ function CheckInKioskInner() {
             </div>
 
             {/* Photo Capture / Upload Box */}
-            <div className="mt-4 pt-4 border-t border-zinc-800">
+            <div className={`mt-4 pt-4 border-t ${isDark ? "border-zinc-800" : "border-zinc-200"}`}>
               <label className={labelStyles}>Government Photo ID Capture / Upload</label>
               <div className={`mt-2 rounded-xl p-5 text-center border ${
-                isDark ? "bg-[#18181b] border-zinc-800" : "bg-zinc-50 border-zinc-200"
+                isDark ? "bg-[#18181b] border-zinc-700 text-zinc-200" : "bg-zinc-50 border-zinc-300 text-zinc-950"
               }`}>
                 {formData.idPhotoUrl ? (
                   <div className="space-y-3">
-                    <div className="relative inline-block max-w-xs rounded-lg overflow-hidden border border-zinc-700">
+                    <div className={`relative inline-block max-w-xs rounded-lg overflow-hidden border ${isDark ? "border-zinc-700" : "border-zinc-300"}`}>
                       <img src={formData.idPhotoUrl} alt="ID Upload" className="max-h-48 object-contain" />
                     </div>
                     <div>
                       <button
                         type="button"
                         onClick={() => setFormData({ ...formData, idPhotoUrl: "" })}
-                        className="inline-flex items-center gap-1.5 rounded-md bg-rose-500/10 text-rose-400 border border-rose-500/20 px-3 py-1.5 text-xs font-medium hover:bg-rose-500/20 transition"
+                        className="inline-flex items-center gap-1.5 rounded-md bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/30 px-3 py-1.5 text-xs font-bold hover:bg-rose-500/20 transition"
                       >
                         <Trash2 className="h-3.5 w-3.5" /> Remove & Retake
                       </button>
@@ -822,16 +826,18 @@ function CheckInKioskInner() {
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    <div className="inline-flex p-3 rounded-full bg-zinc-800 text-zinc-300">
+                    <div className={`inline-flex p-3 rounded-full ${isDark ? "bg-zinc-800 text-zinc-200" : "bg-zinc-200 text-zinc-800"}`}>
                       <Camera className="h-5 w-5" />
                     </div>
-                    <div className="text-xs font-medium text-zinc-200">
+                    <div className={`text-xs font-bold ${isDark ? "text-zinc-200" : "text-zinc-900"}`}>
                       {compressingPhoto ? "Compressing image..." : "Upload or Take ID Photo"}
                     </div>
-                    <label className={`inline-block cursor-pointer rounded-lg px-4 py-2 text-xs font-semibold transition ${
+                    <label className={`inline-block cursor-pointer rounded-lg px-4 py-2 text-xs font-bold transition shadow-sm ${
                       compressingPhoto
-                        ? "opacity-50 pointer-events-none bg-zinc-800 text-zinc-400"
-                        : "bg-white text-zinc-950 hover:bg-zinc-200"
+                        ? "opacity-50 pointer-events-none bg-zinc-700 text-zinc-400"
+                        : isDark
+                        ? "bg-white text-zinc-950 hover:bg-zinc-200"
+                        : "bg-zinc-950 text-white hover:bg-zinc-800"
                     }`}>
                       {compressingPhoto ? "Processing..." : "Select File / Camera"}
                       <input
@@ -857,9 +863,13 @@ function CheckInKioskInner() {
                 <button
                   type="button"
                   onClick={() => setShowCoGuestInput(true)}
-                  className="flex items-center gap-1 rounded px-2.5 py-1 text-xs font-medium bg-zinc-800 hover:bg-zinc-700 text-zinc-200 transition"
+                  className={`flex items-center gap-1 rounded-lg px-3 py-1 text-xs font-bold border transition ${
+                    isDark
+                      ? "bg-zinc-800 border-zinc-700 text-zinc-200 hover:bg-zinc-700"
+                      : "bg-zinc-100 border-zinc-300 text-zinc-900 hover:bg-zinc-200"
+                  }`}
                 >
-                  <Plus className="h-3 w-3" /> Add Co-Guest
+                  <Plus className="h-3.5 w-3.5" /> Add Co-Guest
                 </button>
               )}
             </div>
@@ -870,19 +880,19 @@ function CheckInKioskInner() {
                   <div
                     key={idx}
                     className={`flex items-center justify-between p-3 rounded-lg border text-xs ${
-                      isDark ? "bg-[#18181b] border-zinc-800" : "bg-zinc-50 border-zinc-200"
+                      isDark ? "bg-[#18181b] border-zinc-700" : "bg-zinc-50 border-zinc-300"
                     }`}
                   >
                     <div>
-                      <div className="font-semibold text-zinc-100">{cg.name}</div>
-                      <div className="text-[11px] text-zinc-400 font-mono mt-0.5">
+                      <div className={`font-bold ${isDark ? "text-white" : "text-zinc-950"}`}>{cg.name}</div>
+                      <div className={`text-[11px] font-mono mt-0.5 ${isDark ? "text-zinc-400" : "text-zinc-600"}`}>
                         {cg.age} yrs • {cg.gender} • {cg.relation} • {cg.idType}
                       </div>
                     </div>
                     <button
                       type="button"
                       onClick={() => handleRemoveCoGuest(idx)}
-                      className="p-1.5 text-zinc-400 hover:text-rose-400 transition"
+                      className="p-1.5 text-zinc-400 hover:text-rose-500 transition"
                     >
                       <Trash2 className="h-4 w-4" />
                     </button>
@@ -891,7 +901,7 @@ function CheckInKioskInner() {
               </div>
             ) : (
               !showCoGuestInput && (
-                <div className="text-center py-2 text-xs text-zinc-400 italic">
+                <div className={`text-center py-2 text-xs italic ${isDark ? "text-zinc-500" : "text-zinc-500"}`}>
                   No accompanying co-guests added.
                 </div>
               )
@@ -899,9 +909,9 @@ function CheckInKioskInner() {
 
             {showCoGuestInput && (
               <div className={`mt-3 p-4 rounded-xl border space-y-3 text-xs ${
-                isDark ? "bg-[#18181b] border-zinc-800" : "bg-zinc-50 border-zinc-200"
+                isDark ? "bg-[#18181b] border-zinc-700" : "bg-zinc-50 border-zinc-300"
               }`}>
-                <div className="font-semibold text-zinc-200">Co-Guest Details</div>
+                <div className={`font-bold ${isDark ? "text-zinc-200" : "text-zinc-950"}`}>Co-Guest Details</div>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                   <input
                     type="text"
@@ -956,14 +966,16 @@ function CheckInKioskInner() {
                   <button
                     type="button"
                     onClick={() => setShowCoGuestInput(false)}
-                    className="px-3 py-1.5 rounded-lg text-zinc-400 hover:text-zinc-200"
+                    className={`px-3 py-1.5 rounded-lg font-medium transition ${isDark ? "text-zinc-400 hover:text-zinc-200" : "text-zinc-600 hover:text-zinc-950"}`}
                   >
                     Cancel
                   </button>
                   <button
                     type="button"
                     onClick={handleAddCoGuest}
-                    className="px-4 py-1.5 rounded-lg font-semibold bg-white text-zinc-950 hover:bg-zinc-200 transition"
+                    className={`px-4 py-1.5 rounded-lg font-bold transition ${
+                      isDark ? "bg-white text-zinc-950 hover:bg-zinc-200" : "bg-zinc-950 text-white hover:bg-zinc-800"
+                    }`}
                   >
                     Save Co-Guest
                   </button>
@@ -978,11 +990,11 @@ function CheckInKioskInner() {
               <span>05. House Rules & Signature</span>
             </div>
 
-            <div className={`p-4 rounded-xl text-xs space-y-2 leading-relaxed ${
-              isDark ? "bg-[#18181b] border border-zinc-800 text-zinc-300" : "bg-zinc-50 border border-zinc-200 text-zinc-700"
+            <div className={`p-4 rounded-xl text-xs space-y-2 leading-relaxed border ${
+              isDark ? "bg-[#18181b] border-zinc-700 text-zinc-200" : "bg-zinc-50 border-zinc-300 text-zinc-900"
             }`}>
-              <div className="font-semibold text-zinc-100">Hotel Guidelines:</div>
-              <ul className="list-disc list-inside space-y-1 text-zinc-400">
+              <div className={`font-black ${isDark ? "text-white" : "text-zinc-950"}`}>Hotel Guidelines:</div>
+              <ul className={`list-disc list-inside space-y-1 font-medium ${isDark ? "text-zinc-300" : "text-zinc-700"}`}>
                 <li>Check-out time is strictly 11:00 AM.</li>
                 <li>Physical Government ID must be presented at the front desk upon key handover.</li>
                 <li>In-room dining is served by Ambarish Restaurant & Room Dining (Dial Ext 9).</li>
@@ -996,14 +1008,16 @@ function CheckInKioskInner() {
                 <button
                   type="button"
                   onClick={clearSignature}
-                  className="flex items-center gap-1 text-[11px] text-zinc-400 hover:text-zinc-200 transition"
+                  className={`flex items-center gap-1 text-[11px] font-bold transition ${
+                    isDark ? "text-zinc-400 hover:text-white" : "text-zinc-600 hover:text-zinc-950"
+                  }`}
                 >
                   <RotateCcw className="h-3 w-3" /> Clear
                 </button>
               </div>
 
               <div className={`relative rounded-xl border overflow-hidden touch-none select-none ${
-                isDark ? "border-zinc-800 bg-[#09090b]" : "border-zinc-300 bg-zinc-50"
+                isDark ? "border-zinc-700 bg-[#09090b]" : "border-zinc-300 bg-zinc-50"
               }`}>
                 <canvas
                   ref={canvasRef}
@@ -1018,8 +1032,10 @@ function CheckInKioskInner() {
                 />
 
                 {!hasSignature && (
-                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none text-xs text-zinc-600">
-                    Sign inside the box using your finger or stylus
+                  <div className={`absolute inset-0 flex items-center justify-center pointer-events-none text-xs font-medium ${
+                    isDark ? "text-zinc-500" : "text-zinc-400"
+                  }`}>
+                    Sign inside the box using your finger, stylus, or mouse
                   </div>
                 )}
               </div>
@@ -1032,16 +1048,16 @@ function CheckInKioskInner() {
                 required
                 checked={formData.termsAccepted}
                 onChange={(e) => setFormData({ ...formData, termsAccepted: e.target.checked })}
-                className="mt-0.5 rounded border-zinc-700 text-zinc-900 focus:ring-0"
+                className="mt-0.5 rounded border-zinc-400 text-zinc-950 focus:ring-0"
               />
-              <span className={isDark ? "text-zinc-300" : "text-zinc-700"}>
+              <span className={`font-medium ${isDark ? "text-zinc-200" : "text-zinc-900"}`}>
                 I certify that the information provided is accurate and agree to follow all hotel regulations.
               </span>
             </label>
           </div>
 
           {submitError && (
-            <div className="rounded-xl bg-rose-500/10 border border-rose-500/20 p-4 text-xs text-rose-400 flex items-center gap-2">
+            <div className="rounded-xl bg-rose-500/10 border border-rose-500/30 p-4 text-xs font-bold text-rose-600 dark:text-rose-400 flex items-center gap-2">
               <AlertCircle className="h-4 w-4 shrink-0" />
               <span>{submitError}</span>
             </div>
@@ -1051,7 +1067,11 @@ function CheckInKioskInner() {
           <button
             type="submit"
             disabled={submitting}
-            className="w-full rounded-xl py-4 text-sm font-bold bg-white text-zinc-950 hover:bg-zinc-200 transition flex items-center justify-center gap-2 disabled:opacity-50 shadow-md"
+            className={`w-full rounded-xl py-4 text-sm font-black transition flex items-center justify-center gap-2 disabled:opacity-50 shadow-lg ${
+              isDark
+                ? "bg-white text-zinc-950 hover:bg-zinc-200"
+                : "bg-zinc-950 text-white hover:bg-zinc-800"
+            }`}
           >
             {submitting ? (
               <span>Submitting Registration...</span>
@@ -1072,8 +1092,8 @@ export default function CheckInKioskPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen bg-[#09090b] text-zinc-100 flex items-center justify-center">
-          <div className="text-sm font-mono text-zinc-400">Loading Kiosk...</div>
+        <div className="min-h-screen bg-[#f4f4f5] text-zinc-950 flex items-center justify-center">
+          <div className="text-sm font-mono text-zinc-600">Loading Kiosk...</div>
         </div>
       }
     >
