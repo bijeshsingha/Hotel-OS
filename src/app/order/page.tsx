@@ -30,8 +30,6 @@ function GuestOrderContent() {
   const initialRoom = searchParams.get("room") || "";
   const queryPropertyId = searchParams.get("propertyId") || "";
 
-  const [selectedPropertyId, setSelectedPropertyId] = useState<string>(queryPropertyId);
-  const [showPropertyDropdown, setShowPropertyDropdown] = useState(false);
   const [menuData, setMenuData] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   const [currentTime, setCurrentTime] = useState<string>("");
@@ -44,7 +42,6 @@ function GuestOrderContent() {
   const [isRoomDropdownOpen, setIsRoomDropdownOpen] = useState(false);
   const [onlyOccupiedRooms, setOnlyOccupiedRooms] = useState(true);
   const roomDropdownRef = useRef<HTMLDivElement>(null);
-  const propertyDropdownRef = useRef<HTMLDivElement>(null);
 
   // Menu filters
   const [selectedCategory, setSelectedCategory] = useState<string>("ALL");
@@ -72,9 +69,6 @@ function GuestOrderContent() {
       const res = await fetch(url);
       const data = await res.json();
       setMenuData(data);
-      if (data?.property?.id) {
-        setSelectedPropertyId(data.property.id);
-      }
 
       // If initial room provided, auto-select and auto-populate
       if (initialRoom && data.rooms) {
@@ -96,15 +90,6 @@ function GuestOrderContent() {
   useEffect(() => {
     loadMenu(queryPropertyId);
   }, [queryPropertyId]);
-
-  const handleSwitchProperty = (p: any) => {
-    setSelectedPropertyId(p.id);
-    setShowPropertyDropdown(false);
-    setRoomNumber("");
-    setCustomerName("");
-    setCustomerPhone("");
-    loadMenu(p.id);
-  };
 
   // Update clock
   useEffect(() => {
@@ -360,71 +345,25 @@ function GuestOrderContent() {
             </div>
           </div>
 
-          {/* Property & Room Selectors */}
-          <div className="flex items-center gap-2">
-            {/* Property Selector */}
-            {menuData?.allProperties && menuData.allProperties.length > 1 && (
-              <div className="relative" ref={propertyDropdownRef}>
-                <button
-                  type="button"
-                  onClick={() => setShowPropertyDropdown(!showPropertyDropdown)}
-                  className="flex items-center gap-1.5 rounded-md bg-[#18181b] border border-zinc-800 px-2.5 py-1.5 text-xs text-zinc-300 hover:border-zinc-700 transition"
-                  title="Switch Hotel"
-                >
-                  <Building2 className="h-3.5 w-3.5 text-emerald-400" />
-                  <span className="font-semibold text-zinc-100 hidden sm:inline">
-                    {menuData?.property?.name || "Hotel"}
+          {/* Room Selector with Search Dropdown */}
+          <div className="relative" ref={roomDropdownRef}>
+            <button
+              onClick={() => setIsRoomDropdownOpen(!isRoomDropdownOpen)}
+              className="flex items-center gap-2 rounded-md bg-[#18181b] border border-zinc-800 px-3 py-1.5 text-xs text-zinc-200 hover:border-zinc-700 transition shadow-sm"
+            >
+              <BedDouble className="h-3.5 w-3.5 text-zinc-400" />
+              <div className="text-left">
+                <span className="font-semibold text-zinc-100">
+                  {roomNumber ? `Room ${roomNumber}` : "Select Room"}
+                </span>
+                {customerName && (
+                  <span className="text-[10px] text-zinc-400 block -mt-0.5 truncate max-w-[100px]">
+                    {customerName}
                   </span>
-                  <ChevronDown className="h-3 w-3 text-zinc-500" />
-                </button>
-
-                {showPropertyDropdown && (
-                  <div className="absolute right-0 sm:left-0 mt-1.5 w-64 rounded-xl border border-zinc-800 bg-[#121215] p-2 shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-75 space-y-1">
-                    <div className="px-2 py-1 text-[10px] font-mono uppercase text-zinc-500">
-                      Delivering To Property
-                    </div>
-                    {menuData.allProperties.map((p: any) => (
-                      <button
-                        key={p.id}
-                        type="button"
-                        onClick={() => handleSwitchProperty(p)}
-                        className={`w-full text-left rounded-lg p-2 text-xs transition flex items-center justify-between ${
-                          p.id === selectedPropertyId
-                            ? "bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/40"
-                            : "text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
-                        }`}
-                      >
-                        <div>
-                          <div>{p.displayName}</div>
-                          <div className="text-[10px] text-zinc-500 font-mono">{p.code}</div>
-                        </div>
-                        {p.id === selectedPropertyId && <Check className="h-3.5 w-3.5 text-emerald-400" />}
-                      </button>
-                    ))}
-                  </div>
                 )}
               </div>
-            )}
-
-            {/* Room Selector with Search Dropdown */}
-            <div className="relative" ref={roomDropdownRef}>
-              <button
-                onClick={() => setIsRoomDropdownOpen(!isRoomDropdownOpen)}
-                className="flex items-center gap-2 rounded-md bg-[#18181b] border border-zinc-800 px-3 py-1.5 text-xs text-zinc-200 hover:border-zinc-700 transition shadow-sm"
-              >
-                <BedDouble className="h-3.5 w-3.5 text-zinc-400" />
-                <div className="text-left">
-                  <span className="font-semibold text-zinc-100">
-                    {roomNumber ? `Room ${roomNumber}` : "Select Room"}
-                  </span>
-                  {customerName && (
-                    <span className="text-[10px] text-zinc-400 block -mt-0.5 truncate max-w-[100px]">
-                      {customerName}
-                    </span>
-                  )}
-                </div>
-                <ChevronDown className="h-3.5 w-3.5 text-zinc-500 ml-1" />
-              </button>
+              <ChevronDown className="h-3.5 w-3.5 text-zinc-500 ml-1" />
+            </button>
 
             {/* Room Selection Dropdown */}
             {isRoomDropdownOpen && (
