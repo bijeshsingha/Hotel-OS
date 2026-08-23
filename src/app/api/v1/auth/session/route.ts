@@ -4,14 +4,31 @@ import { prisma } from "@/lib/db/prisma";
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const requestedEmail = searchParams.get("email");
+    const requestedIdentifier = searchParams.get("email") || searchParams.get("username");
     const requestedPropertyId = searchParams.get("propertyId");
 
-    // Fetch user by requested email, or fallback to first available user
+    // Map clean usernames to email addresses
+    const usernameAliases: Record<string, string> = {
+      "ambarish_frontdesk": "reception.ambarish@hotelos.in",
+      "ambarish_reception": "reception.ambarish@hotelos.in",
+      "divine_frontdesk": "reception.divine@hotelos.in",
+      "divine_reception": "reception.divine@hotelos.in",
+      "general_manager": "gm@brahmaputra.com",
+      "admin": "gm@brahmaputra.com",
+    };
+
+    const targetEmail = requestedIdentifier ? (usernameAliases[requestedIdentifier.toLowerCase()] || requestedIdentifier) : null;
+
+    // Fetch user by requested email / username, or fallback to first available user
     let user = null;
-    if (requestedEmail) {
+    if (targetEmail) {
       user = await prisma.user.findFirst({
-        where: { email: requestedEmail },
+        where: {
+          OR: [
+            { email: targetEmail },
+            { email: { startsWith: targetEmail + "@" } },
+          ],
+        },
         include: {
           memberships: {
             include: {
@@ -60,7 +77,7 @@ export async function GET(request: Request) {
         memberships: {
           include: {
             propertyGrants: {
-              include: { role: true },
+              include: { property: true, role: true },
             },
           },
         },
@@ -80,23 +97,43 @@ export async function GET(request: Request) {
     const activeGrant = activeProperty ? grants.find((g) => g.propertyId === activeProperty.id) : null;
     const activeRole = activeGrant?.role?.code || "ORG_OWNER";
 
+    const getUsername = (email: string) => {
+      if (email.includes("reception.ambarish")) return "ambarish_frontdesk";
+      if (email.includes("reception.divine")) return "divine_frontdesk";
+      if (email.includes("gm@")) return "general_manager";
+      return email.split("@")[0];
+    };
+
     return NextResponse.json({
       user: {
         id: user.id,
         name: user.name,
+        username: getUsername(user.email),
         email: user.email,
         activeRole,
         roleName: activeGrant?.role?.name || "Organization Owner",
       },
       activeProperty,
       availableProperties,
-      allUsers: allUsers.map((u) => ({
-        id: u.id,
-        name: u.name,
-        email: u.email,
-        role: u.memberships[0]?.propertyGrants[0]?.role?.code || "ORG_OWNER",
-        roleName: u.memberships[0]?.propertyGrants[0]?.role?.name || "Owner",
-      })),
+      allUsers: allUsers.map((u) => {
+        const uGrants = u.memberships[0]?.propertyGrants || [];
+        let propertyScope = "All Properties";
+        if (uGrants.length === 1) {
+          propertyScope = uGrants[0].property.displayName;
+        } else if (uGrants.length > 1) {
+          propertyScope = `Multi-Property (${uGrants.length})`;
+        }
+
+        return {
+          id: u.id,
+          name: u.name,
+          username: getUsername(u.email),
+          email: u.email,
+          role: u.memberships[0]?.propertyGrants[0]?.role?.code || "ORG_OWNER",
+          roleName: u.memberships[0]?.propertyGrants[0]?.role?.name || "Owner",
+          propertyScope,
+        };
+      }),
       allProperties,
     });
   } catch (error: any) {

@@ -4,17 +4,28 @@ import { prisma } from "@/lib/db/prisma";
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    let propertyId = searchParams.get("propertyId");
+    const propertyParam =
+      searchParams.get("property") ||
+      searchParams.get("propertyCode") ||
+      searchParams.get("code") ||
+      searchParams.get("propertyId");
 
     const allProperties = await prisma.property.findMany({
       select: { id: true, code: true, displayName: true, legalName: true, address: true, phone: true, email: true },
       orderBy: { createdAt: "asc" },
     });
 
-    if (!propertyId) {
-      const defaultProperty = allProperties.find((p) => p.code === "GUW-01") || allProperties[0];
-      propertyId = defaultProperty?.id || "";
+    let matchedProperty = null;
+    if (propertyParam) {
+      const cleanParam = propertyParam.trim().toUpperCase();
+      matchedProperty = allProperties.find(
+        (p) => p.id === propertyParam || p.code?.toUpperCase() === cleanParam
+      );
     }
+    if (!matchedProperty) {
+      matchedProperty = allProperties.find((p) => p.code === "GUW-01") || allProperties[0];
+    }
+    const propertyId = matchedProperty?.id || "";
 
     const property = await prisma.property.findUnique({
       where: { id: propertyId },
@@ -225,7 +236,8 @@ export async function GET(request: Request) {
       property: {
         id: property.id,
         code: property.code,
-        name: property.displayName || "Hotel Ambarish Grand Residency",
+        displayName: property.displayName || property.legalName || "Hotel Ambarish Grand Residency",
+        name: property.displayName || property.legalName || "Hotel Ambarish Grand Residency",
         legalName: property.legalName,
         address: property.address || "M.D. Shah Road, Paltan Bazar, Guwahati, Assam",
         phone: property.phone || "+91 69017 41211",

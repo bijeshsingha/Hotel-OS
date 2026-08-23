@@ -4,16 +4,45 @@ import { prisma } from "@/lib/db/prisma";
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const propertyId = searchParams.get("propertyId");
+    const rawProp =
+      searchParams.get("propertyId") ||
+      searchParams.get("property") ||
+      searchParams.get("propertyCode") ||
+      searchParams.get("code");
     const status = searchParams.get("status"); // IN_HOUSE, CHECKED_OUT, DUE_IN, DUE_OUT
 
-    if (!propertyId) {
-      return NextResponse.json({ error: "propertyId is required" }, { status: 400 });
+    let targetPropertyId = rawProp;
+
+    // Resolve property if ID or Code is provided
+    if (rawProp) {
+      const prop = await prisma.property.findFirst({
+        where: {
+          OR: [
+            { id: rawProp },
+            { code: { equals: rawProp } },
+            { displayName: { contains: rawProp } },
+          ],
+        },
+      });
+      if (prop) {
+        targetPropertyId = prop.id;
+      }
+    } else {
+      // Default to the first active property
+      const defaultProp = await prisma.property.findFirst({
+        where: { status: "ACTIVE" },
+        orderBy: { createdAt: "asc" },
+      });
+      targetPropertyId = defaultProp?.id || null;
+    }
+
+    if (!targetPropertyId) {
+      return NextResponse.json([]);
     }
 
     const stays = await prisma.stay.findMany({
       where: {
-        propertyId,
+        propertyId: targetPropertyId,
         ...(status ? { status } : {}),
       },
       include: {
@@ -40,6 +69,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json(stays);
   } catch (error: any) {
+    console.error("Error in /api/v1/stays:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

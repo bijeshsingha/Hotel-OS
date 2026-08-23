@@ -72,6 +72,7 @@ model Property {
   auditLogs       AuditLog[]
   metricSnapshots MetricSnapshot[]
   guestRegistrations GuestRegistration[]
+  expenses        Expense[]
 
   @@unique([organizationId, code])
 }
@@ -1377,4 +1378,35 @@ model AuditLog {
   occurredAt       DateTime @default(now())
 
   property         Property @relation(fields: [propertyId], references: [id])
+}
+
+// ----------------------------------------------------
+// Daily Expenses & Petty Cash Outflows
+// ----------------------------------------------------
+
+model Expense {
+  id             String   @id @default(cuid())
+  organizationId String
+  propertyId     String
+  voucherNo      String   // EXP-2627-0001
+  category       String   // FB_PURCHASE, MAINTENANCE, HOUSEKEEPING, PETTY_CASH, UTILITIES, GUEST_REFUND, SALARY_ADVANCE, OTHER
+  payeeName      String   // Vendor / Supplier / Staff name
+  description    String   // Description / Narration
+  amount         Float    // Net Amount
+  taxAmount      Float    @default(0)
+  totalAmount    Float    // Total Paid
+  paymentMethod  String   // CASH, UPI, BANK_TRANSFER, CHEQUE, CARD
+  reference      String?  // UTR / Cheque No / Invoice No
+  paidAt         DateTime @default(now())
+  businessDate   String   // YYYY-MM-DD
+  status         String   @default("PAID") // PAID, VOIDED
+  createdById    String?
+  createdByName  String?
+  notes          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  property       Property @relation(fields: [propertyId], references: [id])
+
+  @@unique([propertyId, voucherNo])
 }

@@ -8,6 +8,7 @@ import { AppSidebar } from "./sidebar";
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const isKioskOrGuestPage =
+    pathname.startsWith("/login") ||
     pathname.startsWith("/checkin") ||
     pathname.startsWith("/order") ||
     pathname.startsWith("/guest") ||

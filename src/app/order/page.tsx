@@ -6,29 +6,40 @@ import { formatINR, calculateGST } from "@/lib/gst/calculator";
 import {
   UtensilsCrossed,
   Clock,
-  PhoneCall,
   Search,
   Plus,
   Minus,
   ShoppingBag,
   CheckCircle2,
   X,
-  Sparkles,
   BedDouble,
   ChevronRight,
   Coffee,
   Check,
   ChevronDown,
   User,
-  ShieldCheck,
+  Phone,
   Flame,
-  Filter,
+  MessageSquarePlus,
+  ChefHat,
+  Truck,
+  Timer,
+  RefreshCw,
+  History,
+  Sparkles,
+  ArrowRight,
+  AlertCircle,
 } from "lucide-react";
 
 function GuestOrderContent() {
   const searchParams = useSearchParams();
   const initialRoom = searchParams.get("room") || "";
-  const queryPropertyId = searchParams.get("propertyId") || "";
+  const queryProperty =
+    searchParams.get("property") ||
+    searchParams.get("propertyCode") ||
+    searchParams.get("code") ||
+    searchParams.get("propertyId") ||
+    "";
 
   const [menuData, setMenuData] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
@@ -51,21 +62,27 @@ function GuestOrderContent() {
   // Cart & checkout
   const [cart, setCart] = useState<{ [itemId: string]: { item: any; qty: number; notes: string } }>({});
   const [isCartOpen, setIsCartOpen] = useState(false);
-  const [specialInstructions, setSpecialInstructions] = useState("");
+  const [activeNoteItemId, setActiveNoteItemId] = useState<string | null>(null);
+  const [isRoomVerified, setIsRoomVerified] = useState(true);
   const [paymentPref, setPaymentPref] = useState<"POST_TO_ROOM" | "UPI_ON_DELIVERY" | "CASH_ON_DELIVERY">("POST_TO_ROOM");
 
   // Order Placement & Live Tracking
   const [submitting, setSubmitting] = useState(false);
-  const [placedOrder, setPlacedOrder] = useState<any | null>(null);
-  const [orderStatus, setOrderStatus] = useState<any | null>(null);
+  const [activeOrders, setActiveOrders] = useState<any[]>([]);
+  const [pastOrders, setPastOrders] = useState<any[]>([]);
+  const [selectedOrderForTracking, setSelectedOrderForTracking] = useState<any | null>(null);
+  const [showTrackingModal, setShowTrackingModal] = useState<boolean>(false);
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState<boolean>(false);
+  const [trackingTab, setTrackingTab] = useState<"ACTIVE" | "PAST">("ACTIVE");
 
   const [showWelcomeModal, setShowWelcomeModal] = useState<boolean>(!initialRoom);
 
   // Fetch Menu from API
-  const loadMenu = async (propId?: string) => {
+  const loadMenu = async (propParam?: string) => {
     try {
       setLoading(true);
-      const url = propId ? `/api/v1/guest/menu?propertyId=${propId}` : "/api/v1/guest/menu";
+      const targetProp = propParam || queryProperty;
+      const url = targetProp ? `/api/v1/guest/menu?property=${encodeURIComponent(targetProp)}` : "/api/v1/guest/menu";
       const res = await fetch(url);
       const data = await res.json();
       setMenuData(data);
@@ -99,8 +116,8 @@ function GuestOrderContent() {
   };
 
   useEffect(() => {
-    loadMenu(queryPropertyId);
-  }, [queryPropertyId]);
+    loadMenu(queryProperty);
+  }, [queryProperty]);
 
   // Auto-sync guest name from database whenever roomNumber changes
   useEffect(() => {
@@ -145,25 +162,61 @@ function GuestOrderContent() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Poll live order status if placed
-  useEffect(() => {
-    if (!placedOrder?.id) return;
-    const checkStatus = async () => {
-      try {
-        const res = await fetch(`/api/v1/guest/orders/${placedOrder.id}`);
-        if (res.ok) {
-          const data = await res.json();
-          setOrderStatus(data.order);
+  // Fetch room active and past orders from backend
+  const fetchRoomOrders = async (targetRoom?: string) => {
+    const roomToFetch = targetRoom || roomNumber;
+    if (!roomToFetch) return;
+    try {
+      const propCode = menuData?.property?.code || queryProperty;
+      const url = `/api/v1/guest/orders?room=${encodeURIComponent(roomToFetch)}${propCode ? `&property=${encodeURIComponent(propCode)}` : ""}`;
+      const res = await fetch(url);
+      const data = await res.json();
+      if (data.success) {
+        setActiveOrders(data.activeOrders || []);
+        setPastOrders(data.pastOrders || []);
+        if (data.activeOrders?.length > 0) {
+          setSelectedOrderForTracking((prev: any) => {
+            if (!prev) return data.activeOrders[0];
+            const updated = data.activeOrders.find((o: any) => o.id === prev.id);
+            return updated || data.activeOrders[0];
+          });
         }
-      } catch (e) {
-        console.error("Poll order error:", e);
       }
-    };
+    } catch (e) {
+      console.error("Failed to fetch room orders:", e);
+    }
+  };
 
-    checkStatus();
-    const timer = setInterval(checkStatus, 5000);
+  // Poll live order status every 8 seconds
+  useEffect(() => {
+    if (!roomNumber) return;
+    fetchRoomOrders(roomNumber);
+    const timer = setInterval(() => {
+      fetchRoomOrders(roomNumber);
+    }, 8000);
     return () => clearInterval(timer);
-  }, [placedOrder?.id]);
+  }, [roomNumber, menuData?.property?.id]);
+
+  // Simulate kitchen status advancement (testing / staff action)
+  const handleSimulateStatus = async (orderId: string, nextStatus: string) => {
+    setIsUpdatingStatus(true);
+    try {
+      const res = await fetch("/api/v1/guest/orders", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId, status: nextStatus }),
+      });
+      const data = await res.json();
+      if (data.success && data.order) {
+        setSelectedOrderForTracking(data.order);
+        await fetchRoomOrders(roomNumber);
+      }
+    } catch (err) {
+      console.error("Status simulation error:", err);
+    } finally {
+      setIsUpdatingStatus(false);
+    }
+  };
 
   // Handle Room Selection & Auto-populate
   const handleSelectRoom = (room: any) => {
@@ -172,6 +225,15 @@ function GuestOrderContent() {
     setCustomerPhone(room.guestPhone || "");
     setIsRoomDropdownOpen(false);
     setRoomSearchQuery("");
+
+    if (typeof window !== "undefined") {
+      const url = new URL(window.location.href);
+      url.searchParams.set("room", room.number);
+      if (menuData?.property?.code) {
+        url.searchParams.set("property", menuData.property.code);
+      }
+      window.history.replaceState({}, "", url.toString());
+    }
   };
 
   // Cart operations
@@ -253,17 +315,29 @@ function GuestOrderContent() {
     });
   }, [allRooms, onlyOccupiedRooms, roomSearchQuery]);
 
-  // Current selected room object
-  const activeSelectedRoom = allRooms.find((r: any) => String(r.number) === String(roomNumber));
+  // Active room details
+  const activeSelectedRoom = useMemo(() => {
+    if (!roomNumber || !menuData?.rooms) return null;
+    const targetNo = String(roomNumber).trim().toLowerCase();
+    return (
+      menuData.rooms.find((r: any) => String(r.number).trim().toLowerCase() === targetNo && r.guestName) ||
+      menuData.rooms.find((r: any) => String(r.number).trim().toLowerCase() === targetNo) ||
+      null
+    );
+  }, [roomNumber, menuData]);
 
-  // Filter Categories & Items
+  // Filter Menu Categories & Items
   const categories = menuData?.outlet?.categories || [];
   const timeStatus = menuData?.timeStatus;
 
   const filteredCategories = useMemo(() => {
     return categories
       .map((cat: any) => {
-        const items = (cat.items || []).filter((item: any) => {
+        if (selectedCategory !== "ALL" && cat.id !== selectedCategory) {
+          return null;
+        }
+
+        const filteredItems = (cat.items || []).filter((item: any) => {
           if (vegFilter === "VEG" && !item.isVeg) return false;
           if (vegFilter === "NON_VEG" && item.isVeg) return false;
 
@@ -271,65 +345,73 @@ function GuestOrderContent() {
             const q = searchQuery.toLowerCase();
             const matchName = item.name.toLowerCase().includes(q);
             const matchDesc = item.description?.toLowerCase().includes(q);
-            const matchCode = item.code.toLowerCase().includes(q);
-            if (!matchName && !matchDesc && !matchCode) return false;
+            const matchTags = item.tags?.toLowerCase().includes(q);
+            if (!matchName && !matchDesc && !matchTags) return false;
           }
-
           return true;
         });
 
+        if (filteredItems.length === 0) return null;
+
         return {
           ...cat,
-          filteredItems: items,
+          filteredItems,
         };
       })
-      .filter((cat: any) => {
-        if (selectedCategory !== "ALL" && cat.id !== selectedCategory) return false;
-        return cat.filteredItems.length > 0;
-      });
-  }, [categories, vegFilter, searchQuery, selectedCategory]);
+      .filter(Boolean);
+  }, [categories, selectedCategory, vegFilter, searchQuery]);
 
-  // Submit Order
+  // Place Order Handler
   const handlePlaceOrder = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (cartList.length === 0) return;
     if (!roomNumber.trim()) {
-      alert("Please select your room number.");
+      alert("Please enter or select your Room Number before ordering.");
+      return;
+    }
+    if (cartList.length === 0) {
+      alert("Your order tray is empty. Please add items to order.");
       return;
     }
 
     setSubmitting(true);
     try {
-      const itemsPayload = cartList.map((c) => ({
-        id: c.item.id,
-        name: c.item.name,
-        unitPrice: c.item.variants?.[0]?.price || 100,
-        qty: c.qty,
-        notes: c.notes,
-        stationId: c.item.variants?.[0]?.stationId,
-      }));
+      const payload = {
+        propertyId: menuData?.property?.id,
+        propertyCode: menuData?.property?.code || queryProperty,
+        roomNumber: roomNumber.trim(),
+        customerName: customerName.trim() || "In-House Guest",
+        customerContact: customerPhone.trim() || undefined,
+        paymentPreference: paymentPref,
+        items: cartList.map((c) => {
+          const itemPrice = Number(c.item.variants?.[0]?.price ?? c.item.price ?? 100);
+          return {
+            menuItemId: c.item.id,
+            variantId: c.item.variants?.[0]?.id,
+            name: c.item.name,
+            qty: c.qty,
+            unitPrice: itemPrice,
+            price: itemPrice,
+            notes: c.notes || undefined,
+          };
+        }),
+      };
 
       const res = await fetch("/api/v1/guest/orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          propertyId: menuData?.property?.id,
-          roomNumber: roomNumber.trim(),
-          customerName: customerName.trim(),
-          customerContact: customerPhone.trim(),
-          items: itemsPayload,
-          paymentPreference: paymentPref,
-          specialInstructions: specialInstructions.trim(),
-        }),
+        body: JSON.stringify(payload),
       });
 
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to place order");
 
-      setPlacedOrder(data.order);
-      setOrderStatus(data.order);
       setCart({});
       setIsCartOpen(false);
+      if (data.order?.tracker) {
+        setSelectedOrderForTracking(data.order.tracker);
+      }
+      setShowTrackingModal(true);
+      await fetchRoomOrders(roomNumber);
     } catch (err: any) {
       alert(`Order placement error: ${err.message}`);
     } finally {
@@ -339,167 +421,136 @@ function GuestOrderContent() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#09090b] flex flex-col items-center justify-center text-zinc-100 space-y-3">
+      <div className="min-h-screen bg-[#09090b] flex flex-col items-center justify-center text-zinc-100 space-y-3 px-4">
         <div className="h-8 w-8 border-2 border-zinc-500 border-t-zinc-100 rounded-full animate-spin" />
-        <div className="text-xs font-medium text-zinc-400">Loading In-Room Dining Menu...</div>
+        <div className="text-xs font-mono font-medium text-zinc-400">Loading Dining Menu...</div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#09090b] text-zinc-100 font-sans pb-32 selection:bg-blue-600 selection:text-white">
-      {/* 1. TOP HEADER (CLEAN & MINIMALIST) */}
-      <header className="sticky top-0 z-40 bg-[#09090b]/95 backdrop-blur-md border-b border-[#27272a] px-4 py-3">
-        <div className="max-w-4xl mx-auto flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-8 w-8 items-center justify-center rounded-md bg-zinc-100 text-zinc-950 font-bold text-sm tracking-tight">
-              H
+    <div className="min-h-screen w-full max-w-full overflow-x-hidden bg-[#09090b] text-zinc-100 font-sans pb-36 selection:bg-blue-600 selection:text-white">
+      {/* 1. TOP HEADER */}
+      <header className="sticky top-0 z-40 bg-[#09090b]/95 backdrop-blur-md border-b border-[#27272a] px-4 sm:px-8 py-3 w-full">
+        <div className="max-w-7xl mx-auto flex items-center justify-between gap-3 sm:gap-4 w-full">
+          {/* Top Row: Hotel Brand & Details */}
+          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white text-zinc-950 font-black text-xs sm:text-sm tracking-tight shadow-sm">
+              {menuData?.property?.displayName?.[0] || menuData?.property?.name?.[0] || "H"}
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-sm font-semibold tracking-tight text-zinc-100">
-                  {menuData?.property?.name || "Hotel Ambarish Grand Residency"}
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-1.5 min-w-0">
+                <h1 className="text-xs sm:text-sm font-bold tracking-tight text-white truncate">
+                  {menuData?.property?.displayName || menuData?.property?.name || "Hotel OS"}
                 </h1>
-                <span className="rounded px-1.5 py-0.2 text-[10px] font-mono font-medium text-zinc-400 bg-zinc-800 border border-zinc-700/60">
-                  In-Room Dining
-                </span>
-              </div>
-              <p className="text-[11px] text-zinc-400">
-                {timeStatus?.serviceMessage || "Kitchen Open (40 Min Prep Time)"}
-              </p>
-            </div>
-          </div>
-
-          {/* Room Selector with Search Dropdown */}
-          <div className="relative" ref={roomDropdownRef}>
-            <button
-              onClick={() => setIsRoomDropdownOpen(!isRoomDropdownOpen)}
-              className="flex items-center gap-2 rounded-md bg-[#18181b] border border-zinc-800 px-3 py-1.5 text-xs text-zinc-200 hover:border-zinc-700 transition shadow-sm"
-            >
-              <BedDouble className="h-3.5 w-3.5 text-zinc-400" />
-              <div className="text-left">
-                <span className="font-semibold text-zinc-100">
-                  {roomNumber ? `Room ${roomNumber}` : "Select Room"}
-                </span>
-                {customerName && (
-                  <span className="text-[10px] text-zinc-400 block -mt-0.5 truncate max-w-[100px]">
-                    {customerName}
+                {menuData?.property?.code && (
+                  <span className="bg-zinc-800 text-zinc-300 border border-zinc-700 text-[9px] sm:text-[10px] font-mono font-bold px-1.5 py-0.2 rounded shrink-0">
+                    {menuData.property.code}
                   </span>
                 )}
               </div>
-              <ChevronDown className="h-3.5 w-3.5 text-zinc-500 ml-1" />
-            </button>
-
-            {/* Room Selection Dropdown */}
-            {isRoomDropdownOpen && (
-              <div className="absolute right-0 mt-1.5 w-80 rounded-xl border border-zinc-800 bg-[#121215] p-2.5 shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-75 space-y-2">
-                <div className="flex items-center justify-between pb-1 border-b border-zinc-800/80">
-                  <span className="text-[11px] font-semibold text-zinc-300">Select In-House Room</span>
-                  <label className="flex items-center gap-1.5 text-[10px] text-zinc-400 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={onlyOccupiedRooms}
-                      onChange={(e) => setOnlyOccupiedRooms(e.target.checked)}
-                      className="rounded bg-zinc-800 border-zinc-700 accent-blue-600 h-3 w-3"
-                    />
-                    <span>Occupied Only ({allRooms.filter((r: any) => r.isOccupied).length})</span>
-                  </label>
-                </div>
-
-                {/* Room Search Box */}
-                <div className="relative">
-                  <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-zinc-500" />
-                  <input
-                    type="text"
-                    placeholder="Search room or guest name..."
-                    value={roomSearchQuery}
-                    onChange={(e) => setRoomSearchQuery(e.target.value)}
-                    className="w-full rounded-lg bg-zinc-900 border border-zinc-800 pl-8 pr-3 py-1.5 text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-zinc-600"
-                    autoFocus
-                  />
-                </div>
-
-                {/* Rooms List */}
-                <div className="max-h-60 overflow-y-auto space-y-1 pr-0.5">
-                  {filteredRooms.map((r: any) => {
-                    const isSelected = String(r.number) === String(roomNumber);
-                    return (
-                      <div
-                        key={r.id}
-                        onClick={() => handleSelectRoom(r)}
-                        className={`p-2 rounded-lg cursor-pointer transition flex items-center justify-between text-xs ${
-                          isSelected
-                            ? "bg-zinc-800 text-zinc-100 font-medium border border-zinc-700"
-                            : "text-zinc-300 hover:bg-zinc-800/60"
-                        }`}
-                      >
-                        <div className="space-y-0.5">
-                          <div className="flex items-center gap-1.5">
-                            <span className="font-semibold">Room {r.number}</span>
-                            <span className="text-[10px] text-zinc-500">• {r.roomTypeName}</span>
-                          </div>
-                          {r.guestName ? (
-                            <div className="text-[11px] text-blue-400 font-medium flex items-center gap-1">
-                              <User className="h-3 w-3 text-zinc-500" /> {r.guestName}
-                            </div>
-                          ) : (
-                            <div className="text-[10px] text-zinc-500 italic">Vacant / Unassigned</div>
-                          )}
-                        </div>
-
-                        <div className="text-right">
-                          <span
-                            className={`rounded px-1.5 py-0.5 text-[9px] font-mono font-medium ${
-                              r.isOccupied
-                                ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
-                                : "bg-zinc-800 text-zinc-500"
-                            }`}
-                          >
-                            {r.isOccupied ? "Occupied" : "Vacant"}
-                          </span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                  {filteredRooms.length === 0 && (
-                    <div className="p-4 text-center text-xs text-zinc-500">No rooms found</div>
-                  )}
-                </div>
+              <div className="flex items-center gap-1.5 text-[10px] sm:text-[11px] text-zinc-400">
+                <span className="text-emerald-400 font-medium font-mono">Kitchen Live</span>
+                <span>•</span>
+                <span>Ext 9</span>
               </div>
-            )}
+            </div>
+          </div>
+
+          {/* Header Right Actions: Live Order Status & Room Selector */}
+          <div className="flex items-center gap-2 shrink-0">
+            {activeOrders.length > 0 ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setTrackingTab("ACTIVE");
+                  setSelectedOrderForTracking(activeOrders[0]);
+                  setShowTrackingModal(true);
+                }}
+                className="flex items-center gap-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 px-2.5 py-1.5 text-xs text-white transition shadow-sm active:scale-95 animate-in fade-in"
+              >
+                <span className="relative flex h-2 w-2 shrink-0">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                </span>
+                <Clock className="h-3.5 w-3.5 text-zinc-300 shrink-0" />
+                <span className="hidden sm:inline font-semibold">Status</span>
+                <span className="bg-zinc-800 text-emerald-400 border border-emerald-500/30 px-1.5 py-0.2 rounded font-mono font-bold text-[10px]">
+                  ~{activeOrders[0].estimatedMinutesRemaining}m
+                </span>
+              </button>
+            ) : pastOrders.length > 0 ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setTrackingTab("PAST");
+                  setSelectedOrderForTracking(pastOrders[0]);
+                  setShowTrackingModal(true);
+                }}
+                className="flex items-center gap-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 px-2.5 py-1.5 text-xs text-zinc-300 hover:text-white transition"
+              >
+                <History className="h-3.5 w-3.5 text-zinc-400 shrink-0" />
+                <span className="font-mono text-[11px]">Orders</span>
+              </button>
+            ) : null}
+
+            {/* Locked Room Badge — not changeable by guest */}
+            <div className="flex items-center gap-1.5 rounded-lg bg-[#18181b] border border-zinc-700 px-2.5 sm:px-3 py-1.5 text-xs text-white shadow-sm shrink-0">
+              <BedDouble className="h-3.5 w-3.5 text-zinc-400 shrink-0" />
+              <span className="font-bold font-mono text-[11px] sm:text-xs">
+                {roomNumber ? `Rm ${roomNumber}` : "Room"}
+              </span>
+              {activeSelectedRoom?.isOccupied && (
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 shrink-0" />
+              )}
+            </div>
           </div>
         </div>
       </header>
 
       {/* 2. MAIN CONTAINER */}
-      <main className="max-w-4xl mx-auto px-4 pt-4 space-y-4">
+      <main className="max-w-7xl mx-auto px-4 sm:px-8 pt-4 sm:pt-6 pb-48 space-y-4 sm:space-y-6 w-full">
         {/* ROOM BANNER WITH AUTO-SYNCED GUEST DETAILS */}
-        <div className="rounded-xl bg-[#121215] border border-zinc-800 p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="h-9 w-9 rounded-lg bg-zinc-800 border border-zinc-700/60 flex items-center justify-center text-zinc-300">
-              <BedDouble className="h-4 w-4" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-semibold text-zinc-100">
-                  Delivering to Room {roomNumber || "..."}
-                </span>
-                {activeSelectedRoom?.isOccupied && (
-                  <span className="rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-1.5 py-0.2 text-[10px] font-medium font-mono">
-                    Auto-Synced to Folio
-                  </span>
-                )}
+        <div className="rounded-2xl bg-[#121215] border border-zinc-800 p-4 shadow-sm min-w-0 w-full space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0 flex-1">
+              <div className="h-10 w-10 shrink-0 rounded-xl bg-zinc-800 border border-zinc-700/60 flex items-center justify-center text-zinc-300">
+                <BedDouble className="h-5 w-5" />
               </div>
-              <p className="text-[11px] text-zinc-400">
-                Guest: <strong className="text-zinc-200">{customerName || "In-House Guest"}</strong>
-                {customerPhone && ` • ${customerPhone}`}
-              </p>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-xs sm:text-sm font-bold text-white">
+                    Delivering to Room {roomNumber || "..."}
+                  </span>
+                  {activeSelectedRoom?.isOccupied && (
+                    <span className="rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 text-[10px] font-medium font-mono">
+                      ● Synced to Folio
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-zinc-400 truncate mt-0.5">
+                  Guest: <strong className="text-white">{customerName || "In-House Guest"}</strong>
+                  {customerPhone && ` • ${customerPhone}`}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 text-xs text-zinc-400 font-mono self-start sm:self-auto bg-zinc-900 px-3 py-1.5 rounded-lg border border-zinc-800 shrink-0">
+              <Clock className="h-3.5 w-3.5 text-zinc-500" />
+              <span>Prep Time: <strong className="text-white">~40 Mins</strong></span>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 text-xs text-zinc-400 font-mono">
-            <Clock className="h-3.5 w-3.5 text-zinc-500" />
-            <span>Prep Time: <strong className="text-zinc-200">~40 Mins</strong></span>
+          {/* Mismatch contact row */}
+          <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-zinc-500 pt-2 border-t border-zinc-800/80">
+            <span>Mismatch in room or guest details?</span>
+            <a
+              href={`tel:${menuData?.property?.phone || "+916901741211"}`}
+              className="text-emerald-400 hover:text-emerald-300 font-semibold flex items-center gap-1 font-mono transition"
+            >
+              <Phone className="h-3 w-3 shrink-0" />
+              <span>Dial Ext 9 / {menuData?.property?.phone || "+91 69017 41211"}</span>
+            </a>
           </div>
         </div>
 
@@ -508,67 +559,70 @@ function GuestOrderContent() {
           <div className="flex flex-col sm:flex-row gap-2">
             {/* Search Input */}
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-zinc-500" />
+              <Search className="absolute left-3.5 top-3 h-4 w-4 text-zinc-500" />
               <input
                 type="text"
                 placeholder="Search food items, tea, biryani, paneer, fish..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full rounded-lg bg-[#121215] border border-zinc-800 pl-9 pr-4 py-2 text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-zinc-700 transition"
+                className="w-full rounded-xl bg-[#121215] border border-zinc-800 pl-10 pr-9 py-2.5 text-xs sm:text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-zinc-600 transition"
               />
               {searchQuery && (
                 <button
                   onClick={() => setSearchQuery("")}
-                  className="absolute right-3 top-2.5 text-zinc-500 hover:text-zinc-300"
+                  className="absolute right-3 top-3 text-zinc-500 hover:text-white"
                 >
-                  <X className="h-3.5 w-3.5" />
+                  <X className="h-4 w-4" />
                 </button>
               )}
             </div>
 
-            {/* Veg / Non-Veg Filter */}
-            <div className="flex items-center rounded-lg bg-[#121215] border border-zinc-800 p-1">
+            {/* Veg / Non-Veg Filter (Full width on mobile) */}
+            <div className="grid grid-cols-3 sm:flex items-center rounded-xl bg-[#121215] border border-zinc-800 p-1 gap-1">
               <button
+                type="button"
                 onClick={() => setVegFilter("ALL")}
-                className={`rounded-md px-3 py-1 text-xs font-medium transition ${
+                className={`rounded-lg py-1.5 px-3 text-xs font-bold transition text-center ${
                   vegFilter === "ALL"
-                    ? "bg-zinc-800 text-zinc-100 shadow-sm"
-                    : "text-zinc-400 hover:text-zinc-200"
+                    ? "bg-white text-zinc-950 shadow-sm"
+                    : "text-zinc-400 hover:text-white"
                 }`}
               >
                 All
               </button>
               <button
+                type="button"
                 onClick={() => setVegFilter("VEG")}
-                className={`flex items-center gap-1.5 rounded-md px-3 py-1 text-xs font-medium transition ${
+                className={`flex items-center justify-center gap-1.5 rounded-lg py-1.5 px-3 text-xs font-bold transition ${
                   vegFilter === "VEG"
-                    ? "bg-emerald-600/20 text-emerald-400 border border-emerald-500/30"
-                    : "text-zinc-400 hover:text-zinc-200"
+                    ? "bg-emerald-600 text-white shadow-sm"
+                    : "text-zinc-400 hover:text-white"
                 }`}
               >
-                <span className="h-2 w-2 rounded-sm bg-emerald-500" /> Pure Veg
+                <span className="h-2 w-2 rounded-sm bg-emerald-400" /> Pure Veg
               </button>
               <button
+                type="button"
                 onClick={() => setVegFilter("NON_VEG")}
-                className={`flex items-center gap-1.5 rounded-md px-3 py-1 text-xs font-medium transition ${
+                className={`flex items-center justify-center gap-1.5 rounded-lg py-1.5 px-3 text-xs font-bold transition ${
                   vegFilter === "NON_VEG"
-                    ? "bg-rose-600/20 text-rose-400 border border-rose-500/30"
-                    : "text-zinc-400 hover:text-zinc-200"
+                    ? "bg-rose-600 text-white shadow-sm"
+                    : "text-zinc-400 hover:text-white"
                 }`}
               >
-                <span className="h-2 w-2 rounded-full bg-rose-500" /> Non-Veg
+                <span className="h-2 w-2 rounded-full bg-rose-400" /> Non-Veg
               </button>
             </div>
           </div>
 
-          {/* Category Tabs */}
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+          {/* Category Horizontal Scroll Bar (Sticky on Mobile) */}
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none snap-x active:cursor-grabbing">
             <button
               onClick={() => setSelectedCategory("ALL")}
-              className={`rounded-lg px-3 py-1.5 text-xs font-medium whitespace-nowrap transition flex items-center gap-1.5 ${
+              className={`rounded-xl px-3.5 py-2 text-xs font-bold whitespace-nowrap transition snap-start flex items-center gap-1.5 ${
                 selectedCategory === "ALL"
-                  ? "bg-zinc-100 text-zinc-950 font-semibold shadow-sm"
-                  : "bg-[#121215] text-zinc-400 hover:text-zinc-200 border border-zinc-800"
+                  ? "bg-white text-zinc-950 shadow-md"
+                  : "bg-[#121215] text-zinc-300 hover:text-white border border-zinc-800"
               }`}
             >
               All Items
@@ -580,14 +634,15 @@ function GuestOrderContent() {
                 <button
                   key={cat.id}
                   onClick={() => setSelectedCategory(cat.id)}
-                  className={`rounded-lg px-3 py-1.5 text-xs font-medium whitespace-nowrap transition flex items-center gap-1.5 ${
+                  className={`rounded-xl px-3.5 py-2 text-xs font-bold whitespace-nowrap transition snap-start flex items-center gap-1.5 ${
                     isSelected
-                      ? "bg-zinc-100 text-zinc-950 font-semibold shadow-sm"
-                      : "bg-[#121215] text-zinc-400 hover:text-zinc-200 border border-zinc-800"
+                      ? "bg-white text-zinc-950 shadow-md"
+                      : "bg-[#121215] text-zinc-300 hover:text-white border border-zinc-800"
                   }`}
                 >
-                  {isBreakfast ? <Coffee className="h-3 w-3" /> : <UtensilsCrossed className="h-3 w-3" />}
-                  {cat.name} ({cat.items?.length || 0})
+                  {isBreakfast ? <Coffee className="h-3.5 w-3.5" /> : <UtensilsCrossed className="h-3.5 w-3.5" />}
+                  <span>{cat.name}</span>
+                  <span className="text-[10px] opacity-70 font-mono">({cat.items?.length || 0})</span>
                 </button>
               );
             })}
@@ -595,115 +650,147 @@ function GuestOrderContent() {
         </div>
 
         {/* 4. MENU ITEMS CATALOG */}
-        <div className="space-y-6">
+        <div className="space-y-6 pt-1">
           {filteredCategories.map((cat: any) => {
             const isBreakfast = cat.servicePeriod === "BREAKFAST";
             return (
-              <section key={cat.id} className="space-y-2.5">
+              <section key={cat.id} className="space-y-3">
                 {/* Category Header */}
-                <div className="flex items-center justify-between pb-1.5 border-b border-zinc-800/80">
+                <div className="flex items-center justify-between pb-2 border-b border-zinc-800">
                   <div className="flex items-center gap-2">
-                    <h2 className="text-xs font-semibold text-zinc-200 uppercase tracking-wider">
+                    <h2 className="text-xs sm:text-sm font-black text-white uppercase tracking-wider">
                       {cat.name}
                     </h2>
-                    <span className="text-[10px] text-zinc-500">
+                    <span className="text-[11px] text-zinc-500 font-mono">
                       ({cat.filteredItems.length})
                     </span>
                   </div>
 
-                  <span className="text-[10px] font-mono text-zinc-500">
+                  <span className="text-[11px] font-mono text-zinc-500">
                     {isBreakfast ? "08:00 AM – 11:00 AM" : "12:00 PM – 10:45 PM"}
                   </span>
                 </div>
 
-                {/* Items Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                {/* Items Grid (1 Col on Mobile, 2 Col on Tablet/Desktop) */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {cat.filteredItems.map((item: any) => {
                     const price = item.variants?.[0]?.price || 100;
                     const cartItem = cart[item.id];
                     const inCartQty = cartItem?.qty || 0;
+                    const isNoteOpen = activeNoteItemId === item.id || (cartItem?.notes && cartItem.notes.length > 0);
 
                     return (
                       <div
                         key={item.id}
-                        className={`rounded-xl p-3 border transition flex flex-col justify-between ${
+                        className={`rounded-2xl p-3.5 sm:p-4 border transition flex flex-col justify-between ${
                           inCartQty > 0
-                            ? "bg-[#18181b] border-zinc-700 shadow-sm"
-                            : "bg-[#121215] border-zinc-800/90 hover:border-zinc-700/80"
+                            ? "bg-[#18181b] border-zinc-600 shadow-md"
+                            : "bg-[#121215] border-zinc-800/90 hover:border-zinc-700"
                         }`}
                       >
-                        <div className="space-y-1">
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="flex items-start gap-2">
+                        <div className="space-y-1.5">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex items-start gap-2.5 min-w-0">
                               {/* Veg / Non-Veg Marker */}
                               <div
-                                className={`mt-0.5 h-3.5 w-3.5 rounded-sm border flex items-center justify-center shrink-0 ${
+                                className={`mt-0.5 h-4 w-4 rounded-sm border flex items-center justify-center shrink-0 ${
                                   item.isVeg
-                                    ? "border-emerald-500 bg-emerald-950/40"
-                                    : "border-rose-500 bg-rose-950/40"
+                                    ? "border-emerald-500 bg-emerald-950/50"
+                                    : "border-rose-500 bg-rose-950/50"
                                 }`}
+                                title={item.isVeg ? "Vegetarian" : "Non-Vegetarian"}
                               >
                                 <span
-                                  className={`h-1.5 w-1.5 rounded-full ${
+                                  className={`h-2 w-2 rounded-full ${
                                     item.isVeg ? "bg-emerald-400" : "bg-rose-400"
                                   }`}
                                 />
                               </div>
 
-                              <div>
-                                <h3 className="text-xs font-semibold text-zinc-200">
+                              <div className="min-w-0">
+                                <h3 className="text-xs sm:text-sm font-bold text-white leading-snug">
                                   {item.name}
                                 </h3>
                                 {item.portionSize && (
-                                  <span className="text-[10px] text-zinc-400 font-mono">
-                                    {item.portionSize}
+                                  <span className="text-[10px] text-zinc-400 font-mono block mt-0.5">
+                                    Portion: {item.portionSize}
                                   </span>
                                 )}
                               </div>
                             </div>
 
                             {/* Price */}
-                            <span className="font-mono font-semibold text-xs text-zinc-100 shrink-0">
+                            <span className="font-mono font-black text-sm text-white shrink-0">
                               {formatINR(price)}
                             </span>
                           </div>
 
                           {item.description && (
-                            <p className="text-[11px] text-zinc-400 pl-5.5 leading-relaxed">
+                            <p className="text-xs text-zinc-400 pl-6 leading-relaxed">
                               {item.description}
                             </p>
                           )}
                         </div>
 
-                        {/* Add / Quantity Button */}
-                        <div className="mt-3 pt-2 border-t border-zinc-800/60 flex items-center justify-between">
-                          <span className="text-[10px] text-zinc-500 font-mono">
-                            ⏱️ 40 mins
+                        {/* Special Note Input (Expandable) */}
+                        {inCartQty > 0 && (
+                          <div className="mt-2.5 pt-2 border-t border-zinc-800">
+                            {isNoteOpen ? (
+                              <input
+                                type="text"
+                                placeholder="Special instruction (e.g. less spicy, extra lemon)..."
+                                value={cartItem?.notes || ""}
+                                onChange={(e) => updateItemNotes(item.id, e.target.value)}
+                                className="w-full rounded-lg bg-zinc-950 border border-zinc-700 px-2.5 py-1.5 text-xs text-white placeholder-zinc-600 focus:outline-none focus:border-white transition"
+                              />
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => setActiveNoteItemId(item.id)}
+                                className="flex items-center gap-1 text-[11px] text-zinc-400 hover:text-white transition"
+                              >
+                                <MessageSquarePlus className="h-3 w-3" />
+                                <span>Add preparation note</span>
+                              </button>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Add / Quantity Button Row */}
+                        <div className="mt-3 pt-2.5 border-t border-zinc-800/80 flex items-center justify-between">
+                          <span className="text-[11px] text-zinc-500 font-mono flex items-center gap-1">
+                            <Clock className="h-3 w-3" /> 40 mins
                           </span>
 
                           {inCartQty === 0 ? (
                             <button
+                              type="button"
                               onClick={() => addToCart(item)}
-                              className="flex items-center gap-1 rounded-md bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 px-2.5 py-1 text-xs font-medium transition"
+                              className="flex items-center gap-1.5 rounded-xl bg-white text-zinc-950 hover:bg-zinc-200 px-4 py-2 text-xs font-bold transition shadow-sm active:scale-95"
                             >
-                              <Plus className="h-3 w-3 text-zinc-400" /> Add
+                              <Plus className="h-3.5 w-3.5" />
+                              <span>Add</span>
                             </button>
                           ) : (
-                            <div className="flex items-center gap-2 bg-zinc-900 rounded-md p-0.5 border border-zinc-700">
+                            <div className="flex items-center gap-2.5 bg-zinc-900 rounded-xl p-1 border border-zinc-700 shadow-sm">
                               <button
+                                type="button"
                                 onClick={() => removeFromCart(item.id)}
-                                className="h-5 w-5 rounded bg-zinc-800 hover:bg-zinc-700 flex items-center justify-center text-zinc-300"
+                                className="h-7 w-7 rounded-lg bg-zinc-800 hover:bg-zinc-700 flex items-center justify-center text-white active:scale-90 transition"
+                                title="Decrease quantity"
                               >
-                                <Minus className="h-3 w-3" />
+                                <Minus className="h-3.5 w-3.5" />
                               </button>
-                              <span className="font-semibold text-zinc-100 text-xs w-4 text-center font-mono">
+                              <span className="font-bold text-white text-xs w-5 text-center font-mono">
                                 {inCartQty}
                               </span>
                               <button
+                                type="button"
                                 onClick={() => addToCart(item)}
-                                className="h-5 w-5 rounded bg-zinc-800 hover:bg-zinc-700 flex items-center justify-center text-zinc-300"
+                                className="h-7 w-7 rounded-lg bg-zinc-800 hover:bg-zinc-700 flex items-center justify-center text-white active:scale-90 transition"
+                                title="Increase quantity"
                               >
-                                <Plus className="h-3 w-3" />
+                                <Plus className="h-3.5 w-3.5" />
                               </button>
                             </div>
                           )}
@@ -717,284 +804,669 @@ function GuestOrderContent() {
           })}
 
           {filteredCategories.length === 0 && (
-            <div className="rounded-xl bg-[#121215] border border-zinc-800 p-8 text-center text-xs text-zinc-500">
-              No menu items match your search.
+            <div className="rounded-2xl bg-[#121215] border border-zinc-800 p-8 text-center text-xs text-zinc-400 space-y-2">
+              <p className="font-semibold text-zinc-200">No dishes matched your search.</p>
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchQuery("");
+                  setVegFilter("ALL");
+                  setSelectedCategory("ALL");
+                }}
+                className="text-xs text-blue-400 hover:underline font-medium"
+              >
+                Clear all filters
+              </button>
             </div>
           )}
         </div>
       </main>
 
-      {/* 5. FLOATING BOTTOM CART BAR */}
+      {/* 5. FLOATING BOTTOM CART BAR (MOBILE-OPTIMIZED) */}
       {totalItemCount > 0 && !isCartOpen && (
-        <div className="fixed bottom-4 inset-x-4 max-w-md mx-auto z-40 animate-in slide-in-from-bottom-5 duration-150">
+        <div className="fixed bottom-4 inset-x-3 sm:inset-x-auto sm:left-1/2 sm:-translate-x-1/2 sm:w-full sm:max-w-md z-40 animate-in slide-in-from-bottom-5 duration-150">
           <div
             onClick={() => setIsCartOpen(true)}
-            className="rounded-xl bg-zinc-100 text-zinc-950 p-3 shadow-xl cursor-pointer flex items-center justify-between border border-zinc-300 hover:bg-white transition"
+            className="rounded-2xl bg-white text-zinc-950 p-3.5 shadow-2xl cursor-pointer flex items-center justify-between border border-zinc-200 hover:bg-zinc-100 transition active:scale-[0.99]"
           >
-            <div className="flex items-center gap-2.5">
-              <div className="h-7 w-7 rounded-md bg-zinc-950 text-zinc-100 flex items-center justify-center font-bold text-xs">
+            <div className="flex items-center gap-3">
+              <div className="h-8 w-8 rounded-xl bg-zinc-950 text-white flex items-center justify-center font-black text-xs font-mono shadow-sm">
                 {totalItemCount}
               </div>
-              <div className="text-xs font-semibold">
-                View Tray • Room {roomNumber}
+              <div>
+                <div className="text-xs sm:text-sm font-black">
+                  View Tray • Room {roomNumber}
+                </div>
+                <div className="text-[11px] text-zinc-600 font-medium">
+                  {totalItemCount} item{totalItemCount > 1 ? "s" : ""} in order
+                </div>
               </div>
             </div>
 
             <div className="flex items-center gap-2 font-mono">
-              <span className="text-xs font-bold">{formatINR(gst.totalAmount)}</span>
-              <ChevronRight className="h-4 w-4" />
+              <span className="text-sm font-black">{formatINR(gst.totalAmount)}</span>
+              <ChevronRight className="h-5 w-5 text-zinc-950" />
             </div>
           </div>
         </div>
       )}
 
-      {/* 6. CART & CHECKOUT DRAWER */}
+      {/* 6. CART & CHECKOUT DRAWER / BOTTOM SHEET */}
       {isCartOpen && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-150">
-          <div className="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-t-2xl sm:rounded-2xl border border-zinc-800 bg-[#121215] p-5 shadow-2xl space-y-4 text-zinc-200">
+          <div className="w-full max-w-md max-h-[92vh] flex flex-col rounded-t-3xl sm:rounded-3xl border border-zinc-700 bg-[#121215] shadow-2xl text-zinc-200 overflow-hidden">
+            {/* Grab Handle for Mobile */}
+            <div className="w-12 h-1 rounded-full bg-zinc-700 mx-auto mt-2.5 sm:hidden" />
+
             {/* Header */}
-            <div className="flex items-center justify-between pb-3 border-b border-zinc-800">
-              <div className="flex items-center gap-2">
-                <ShoppingBag className="h-4 w-4 text-zinc-400" />
-                <h3 className="text-sm font-semibold text-zinc-100">Order Tray (Room {roomNumber})</h3>
+            <div className="flex items-center justify-between p-4 sm:p-5 border-b border-zinc-800">
+              <div className="flex items-center gap-2.5">
+                <ShoppingBag className="h-5 w-5 text-white" />
+                <div>
+                  <h3 className="text-sm font-bold text-white">Order Tray (Room {roomNumber})</h3>
+                  <p className="text-[11px] text-zinc-400">Review items before kitchen confirmation</p>
+                </div>
               </div>
               <button
                 onClick={() => setIsCartOpen(false)}
-                className="h-7 w-7 rounded-md bg-zinc-800 flex items-center justify-center text-zinc-400 hover:text-zinc-100"
+                className="h-8 w-8 rounded-xl bg-zinc-800 flex items-center justify-center text-zinc-400 hover:text-white transition"
               >
-                <X className="h-3.5 w-3.5" />
+                <X className="h-4 w-4" />
               </button>
             </div>
 
-            {/* Cart Items */}
-            <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
-              {cartList.map(({ item, qty, notes }) => {
-                const price = item.variants?.[0]?.price || 100;
-                return (
-                  <div
-                    key={item.id}
-                    className="rounded-lg bg-zinc-900/80 p-2.5 border border-zinc-800 space-y-1.5 text-xs"
-                  >
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <div className="font-medium text-zinc-100">{item.name}</div>
-                        <div className="text-[11px] text-zinc-500 font-mono">
-                          {formatINR(price)} × {qty}
+            {/* Scrollable Content */}
+            <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4">
+              {/* Cart Items */}
+              <div className="space-y-2.5">
+                {cartList.map(({ item, qty, notes }) => {
+                  const price = item.variants?.[0]?.price || 100;
+                  return (
+                    <div
+                      key={item.id}
+                      className="rounded-xl bg-[#18181b] p-3 border border-zinc-800 space-y-2 text-xs"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <div className="font-bold text-white">{item.name}</div>
+                          <div className="text-[11px] text-zinc-400 font-mono">
+                            {formatINR(price)} × {qty}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2.5">
+                          <div className="flex items-center gap-1.5 bg-zinc-900 rounded-lg p-1 border border-zinc-700">
+                            <button
+                              type="button"
+                              onClick={() => removeFromCart(item.id)}
+                              className="h-6 w-6 rounded bg-zinc-800 hover:bg-zinc-700 flex items-center justify-center text-white"
+                            >
+                              <Minus className="h-3 w-3" />
+                            </button>
+                            <span className="font-bold text-white w-4 text-center font-mono">{qty}</span>
+                            <button
+                              type="button"
+                              onClick={() => addToCart(item)}
+                              className="h-6 w-6 rounded bg-zinc-800 hover:bg-zinc-700 flex items-center justify-center text-white"
+                            >
+                              <Plus className="h-3 w-3" />
+                            </button>
+                          </div>
+                          <span className="font-mono font-bold text-white w-14 text-right">
+                            {formatINR(price * qty)}
+                          </span>
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-2">
-                        <div className="flex items-center gap-1 bg-zinc-800 rounded p-0.5">
-                          <button
-                            onClick={() => removeFromCart(item.id)}
-                            className="p-0.5 hover:text-white text-zinc-400"
-                          >
-                            <Minus className="h-3 w-3" />
-                          </button>
-                          <span className="font-semibold text-zinc-200 w-4 text-center font-mono">{qty}</span>
-                          <button
-                            onClick={() => addToCart(item)}
-                            className="p-0.5 hover:text-white text-zinc-400"
-                          >
-                            <Plus className="h-3 w-3" />
-                          </button>
-                        </div>
-                        <span className="font-mono font-semibold text-zinc-100 w-14 text-right">
-                          {formatINR(price * qty)}
-                        </span>
-                      </div>
+                      <input
+                        type="text"
+                        placeholder="Special instruction (e.g. less spicy)..."
+                        value={notes}
+                        onChange={(e) => updateItemNotes(item.id, e.target.value)}
+                        className="w-full rounded-lg bg-zinc-950 border border-zinc-700 px-2.5 py-1.5 text-xs text-white placeholder-zinc-600 focus:outline-none focus:border-white"
+                      />
                     </div>
+                  );
+                })}
+              </div>
 
-                    <input
-                      type="text"
-                      placeholder="Special note (e.g. less spicy)..."
-                      value={notes}
-                      onChange={(e) => updateItemNotes(item.id, e.target.value)}
-                      className="w-full rounded bg-zinc-950 border border-zinc-800 px-2 py-1 text-[11px] text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-zinc-700"
-                    />
+              {/* Bill Breakdown with 5% GST */}
+              <div className="rounded-xl bg-zinc-900 p-3.5 border border-zinc-800 space-y-1.5 text-xs text-zinc-300">
+                <div className="flex justify-between">
+                  <span>Subtotal</span>
+                  <span className="font-mono font-medium">{formatINR(gst.taxableAmount)}</span>
+                </div>
+                <div className="flex justify-between text-zinc-400 text-[11px]">
+                  <span>GST (5% SAC 996331)</span>
+                  <span className="font-mono">{formatINR(gst.taxAmount)}</span>
+                </div>
+                <div className="flex justify-between font-bold text-sm text-white pt-2 border-t border-zinc-800">
+                  <span>Total Amount</span>
+                  <span className="font-mono text-white">{formatINR(gst.totalAmount)}</span>
+                </div>
+              </div>
+
+              {/* Delivery Details & Room Verification */}
+              <form onSubmit={handlePlaceOrder} className="space-y-3.5 text-xs">
+                {/* 1. Verified Room Delivery Card */}
+                <div className="rounded-2xl bg-[#18181b] border border-zinc-700/90 p-3.5 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] uppercase font-mono tracking-wider text-zinc-400 font-bold">
+                      Delivery Destination
+                    </span>
+                    {/* Room is locked — not changeable by guest */}
+                    <span className="flex items-center gap-1 text-[10px] font-mono text-emerald-400">
+                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                      Rm {roomNumber} Verified
+                    </span>
                   </div>
-                );
-              })}
-            </div>
 
-            {/* Bill Breakdown with 5% GST */}
-            <div className="rounded-lg bg-zinc-900/80 p-3 border border-zinc-800 space-y-1 text-xs text-zinc-300">
-              <div className="flex justify-between">
-                <span>Subtotal</span>
-                <span className="font-mono font-medium">{formatINR(gst.taxableAmount)}</span>
-              </div>
-              <div className="flex justify-between text-zinc-500 text-[11px]">
-                <span>GST (5% SAC 996331)</span>
-                <span className="font-mono">{formatINR(gst.taxAmount)}</span>
-              </div>
-              <div className="flex justify-between font-semibold text-sm text-zinc-100 pt-1.5 border-t border-zinc-800">
-                <span>Total Amount</span>
-                <span className="font-mono text-zinc-100">{formatINR(gst.totalAmount)}</span>
-              </div>
-            </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="h-10 w-10 rounded-xl bg-zinc-900 border border-zinc-700 flex items-center justify-center text-white shrink-0 shadow-sm">
+                        <BedDouble className="h-5 w-5" />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-sm font-black text-white font-mono flex items-center gap-2">
+                          <span>Room {roomNumber || "..."}</span>
+                          {activeSelectedRoom?.isOccupied && (
+                            <span className="text-[10px] text-emerald-400 font-mono font-medium">
+                              ● In-House Verified
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-xs text-zinc-300 font-medium truncate mt-0.5">
+                          Guest: <strong className="text-white">{customerName || "In-House Guest"}</strong>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
 
-            {/* Delivery Details & Room Posting */}
-            <form onSubmit={handlePlaceOrder} className="space-y-3 text-xs">
-              <div className="grid grid-cols-2 gap-2.5">
-                <div>
-                  <label className="text-zinc-300 font-semibold flex items-center justify-between">
-                    <span>Room Number</span>
-                  </label>
+                  {/* Phone contact for mismatch */}
+                  <div className="pt-2 border-t border-zinc-800/80 flex flex-wrap items-center justify-between gap-1 text-[11px] text-zinc-400">
+                    <span>Not your room?</span>
+                    <a
+                      href={`tel:${menuData?.property?.phone || "+916901741211"}`}
+                      className="text-emerald-400 hover:text-emerald-300 font-semibold flex items-center gap-1 font-mono transition"
+                    >
+                      <Phone className="h-3 w-3 shrink-0" />
+                      <span>Dial Ext 9 / {menuData?.property?.phone || "+91 69017 41211"}</span>
+                    </a>
+                  </div>
+                </div>
+
+                {/* 2. Room Verification Checkbox */}
+                <label className="flex items-start gap-2.5 p-3 rounded-xl bg-zinc-900 border border-zinc-800 cursor-pointer hover:border-zinc-700 transition">
                   <input
-                    type="text"
+                    type="checkbox"
                     required
-                    value={roomNumber}
-                    onChange={(e) => setRoomNumber(e.target.value)}
-                    placeholder="e.g. 201"
-                    className="mt-1 w-full rounded-lg bg-[#18181b] border border-zinc-700 px-3 py-2 text-white font-bold text-xs focus:outline-none focus:border-white focus:ring-1 focus:ring-zinc-600 transition placeholder-zinc-500"
+                    checked={isRoomVerified}
+                    onChange={(e) => setIsRoomVerified(e.target.checked)}
+                    className="mt-0.5 h-4 w-4 rounded border-zinc-700 bg-zinc-800 text-emerald-500 accent-emerald-500 focus:ring-0"
                   />
-                </div>
-                <div>
-                  <label className="text-zinc-300 font-semibold flex items-center justify-between">
-                    <span>Guest Name</span>
-                    {customerName && (
-                      <span className="text-[10px] text-emerald-400 font-mono font-medium">● Synced</span>
-                    )}
-                  </label>
-                  <input
-                    type="text"
-                    value={customerName}
-                    onChange={(e) => setCustomerName(e.target.value)}
-                    placeholder="Guest Name"
-                    className="mt-1 w-full rounded-lg bg-[#18181b] border border-zinc-700 px-3 py-2 text-white font-bold text-xs focus:outline-none focus:border-white focus:ring-1 focus:ring-zinc-600 transition placeholder-zinc-500"
-                  />
-                </div>
-              </div>
+                  <span className="text-zinc-200 font-medium leading-relaxed text-xs">
+                    I confirm that this order is for <strong className="text-white">Room {roomNumber}</strong> ({customerName || "In-House Guest"}).
+                  </span>
+                </label>
 
-              {/* Payment Mode */}
-              <div className="space-y-1.5">
-                <label className="text-zinc-400 font-medium">Bill Settlement</label>
-                <div className="space-y-1.5">
-                  <label
-                    onClick={() => setPaymentPref("POST_TO_ROOM")}
-                    className={`flex items-center justify-between p-2 rounded-lg border cursor-pointer transition ${
-                      paymentPref === "POST_TO_ROOM"
-                        ? "bg-zinc-800 border-zinc-600 text-zinc-100 font-medium"
-                        : "bg-zinc-900 border-zinc-800 text-zinc-400"
-                    }`}
-                  >
-                    <div className="flex items-center gap-2">
-                      <BedDouble className="h-4 w-4 text-zinc-400" />
-                      <div>
-                        <div>Post to Room Bill (Room {roomNumber})</div>
-                        <div className="text-[10px] text-zinc-500">Auto-calculated & paid at checkout</div>
+                {/* 3. Payment Mode */}
+                <div className="space-y-2">
+                  <label className="text-zinc-200 font-bold block">Bill Settlement</label>
+                  <div className="space-y-2">
+                    <label
+                      onClick={() => setPaymentPref("POST_TO_ROOM")}
+                      className={`flex items-center justify-between p-3 rounded-xl border cursor-pointer transition ${
+                        paymentPref === "POST_TO_ROOM"
+                          ? "bg-zinc-800 border-zinc-500 text-white font-bold"
+                          : "bg-zinc-900 border-zinc-800 text-zinc-400"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <BedDouble className="h-4 w-4 text-zinc-300" />
+                        <div>
+                          <div className="text-xs">Post to Room Bill (Room {roomNumber})</div>
+                          <div className="text-[10px] text-zinc-400 font-normal">Auto-calculated & paid at checkout</div>
+                        </div>
                       </div>
-                    </div>
-                    {paymentPref === "POST_TO_ROOM" && <Check className="h-4 w-4 text-blue-400" />}
-                  </label>
+                      {paymentPref === "POST_TO_ROOM" && <Check className="h-4 w-4 text-emerald-400" />}
+                    </label>
 
-                  <label
-                    onClick={() => setPaymentPref("UPI_ON_DELIVERY")}
-                    className={`flex items-center justify-between p-2 rounded-lg border cursor-pointer transition ${
-                      paymentPref === "UPI_ON_DELIVERY"
-                        ? "bg-zinc-800 border-zinc-600 text-zinc-100 font-medium"
-                        : "bg-zinc-900 border-zinc-800 text-zinc-400"
-                    }`}
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono text-zinc-400 font-bold">UPI</span>
-                      <div>
-                        <div>UPI / QR Code on Delivery</div>
-                        <div className="text-[10px] text-zinc-500">Scan QR when delivered</div>
+                    <label
+                      onClick={() => setPaymentPref("UPI_ON_DELIVERY")}
+                      className={`flex items-center justify-between p-3 rounded-xl border cursor-pointer transition ${
+                        paymentPref === "UPI_ON_DELIVERY"
+                          ? "bg-zinc-800 border-zinc-500 text-white font-bold"
+                          : "bg-zinc-900 border-zinc-800 text-zinc-400"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <span className="font-mono text-zinc-300 font-black text-xs">UPI</span>
+                        <div>
+                          <div className="text-xs">UPI / QR Code on Delivery</div>
+                          <div className="text-[10px] text-zinc-400 font-normal">Scan QR when delivered</div>
+                        </div>
                       </div>
-                    </div>
-                    {paymentPref === "UPI_ON_DELIVERY" && <Check className="h-4 w-4 text-blue-400" />}
-                  </label>
+                      {paymentPref === "UPI_ON_DELIVERY" && <Check className="h-4 w-4 text-emerald-400" />}
+                    </label>
+                  </div>
                 </div>
-              </div>
 
-              {/* Submit */}
-              <button
-                type="submit"
-                disabled={submitting}
-                className="w-full rounded-lg bg-zinc-100 text-zinc-950 hover:bg-white py-2.5 font-semibold text-xs shadow-md transition flex items-center justify-center gap-2 disabled:opacity-50"
-              >
-                {submitting ? "Placing Order..." : `Confirm Order (${formatINR(gst.totalAmount)})`}
-              </button>
-            </form>
+                {/* 4. Submit Order */}
+                <button
+                  type="submit"
+                  disabled={submitting || !roomNumber || !isRoomVerified}
+                  className="w-full rounded-xl bg-white text-zinc-950 hover:bg-zinc-200 py-3.5 font-black text-xs sm:text-sm shadow-xl transition flex items-center justify-center gap-2 disabled:opacity-50 active:scale-95"
+                >
+                  {submitting ? (
+                    "Sending to Kitchen..."
+                  ) : (
+                    <>
+                      <span>Confirm Order for Room {roomNumber}</span>
+                      <span className="font-mono">({formatINR(gst.totalAmount)})</span>
+                      <ChevronRight className="h-4 w-4" />
+                    </>
+                  )}
+                </button>
+              </form>
+            </div>
           </div>
         </div>
       )}
 
-      {/* 7. LIVE ORDER TRACKING MODAL */}
-      {placedOrder && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-150">
-          <div className="w-full max-w-md rounded-2xl border border-zinc-800 bg-[#121215] p-5 shadow-2xl text-center space-y-4">
-            <div className="h-12 w-12 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 flex items-center justify-center mx-auto">
-              <CheckCircle2 className="h-6 w-6" />
-            </div>
-
-            <div>
-              <span className="text-[10px] uppercase font-mono font-medium text-zinc-400">
-                Order #{placedOrder.orderNo} Placed
-              </span>
-              <h2 className="text-base font-bold text-zinc-100 mt-0.5">
-                Sent to Kitchen for Room {placedOrder.roomNumber}
-              </h2>
-              <p className="text-xs text-zinc-400 mt-1">
-                Estimated Delivery: <strong className="text-zinc-200">~40 Mins</strong>
-              </p>
-            </div>
-
-            {/* Stepper */}
-            <div className="rounded-xl bg-zinc-900 p-3.5 border border-zinc-800 space-y-2.5 text-left text-xs">
-              <div className="flex items-center gap-2.5">
-                <div className="h-5 w-5 rounded-full bg-emerald-500 text-zinc-950 flex items-center justify-center text-[10px] font-bold shrink-0">
-                  ✓
+      {/* 7. PERSISTENT FLOATING LIVE ORDER STATUS PILL */}
+      {activeOrders.length > 0 && !showTrackingModal && !isCartOpen && (
+        <div
+          className={`fixed inset-x-3 sm:inset-x-auto sm:left-1/2 sm:-translate-x-1/2 sm:w-full sm:max-w-md z-30 animate-in slide-in-from-bottom-3 duration-200 ${
+            totalItemCount > 0 ? "bottom-24" : "bottom-4"
+          }`}
+        >
+          <div
+            onClick={() => {
+              setTrackingTab("ACTIVE");
+              setSelectedOrderForTracking(activeOrders[0]);
+              setShowTrackingModal(true);
+            }}
+            className="rounded-2xl bg-[#18181b]/95 border border-zinc-700 p-3 shadow-2xl backdrop-blur-xl cursor-pointer hover:border-zinc-500 transition text-white flex items-center justify-between gap-2.5 active:scale-[0.99] min-w-0 w-full"
+          >
+            <div className="flex items-center gap-2.5 min-w-0 flex-1">
+              <div className="h-9 w-9 rounded-xl bg-zinc-900 border border-zinc-700 flex items-center justify-center text-emerald-400 shrink-0 shadow-inner">
+                <Clock className="h-4 w-4 animate-pulse" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <span className="text-[9px] font-mono font-bold uppercase text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20 shrink-0">
+                    {activeOrders[0].statusLabel}
+                  </span>
+                  <span className="text-[9px] text-zinc-400 font-mono truncate">
+                    #{activeOrders[0].orderNo}
+                  </span>
                 </div>
-                <div>
-                  <div className="font-medium text-zinc-200">Order Confirmed</div>
-                  <div className="text-[10px] text-zinc-500">KOT ticket received in kitchen</div>
+                <p className="text-[11px] font-semibold text-zinc-200 truncate mt-0.5">
+                  ETA: <span className="text-white font-bold">~{activeOrders[0].estimatedMinutesRemaining}m</span> • Expected {activeOrders[0].estimatedDeliveryTime}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1 text-xs font-bold text-zinc-950 bg-white hover:bg-zinc-200 px-3 py-1.5 rounded-xl transition shadow shrink-0">
+              <span>Track</span>
+              <ChevronRight className="h-3.5 w-3.5" />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 8. COMPREHENSIVE LIVE ORDER TRACKING MODAL (MOBILE BOTTOM SHEET & DESKTOP DIALOG) */}
+      {showTrackingModal && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-sm p-0 sm:p-4 overflow-hidden animate-in fade-in duration-150">
+          <div className="w-full max-w-lg rounded-t-3xl sm:rounded-3xl border-t sm:border border-zinc-800 bg-[#121215] shadow-2xl flex flex-col max-h-[90vh] sm:max-h-[85vh] text-zinc-200 text-xs overflow-hidden">
+            {/* Mobile Sheet Drag Handle */}
+            <div className="w-10 h-1 rounded-full bg-zinc-700 mx-auto mt-2.5 sm:hidden shrink-0" />
+
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-3.5 sm:px-6 py-3 border-b border-zinc-800 shrink-0 min-w-0 w-full">
+              <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                <div className="h-8 w-8 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-100 flex items-center justify-center shrink-0">
+                  <UtensilsCrossed className="h-4 w-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h2 className="text-xs sm:text-sm font-bold text-white flex items-center gap-1.5 min-w-0">
+                    <span className="truncate">In-Room Dining Tracker</span>
+                    <span className="text-[10px] font-mono text-zinc-300 bg-zinc-800 border border-zinc-700 px-1.5 py-0.2 rounded font-medium shrink-0">
+                      Room {roomNumber}
+                    </span>
+                  </h2>
+                  <p className="text-[10px] text-zinc-400 font-mono truncate">
+                    Live updates synced with kitchen workstation
+                  </p>
                 </div>
               </div>
 
-              <div className="flex items-center gap-2.5">
-                <div
-                  className={`h-5 w-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${
-                    orderStatus?.tracker?.step >= 2
-                      ? "bg-emerald-500 text-zinc-950"
-                      : "bg-zinc-800 text-zinc-400 border border-zinc-700 animate-pulse"
-                  }`}
+              <div className="flex items-center gap-1.5 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => fetchRoomOrders(roomNumber)}
+                  className="h-7 w-7 sm:h-8 sm:w-8 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-400 hover:text-white transition"
+                  title="Refresh order status"
                 >
-                  2
+                  <RefreshCw className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowTrackingModal(false)}
+                  className="h-7 w-7 sm:h-8 sm:w-8 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-400 hover:text-white transition"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Scrollable Body */}
+            <div className="overflow-y-auto overflow-x-hidden px-3.5 sm:px-6 py-3.5 space-y-3 flex-1 min-w-0 w-full">
+              {/* Active vs Past Orders Tab Switcher (If both exist) */}
+              {(activeOrders.length > 0 || pastOrders.length > 0) && (
+                <div className="grid grid-cols-2 gap-1 p-1 rounded-xl bg-zinc-900 border border-zinc-800 w-full min-w-0">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTrackingTab("ACTIVE");
+                      if (activeOrders.length > 0) setSelectedOrderForTracking(activeOrders[0]);
+                    }}
+                    className={`py-1.5 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 min-w-0 truncate ${
+                      trackingTab === "ACTIVE"
+                        ? "bg-zinc-800 text-white shadow-sm border border-zinc-700"
+                        : "text-zinc-400 hover:text-white"
+                    }`}
+                  >
+                    <Clock className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
+                    <span className="truncate">Active ({activeOrders.length})</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTrackingTab("PAST");
+                      if (pastOrders.length > 0) setSelectedOrderForTracking(pastOrders[0]);
+                    }}
+                    className={`py-1.5 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 min-w-0 truncate ${
+                      trackingTab === "PAST"
+                        ? "bg-zinc-800 text-white shadow-sm border border-zinc-700"
+                        : "text-zinc-400 hover:text-white"
+                    }`}
+                  >
+                    <History className="h-3.5 w-3.5 text-zinc-400 shrink-0" />
+                    <span className="truncate">Past ({pastOrders.length})</span>
+                  </button>
                 </div>
-                <div>
-                  <div className="font-medium text-zinc-200">Preparing in Kitchen</div>
-                  <div className="text-[10px] text-zinc-500">
-                    {orderStatus?.tracker?.subtitle || "Chefs preparing your fresh food (~40 mins)"}
+              )}
+
+              {/* Multiple Orders Selector Chips */}
+              {trackingTab === "ACTIVE" && activeOrders.length > 1 && (
+                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 min-w-0 w-full">
+                  {activeOrders.map((o) => (
+                    <button
+                      key={o.id}
+                      type="button"
+                      onClick={() => setSelectedOrderForTracking(o)}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold whitespace-nowrap transition shrink-0 ${
+                        selectedOrderForTracking?.id === o.id
+                          ? "bg-white text-zinc-950 shadow"
+                          : "bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white"
+                      }`}
+                    >
+                      #{o.orderNo} (~{o.estimatedMinutesRemaining}m)
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {trackingTab === "PAST" && pastOrders.length > 1 && (
+                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 min-w-0 w-full">
+                  {pastOrders.map((o) => (
+                    <button
+                      key={o.id}
+                      type="button"
+                      onClick={() => setSelectedOrderForTracking(o)}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold whitespace-nowrap transition shrink-0 ${
+                        selectedOrderForTracking?.id === o.id
+                          ? "bg-white text-zinc-950 shadow"
+                          : "bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white"
+                      }`}
+                    >
+                      #{o.orderNo} ({o.orderedAtFormatted})
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Main Tracker Content */}
+              {selectedOrderForTracking ? (
+                <div className="space-y-3 min-w-0 w-full">
+                  {/* 1. HERO ESTIMATED TIME & STATUS BANNER */}
+                  <div className="rounded-2xl bg-zinc-900/90 border border-zinc-800 p-3.5 sm:p-4 text-center space-y-2.5 min-w-0 w-full">
+                    <div className="flex items-center justify-between text-[11px] font-mono gap-2 min-w-0">
+                      <span className="text-zinc-400 truncate">
+                        Order <strong className="text-white font-mono">#{selectedOrderForTracking.orderNo}</strong>
+                      </span>
+                      <span className="px-2 py-0.5 rounded font-bold uppercase text-[9px] sm:text-[10px] font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shrink-0">
+                        {selectedOrderForTracking.statusLabel}
+                      </span>
+                    </div>
+
+                    {/* Big ETA Display */}
+                    <div className="py-0.5">
+                      {selectedOrderForTracking.step < 4 ? (
+                        <div>
+                          <div className="text-2xl sm:text-3xl font-black text-white font-mono tracking-tight flex items-center justify-center gap-2">
+                            <Clock className="h-5 w-5 sm:h-6 sm:w-6 text-emerald-400 animate-pulse shrink-0" />
+                            <span>~{selectedOrderForTracking.estimatedMinutesRemaining} Minutes</span>
+                          </div>
+                          <p className="text-[11px] sm:text-xs text-zinc-400 mt-1 font-medium leading-normal">
+                            Estimated Delivery: <strong className="text-white font-bold font-mono">{selectedOrderForTracking.estimatedDeliveryTime}</strong> to Room {roomNumber}
+                          </p>
+                        </div>
+                      ) : (
+                        <div>
+                          <div className="text-2xl sm:text-3xl font-black text-emerald-400 tracking-tight flex items-center justify-center gap-2">
+                            <CheckCircle2 className="h-6 w-6 sm:h-7 sm:w-7 text-emerald-400 shrink-0" />
+                            <span>Delivered to Room {roomNumber}</span>
+                          </div>
+                          <p className="text-[11px] sm:text-xs text-zinc-400 mt-1 font-mono">
+                            Delivered at {selectedOrderForTracking.orderedAtFormatted} • Enjoy your meal!
+                          </p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Clean Progress Bar */}
+                    <div className="space-y-1 pt-0.5">
+                      <div className="h-1.5 w-full rounded-full bg-zinc-800 overflow-hidden">
+                        <div
+                          className="h-full bg-emerald-500 rounded-full transition-all duration-500"
+                          style={{ width: `${selectedOrderForTracking.progressPercentage}%` }}
+                        />
+                      </div>
+                      <div className="flex items-center justify-between text-[10px] text-zinc-400 font-mono gap-1 min-w-0">
+                        <span className="truncate">Ordered {selectedOrderForTracking.orderedAtFormatted}</span>
+                        <span className="shrink-0 font-medium">Step {selectedOrderForTracking.step}/4: {selectedOrderForTracking.statusLabel}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 2. 4-STEP LIVE TIMELINE */}
+                  <div className="rounded-2xl bg-zinc-900/90 border border-zinc-800 p-3 sm:p-4 space-y-3 text-xs min-w-0 w-full">
+                    <div className="font-bold text-white flex items-center justify-between border-b border-zinc-800 pb-2">
+                      <div className="flex items-center gap-1.5">
+                        <Clock className="h-3.5 w-3.5 text-zinc-400" />
+                        <span>Live Kitchen & Delivery Timeline</span>
+                      </div>
+                      <span className="text-[10px] font-mono text-zinc-400">
+                        Room {roomNumber}
+                      </span>
+                    </div>
+
+                    {/* Step 1: Order Confirmed */}
+                    <div className="flex items-start gap-2.5 min-w-0 w-full">
+                      <div
+                        className={`h-5 w-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 mt-0.5 ${
+                          selectedOrderForTracking.step >= 1
+                            ? "bg-emerald-500 text-zinc-950"
+                            : "bg-zinc-800 text-zinc-500"
+                        }`}
+                      >
+                        ✓
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="font-bold text-white flex items-center justify-between gap-2">
+                          <span className="truncate">1. Order Confirmed in Kitchen</span>
+                          <span className="text-[10px] font-mono text-zinc-400 font-normal shrink-0">
+                            {selectedOrderForTracking.orderedAtFormatted}
+                          </span>
+                        </div>
+                        <div className="text-[11px] text-zinc-400 leading-snug break-words mt-0.5">
+                          KOT ticket printed and assigned to kitchen workstation
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Step 2: Cooking in Kitchen */}
+                    <div className="flex items-start gap-2.5 min-w-0 w-full">
+                      <div
+                        className={`h-5 w-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 mt-0.5 ${
+                          selectedOrderForTracking.step > 2
+                            ? "bg-emerald-500 text-zinc-950"
+                            : selectedOrderForTracking.step === 2
+                            ? "bg-white text-zinc-950 ring-2 ring-white/20"
+                            : "bg-zinc-800 text-zinc-500"
+                        }`}
+                      >
+                        {selectedOrderForTracking.step > 2 ? "✓" : "2"}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="font-bold text-white flex items-center justify-between gap-2">
+                          <span className={selectedOrderForTracking.step === 2 ? "text-white font-black truncate" : "text-zinc-300 font-bold truncate"}>
+                            2. Chefs Cooking Fresh Meal
+                          </span>
+                          {selectedOrderForTracking.step === 2 && (
+                            <span className="text-[10px] font-mono text-emerald-400 font-bold shrink-0">
+                              ~{selectedOrderForTracking.estimatedMinutesRemaining}m
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-[11px] text-zinc-400 leading-snug break-words mt-0.5">
+                          Chefs actively preparing fresh ingredients on tandoor & wok
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Step 3: Out for Delivery */}
+                    <div className="flex items-start gap-2.5 min-w-0 w-full">
+                      <div
+                        className={`h-5 w-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 mt-0.5 ${
+                          selectedOrderForTracking.step > 3
+                            ? "bg-emerald-500 text-zinc-950"
+                            : selectedOrderForTracking.step === 3
+                            ? "bg-white text-zinc-950 ring-2 ring-white/20"
+                            : "bg-zinc-800 text-zinc-500"
+                        }`}
+                      >
+                        {selectedOrderForTracking.step > 3 ? "✓" : "3"}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="font-bold text-white flex items-center justify-between gap-2">
+                          <span className={selectedOrderForTracking.step === 3 ? "text-white font-black truncate" : "text-zinc-300 font-bold truncate"}>
+                            3. Dispatched & Out for Delivery
+                          </span>
+                          {selectedOrderForTracking.step === 3 && (
+                            <span className="text-[10px] font-mono text-emerald-400 font-bold shrink-0">
+                              On the Way (~5m)
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-[11px] text-zinc-400 leading-snug break-words mt-0.5">
+                          Food plated warm; room service runner bringing tray to Room {roomNumber}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Step 4: Delivered */}
+                    <div className="flex items-start gap-2.5 min-w-0 w-full">
+                      <div
+                        className={`h-5 w-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 mt-0.5 ${
+                          selectedOrderForTracking.step === 4
+                            ? "bg-emerald-500 text-zinc-950"
+                            : "bg-zinc-800 text-zinc-500"
+                        }`}
+                      >
+                        {selectedOrderForTracking.step === 4 ? "✓" : "4"}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="font-bold text-white">4. Delivered to Room</div>
+                        <div className="text-[11px] text-zinc-400 leading-snug break-words mt-0.5">
+                          Meal received in room. Bill posted to room folio / settled.
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 3. ORDER ITEMS BREAKDOWN (GENUINE DATABASE ITEMS) */}
+                  <div className="rounded-2xl bg-zinc-900/90 border border-zinc-800 p-3 sm:p-4 space-y-2 text-xs min-w-0 w-full">
+                    <div className="font-bold text-white flex items-center justify-between border-b border-zinc-800 pb-2">
+                      <span>Ordered Dishes ({selectedOrderForTracking.items?.length || 0} items)</span>
+                      <span className="font-mono text-emerald-400 font-bold">
+                        {formatINR(selectedOrderForTracking.totalAmount)}
+                      </span>
+                    </div>
+
+                    <div className="space-y-1.5 max-h-40 overflow-y-auto pr-0.5 min-w-0 w-full">
+                      {selectedOrderForTracking.items?.map((it: any) => (
+                        <div key={it.id} className="flex items-center justify-between gap-2 text-xs py-1 border-b border-zinc-800/40 min-w-0 w-full">
+                          <div className="flex items-center gap-2 min-w-0 flex-1">
+                            <span className="font-mono font-bold text-zinc-400 shrink-0">{it.qty}x</span>
+                            <div className="min-w-0 flex-1">
+                              <span className="text-white font-medium truncate block">{it.name}</span>
+                              {it.notes && (
+                                <span className="text-[10px] text-zinc-400 block font-mono truncate">
+                                  Note: {it.notes}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <span className="font-mono text-zinc-300 shrink-0">{formatINR(it.total)}</span>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="pt-2 border-t border-zinc-800 flex items-center justify-between text-[11px] text-zinc-400 font-mono">
+                      <span>GST (5% SAC 996331): {formatINR(selectedOrderForTracking.taxTotal)}</span>
+                      <span className="text-white font-bold">Total: {formatINR(selectedOrderForTracking.totalAmount)}</span>
+                    </div>
                   </div>
                 </div>
-              </div>
-
-              <div className="flex items-center gap-2.5">
-                <div
-                  className={`h-5 w-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${
-                    orderStatus?.tracker?.step >= 3
-                      ? "bg-emerald-500 text-zinc-950"
-                      : "bg-zinc-800 text-zinc-500"
-                  }`}
-                >
-                  3
+              ) : (
+                <div className="py-8 text-center text-zinc-500 space-y-2">
+                  <UtensilsCrossed className="h-8 w-8 mx-auto text-zinc-600" />
+                  <p>No active food orders found for Room {roomNumber}.</p>
+                  <button
+                    type="button"
+                    onClick={() => setShowTrackingModal(false)}
+                    className="rounded-xl bg-white text-zinc-950 font-bold px-4 py-2 text-xs shadow-md"
+                  >
+                    Browse Menu & Place Order
+                  </button>
                 </div>
-                <div>
-                  <div className="font-medium text-zinc-400">Delivering to Room</div>
-                  <div className="text-[10px] text-zinc-500">Staff bringing tray to Room {placedOrder.roomNumber}</div>
-                </div>
-              </div>
+              )}
             </div>
 
-            {/* Dismiss */}
-            <button
-              onClick={() => setPlacedOrder(null)}
-              className="w-full rounded-lg bg-zinc-800 hover:bg-zinc-700 py-2 text-xs font-medium text-zinc-300 transition"
-            >
-              Close / Order More Items
-            </button>
+            {/* Modal Sticky Bottom Footer */}
+            <div className="p-3.5 sm:p-4 border-t border-zinc-800 bg-[#121215] shrink-0 w-full">
+              <button
+                type="button"
+                onClick={() => setShowTrackingModal(false)}
+                className="w-full rounded-xl bg-white text-zinc-950 hover:bg-zinc-200 py-3 text-xs font-bold transition active:scale-95 shadow-md"
+              >
+                Close & Continue Dining
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -1002,13 +1474,13 @@ function GuestOrderContent() {
       {/* 8. WELCOME ROOM SELECTOR MODAL (FOR GENERIC QR SCANS) */}
       {showWelcomeModal && !roomNumber && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4 animate-in fade-in">
-          <div className="w-full max-w-md rounded-2xl border border-zinc-800 bg-[#121215] p-5 shadow-2xl space-y-4 text-zinc-200">
+          <div className="w-full max-w-md rounded-3xl border border-zinc-700 bg-[#121215] p-5 sm:p-6 shadow-2xl space-y-4 text-zinc-200">
             <div className="text-center space-y-1.5 pb-2 border-b border-zinc-800">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-zinc-100 text-zinc-950 font-bold text-sm tracking-tight mx-auto mb-2">
-                H
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-zinc-950 font-black text-base tracking-tight mx-auto mb-2 shadow-md">
+                A
               </div>
-              <h2 className="text-base font-bold text-zinc-100">
-                Welcome to Hotel Ambarish In-Room Dining
+              <h2 className="text-base sm:text-lg font-black text-white">
+                In-Room Dining
               </h2>
               <p className="text-xs text-zinc-400">
                 Please select your room to explore the menu and order directly to your room.
@@ -1017,20 +1489,20 @@ function GuestOrderContent() {
 
             {/* Room Search */}
             <div className="relative">
-              <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-zinc-500" />
+              <Search className="absolute left-3.5 top-3 h-4 w-4 text-zinc-500" />
               <input
                 type="text"
                 placeholder="Search room number or your name..."
                 value={roomSearchQuery}
                 onChange={(e) => setRoomSearchQuery(e.target.value)}
-                className="w-full rounded-lg bg-zinc-900 border border-zinc-800 pl-9 pr-3 py-2 text-xs text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-zinc-700"
+                className="w-full rounded-xl bg-zinc-900 border border-zinc-700 pl-10 pr-3 py-2.5 text-xs sm:text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-white"
               />
             </div>
 
             {/* Occupied In-House Rooms (1-Tap Selection) */}
-            <div className="space-y-1.5 max-h-60 overflow-y-auto pr-1">
-              <div className="text-[10px] uppercase font-mono tracking-wider text-zinc-500 font-semibold">
-                Occupied In-House Rooms
+            <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+              <div className="text-[10px] uppercase font-mono tracking-wider text-zinc-400 font-bold">
+                In-House Rooms
               </div>
 
               {filteredRooms.map((r: any) => (
@@ -1040,22 +1512,22 @@ function GuestOrderContent() {
                     handleSelectRoom(r);
                     setShowWelcomeModal(false);
                   }}
-                  className="p-2.5 rounded-xl bg-zinc-900/80 hover:bg-zinc-800 border border-zinc-800/90 hover:border-zinc-700 cursor-pointer transition flex items-center justify-between text-xs"
+                  className="p-3 rounded-2xl bg-zinc-900/90 hover:bg-zinc-800 border border-zinc-800 hover:border-zinc-600 cursor-pointer transition flex items-center justify-between text-xs"
                 >
                   <div className="space-y-0.5">
                     <div className="flex items-center gap-2">
-                      <span className="font-bold text-zinc-100">Room {r.number}</span>
+                      <span className="font-bold text-white font-mono">Room {r.number}</span>
                       <span className="text-[10px] text-zinc-400">• {r.roomTypeName}</span>
                     </div>
                     {r.guestName && (
                       <div className="text-[11px] text-blue-400 font-medium flex items-center gap-1">
-                        <User className="h-3 w-3 text-zinc-500" /> {r.guestName}
+                        <User className="h-3 w-3 text-blue-400" /> {r.guestName}
                       </div>
                     )}
                   </div>
 
                   <span
-                    className={`rounded px-1.5 py-0.5 text-[9px] font-mono font-medium ${
+                    className={`rounded-md px-2 py-0.5 text-[9px] font-mono font-bold ${
                       r.isOccupied
                         ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
                         : "bg-zinc-800 text-zinc-500"
@@ -1069,7 +1541,7 @@ function GuestOrderContent() {
 
             <button
               onClick={() => setShowWelcomeModal(false)}
-              className="w-full rounded-lg bg-zinc-800 hover:bg-zinc-700 py-2 text-xs font-medium text-zinc-300 transition"
+              className="w-full rounded-xl bg-zinc-800 hover:bg-zinc-700 py-3 text-xs font-bold text-zinc-300 transition"
             >
               Browse Menu First
             </button>
@@ -1082,7 +1554,13 @@ function GuestOrderContent() {
 
 export default function GuestOrderPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-[#09090b] flex items-center justify-center text-zinc-400 text-xs">Loading Menu...</div>}>
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-[#09090b] flex items-center justify-center text-zinc-400 text-xs font-mono">
+          Loading Menu...
+        </div>
+      }
+    >
       <GuestOrderContent />
     </Suspense>
   );

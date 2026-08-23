@@ -37,7 +37,12 @@ interface RoomOption {
 
 function CheckInKioskInner() {
   const searchParams = useSearchParams();
-  const queryPropertyId = searchParams.get("propertyId") || "";
+  const queryPropertyId =
+    searchParams.get("property") ||
+    searchParams.get("propertyCode") ||
+    searchParams.get("code") ||
+    searchParams.get("propertyId") ||
+    "";
 
   const [theme, setTheme] = useState<"dark" | "light">("light");
   const [selectedProperty, setSelectedProperty] = useState<PropertySummary | null>(null);
@@ -48,7 +53,7 @@ function CheckInKioskInner() {
   const [formData, setFormData] = useState({
     arrivalDateTime: "",
     fullName: "",
-    age: "32",
+    age: "",
     gender: "Male",
     nationality: "Indian",
     fatherSpouseName: "",
@@ -57,7 +62,7 @@ function CheckInKioskInner() {
     streetAddress: "",
     city: "",
     state: "",
-    pinZipCode: "781008",
+    pinZipCode: "",
     country: "India",
     // Travel Details
     arrivedFrom: "",
@@ -65,7 +70,7 @@ function CheckInKioskInner() {
     purposeOfVisit: "Tourism / Holiday",
     referralChannel: "Direct / Walk-In",
     // Contact & Vehicle
-    mobilePhone: "+91 ",
+    mobilePhone: "",
     alternatePhone: "",
     email: "",
     driverName: "",
@@ -144,8 +149,13 @@ function CheckInKioskInner() {
           if (roomsRes.ok) {
             const roomsData = await roomsRes.json();
             if (Array.isArray(roomsData)) {
+              const vacantRooms = roomsData.filter(
+                (r: any) =>
+                  (!r.assignments || r.assignments.length === 0) &&
+                  r.roomState?.occupancyStatus !== "OCCUPIED"
+              );
               setPropertyRooms(
-                roomsData.map((r: any) => ({
+                vacantRooms.map((r: any) => ({
                   id: r.id,
                   number: r.number,
                   floor: r.floor,
@@ -233,10 +243,10 @@ function CheckInKioskInner() {
     const pt = getCanvasPoint(e);
     if (!pt) return;
 
-    ctx.lineWidth = 2.5;
+    ctx.lineWidth = 3;
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
-    ctx.strokeStyle = theme === "dark" ? "#ffffff" : "#09090b";
+    ctx.strokeStyle = "#0f172a";
     ctx.lineTo(pt.x, pt.y);
     ctx.stroke();
   };
@@ -600,6 +610,7 @@ function CheckInKioskInner() {
                     required
                     min={1}
                     max={120}
+                    placeholder="e.g. 28"
                     value={formData.age}
                     onChange={(e) => setFormData({ ...formData, age: e.target.value })}
                     className={`${inputStyles} font-mono`}
@@ -1016,9 +1027,7 @@ function CheckInKioskInner() {
                 </button>
               </div>
 
-              <div className={`relative rounded-xl border overflow-hidden touch-none select-none ${
-                isDark ? "border-zinc-700 bg-[#09090b]" : "border-zinc-300 bg-zinc-50"
-              }`}>
+              <div className="relative rounded-2xl border-2 border-dashed border-zinc-400 bg-white overflow-hidden touch-none select-none p-1 shadow-inner">
                 <canvas
                   ref={canvasRef}
                   onMouseDown={startDrawing}
@@ -1028,14 +1037,18 @@ function CheckInKioskInner() {
                   onTouchStart={startDrawing}
                   onTouchMove={draw}
                   onTouchEnd={stopDrawing}
-                  className="w-full h-36 cursor-crosshair block"
+                  className="w-full h-36 cursor-crosshair block bg-white"
                 />
 
-                {!hasSignature && (
-                  <div className={`absolute inset-0 flex items-center justify-center pointer-events-none text-xs font-medium ${
-                    isDark ? "text-zinc-500" : "text-zinc-400"
-                  }`}>
-                    Sign inside the box using your finger, stylus, or mouse
+                {!hasSignature ? (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-xs font-semibold text-zinc-400 gap-1">
+                    <span>✍️ Sign inside this box using finger, stylus, or mouse</span>
+                    <span className="text-[10px] text-zinc-400">Official Guest Registration Signature</span>
+                  </div>
+                ) : (
+                  <div className="absolute bottom-2 left-4 right-4 pointer-events-none flex justify-between text-[9px] text-zinc-400 font-mono border-t border-zinc-200 pt-0.5">
+                    <span>✕ Signed Signature</span>
+                    <span>Legal Verification</span>
                   </div>
                 )}
               </div>

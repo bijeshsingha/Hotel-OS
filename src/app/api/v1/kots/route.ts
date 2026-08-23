@@ -4,16 +4,43 @@ import { prisma } from "@/lib/db/prisma";
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const propertyId = searchParams.get("propertyId");
+    const rawProp =
+      searchParams.get("propertyId") ||
+      searchParams.get("property") ||
+      searchParams.get("propertyCode") ||
+      searchParams.get("code");
     const stationId = searchParams.get("stationId");
 
-    if (!propertyId) {
-      return NextResponse.json({ error: "propertyId is required" }, { status: 400 });
+    let targetPropertyId = rawProp;
+
+    if (rawProp) {
+      const prop = await prisma.property.findFirst({
+        where: {
+          OR: [
+            { id: rawProp },
+            { code: { equals: rawProp } },
+            { displayName: { contains: rawProp } },
+          ],
+        },
+      });
+      if (prop) {
+        targetPropertyId = prop.id;
+      }
+    } else {
+      const defaultProp = await prisma.property.findFirst({
+        where: { status: "ACTIVE" },
+        orderBy: { createdAt: "asc" },
+      });
+      targetPropertyId = defaultProp?.id || null;
+    }
+
+    if (!targetPropertyId) {
+      return NextResponse.json([]);
     }
 
     const kots = await prisma.kOT.findMany({
       where: {
-        propertyId,
+        propertyId: targetPropertyId,
         ...(stationId ? { stationId } : {}),
         status: { in: ["QUEUED", "PREPARING", "READY"] },
       },
@@ -21,7 +48,15 @@ export async function GET(request: Request) {
         order: {
           include: {
             table: true,
-            stay: { include: { primaryGuest: true } },
+            stay: {
+              include: {
+                primaryGuest: true,
+                roomAssignments: {
+                  where: { endsAt: null },
+                  include: { room: true },
+                },
+              },
+            },
           },
         },
         station: true,
@@ -36,6 +71,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json(kots);
   } catch (error: any) {
+    console.error("Error in /api/v1/kots:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

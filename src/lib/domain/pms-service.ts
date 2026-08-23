@@ -208,7 +208,7 @@ export async function checkInGuest({
   // Verify room exists and check cleanliness
   const room = await prisma.room.findUniqueOrThrow({
     where: { id: roomId },
-    include: { roomState: true },
+    include: { roomState: true, roomType: true },
   });
 
   if (room.roomState?.occupancyStatus === "OCCUPIED") {
@@ -358,7 +358,53 @@ export async function checkInGuest({
     data: { folioId: folio.id },
   });
 
-  // 7. Handle advance deposit if provided
+  // 7. Post Initial Room Tariff Charge (SAC 996311)
+  let roomBasePrice = 3200;
+  if (room.roomTypeId) {
+    const rateVersion = await prisma.ratePlanVersion.findFirst({
+      where: { roomTypeId: room.roomTypeId, active: true },
+      orderBy: { createdAt: "desc" },
+    });
+    if (rateVersion?.pricingJson) {
+      try {
+        const pricing = JSON.parse(rateVersion.pricingJson);
+        if (pricing.basePrice) roomBasePrice = Number(pricing.basePrice);
+      } catch {}
+    }
+  }
+
+  const roomGst = calculateGST({
+    grossOrBaseAmount: roomBasePrice,
+    isInclusive: false,
+    sacHsn: "996311",
+    supplierStateCode: property.stateCode || "18",
+  });
+
+  const serviceDateStr = property.businessDate || new Date().toISOString().split("T")[0];
+
+  await prisma.folioEntry.create({
+    data: {
+      organizationId: property.organizationId,
+      propertyId: property.id,
+      folioId: folio.id,
+      folioWindowId: guestWindow.id,
+      serviceDate: serviceDateStr,
+      type: "CHARGE",
+      chargeCode: "ROOM_TARIFF",
+      description: `Room Tariff - Room ${room.number} (${room.roomType?.name || "Room Charge"})`,
+      qty: 1,
+      unitAmount: roomBasePrice,
+      taxableAmount: roomGst.taxableAmount,
+      taxComponentsJson: JSON.stringify(roomGst.components),
+      totalAmount: roomGst.totalAmount,
+      sourceType: "PMS_NIGHTLY_CHARGE",
+      status: "POSTED",
+    },
+  });
+
+  let currentBalance = roomGst.totalAmount;
+
+  // 8. Handle advance deposit if provided
   if (depositAmount > 0) {
     const recSeq = await getNextDocumentNumber(propertyId, "RECEIPT");
     const payment = await prisma.payment.create({
@@ -382,11 +428,13 @@ export async function checkInGuest({
       },
     });
 
-    await prisma.folio.update({
-      where: { id: folio.id },
-      data: { balance: -depositAmount },
-    });
+    currentBalance -= depositAmount;
   }
+
+  await prisma.folio.update({
+    where: { id: folio.id },
+    data: { balance: currentBalance },
+  });
 
   // 8. Write Audit Log
   await prisma.auditLog.create({

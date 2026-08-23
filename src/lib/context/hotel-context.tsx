@@ -18,6 +18,7 @@ export interface PropertyInfo {
 export interface UserInfo {
   id: string;
   name: string;
+  username: string;
   email: string;
   activeRole: string;
   roleName: string;
@@ -27,11 +28,20 @@ interface HotelContextType {
   user: UserInfo | null;
   activeProperty: PropertyInfo | null;
   availableProperties: PropertyInfo[];
-  allUsers: Array<{ id: string; name: string; email: string; role: string; roleName: string }>;
+  allUsers: Array<{
+    id: string;
+    name: string;
+    username: string;
+    email: string;
+    role: string;
+    roleName: string;
+    propertyScope?: string;
+  }>;
   isLoading: boolean;
   activeRole: string;
   switchProperty: (propertyId: string) => void;
-  switchUser: (email: string) => void;
+  switchUser: (identifier: string) => void;
+  logout: () => void;
   refreshData: () => Promise<void>;
   refreshKey: number;
 }
@@ -46,17 +56,22 @@ export function HotelProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
 
-  const fetchSession = useCallback(async (email?: string, propId?: string) => {
+  const fetchSession = useCallback(async (identifier?: string, propId?: string) => {
     try {
       setIsLoading(true);
       const params = new URLSearchParams();
-      if (email) params.set("email", email);
+      if (identifier) params.set("username", identifier);
       if (propId) params.set("propertyId", propId);
 
       const res = await fetch(`/api/v1/auth/session?${params.toString()}`);
       if (res.ok) {
         const data = await res.json();
-        if (data?.user) setUser(data.user);
+        if (data?.user) {
+          setUser(data.user);
+          if (typeof window !== "undefined" && data.user.username) {
+            localStorage.setItem("hotel_os_user", data.user.username);
+          }
+        }
         if (data?.activeProperty) setActiveProperty(data.activeProperty);
         if (Array.isArray(data?.availableProperties)) setAvailableProperties(data.availableProperties);
         if (Array.isArray(data?.allUsers)) setAllUsers(data.allUsers);
@@ -69,22 +84,34 @@ export function HotelProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    fetchSession();
+    const saved = typeof window !== "undefined" ? localStorage.getItem("hotel_os_user") : null;
+    fetchSession(saved || undefined);
   }, [fetchSession]);
 
   const switchProperty = (propertyId: string) => {
-    fetchSession(user?.email, propertyId);
+    fetchSession(user?.username || user?.email, propertyId);
     setRefreshKey((k) => k + 1);
   };
 
-  const switchUser = (email: string) => {
-    fetchSession(email, activeProperty?.id);
+  const switchUser = (identifier: string) => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("hotel_os_user", identifier);
+    }
+    fetchSession(identifier);
     setRefreshKey((k) => k + 1);
+  };
+
+  const logout = () => {
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("hotel_os_user");
+    }
+    setUser(null);
+    window.location.href = "/login";
   };
 
   const refreshData = async () => {
     if (activeProperty) {
-      await fetchSession(user?.email, activeProperty.id);
+      await fetchSession(user?.username || user?.email, activeProperty.id);
       setRefreshKey((k) => k + 1);
     }
   };
@@ -100,6 +127,7 @@ export function HotelProvider({ children }: { children: React.ReactNode }) {
         activeRole: user?.activeRole || "ORG_OWNER",
         switchProperty,
         switchUser,
+        logout,
         refreshData,
         refreshKey,
       }}

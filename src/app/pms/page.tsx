@@ -37,21 +37,83 @@ import {
   Grid,
   FolderTree,
   Building,
+  Upload,
+  Trash2,
+  Plus,
 } from "lucide-react";
+import { useSearchParams, useRouter } from "next/navigation";
+import { Suspense } from "react";
 
-export default function PMSFrontDeskPage() {
+function PMSFrontDeskContent() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const tabParam = searchParams.get("tab");
+  const reviewIdParam = searchParams.get("reviewId");
+
   const { activeProperty, refreshKey, refreshData } = useHotel();
   const [rooms, setRooms] = useState<any[]>([]);
   const [stays, setStays] = useState<any[]>([]);
   const [reservations, setReservations] = useState<any[]>([]);
   const [registrations, setRegistrations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<"grid" | "registrations" | "stays" | "reservations">("grid");
+  const [activeTab, setActiveTab] = useState<"grid" | "registrations" | "stays" | "reservations">(
+    tabParam === "registrations" || tabParam === "stays" || tabParam === "reservations" ? tabParam : "grid"
+  );
+
+  useEffect(() => {
+    if (tabParam && ["grid", "registrations", "stays", "reservations"].includes(tabParam)) {
+      setActiveTab(tabParam as any);
+    }
+  }, [tabParam]);
+
+  // Auto-open Review Check-In modal if reviewId is passed in URL (from Notification Bell or Toast)
+  useEffect(() => {
+    if (reviewIdParam && registrations.length > 0) {
+      const targetReg = registrations.find(
+        (r) => r.id === reviewIdParam || r.registrationNo === reviewIdParam
+      );
+      if (targetReg && targetReg.status === "PENDING_REVIEW") {
+        setSelectedRegForReview(targetReg);
+        let initialCoGuests: any[] = [];
+        if (targetReg.coGuestsJson) {
+          try {
+            const parsed = JSON.parse(targetReg.coGuestsJson);
+            if (Array.isArray(parsed)) initialCoGuests = parsed;
+          } catch {}
+        }
+        setReviewCoGuests(initialCoGuests);
+        setReviewPrimaryIdPhoto(targetReg.idPhotoUrl || null);
+        setShowAddCoGuestInReview(false);
+
+        const nextDay = new Date(Date.now() + 86400000).toISOString().split("T")[0];
+        setFulfillForm({
+          roomId: "", // Blank by default & mandatory
+          departureDate: targetReg.expectedDepartureDate || nextDay,
+          depositAmount: "0",
+          depositMethod: "UPI",
+          depositRef: "",
+          notes: targetReg.internalNotes || "",
+        });
+      }
+    }
+  }, [reviewIdParam, registrations]);
+
+  const handleTabChange = (newTab: "grid" | "registrations" | "stays" | "reservations") => {
+    setActiveTab(newTab);
+    const params = new URLSearchParams(searchParams.toString());
+    if (newTab === "grid") {
+      params.delete("tab");
+    } else {
+      params.set("tab", newTab);
+    }
+    router.replace(`/pms?${params.toString()}`, { scroll: false });
+  };
+
   const [searchQuery, setSearchQuery] = useState("");
   const [floorFilter, setFloorFilter] = useState<string>("ALL");
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
   const [roomTypeFilter, setRoomTypeFilter] = useState<string>("ALL");
-  const [groupBy, setGroupBy] = useState<"STATUS" | "ROOM_TYPE" | "FLOOR" | "COMPACT">("STATUS");
+  const [groupBy, setGroupBy] = useState<"STATUS" | "ROOM_TYPE" | "FLOOR" | "COMPACT">("FLOOR");
   const [showDiningQrModal, setShowDiningQrModal] = useState<boolean>(false);
   const [copiedLink, setCopiedLink] = useState<string | null>(null);
 
@@ -68,9 +130,21 @@ export default function PMSFrontDeskPage() {
 
   // Registration Review & Fulfill Modal state
   const [selectedRegForReview, setSelectedRegForReview] = useState<any | null>(null);
+  const [reviewCoGuests, setReviewCoGuests] = useState<any[]>([]);
+  const [reviewPrimaryIdPhoto, setReviewPrimaryIdPhoto] = useState<string | null>(null);
+  const [showAddCoGuestInReview, setShowAddCoGuestInReview] = useState(false);
+  const [newCoGuestForm, setNewCoGuestForm] = useState({
+    name: "",
+    age: "",
+    gender: "Female",
+    relation: "Spouse",
+    idType: "AADHAAR",
+    idNumber: "",
+    idPhotoUrl: "",
+  });
   const [fulfillForm, setFulfillForm] = useState({
     roomId: "",
-    departureDate: new Date(Date.now() + 86400000 * 2).toISOString().split("T")[0],
+    departureDate: new Date(Date.now() + 86400000).toISOString().split("T")[0],
     depositAmount: "0",
     depositMethod: "UPI",
     depositRef: "",
@@ -266,9 +340,60 @@ export default function PMSFrontDeskPage() {
   };
 
   // Handle Registration Review & Fulfill (Check-in from Middle Interface)
+  const handlePrimaryIdUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const result = ev.target?.result as string;
+      if (result) setReviewPrimaryIdPhoto(result);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleCoGuestIdUpload = (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const result = ev.target?.result as string;
+      if (result) {
+        setReviewCoGuests((prev) =>
+          prev.map((cg, idx) => (idx === index ? { ...cg, idPhotoUrl: result } : cg))
+        );
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleAddCoGuestInReview = () => {
+    if (!newCoGuestForm.name.trim()) return;
+    setReviewCoGuests((prev) => [...prev, { ...newCoGuestForm }]);
+    setNewCoGuestForm({
+      name: "",
+      age: "",
+      gender: "Female",
+      relation: "Spouse",
+      idType: "AADHAAR",
+      idNumber: "",
+      idPhotoUrl: "",
+    });
+    setShowAddCoGuestInReview(false);
+  };
+
+  const handleRemoveCoGuestInReview = (index: number) => {
+    setReviewCoGuests((prev) => prev.filter((_, idx) => idx !== index));
+  };
+
   const handleFulfillRegistration = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedRegForReview) return;
+
+    if (!fulfillForm.roomId) {
+      setActionError("Please select a vacant room to complete check-in (Room assignment is mandatory).");
+      return;
+    }
+
     setActionLoading(true);
     setActionError(null);
 
@@ -283,6 +408,8 @@ export default function PMSFrontDeskPage() {
           depositMethod: fulfillForm.depositMethod,
           depositRef: fulfillForm.depositRef,
           notes: fulfillForm.notes,
+          idPhotoUrl: reviewPrimaryIdPhoto || selectedRegForReview.idPhotoUrl,
+          coGuests: reviewCoGuests,
         }),
       });
 
@@ -499,7 +626,7 @@ export default function PMSFrontDeskPage() {
               </button>
 
               <a
-                href={`/order?room=${room.number}`}
+                href={activeProperty?.code ? `/order?property=${activeProperty.code}&room=${room.number}` : `/order?room=${room.number}`}
                 target="_blank"
                 rel="noreferrer"
                 className="rounded-md bg-amber-500/10 border border-amber-500/30 hover:bg-amber-500/20 px-1.5 py-1 text-[11px] text-amber-300 font-medium transition"
@@ -531,7 +658,7 @@ export default function PMSFrontDeskPage() {
                 + Check-in
               </button>
               <a
-                href={`/order?room=${room.number}`}
+                href={activeProperty?.code ? `/order?property=${activeProperty.code}&room=${room.number}` : `/order?room=${room.number}`}
                 target="_blank"
                 rel="noreferrer"
                 className="rounded-md bg-zinc-800/80 hover:bg-zinc-700 p-1 text-zinc-400 hover:text-zinc-200 transition"
@@ -711,8 +838,18 @@ export default function PMSFrontDeskPage() {
           <div className="text-[10px] text-zinc-400">Maintenance Blocks</div>
         </div>
 
-        <div className="rounded-xl bg-[#121215] border border-zinc-800 p-3 space-y-1">
-          <div className="text-[10px] uppercase font-mono tracking-wider text-zinc-400">Digital Queue</div>
+        <div
+          onClick={() => handleTabChange("registrations")}
+          className={`rounded-xl border p-3 space-y-1 cursor-pointer transition ${
+            activeTab === "registrations"
+              ? "bg-purple-950/30 border-purple-500 shadow-md"
+              : "bg-[#121215] border-zinc-800 hover:border-purple-900/60"
+          }`}
+        >
+          <div className="text-[10px] uppercase font-mono tracking-wider text-zinc-400 flex items-center justify-between">
+            <span>Digital Queue</span>
+            {pendingRegistrations.length > 0 && <span className="h-2 w-2 rounded-full bg-purple-500 animate-pulse" />}
+          </div>
           <div className="text-lg font-extrabold text-purple-400 font-mono">{pendingRegistrations.length}</div>
           <div className="text-[10px] text-zinc-400">Pending Review</div>
         </div>
@@ -722,7 +859,7 @@ export default function PMSFrontDeskPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-800 pb-3">
         <div className="flex items-center gap-1.5 flex-wrap">
           <button
-            onClick={() => setActiveTab("grid")}
+            onClick={() => handleTabChange("grid")}
             className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
               activeTab === "grid"
                 ? "bg-zinc-800 text-zinc-100 border border-zinc-700 shadow-sm"
@@ -734,7 +871,7 @@ export default function PMSFrontDeskPage() {
           </button>
 
           <button
-            onClick={() => setActiveTab("registrations")}
+            onClick={() => handleTabChange("registrations")}
             className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition relative ${
               activeTab === "registrations"
                 ? "bg-zinc-800 text-zinc-100 border border-zinc-700 shadow-sm"
@@ -751,7 +888,7 @@ export default function PMSFrontDeskPage() {
           </button>
 
           <button
-            onClick={() => setActiveTab("stays")}
+            onClick={() => handleTabChange("stays")}
             className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
               activeTab === "stays"
                 ? "bg-zinc-800 text-zinc-100 border border-zinc-700 shadow-sm"
@@ -763,7 +900,7 @@ export default function PMSFrontDeskPage() {
           </button>
 
           <button
-            onClick={() => setActiveTab("reservations")}
+            onClick={() => handleTabChange("reservations")}
             className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
               activeTab === "reservations"
                 ? "bg-zinc-800 text-zinc-100 border border-zinc-700 shadow-sm"
@@ -785,15 +922,16 @@ export default function PMSFrontDeskPage() {
               <span className="text-[11px] font-medium text-zinc-400 mr-1.5 flex items-center gap-1">
                 <SlidersHorizontal className="h-3.5 w-3.5 text-zinc-500" /> Group By:
               </span>
+
               <button
-                onClick={() => setGroupBy("STATUS")}
+                onClick={() => setGroupBy("FLOOR")}
                 className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition ${
-                  groupBy === "STATUS"
+                  groupBy === "FLOOR"
                     ? "bg-zinc-100 text-zinc-950 shadow-sm"
                     : "bg-zinc-900 text-zinc-400 hover:text-zinc-200 border border-zinc-800"
                 }`}
               >
-                Occupied vs Vacant
+                Floor
               </button>
 
               <button
@@ -805,17 +943,6 @@ export default function PMSFrontDeskPage() {
                 }`}
               >
                 Room Type
-              </button>
-
-              <button
-                onClick={() => setGroupBy("FLOOR")}
-                className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition ${
-                  groupBy === "FLOOR"
-                    ? "bg-zinc-100 text-zinc-950 shadow-sm"
-                    : "bg-zinc-900 text-zinc-400 hover:text-zinc-200 border border-zinc-800"
-                }`}
-              >
-                Floor
               </button>
 
               <button
@@ -1164,24 +1291,21 @@ export default function PMSFrontDeskPage() {
                           <button
                             onClick={() => {
                               setSelectedRegForReview(reg);
-                              // Auto match pre-assigned room if valid
-                              const preRoom = rooms.find(
-                                (r) =>
-                                  r.number === reg.preAssignedRoom &&
-                                  r.roomState?.occupancyStatus === "VACANT" &&
-                                  r.roomState?.sellabilityStatus === "SELLABLE"
-                              );
-                              const fallbackRoom = rooms.find(
-                                (r) =>
-                                  r.roomState?.occupancyStatus === "VACANT" &&
-                                  r.roomState?.sellabilityStatus === "SELLABLE"
-                              );
+                              let initialCoGuests: any[] = [];
+                              if (reg.coGuestsJson) {
+                                try {
+                                  const parsed = JSON.parse(reg.coGuestsJson);
+                                  if (Array.isArray(parsed)) initialCoGuests = parsed;
+                                } catch {}
+                              }
+                              setReviewCoGuests(initialCoGuests);
+                              setReviewPrimaryIdPhoto(reg.idPhotoUrl || null);
+                              setShowAddCoGuestInReview(false);
 
+                              const nextDay = new Date(Date.now() + 86400000).toISOString().split("T")[0];
                               setFulfillForm({
-                                roomId: preRoom?.id || fallbackRoom?.id || "",
-                                departureDate:
-                                  reg.expectedDepartureDate ||
-                                  new Date(Date.now() + 86400000 * 2).toISOString().split("T")[0],
+                                roomId: "", // Blank by default & mandatory
+                                departureDate: reg.expectedDepartureDate || nextDay,
                                 depositAmount: "0",
                                 depositMethod: "UPI",
                                 depositRef: "",
@@ -1333,50 +1457,64 @@ export default function PMSFrontDeskPage() {
 
       {/* MIDDLE INTERFACE: REVIEW & FULFILL CHECK-IN MODAL */}
       {selectedRegForReview && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 overflow-y-auto">
-          <div className="w-full max-w-3xl rounded-xl border border-zinc-800 bg-[#121215] p-6 shadow-2xl space-y-5 my-8">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-3 sm:p-4 overflow-y-auto">
+          <div className="w-full max-w-4xl rounded-2xl border border-zinc-700 bg-[#121215] p-5 sm:p-6 shadow-2xl space-y-4 my-6 text-zinc-200 text-xs">
+            {/* Modal Header */}
             <div className="flex items-center justify-between pb-3 border-b border-zinc-800">
               <div>
-                <h2 className="text-base font-semibold text-zinc-100 flex items-center gap-2">
-                  <ShieldCheck className="h-4 w-4 text-blue-400" />
-                  Review & Approve Digital Check-in
-                </h2>
-                <p className="text-xs text-zinc-500 font-mono">
+                <div className="flex items-center gap-2">
+                  <h2 className="text-base font-bold text-zinc-100 flex items-center gap-2">
+                    <ShieldCheck className="h-5 w-5 text-blue-400" />
+                    Review & Complete Digital Check-in
+                  </h2>
+                  <span className="rounded px-1.5 py-0.2 text-[10px] font-mono font-bold text-amber-400 bg-amber-950/40 border border-amber-800/40">
+                    PENDING FRONT DESK AUDIT
+                  </span>
+                </div>
+                <p className="text-xs text-zinc-400 font-mono mt-0.5">
                   GRC Number: <span className="text-blue-400 font-bold">{selectedRegForReview.registrationNo}</span>
+                  {selectedRegForReview.arrivalDateTime && (
+                    <span className="text-zinc-500 ml-2">• Submitted: {selectedRegForReview.arrivalDateTime}</span>
+                  )}
                 </p>
               </div>
-              <button onClick={() => setSelectedRegForReview(null)} className="text-zinc-500 hover:text-zinc-200">
+              <button
+                onClick={() => setSelectedRegForReview(null)}
+                className="h-8 w-8 rounded-lg bg-zinc-800 flex items-center justify-center text-zinc-400 hover:text-white transition"
+              >
                 <X className="h-4 w-4" />
               </button>
             </div>
 
             {/* Submitted Customer Data Summary */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Left Column: Personal & Travel Details */}
-              <div className="rounded-lg bg-zinc-900/60 p-3.5 border border-zinc-800 space-y-2.5">
-                <div className="font-semibold text-zinc-200 flex items-center gap-1.5 border-b border-zinc-800 pb-1.5">
-                  <User className="h-3.5 w-3.5 text-zinc-400" />
-                  Primary Guest & Journey
+              <div className="rounded-xl bg-zinc-900/70 p-4 border border-zinc-800 space-y-2.5">
+                <div className="font-bold text-white flex items-center gap-1.5 border-b border-zinc-800 pb-2">
+                  <User className="h-4 w-4 text-blue-400" />
+                  Primary Guest & Journey Information
                 </div>
-                <div className="grid grid-cols-2 gap-2 text-[11px]">
+                <div className="grid grid-cols-2 gap-2.5 text-[11px]">
                   <div>
-                    <span className="text-zinc-500">Name:</span>{" "}
-                    <span className="font-semibold text-zinc-200">{selectedRegForReview.fullName}</span>
+                    <span className="text-zinc-500 block text-[10px] uppercase font-mono">Full Name:</span>
+                    <span className="font-bold text-white text-xs">{selectedRegForReview.fullName}</span>
                   </div>
                   <div>
-                    <span className="text-zinc-500">Age/Gender:</span>{" "}
-                    <span className="text-zinc-300">{selectedRegForReview.age} yrs • {selectedRegForReview.gender}</span>
+                    <span className="text-zinc-500 block text-[10px] uppercase font-mono">Age / Gender:</span>
+                    <span className="text-zinc-200">
+                      {selectedRegForReview.age ? `${selectedRegForReview.age} yrs` : "—"} • {selectedRegForReview.gender || "Male"}
+                    </span>
                   </div>
                   <div>
-                    <span className="text-zinc-500">Mobile:</span>{" "}
-                    <span className="text-zinc-300 font-mono">{selectedRegForReview.mobilePhone}</span>
+                    <span className="text-zinc-500 block text-[10px] uppercase font-mono">Mobile Phone:</span>
+                    <span className="text-zinc-200 font-mono">{selectedRegForReview.mobilePhone}</span>
                   </div>
                   <div>
-                    <span className="text-zinc-500">Email:</span>{" "}
-                    <span className="text-zinc-300 font-mono">{selectedRegForReview.email || "—"}</span>
+                    <span className="text-zinc-500 block text-[10px] uppercase font-mono">Email Address:</span>
+                    <span className="text-zinc-300 font-mono truncate block">{selectedRegForReview.email || "—"}</span>
                   </div>
                   <div className="col-span-2">
-                    <span className="text-zinc-500">Address:</span>{" "}
+                    <span className="text-zinc-500 block text-[10px] uppercase font-mono">Residential Address:</span>
                     <span className="text-zinc-300">
                       {[
                         selectedRegForReview.streetAddress,
@@ -1390,86 +1528,319 @@ export default function PMSFrontDeskPage() {
                     </span>
                   </div>
                   <div>
-                    <span className="text-zinc-500">From / To:</span>{" "}
+                    <span className="text-zinc-500 block text-[10px] uppercase font-mono">Travel Route:</span>
                     <span className="text-zinc-300">
-                      {selectedRegForReview.arrivedFrom || "—"} &rarr; {selectedRegForReview.goingTo || "—"}
+                      {selectedRegForReview.arrivedFrom || "Origin"} &rarr; {selectedRegForReview.goingTo || "Destination"}
                     </span>
                   </div>
                   <div>
-                    <span className="text-zinc-500">Vehicle:</span>{" "}
+                    <span className="text-zinc-500 block text-[10px] uppercase font-mono">Vehicle Number:</span>
                     <span className="text-zinc-300 font-mono">{selectedRegForReview.vehicleNumber || "None"}</span>
-                  </div>
-                  <div className="col-span-2">
-                    <span className="text-zinc-500">Referral Channel:</span>{" "}
-                    <span className="text-blue-400 font-mono">{selectedRegForReview.referralChannel || "Direct"}</span>
                   </div>
                 </div>
               </div>
 
               {/* Right Column: ID Photo & Digital Signature */}
-              <div className="rounded-lg bg-zinc-900/60 p-3.5 border border-zinc-800 space-y-2.5">
-                <div className="font-semibold text-zinc-200 flex items-center gap-1.5 border-b border-zinc-800 pb-1.5">
-                  <Camera className="h-3.5 w-3.5 text-zinc-400" />
-                  Government ID & Digital Signature
+              <div className="rounded-xl bg-zinc-900/70 p-4 border border-zinc-800 space-y-3">
+                <div className="font-bold text-white flex items-center justify-between border-b border-zinc-800 pb-2">
+                  <div className="flex items-center gap-1.5">
+                    <Camera className="h-4 w-4 text-emerald-400" />
+                    <span>Government ID & Digital Signature</span>
+                  </div>
+                  <span className="text-[10px] font-mono text-zinc-400 bg-zinc-800 px-1.5 py-0.5 rounded">
+                    {selectedRegForReview.idDocumentType || "AADHAAR"}
+                  </span>
                 </div>
 
-                <div className="space-y-2">
-                  <div className="text-[11px] text-zinc-400">
-                    <span className="text-zinc-500">Document:</span>{" "}
-                    <span className="font-mono text-zinc-200">
-                      {selectedRegForReview.idDocumentType} ({selectedRegForReview.idDocumentNumber || "Provided"})
-                    </span>
+                <div className="grid grid-cols-2 gap-3 items-start">
+                  {/* ID Document Box */}
+                  <div className="space-y-1.5">
+                    <div className="text-[10px] font-mono text-zinc-400">
+                      ID: <span className="font-bold text-white">{selectedRegForReview.idDocumentNumber || "Physical Provided"}</span>
+                    </div>
+
+                    {(reviewPrimaryIdPhoto || selectedRegForReview.idPhotoUrl) ? (
+                      <div className="relative rounded-xl border border-zinc-700 overflow-hidden bg-zinc-950 flex items-center justify-center h-24 group">
+                        <img
+                          src={reviewPrimaryIdPhoto || selectedRegForReview.idPhotoUrl}
+                          alt="Primary Guest ID"
+                          className="h-24 w-full object-cover"
+                        />
+                        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition">
+                          <label className="cursor-pointer text-[10px] font-bold text-white bg-blue-600 hover:bg-blue-500 px-2 py-1 rounded shadow">
+                            Replace Photo
+                            <input type="file" accept="image/*" className="hidden" onChange={handlePrimaryIdUpload} />
+                          </label>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="rounded-xl border border-dashed border-zinc-700 bg-zinc-950 p-2 text-center flex flex-col items-center justify-center h-24 space-y-1">
+                        <Camera className="h-5 w-5 text-zinc-500" />
+                        <label className="cursor-pointer text-[10px] font-bold text-blue-400 hover:text-blue-300 underline">
+                          + Upload / Scan ID
+                          <input type="file" accept="image/*" className="hidden" onChange={handlePrimaryIdUpload} />
+                        </label>
+                      </div>
+                    )}
                   </div>
 
-                  {selectedRegForReview.idPhotoUrl ? (
-                    <div className="border border-zinc-700 rounded overflow-hidden max-h-24 bg-zinc-950 flex items-center justify-center">
-                      <img
-                        src={selectedRegForReview.idPhotoUrl}
-                        alt="ID Card"
-                        className="max-h-24 object-contain"
-                      />
+                  {/* Digital Signature Box */}
+                  <div className="space-y-1.5">
+                    <div className="text-[10px] font-mono text-zinc-400 flex items-center justify-between">
+                      <span>Digital Signature:</span>
+                      {selectedRegForReview.signatureDataUrl && (
+                        <span className="text-emerald-400 font-bold text-[9px] flex items-center gap-0.5">
+                          <Check className="h-3 w-3" /> VERIFIED
+                        </span>
+                      )}
                     </div>
-                  ) : (
-                    <div className="text-center py-2 text-[11px] text-zinc-500 italic bg-zinc-950 rounded border border-zinc-800">
-                      No photo uploaded (Physical ID verified)
-                    </div>
-                  )}
 
-                  <div className="text-[11px] text-zinc-500">Captured Signature:</div>
-                  {selectedRegForReview.signatureDataUrl ? (
-                    <div className="border border-zinc-700 rounded bg-zinc-950 p-1 flex items-center justify-center">
-                      <img
-                        src={selectedRegForReview.signatureDataUrl}
-                        alt="Guest Signature"
-                        className="max-h-16 object-contain"
-                      />
+                    <div className="rounded-xl border border-zinc-300 bg-white p-2 flex items-center justify-center h-24 shadow-inner">
+                      {selectedRegForReview.signatureDataUrl ? (
+                        <img
+                          src={selectedRegForReview.signatureDataUrl}
+                          alt="Guest Signature"
+                          className="max-h-20 max-w-full object-contain"
+                        />
+                      ) : (
+                        <div className="text-zinc-400 text-[10px] italic text-center">
+                          Signature to be collected upon room handover
+                        </div>
+                      )}
                     </div>
-                  ) : (
-                    <div className="text-center py-2 text-[11px] text-zinc-500 italic bg-zinc-950 rounded border border-zinc-800">
-                      Signature on arrival
-                    </div>
-                  )}
+                  </div>
                 </div>
               </div>
             </div>
 
+            {/* Co-Guests & Police Verification ID Roster */}
+            <div className="rounded-xl bg-zinc-900/70 p-4 border border-zinc-800 space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-zinc-800 pb-2">
+                <div className="flex items-center gap-2">
+                  <Users className="h-4 w-4 text-blue-400" />
+                  <span className="font-bold text-white">Co-Guests & Police Verification ID Roster</span>
+                  <span className="rounded-full bg-blue-950/60 border border-blue-800/60 px-2 py-0.5 text-[10px] font-mono text-blue-300 font-bold">
+                    {reviewCoGuests.length + 1} Total Pax
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-mono text-emerald-400 bg-emerald-950/40 border border-emerald-800/40 px-2 py-0.5 rounded">
+                    ✓ IDs Uploaded: {reviewCoGuests.filter((g) => g.idPhotoUrl).length + (reviewPrimaryIdPhoto || selectedRegForReview.idPhotoUrl ? 1 : 0)} of {reviewCoGuests.length + 1} (Police Verification Valid)
+                  </span>
+                  {!showAddCoGuestInReview && (
+                    <button
+                      type="button"
+                      onClick={() => setShowAddCoGuestInReview(true)}
+                      className="flex items-center gap-1 rounded-lg bg-zinc-800 hover:bg-zinc-700 px-2.5 py-1 text-xs font-bold text-zinc-200 transition"
+                    >
+                      <Plus className="h-3.5 w-3.5" /> Add Co-Guest
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Explanatory Police Compliance Note */}
+              <div className="text-[11px] text-zinc-400 italic">
+                * Note: For group check-ins, police verification requires ID for the primary guest and 2-3 group leaders, not necessarily all members.
+              </div>
+
+              {/* Co-guest list */}
+              <div className="space-y-2">
+                {reviewCoGuests.map((cg, idx) => (
+                  <div
+                    key={idx}
+                    className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-xl bg-zinc-950 border border-zinc-800 text-xs"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="h-7 w-7 rounded-lg bg-zinc-800 flex items-center justify-center font-bold font-mono text-zinc-400 text-xs">
+                        #{idx + 2}
+                      </div>
+                      <div>
+                        <div className="font-bold text-white flex items-center gap-2">
+                          <span>{cg.name}</span>
+                          <span className="text-[10px] font-mono text-zinc-400 font-normal">
+                            ({cg.age ? `${cg.age} yrs` : "Adult"} • {cg.gender} • {cg.relation})
+                          </span>
+                        </div>
+                        <div className="text-[11px] font-mono text-zinc-400 mt-0.5">
+                          {cg.idType}: {cg.idNumber || "Not recorded"}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      {cg.idPhotoUrl ? (
+                        <div className="flex items-center gap-2">
+                          <img
+                            src={cg.idPhotoUrl}
+                            alt="Co-guest ID"
+                            className="h-10 w-14 object-cover rounded border border-zinc-700"
+                          />
+                          <span className="text-[10px] font-mono text-emerald-400 font-bold bg-emerald-950/40 border border-emerald-800/40 px-1.5 py-0.5 rounded">
+                            ✓ ID Uploaded
+                          </span>
+                        </div>
+                      ) : (
+                        <label className="cursor-pointer text-[10px] font-bold text-amber-300 bg-amber-950/40 hover:bg-amber-900/50 border border-amber-800/40 px-2.5 py-1 rounded-lg transition flex items-center gap-1">
+                          <Upload className="h-3 w-3" /> Attach ID (Optional)
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(e) => handleCoGuestIdUpload(idx, e)}
+                          />
+                        </label>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveCoGuestInReview(idx)}
+                        className="text-zinc-500 hover:text-rose-400 p-1 transition"
+                        title="Remove co-guest"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+
+                {reviewCoGuests.length === 0 && !showAddCoGuestInReview && (
+                  <div className="text-center py-2 text-zinc-500 italic text-[11px]">
+                    No accompanying co-guests attached to this reservation.
+                  </div>
+                )}
+              </div>
+
+              {/* Add Co-Guest Form */}
+              {showAddCoGuestInReview && (
+                <div className="p-3.5 rounded-xl bg-zinc-950 border border-blue-900/50 space-y-3 animate-in fade-in">
+                  <div className="font-bold text-white text-xs flex items-center justify-between">
+                    <span>Add Accompanying Co-Guest</span>
+                    <button
+                      type="button"
+                      onClick={() => setShowAddCoGuestInReview(false)}
+                      className="text-zinc-500 hover:text-white"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-2.5">
+                    <input
+                      type="text"
+                      placeholder="Co-Guest Full Name *"
+                      value={newCoGuestForm.name}
+                      onChange={(e) => setNewCoGuestForm({ ...newCoGuestForm, name: e.target.value.toUpperCase() })}
+                      className="rounded-lg bg-zinc-900 border border-zinc-700 px-3 py-1.5 text-white font-bold text-xs focus:outline-none"
+                    />
+                    <input
+                      type="number"
+                      placeholder="Age"
+                      value={newCoGuestForm.age}
+                      onChange={(e) => setNewCoGuestForm({ ...newCoGuestForm, age: e.target.value })}
+                      className="rounded-lg bg-zinc-900 border border-zinc-700 px-3 py-1.5 text-white font-mono text-xs focus:outline-none"
+                    />
+                    <select
+                      value={newCoGuestForm.gender}
+                      onChange={(e) => setNewCoGuestForm({ ...newCoGuestForm, gender: e.target.value })}
+                      className="rounded-lg bg-zinc-900 border border-zinc-700 px-3 py-1.5 text-white text-xs focus:outline-none"
+                    >
+                      <option value="Female">Female</option>
+                      <option value="Male">Male</option>
+                      <option value="Child">Child</option>
+                    </select>
+                    <select
+                      value={newCoGuestForm.relation}
+                      onChange={(e) => setNewCoGuestForm({ ...newCoGuestForm, relation: e.target.value })}
+                      className="rounded-lg bg-zinc-900 border border-zinc-700 px-3 py-1.5 text-white text-xs focus:outline-none"
+                    >
+                      <option value="Spouse">Spouse</option>
+                      <option value="Child">Child</option>
+                      <option value="Parent">Parent</option>
+                      <option value="Friend">Friend</option>
+                      <option value="Colleague">Colleague</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                    <select
+                      value={newCoGuestForm.idType}
+                      onChange={(e) => setNewCoGuestForm({ ...newCoGuestForm, idType: e.target.value })}
+                      className="rounded-lg bg-zinc-900 border border-zinc-700 px-3 py-1.5 text-white text-xs focus:outline-none"
+                    >
+                      <option value="AADHAAR">Aadhaar Card</option>
+                      <option value="PASSPORT">Passport</option>
+                      <option value="DRIVING_LICENSE">Driving License</option>
+                      <option value="VOTER_ID">Voter ID</option>
+                    </select>
+                    <input
+                      type="text"
+                      placeholder="ID Number (Optional)"
+                      value={newCoGuestForm.idNumber}
+                      onChange={(e) => setNewCoGuestForm({ ...newCoGuestForm, idNumber: e.target.value.toUpperCase() })}
+                      className="rounded-lg bg-zinc-900 border border-zinc-700 px-3 py-1.5 text-white font-mono text-xs focus:outline-none"
+                    />
+                    <label className="cursor-pointer rounded-lg bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 px-3 py-1.5 text-xs text-zinc-300 font-bold flex items-center justify-center gap-1.5 transition">
+                      <Upload className="h-3.5 w-3.5" /> Attach ID Photo
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          const reader = new FileReader();
+                          reader.onload = (ev) => {
+                            const res = ev.target?.result as string;
+                            if (res) setNewCoGuestForm((p) => ({ ...p, idPhotoUrl: res }));
+                          };
+                          reader.readAsDataURL(file);
+                        }}
+                      />
+                    </label>
+                  </div>
+
+                  <div className="flex justify-end gap-2 pt-1 border-t border-zinc-800">
+                    <button
+                      type="button"
+                      onClick={() => setShowAddCoGuestInReview(false)}
+                      className="px-3 py-1.5 rounded-lg text-zinc-400 hover:text-white font-medium"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleAddCoGuestInReview}
+                      className="px-4 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold transition shadow-sm"
+                    >
+                      Save Co-Guest
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
             {/* Front Desk Room Assignment & Fulfillment Form */}
-            <form onSubmit={handleFulfillRegistration} className="space-y-4 pt-2 border-t border-zinc-800 text-xs">
-              <div className="font-semibold text-zinc-200 flex items-center gap-1.5">
+            <form onSubmit={handleFulfillRegistration} className="space-y-4 pt-2 border-t border-zinc-800">
+              <div className="font-bold text-white flex items-center gap-1.5">
                 <BedDouble className="h-4 w-4 text-emerald-400" />
                 Assign Room & Complete Check-In
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {/* 1. Assign Room - BLANK & MANDATORY */}
                 <div>
-                  <label className="text-zinc-400 font-medium">Assign Room *</label>
+                  <label className="text-zinc-300 font-bold block mb-1">
+                    Assign Room * <span className="text-rose-400">(Mandatory)</span>
+                  </label>
                   <select
                     required
                     value={fulfillForm.roomId}
                     onChange={(e) => setFulfillForm({ ...fulfillForm, roomId: e.target.value })}
-                    className="mt-1 w-full rounded-md bg-zinc-900 border border-zinc-700 px-3 py-2 text-zinc-100 font-semibold focus:outline-none focus:border-blue-500"
+                    className="w-full rounded-xl bg-zinc-900 border border-zinc-700 px-3 py-2 text-white font-bold focus:outline-none focus:border-blue-500 shadow-sm"
                   >
-                    <option value="">Select clean vacant room...</option>
+                    <option value="">-- Select Vacant Room (Mandatory) * --</option>
                     {rooms
                       .filter((r) => r.roomState?.occupancyStatus === "VACANT" && r.roomState?.sellabilityStatus === "SELLABLE")
                       .map((r) => (
@@ -1480,60 +1851,104 @@ export default function PMSFrontDeskPage() {
                   </select>
                 </div>
 
+                {/* 2. Departure Date - DEFAULT NEXT DAY & CHANGEABLE */}
                 <div>
-                  <label className="text-zinc-400 font-medium">Departure Date *</label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-zinc-300 font-bold">Departure Date *</label>
+                    <span className="text-[10px] text-zinc-400 font-mono">Next Day Default</span>
+                  </div>
                   <input
                     type="date"
                     required
                     value={fulfillForm.departureDate}
                     onChange={(e) => setFulfillForm({ ...fulfillForm, departureDate: e.target.value })}
-                    className="mt-1 w-full rounded-md bg-zinc-900 border border-zinc-800 px-3 py-2 text-zinc-100 font-mono focus:outline-none focus:border-zinc-600"
+                    className="w-full rounded-xl bg-zinc-900 border border-zinc-700 px-3 py-2 text-white font-mono font-bold focus:outline-none focus:border-blue-500 shadow-sm"
                   />
+                  {/* Quick Preset Date Buttons */}
+                  <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const d = new Date(Date.now() + 86400000).toISOString().split("T")[0];
+                        setFulfillForm({ ...fulfillForm, departureDate: d });
+                      }}
+                      className="rounded bg-zinc-800 hover:bg-zinc-700 px-2 py-0.5 text-[10px] font-mono text-zinc-300 transition"
+                    >
+                      +1 Night
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const d = new Date(Date.now() + 86400000 * 2).toISOString().split("T")[0];
+                        setFulfillForm({ ...fulfillForm, departureDate: d });
+                      }}
+                      className="rounded bg-zinc-800 hover:bg-zinc-700 px-2 py-0.5 text-[10px] font-mono text-zinc-300 transition"
+                    >
+                      +2 Nights
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const d = new Date(Date.now() + 86400000 * 3).toISOString().split("T")[0];
+                        setFulfillForm({ ...fulfillForm, departureDate: d });
+                      }}
+                      className="rounded bg-zinc-800 hover:bg-zinc-700 px-2 py-0.5 text-[10px] font-mono text-zinc-300 transition"
+                    >
+                      +3 Nights
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const d = new Date(Date.now() + 86400000 * 7).toISOString().split("T")[0];
+                        setFulfillForm({ ...fulfillForm, departureDate: d });
+                      }}
+                      className="rounded bg-zinc-800 hover:bg-zinc-700 px-2 py-0.5 text-[10px] font-mono text-zinc-300 transition"
+                    >
+                      +1 Week
+                    </button>
+                  </div>
                 </div>
 
+                {/* 3. Advance Deposit */}
                 <div>
-                  <label className="text-zinc-400 font-medium">Advance Deposit (₹)</label>
+                  <label className="text-zinc-300 font-bold block mb-1">Advance Deposit (₹)</label>
                   <input
                     type="number"
                     value={fulfillForm.depositAmount}
                     onChange={(e) => setFulfillForm({ ...fulfillForm, depositAmount: e.target.value })}
                     placeholder="0"
-                    className="mt-1 w-full rounded-md bg-zinc-900 border border-zinc-800 px-3 py-2 text-zinc-100 font-mono focus:outline-none focus:border-zinc-600"
+                    className="w-full rounded-xl bg-zinc-900 border border-zinc-700 px-3 py-2 text-white font-mono font-bold focus:outline-none focus:border-blue-500 shadow-sm"
                   />
+                  <div className="mt-1.5">
+                    <select
+                      value={fulfillForm.depositMethod}
+                      onChange={(e) => setFulfillForm({ ...fulfillForm, depositMethod: e.target.value })}
+                      className="w-full rounded-lg bg-zinc-800 border border-zinc-700 px-2 py-1 text-zinc-300 font-mono text-xs"
+                    >
+                      <option value="UPI">UPI / QR Payment</option>
+                      <option value="CASH">Cash Drawer</option>
+                      <option value="CARD">Credit / Debit Card</option>
+                      <option value="BANK_TRANSFER">Bank NEFT/RTGS</option>
+                    </select>
+                  </div>
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="text-zinc-400">Deposit Method</label>
-                  <select
-                    value={fulfillForm.depositMethod}
-                    onChange={(e) => setFulfillForm({ ...fulfillForm, depositMethod: e.target.value })}
-                    className="mt-1 w-full rounded-md bg-zinc-900 border border-zinc-800 px-3 py-2 text-zinc-100 font-mono"
-                  >
-                    <option value="UPI">UPI / QR Payment</option>
-                    <option value="CASH">Cash</option>
-                    <option value="CARD">Credit / Debit Card</option>
-                    <option value="BANK_TRANSFER">Bank NEFT/RTGS</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="text-zinc-400">Internal Front Desk Notes</label>
-                  <input
-                    type="text"
-                    value={fulfillForm.notes}
-                    onChange={(e) => setFulfillForm({ ...fulfillForm, notes: e.target.value })}
-                    placeholder="e.g. VIP guest, key card #104 handed over"
-                    className="mt-1 w-full rounded-md bg-zinc-900 border border-zinc-800 px-3 py-2 text-zinc-100 placeholder-zinc-600"
-                  />
-                </div>
+              <div>
+                <label className="text-zinc-400 block mb-1">Internal Front Desk Notes</label>
+                <input
+                  type="text"
+                  value={fulfillForm.notes}
+                  onChange={(e) => setFulfillForm({ ...fulfillForm, notes: e.target.value })}
+                  placeholder="e.g. VIP guest, physical Aadhaar checked, room key card handed over"
+                  className="w-full rounded-xl bg-zinc-900 border border-zinc-700 px-3 py-2 text-white placeholder-zinc-500"
+                />
               </div>
 
               {actionError && (
-                <div className="rounded-md bg-rose-500/10 border border-rose-500/20 p-2 text-xs text-rose-400 flex items-center gap-1.5">
-                  <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-                  {actionError}
+                <div className="rounded-xl bg-rose-500/10 border border-rose-500/30 p-3 text-xs text-rose-300 flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4 shrink-0" />
+                  <span>{actionError}</span>
                 </div>
               )}
 
@@ -1541,17 +1956,17 @@ export default function PMSFrontDeskPage() {
                 <button
                   type="button"
                   onClick={() => setSelectedRegForReview(null)}
-                  className="rounded-md px-3.5 py-2 text-zinc-400 hover:text-zinc-200 transition"
+                  className="rounded-xl px-4 py-2 text-zinc-400 hover:text-white font-semibold transition"
                 >
                   Close
                 </button>
                 <button
                   type="submit"
                   disabled={actionLoading}
-                  className="rounded-md bg-blue-600 hover:bg-blue-500 px-5 py-2 font-semibold text-white transition disabled:opacity-50 flex items-center gap-1.5 shadow-md"
+                  className="rounded-xl bg-emerald-500 hover:bg-emerald-400 text-zinc-950 px-6 py-2.5 font-black text-xs sm:text-sm shadow-xl transition flex items-center gap-2 active:scale-95 disabled:opacity-50"
                 >
                   <CheckCircle2 className="h-4 w-4" />
-                  {actionLoading ? "Processing..." : "Approve & Issue Key (Check-in)"}
+                  {actionLoading ? "Processing Check-In..." : "Approve & Complete Check-In"}
                 </button>
               </div>
             </form>
@@ -1580,9 +1995,18 @@ export default function PMSFrontDeskPage() {
             {/* Generated QR Code SVG */}
             {(() => {
               const baseCheckinUrl = networkInfo?.checkinNetworkUrl || "http://192.168.0.19:3000/checkin";
-              const propCheckinUrl = activeProperty?.id
+              const propCode = activeProperty?.code || "";
+              const propCheckinUrl = propCode
+                ? `${baseCheckinUrl}?property=${encodeURIComponent(propCode)}`
+                : activeProperty?.id
                 ? `${baseCheckinUrl}?propertyId=${activeProperty.id}`
                 : baseCheckinUrl;
+              const directKioskHref = propCode
+                ? `/checkin?property=${encodeURIComponent(propCode)}`
+                : activeProperty?.id
+                ? `/checkin?propertyId=${activeProperty.id}`
+                : "/checkin";
+
               return (
                 <>
                   <div className="p-3.5 rounded-xl bg-white mx-auto inline-block shadow-lg border border-zinc-200">
@@ -1599,7 +2023,9 @@ export default function PMSFrontDeskPage() {
                   <div className="space-y-1 text-left">
                     <div className="text-[10px] font-mono uppercase text-emerald-400 font-semibold flex items-center justify-between">
                       <span>{activeProperty?.displayName || "Hotel"} Kiosk Wi-Fi URL</span>
-                      <span>Port 3000</span>
+                      <span className="bg-zinc-800 text-zinc-300 border border-zinc-700 px-1.5 py-0.2 rounded font-mono text-[9px]">
+                        {activeProperty?.code || "Port 3000"}
+                      </span>
                     </div>
                     <div className="p-2 rounded bg-zinc-900 border border-zinc-800 font-mono text-[11px] text-zinc-200 select-all break-all">
                       {propCheckinUrl}
@@ -1617,7 +2043,7 @@ export default function PMSFrontDeskPage() {
                       Copy Wi-Fi Link
                     </button>
                     <a
-                      href={activeProperty?.id ? `/checkin?propertyId=${activeProperty.id}` : "/checkin"}
+                      href={directKioskHref}
                       target="_blank"
                       rel="noreferrer"
                       className="flex-1 rounded-md bg-zinc-100 hover:bg-white py-2 text-xs font-semibold text-zinc-950 transition text-center"
@@ -2223,7 +2649,7 @@ export default function PMSFrontDeskPage() {
                 <div className="flex items-center gap-2 shrink-0">
                   <button
                     onClick={() => {
-                      const genericUrl = `${networkInfo?.localIp ? `http://${networkInfo.localIp}:3000` : window.location.origin}/order`;
+                      const genericUrl = `${networkInfo?.localIp ? `http://${networkInfo.localIp}:3000` : window.location.origin}/order${activeProperty?.code ? `?property=${encodeURIComponent(activeProperty.code)}` : ""}`;
                       navigator.clipboard.writeText(genericUrl);
                       setCopiedLink("GENERIC");
                       setTimeout(() => setCopiedLink(null), 2000);
@@ -2235,10 +2661,10 @@ export default function PMSFrontDeskPage() {
                   </button>
 
                   <a
-                    href="/order"
+                    href={activeProperty?.code ? `/order?property=${encodeURIComponent(activeProperty.code)}` : "/order"}
                     target="_blank"
                     rel="noreferrer"
-                    className="flex items-center gap-1.5 rounded-lg bg-amber-500 text-zinc-950 font-bold hover:bg-amber-400 px-3 py-1.5 text-xs transition"
+                    className="flex items-center gap-1.5 rounded-lg bg-white text-zinc-950 font-bold hover:bg-zinc-200 px-3 py-1.5 text-xs transition"
                   >
                     <ExternalLink className="h-3.5 w-3.5" />
                     Open Menu
@@ -2252,16 +2678,21 @@ export default function PMSFrontDeskPage() {
                   <QrCode className="h-20 w-20 text-zinc-950" />
                 </div>
                 <div className="space-y-1 text-xs">
-                  <div className="text-zinc-300 font-medium">
-                    Generic Menu URL:
+                  <div className="text-zinc-300 font-medium flex items-center gap-1.5">
+                    <span>Generic Menu URL:</span>
+                    {activeProperty?.code && (
+                      <span className="bg-zinc-800 text-zinc-300 border border-zinc-700 text-[10px] font-mono font-bold px-1.5 py-0.2 rounded">
+                        {activeProperty.code}
+                      </span>
+                    )}
                   </div>
-                  <div className="font-mono text-amber-300 break-all select-all bg-zinc-950 px-2.5 py-1 rounded border border-zinc-800">
+                  <div className="font-mono text-zinc-200 break-all select-all bg-zinc-950 px-2.5 py-1 rounded border border-zinc-800">
                     {networkInfo?.localIp
-                      ? `http://${networkInfo.localIp}:3000/order`
-                      : "http://localhost:3000/order"}
+                      ? `http://${networkInfo.localIp}:3000/order${activeProperty?.code ? `?property=${encodeURIComponent(activeProperty.code)}` : ""}`
+                      : `http://localhost:3000/order${activeProperty?.code ? `?property=${encodeURIComponent(activeProperty.code)}` : ""}`}
                   </div>
                   <div className="text-[11px] text-zinc-500">
-                    Guests on the hotel Wi-Fi can scan this single QR from anywhere in the property.
+                    Guests on the hotel Wi-Fi can scan this single QR from anywhere in {activeProperty?.displayName || "the property"}.
                   </div>
                 </div>
               </div>
@@ -2290,7 +2721,7 @@ export default function PMSFrontDeskPage() {
               {/* Rooms QR Grid */}
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5 max-h-72 overflow-y-auto pr-1">
                 {rooms.map((r) => {
-                  const roomUrl = `${networkInfo?.localIp ? `http://${networkInfo.localIp}:3000` : window.location.origin}/order?room=${r.number}`;
+                  const roomUrl = `${networkInfo?.localIp ? `http://${networkInfo.localIp}:3000` : window.location.origin}/order?${activeProperty?.code ? `property=${encodeURIComponent(activeProperty.code)}&` : ""}room=${r.number}`;
                   const isCopied = copiedLink === r.number;
 
                   return (
@@ -2307,7 +2738,7 @@ export default function PMSFrontDeskPage() {
                             {r.roomType?.name || "Standard Room"}
                           </div>
                         </div>
-                        <QrCode className="h-4 w-4 text-amber-400" />
+                        <QrCode className="h-4 w-4 text-zinc-400" />
                       </div>
 
                       <div className="flex items-center gap-1 pt-1 border-t border-zinc-800/80">
@@ -2322,10 +2753,10 @@ export default function PMSFrontDeskPage() {
                           {isCopied ? "Copied!" : "Copy Link"}
                         </button>
                         <a
-                          href={`/order?room=${r.number}`}
+                          href={activeProperty?.code ? `/order?property=${encodeURIComponent(activeProperty.code)}&room=${r.number}` : `/order?room=${r.number}`}
                           target="_blank"
                           rel="noreferrer"
-                          className="rounded bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 p-1 transition"
+                          className="rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white p-1 transition"
                           title="Open Menu"
                         >
                           <ExternalLink className="h-3 w-3" />
@@ -2351,6 +2782,14 @@ export default function PMSFrontDeskPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function PMSFrontDeskPage() {
+  return (
+    <Suspense fallback={<div className="p-12 text-center text-xs text-zinc-500 font-mono">Loading Front Desk PMS...</div>}>
+      <PMSFrontDeskContent />
+    </Suspense>
   );
 }
 

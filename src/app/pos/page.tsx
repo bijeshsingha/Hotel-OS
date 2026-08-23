@@ -15,6 +15,9 @@ import {
   Trash2,
   Search,
   X,
+  User,
+  Phone,
+  ChefHat,
 } from "lucide-react";
 
 export default function POSPage() {
@@ -71,6 +74,15 @@ export default function POSPage() {
   useEffect(() => {
     loadData();
   }, [activeProperty, refreshKey]);
+
+  // Live polling for KDS updates
+  useEffect(() => {
+    if (activeTab !== "kds" || !activeProperty) return;
+    const interval = setInterval(() => {
+      loadData();
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [activeTab, activeProperty]);
 
   const activeOutlet = config?.outlets?.[0];
   const tables = activeOutlet?.tables || [];
@@ -237,6 +249,52 @@ export default function POSPage() {
     } catch (err) {
       console.error("KDS status error:", err);
     }
+  };
+
+  const getKotInfo = (kot: any) => {
+    const stay = kot.order?.stay;
+    const roomAssignment = stay?.roomAssignments?.[0];
+
+    // 1. Room Number
+    let roomNumber = roomAssignment?.room?.number ? String(roomAssignment.room.number) : "";
+    if (!roomNumber && kot.order?.customerName) {
+      const match = kot.order.customerName.match(/Room\s*([A-Za-z0-9_-]+)/i);
+      if (match) roomNumber = match[1];
+    }
+
+    // 2. Guest Name
+    let guestName = stay?.primaryGuest?.name || "";
+    if (!guestName && kot.order?.customerName) {
+      guestName = kot.order.customerName.replace(/\s*\(Room\s*[^\)]+\)/i, "").trim();
+    }
+    if (!guestName && !roomNumber) {
+      guestName = kot.order?.table?.name || "Dine-In Guest";
+    }
+
+    // 3. Contact Number
+    const contactNumber = kot.order?.customerContact || stay?.primaryGuest?.phone || "";
+
+    // 4. Elapsed Time
+    const firedAt = kot.firedAt ? new Date(kot.firedAt) : new Date();
+    const elapsedMins = Math.max(0, Math.floor((Date.now() - firedAt.getTime()) / 60000));
+    const firedTimeStr = firedAt.toLocaleTimeString("en-IN", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+    });
+
+    const isRoomService = Boolean(roomNumber) || kot.order?.mode === "ROOM_SERVICE";
+
+    return {
+      roomNumber,
+      guestName,
+      contactNumber,
+      isRoomService,
+      tableName: kot.order?.table?.name,
+      elapsedMins,
+      firedTimeStr,
+      orderNo: kot.order?.orderNo,
+    };
   };
 
   return (
@@ -476,129 +534,360 @@ export default function POSPage() {
         </div>
       )}
 
-      {/* TAB 2: KDS */}
+      {/* TAB 2: KDS (Kitchen Display System) */}
       {activeTab === "kds" && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {/* QUEUED */}
-          <div className="rounded-lg bg-[#111114] border border-zinc-800 p-3 space-y-2.5">
-            <div className="flex items-center justify-between pb-1.5 border-b border-zinc-800 font-mono text-xs font-semibold text-amber-400">
+          <div className="rounded-xl bg-[#111114] border border-zinc-800 p-3.5 space-y-3">
+            <div className="flex items-center justify-between pb-2 border-b border-zinc-800 font-mono text-xs font-bold text-amber-400">
               <span className="flex items-center gap-1.5">
-                <Clock className="h-3.5 w-3.5" /> Queued KOTs
+                <Clock className="h-4 w-4" /> Queued KOTs
               </span>
-              <span>{kots.filter((k) => k.status === "QUEUED").length}</span>
+              <span className="bg-amber-400/10 px-2 py-0.5 rounded border border-amber-400/30">
+                {kots.filter((k) => k.status === "QUEUED").length}
+              </span>
             </div>
 
-            <div className="space-y-2">
-              {kots
-                .filter((k) => k.status === "QUEUED")
-                .map((kot) => (
-                  <div key={kot.id} className="rounded-md bg-zinc-900 p-2.5 border border-zinc-800 space-y-1.5 text-xs">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <span className="font-mono font-medium text-blue-400">{kot.kotNo}</span>
-                        <div className="text-zinc-200 font-medium">{kot.order?.table?.name || "Room Service"}</div>
-                      </div>
-                      <span className="rounded bg-zinc-800 px-1.5 py-0.2 text-[10px] font-mono text-zinc-400">
-                        {kot.station?.name}
-                      </span>
-                    </div>
-
-                    <div className="space-y-0.5 pt-1.5 border-t border-zinc-800">
-                      {kot.lines?.map((line: any) => (
-                        <div key={line.id} className="flex items-center justify-between text-zinc-300">
-                          <span>{line.orderItem?.nameSnapshot}</span>
-                          <span className="font-mono font-semibold text-amber-400">×{line.qty}</span>
+            <div className="space-y-3 max-h-[calc(100vh-280px)] overflow-y-auto pr-1">
+              {kots.filter((k) => k.status === "QUEUED").length === 0 ? (
+                <div className="text-center py-12 text-zinc-500 text-xs">No tickets queued.</div>
+              ) : (
+                kots
+                  .filter((k) => k.status === "QUEUED")
+                  .map((kot) => {
+                    const info = getKotInfo(kot);
+                    return (
+                      <div
+                        key={kot.id}
+                        className="rounded-xl bg-[#18181b] p-3.5 border border-zinc-800 space-y-3 text-xs shadow-sm hover:border-zinc-700 transition"
+                      >
+                        {/* Header: KOT #, Order # and Station */}
+                        <div className="flex items-start justify-between gap-2 pb-2 border-b border-zinc-800">
+                          <div>
+                            <div className="flex items-center gap-1.5 font-mono">
+                              <span className="font-bold text-amber-400">#{kot.kotNo}</span>
+                              {info.orderNo && (
+                                <span className="text-[10px] text-zinc-400">• Order #{info.orderNo}</span>
+                              )}
+                            </div>
+                            <div className="text-[10px] text-zinc-400 font-mono flex items-center gap-1 mt-0.5">
+                              <Clock className="h-3 w-3 text-zinc-500" />
+                              <span>{info.firedTimeStr} ({info.elapsedMins}m ago)</span>
+                            </div>
+                          </div>
+                          <span className="rounded bg-zinc-900 border border-zinc-700 px-2 py-0.5 text-[10px] font-mono text-zinc-300 font-medium shrink-0">
+                            {kot.station?.name || "Kitchen"}
+                          </span>
                         </div>
-                      ))}
-                    </div>
 
-                    <button
-                      onClick={() => handleKdsStatus(kot.id, "PREPARING")}
-                      className="w-full mt-1 rounded bg-zinc-800 hover:bg-zinc-700 py-1 text-xs font-medium text-zinc-200 transition"
-                    >
-                      Start Preparing
-                    </button>
-                  </div>
-                ))}
+                        {/* Room, Guest Name & Phone details */}
+                        <div className="rounded-lg bg-zinc-900/90 border border-zinc-800 p-2.5 space-y-1.5">
+                          <div className="flex items-center justify-between gap-2">
+                            {info.isRoomService ? (
+                              <div className="flex items-center gap-1.5">
+                                <span className="flex items-center gap-1 font-mono font-bold text-white bg-blue-600/30 border border-blue-500/50 text-blue-300 px-2 py-0.5 rounded text-xs">
+                                  <BedDouble className="h-3.5 w-3.5" />
+                                  Room {info.roomNumber || "Service"}
+                                </span>
+                                <span className="text-[10px] font-mono text-zinc-400">IN-ROOM</span>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-1.5">
+                                <span className="flex items-center gap-1 font-mono font-bold text-white bg-emerald-600/30 border border-emerald-500/50 text-emerald-300 px-2 py-0.5 rounded text-xs">
+                                  <UtensilsCrossed className="h-3.5 w-3.5" />
+                                  {info.tableName || "Dine-In Table"}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Guest Name */}
+                          <div className="flex items-center gap-1.5 text-zinc-100 font-semibold text-xs">
+                            <User className="h-3.5 w-3.5 text-zinc-400 shrink-0" />
+                            <span className="truncate">{info.guestName || "Guest"}</span>
+                          </div>
+
+                          {/* Phone Number */}
+                          {info.contactNumber && (
+                            <div className="flex items-center gap-1.5 text-[11px] text-zinc-400 font-mono">
+                              <Phone className="h-3 w-3 text-emerald-400 shrink-0" />
+                              <a
+                                href={`tel:${info.contactNumber}`}
+                                className="text-zinc-300 hover:text-white transition underline underline-offset-2"
+                              >
+                                {info.contactNumber}
+                              </a>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Ordered Dishes List */}
+                        <div className="space-y-1 pt-1 border-t border-zinc-800/80">
+                          {kot.lines?.map((line: any) => (
+                            <div key={line.id} className="flex items-start justify-between gap-2 text-zinc-200">
+                              <div className="min-w-0 flex-1">
+                                <div className="font-medium text-zinc-200 break-words">
+                                  {line.orderItem?.nameSnapshot}
+                                </div>
+                                {line.orderItem?.notes && (
+                                  <div className="text-[10px] text-amber-400 font-mono mt-0.5">
+                                    Note: {line.orderItem.notes}
+                                  </div>
+                                )}
+                              </div>
+                              <span className="font-mono font-bold text-xs text-amber-400 shrink-0">
+                                ×{line.qty}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+
+                        <button
+                          onClick={() => handleKdsStatus(kot.id, "PREPARING")}
+                          className="w-full rounded-md bg-zinc-800 hover:bg-zinc-700 py-1.5 text-xs font-semibold text-zinc-100 transition flex items-center justify-center gap-1.5"
+                        >
+                          <Flame className="h-3.5 w-3.5 text-amber-400" /> Start Preparing
+                        </button>
+                      </div>
+                    );
+                  })
+              )}
             </div>
           </div>
 
           {/* PREPARING */}
-          <div className="rounded-lg bg-[#111114] border border-zinc-800 p-3 space-y-2.5">
-            <div className="flex items-center justify-between pb-1.5 border-b border-zinc-800 font-mono text-xs font-semibold text-blue-400">
+          <div className="rounded-xl bg-[#111114] border border-zinc-800 p-3.5 space-y-3">
+            <div className="flex items-center justify-between pb-2 border-b border-zinc-800 font-mono text-xs font-bold text-blue-400">
               <span className="flex items-center gap-1.5">
-                <Flame className="h-3.5 w-3.5" /> Preparing
+                <Flame className="h-4 w-4" /> Preparing / Cooking
               </span>
-              <span>{kots.filter((k) => k.status === "PREPARING").length}</span>
+              <span className="bg-blue-400/10 px-2 py-0.5 rounded border border-blue-400/30">
+                {kots.filter((k) => k.status === "PREPARING").length}
+              </span>
             </div>
 
-            <div className="space-y-2">
-              {kots
-                .filter((k) => k.status === "PREPARING")
-                .map((kot) => (
-                  <div key={kot.id} className="rounded-md bg-zinc-900 p-2.5 border border-zinc-800 space-y-1.5 text-xs">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <span className="font-mono font-medium text-blue-400">{kot.kotNo}</span>
-                        <div className="text-zinc-200 font-medium">{kot.order?.table?.name || "Room Service"}</div>
-                      </div>
-                      <span className="rounded bg-zinc-800 px-1.5 py-0.2 text-[10px] font-mono text-zinc-400">
-                        {kot.station?.name}
-                      </span>
-                    </div>
-
-                    <div className="space-y-0.5 pt-1.5 border-t border-zinc-800">
-                      {kot.lines?.map((line: any) => (
-                        <div key={line.id} className="flex items-center justify-between text-zinc-300">
-                          <span>{line.orderItem?.nameSnapshot}</span>
-                          <span className="font-mono font-semibold text-blue-400">×{line.qty}</span>
+            <div className="space-y-3 max-h-[calc(100vh-280px)] overflow-y-auto pr-1">
+              {kots.filter((k) => k.status === "PREPARING").length === 0 ? (
+                <div className="text-center py-12 text-zinc-500 text-xs">No active orders cooking.</div>
+              ) : (
+                kots
+                  .filter((k) => k.status === "PREPARING")
+                  .map((kot) => {
+                    const info = getKotInfo(kot);
+                    return (
+                      <div
+                        key={kot.id}
+                        className="rounded-xl bg-[#18181b] p-3.5 border border-blue-500/30 space-y-3 text-xs shadow-sm hover:border-blue-500/60 transition"
+                      >
+                        {/* Header: KOT #, Order # and Station */}
+                        <div className="flex items-start justify-between gap-2 pb-2 border-b border-zinc-800">
+                          <div>
+                            <div className="flex items-center gap-1.5 font-mono">
+                              <span className="font-bold text-blue-400">#{kot.kotNo}</span>
+                              {info.orderNo && (
+                                <span className="text-[10px] text-zinc-400">• Order #{info.orderNo}</span>
+                              )}
+                            </div>
+                            <div className="text-[10px] text-zinc-400 font-mono flex items-center gap-1 mt-0.5">
+                              <Clock className="h-3 w-3 text-zinc-500" />
+                              <span>{info.firedTimeStr} ({info.elapsedMins}m ago)</span>
+                            </div>
+                          </div>
+                          <span className="rounded bg-zinc-900 border border-zinc-700 px-2 py-0.5 text-[10px] font-mono text-zinc-300 font-medium shrink-0">
+                            {kot.station?.name || "Kitchen"}
+                          </span>
                         </div>
-                      ))}
-                    </div>
 
-                    <button
-                      onClick={() => handleKdsStatus(kot.id, "READY")}
-                      className="w-full mt-1 rounded bg-zinc-100 hover:bg-white text-zinc-950 py-1 text-xs font-medium transition"
-                    >
-                      Mark Ready
-                    </button>
-                  </div>
-                ))}
+                        {/* Room, Guest Name & Phone details */}
+                        <div className="rounded-lg bg-zinc-900/90 border border-zinc-800 p-2.5 space-y-1.5">
+                          <div className="flex items-center justify-between gap-2">
+                            {info.isRoomService ? (
+                              <div className="flex items-center gap-1.5">
+                                <span className="flex items-center gap-1 font-mono font-bold text-white bg-blue-600/30 border border-blue-500/50 text-blue-300 px-2 py-0.5 rounded text-xs">
+                                  <BedDouble className="h-3.5 w-3.5" />
+                                  Room {info.roomNumber || "Service"}
+                                </span>
+                                <span className="text-[10px] font-mono text-zinc-400">IN-ROOM</span>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-1.5">
+                                <span className="flex items-center gap-1 font-mono font-bold text-white bg-emerald-600/30 border border-emerald-500/50 text-emerald-300 px-2 py-0.5 rounded text-xs">
+                                  <UtensilsCrossed className="h-3.5 w-3.5" />
+                                  {info.tableName || "Dine-In Table"}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Guest Name */}
+                          <div className="flex items-center gap-1.5 text-zinc-100 font-semibold text-xs">
+                            <User className="h-3.5 w-3.5 text-zinc-400 shrink-0" />
+                            <span className="truncate">{info.guestName || "Guest"}</span>
+                          </div>
+
+                          {/* Phone Number */}
+                          {info.contactNumber && (
+                            <div className="flex items-center gap-1.5 text-[11px] text-zinc-400 font-mono">
+                              <Phone className="h-3 w-3 text-emerald-400 shrink-0" />
+                              <a
+                                href={`tel:${info.contactNumber}`}
+                                className="text-zinc-300 hover:text-white transition underline underline-offset-2"
+                              >
+                                {info.contactNumber}
+                              </a>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Ordered Dishes List */}
+                        <div className="space-y-1 pt-1 border-t border-zinc-800/80">
+                          {kot.lines?.map((line: any) => (
+                            <div key={line.id} className="flex items-start justify-between gap-2 text-zinc-200">
+                              <div className="min-w-0 flex-1">
+                                <div className="font-medium text-zinc-200 break-words">
+                                  {line.orderItem?.nameSnapshot}
+                                </div>
+                                {line.orderItem?.notes && (
+                                  <div className="text-[10px] text-amber-400 font-mono mt-0.5">
+                                    Note: {line.orderItem.notes}
+                                  </div>
+                                )}
+                              </div>
+                              <span className="font-mono font-bold text-xs text-blue-400 shrink-0">
+                                ×{line.qty}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+
+                        <button
+                          onClick={() => handleKdsStatus(kot.id, "READY")}
+                          className="w-full rounded-md bg-blue-600 hover:bg-blue-500 py-1.5 text-xs font-semibold text-white transition flex items-center justify-center gap-1.5 shadow-sm shadow-blue-500/20"
+                        >
+                          <CheckCircle2 className="h-3.5 w-3.5" /> Mark Ready (Plated)
+                        </button>
+                      </div>
+                    );
+                  })
+              )}
             </div>
           </div>
 
           {/* READY */}
-          <div className="rounded-lg bg-[#111114] border border-zinc-800 p-3 space-y-2.5">
-            <div className="flex items-center justify-between pb-1.5 border-b border-zinc-800 font-mono text-xs font-semibold text-emerald-400">
+          <div className="rounded-xl bg-[#111114] border border-zinc-800 p-3.5 space-y-3">
+            <div className="flex items-center justify-between pb-2 border-b border-zinc-800 font-mono text-xs font-bold text-emerald-400">
               <span className="flex items-center gap-1.5">
-                <CheckCircle2 className="h-3.5 w-3.5" /> Ready to Serve
+                <CheckCircle2 className="h-4 w-4" /> Ready to Serve / Dispatch
               </span>
-              <span>{kots.filter((k) => k.status === "READY").length}</span>
+              <span className="bg-emerald-400/10 px-2 py-0.5 rounded border border-emerald-400/30">
+                {kots.filter((k) => k.status === "READY").length}
+              </span>
             </div>
 
-            <div className="space-y-2">
-              {kots
-                .filter((k) => k.status === "READY")
-                .map((kot) => (
-                  <div key={kot.id} className="rounded-md bg-zinc-900 p-2.5 border border-zinc-800 space-y-1.5 text-xs">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <span className="font-mono font-medium text-blue-400">{kot.kotNo}</span>
-                        <div className="text-zinc-200 font-medium">{kot.order?.table?.name || "Room Service"}</div>
-                      </div>
-                      <span className="rounded bg-zinc-800 px-1.5 py-0.2 text-[10px] font-mono text-zinc-400">
-                        {kot.station?.name}
-                      </span>
-                    </div>
+            <div className="space-y-3 max-h-[calc(100vh-280px)] overflow-y-auto pr-1">
+              {kots.filter((k) => k.status === "READY").length === 0 ? (
+                <div className="text-center py-12 text-zinc-500 text-xs">No orders waiting for runner.</div>
+              ) : (
+                kots
+                  .filter((k) => k.status === "READY")
+                  .map((kot) => {
+                    const info = getKotInfo(kot);
+                    return (
+                      <div
+                        key={kot.id}
+                        className="rounded-xl bg-[#18181b] p-3.5 border border-emerald-500/30 space-y-3 text-xs shadow-sm hover:border-emerald-500/60 transition"
+                      >
+                        {/* Header: KOT #, Order # and Station */}
+                        <div className="flex items-start justify-between gap-2 pb-2 border-b border-zinc-800">
+                          <div>
+                            <div className="flex items-center gap-1.5 font-mono">
+                              <span className="font-bold text-emerald-400">#{kot.kotNo}</span>
+                              {info.orderNo && (
+                                <span className="text-[10px] text-zinc-400">• Order #{info.orderNo}</span>
+                              )}
+                            </div>
+                            <div className="text-[10px] text-zinc-400 font-mono flex items-center gap-1 mt-0.5">
+                              <Clock className="h-3 w-3 text-zinc-500" />
+                              <span>{info.firedTimeStr} ({info.elapsedMins}m ago)</span>
+                            </div>
+                          </div>
+                          <span className="rounded bg-zinc-900 border border-zinc-700 px-2 py-0.5 text-[10px] font-mono text-zinc-300 font-medium shrink-0">
+                            {kot.station?.name || "Kitchen"}
+                          </span>
+                        </div>
 
-                    <button
-                      onClick={() => handleKdsStatus(kot.id, "COMPLETED")}
-                      className="w-full mt-1 rounded bg-zinc-800 hover:bg-zinc-700 py-1 text-xs font-medium text-zinc-200 transition"
-                    >
-                      Complete / Served
-                    </button>
-                  </div>
-                ))}
+                        {/* Room, Guest Name & Phone details */}
+                        <div className="rounded-lg bg-zinc-900/90 border border-zinc-800 p-2.5 space-y-1.5">
+                          <div className="flex items-center justify-between gap-2">
+                            {info.isRoomService ? (
+                              <div className="flex items-center gap-1.5">
+                                <span className="flex items-center gap-1 font-mono font-bold text-white bg-blue-600/30 border border-blue-500/50 text-blue-300 px-2 py-0.5 rounded text-xs">
+                                  <BedDouble className="h-3.5 w-3.5" />
+                                  Room {info.roomNumber || "Service"}
+                                </span>
+                                <span className="text-[10px] font-mono text-zinc-400">IN-ROOM</span>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-1.5">
+                                <span className="flex items-center gap-1 font-mono font-bold text-white bg-emerald-600/30 border border-emerald-500/50 text-emerald-300 px-2 py-0.5 rounded text-xs">
+                                  <UtensilsCrossed className="h-3.5 w-3.5" />
+                                  {info.tableName || "Dine-In Table"}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Guest Name */}
+                          <div className="flex items-center gap-1.5 text-zinc-100 font-semibold text-xs">
+                            <User className="h-3.5 w-3.5 text-zinc-400 shrink-0" />
+                            <span className="truncate">{info.guestName || "Guest"}</span>
+                          </div>
+
+                          {/* Phone Number */}
+                          {info.contactNumber && (
+                            <div className="flex items-center gap-1.5 text-[11px] text-zinc-400 font-mono">
+                              <Phone className="h-3 w-3 text-emerald-400 shrink-0" />
+                              <a
+                                href={`tel:${info.contactNumber}`}
+                                className="text-zinc-300 hover:text-white transition underline underline-offset-2"
+                              >
+                                {info.contactNumber}
+                              </a>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Ordered Dishes List */}
+                        <div className="space-y-1 pt-1 border-t border-zinc-800/80">
+                          {kot.lines?.map((line: any) => (
+                            <div key={line.id} className="flex items-start justify-between gap-2 text-zinc-200">
+                              <div className="min-w-0 flex-1">
+                                <div className="font-medium text-zinc-200 break-words">
+                                  {line.orderItem?.nameSnapshot}
+                                </div>
+                                {line.orderItem?.notes && (
+                                  <div className="text-[10px] text-amber-400 font-mono mt-0.5">
+                                    Note: {line.orderItem.notes}
+                                  </div>
+                                )}
+                              </div>
+                              <span className="font-mono font-bold text-xs text-emerald-400 shrink-0">
+                                ×{line.qty}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+
+                        <button
+                          onClick={() => handleKdsStatus(kot.id, "COMPLETED")}
+                          className="w-full rounded-md bg-emerald-600 hover:bg-emerald-500 py-1.5 text-xs font-semibold text-white transition flex items-center justify-center gap-1.5 shadow-sm shadow-emerald-500/20"
+                        >
+                          <CheckCircle2 className="h-3.5 w-3.5" /> Complete / Served
+                        </button>
+                      </div>
+                    );
+                  })
+              )}
             </div>
           </div>
         </div>

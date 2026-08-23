@@ -90,6 +90,27 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "No active property found" }, { status: 404 });
     }
 
+    // Validate room occupancy if preAssignedRoom is requested
+    if (preAssignedRoom) {
+      const roomNum = String(preAssignedRoom).trim();
+      const existingOccupancy = await prisma.roomAssignment.findFirst({
+        where: {
+          room: { propertyId: prop.id, number: roomNum },
+          endsAt: null,
+          stay: { status: "IN_HOUSE" },
+        },
+        include: { room: true },
+      });
+      if (existingOccupancy) {
+        return NextResponse.json(
+          {
+            error: `Room ${roomNum} is currently occupied by an active guest. Please select an available room or leave blank for reception assignment.`,
+          },
+          { status: 400, headers: corsHeaders }
+        );
+      }
+    }
+
     // Generate unique Registration / GRC Number scoped to property
     const propCode = prop.code === "GUW-01" ? "AMB" : prop.code === "HDW" || prop.code === "HDV-01" ? "HDV" : prop.code;
     const regCount = await prisma.guestRegistration.count({ where: { propertyId: prop.id } });

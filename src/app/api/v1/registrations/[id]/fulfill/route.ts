@@ -19,6 +19,10 @@ export async function POST(
       depositRef = "",
       notes = "",
       userId,
+      idPhotoUrl,
+      idDocumentType,
+      idDocumentNumber,
+      coGuests,
     } = body;
 
     const registration = await prisma.guestRegistration.findUnique({
@@ -54,9 +58,25 @@ export async function POST(
     }
 
     // Check if room is already occupied
-    if (targetRoom.roomState?.occupancyStatus === "OCCUPIED") {
-      return NextResponse.json({ error: `Room ${targetRoom.number} is already occupied.` }, { status: 400 });
+    const activeAssignment = await prisma.roomAssignment.findFirst({
+      where: {
+        roomId: targetRoom.id,
+        endsAt: null,
+        stay: { status: "IN_HOUSE" },
+      },
+    });
+
+    if (activeAssignment || targetRoom.roomState?.occupancyStatus === "OCCUPIED") {
+      return NextResponse.json(
+        { error: `Room ${targetRoom.number} is already occupied by an in-house guest.` },
+        { status: 400 }
+      );
     }
+
+    const finalIdPhotoUrl = idPhotoUrl || registration.idPhotoUrl;
+    const finalIdDocType = idDocumentType || registration.idDocumentType;
+    const finalIdDocNum = idDocumentNumber || registration.idDocumentNumber;
+    const finalCoGuestsJson = coGuests ? JSON.stringify(coGuests) : registration.coGuestsJson;
 
     // 1. Find or create Guest
     let guest = await prisma.guest.findFirst({
@@ -99,18 +119,36 @@ export async function POST(
       });
     }
 
-    // 2. Save ID document if provided
-    if (registration.idDocumentNumber) {
+    // 2. Save primary ID document if provided
+    if (finalIdDocNum || finalIdPhotoUrl) {
       await prisma.guestDocument.create({
         data: {
           guestId: guest.id,
           propertyId: registration.propertyId,
-          documentType: registration.idDocumentType || "AADHAAR",
-          last4: registration.idDocumentNumber.slice(-4),
+          documentType: finalIdDocType || "AADHAAR",
+          last4: finalIdDocNum ? finalIdDocNum.slice(-4) : "ID",
           issuerCountry: registration.country || "India",
-          objectKey: registration.idPhotoUrl || null,
+          objectKey: finalIdPhotoUrl || null,
         },
       });
+    }
+
+    // Save co-guest documents for police verification if photos provided
+    if (coGuests && Array.isArray(coGuests)) {
+      for (const cg of coGuests) {
+        if (cg.idPhotoUrl || cg.idNumber) {
+          await prisma.guestDocument.create({
+            data: {
+              guestId: guest.id,
+              propertyId: registration.propertyId,
+              documentType: cg.idType || "AADHAAR",
+              last4: cg.idNumber ? cg.idNumber.slice(-4) : "ID",
+              issuerCountry: "India",
+              objectKey: cg.idPhotoUrl || null,
+            },
+          });
+        }
+      }
     }
 
     // 3. Create PMS Stay
@@ -191,7 +229,53 @@ export async function POST(
       data: { folioId: folio.id },
     });
 
-    // 6. Handle Advance Deposit if collected
+    // 6. Post Initial Room Tariff Charge (SAC 996311)
+    let roomBasePrice = 3200;
+    if (targetRoom.roomTypeId) {
+      const rateVersion = await prisma.ratePlanVersion.findFirst({
+        where: { roomTypeId: targetRoom.roomTypeId, active: true },
+        orderBy: { createdAt: "desc" },
+      });
+      if (rateVersion?.pricingJson) {
+        try {
+          const pricing = JSON.parse(rateVersion.pricingJson);
+          if (pricing.basePrice) roomBasePrice = Number(pricing.basePrice);
+        } catch {}
+      }
+    }
+
+    const roomGst = calculateGST({
+      grossOrBaseAmount: roomBasePrice,
+      isInclusive: false,
+      sacHsn: "996311",
+      supplierStateCode: registration.property?.stateCode || "18",
+    });
+
+    const serviceDateStr = registration.property?.businessDate || new Date().toISOString().split("T")[0];
+
+    await prisma.folioEntry.create({
+      data: {
+        organizationId: registration.organizationId,
+        propertyId: registration.propertyId,
+        folioId: folio.id,
+        folioWindowId: window.id,
+        serviceDate: serviceDateStr,
+        type: "CHARGE",
+        chargeCode: "ROOM_TARIFF",
+        description: `Room Tariff - Room ${targetRoom.number} (${targetRoom.roomType?.name || "Room Charge"})`,
+        qty: 1,
+        unitAmount: roomBasePrice,
+        taxableAmount: roomGst.taxableAmount,
+        taxComponentsJson: JSON.stringify(roomGst.components),
+        totalAmount: roomGst.totalAmount,
+        sourceType: "PMS_NIGHTLY_CHARGE",
+        status: "POSTED",
+      },
+    });
+
+    let currentBalance = roomGst.totalAmount;
+
+    // 7. Handle Advance Deposit if collected
     if (Number(depositAmount) > 0) {
       const depAmt = Number(depositAmount);
       const seq = await prisma.documentSequence.findFirst({
@@ -205,7 +289,7 @@ export async function POST(
         });
       }
 
-      await prisma.payment.create({
+      const payment = await prisma.payment.create({
         data: {
           organizationId: registration.organizationId,
           propertyId: registration.propertyId,
@@ -219,11 +303,21 @@ export async function POST(
         },
       });
 
-      await prisma.folio.update({
-        where: { id: folio.id },
-        data: { balance: -depAmt },
+      await prisma.paymentAllocation.create({
+        data: {
+          paymentId: payment.id,
+          folioWindowId: window.id,
+          amount: depAmt,
+        },
       });
+
+      currentBalance -= depAmt;
     }
+
+    await prisma.folio.update({
+      where: { id: folio.id },
+      data: { balance: currentBalance },
+    });
 
     // 7. Update Registration status
     const updatedReg = await prisma.guestRegistration.update({
