@@ -13,6 +13,7 @@ import {
   Wrench,
   BarChart3,
   ScrollText,
+  Building2,
 } from "lucide-react";
 
 function SidebarNav() {
@@ -28,6 +29,7 @@ function SidebarNav() {
     { label: "Maintenance", href: "/maintenance", icon: Wrench, badge: "M01" },
     { label: "Reports & Exports", href: "/reports", icon: BarChart3, badge: "R01" },
     { label: "Audit Trail", href: "/audit-log", icon: ScrollText, badge: "A01" },
+    { label: "Onboard Hotel", href: "/onboarding", icon: Building2, badge: "NEW" },
   ];
 
   return (

@@ -173,10 +173,15 @@ export async function checkInGuest({
   expectedDepartureAt,
   adults = 2,
   children = 0,
+  paxM,
+  paxF,
+  paxC,
   ratePlanId,
   depositAmount = 0,
   actorId,
   overrideReason,
+  coGuests,
+  foreignDetails,
 }: {
   propertyId: string;
   reservationId?: string;
@@ -186,20 +191,40 @@ export async function checkInGuest({
     email?: string;
     nationality?: string;
     address?: string;
+    streetAddress?: string;
+    policeStation?: string;
+    city?: string;
+    state?: string;
+    pinZipCode?: string;
+    country?: string;
+    fatherSpouseName?: string;
+    profession?: string;
+    arrivedFrom?: string;
+    goingTo?: string;
+    purposeOfVisit?: string;
+    driverName?: string;
+    vehicleNumber?: string;
     gstin?: string;
     companyName?: string;
     idType?: string;
     idLast4?: string;
+    age?: number;
+    gender?: string;
   };
   roomId: string;
   arrivalAt?: Date;
   expectedDepartureAt: Date;
   adults?: number;
   children?: number;
+  paxM?: number;
+  paxF?: number;
+  paxC?: number;
   ratePlanId?: string;
   depositAmount?: number;
   actorId?: string;
   overrideReason?: string;
+  coGuests?: any[];
+  foreignDetails?: any;
 }) {
   const property = await prisma.property.findUniqueOrThrow({
     where: { id: propertyId },
@@ -233,6 +258,15 @@ export async function checkInGuest({
     });
   }
 
+  const fullAddressJson = JSON.stringify({
+    street: guestData.streetAddress || guestData.address || "",
+    policeStation: guestData.policeStation || "",
+    city: guestData.city || "",
+    state: guestData.state || "",
+    pinZipCode: guestData.pinZipCode || "",
+    country: guestData.country || "India",
+  });
+
   if (!guest) {
     guest = await prisma.guest.create({
       data: {
@@ -241,9 +275,19 @@ export async function checkInGuest({
         phone: guestData.phone,
         email: guestData.email,
         nationality: guestData.nationality || "Indian",
-        addressJson: guestData.address,
+        addressJson: fullAddressJson,
         gstin: guestData.gstin,
         companyName: guestData.companyName,
+      },
+    });
+  } else {
+    await prisma.guest.update({
+      where: { id: guest.id },
+      data: {
+        name: guestData.name || guest.name,
+        addressJson: fullAddressJson,
+        gstin: guestData.gstin || guest.gstin,
+        companyName: guestData.companyName || guest.companyName,
       },
     });
   }
@@ -436,7 +480,52 @@ export async function checkInGuest({
     data: { balance: currentBalance },
   });
 
-  // 8. Write Audit Log
+  // 9. Generate GRC Registration Record
+  const grcSeq = await getNextDocumentNumber(propertyId, "GRC");
+  const formattedArrival = (arrivalAt || new Date()).toISOString().replace("T", " ").slice(0, 16);
+
+  const registration = await prisma.guestRegistration.create({
+    data: {
+      organizationId: property.organizationId,
+      propertyId: property.id,
+      registrationNo: grcSeq.formattedNumber,
+      status: "CHECKED_IN",
+      fullName: guestData.name,
+      age: guestData.age ? Number(guestData.age) : undefined,
+      gender: guestData.gender || "Male",
+      nationality: guestData.nationality || "Indian",
+      fatherSpouseName: guestData.fatherSpouseName || "",
+      arrivalDateTime: formattedArrival,
+      expectedDepartureDate: expectedDepartureAt.toISOString().split("T")[0],
+      preAssignedRoom: room.number,
+      streetAddress: guestData.streetAddress || guestData.address || "",
+      city: guestData.city || "",
+      state: guestData.state || "",
+      pinZipCode: guestData.pinZipCode || "",
+      country: guestData.country || "India",
+      arrivedFrom: guestData.arrivedFrom || "",
+      goingTo: guestData.goingTo || "",
+      purposeOfVisit: guestData.purposeOfVisit || "Tourism / Holiday",
+      referralChannel: "Direct / Walk-In",
+      mobilePhone: guestData.phone || "",
+      alternatePhone: guestData.phone || "",
+      email: guestData.email || "",
+      driverName: guestData.driverName || "",
+      vehicleNumber: guestData.vehicleNumber || "",
+      coGuestsJson: coGuests ? JSON.stringify(coGuests) : null,
+      idDocumentType: guestData.idType || "AADHAAR",
+      idDocumentNumber: guestData.idLast4 || "",
+      foreignPassportDetailsJson: foreignDetails ? JSON.stringify(foreignDetails) : null,
+      assignedRoomId: room.id,
+      assignedRoomNumber: room.number,
+      stayId: stay.id,
+      guestId: guest.id,
+      depositAmount: depositAmount,
+      processedByUserId: actorId,
+    },
+  });
+
+  // 10. Write Audit Log
   await prisma.auditLog.create({
     data: {
       organizationId: property.organizationId,
@@ -448,14 +537,14 @@ export async function checkInGuest({
       targetId: stay.id,
       afterJson: JSON.stringify({
         roomNumber: room.number,
+        grcNo: grcSeq.formattedNumber,
         guestName: guest.name,
-        stayId: stay.id,
-        folioId: folio.id,
+        depositAmount,
       }),
     },
   });
 
-  return { stay, folio, guest, room };
+  return { stay, guest, folio, registration, room };
 }
 
 export async function moveRoom({

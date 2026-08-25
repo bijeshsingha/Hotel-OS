@@ -7,7 +7,8 @@ export type DocumentType =
   | "KOT"
   | "ORDER"
   | "RESERVATION"
-  | "MAINTENANCE";
+  | "MAINTENANCE"
+  | "GRC";
 
 export async function getNextDocumentNumber(
   propertyId: string,
@@ -28,6 +29,7 @@ export async function getNextDocumentNumber(
   else if (documentType === "CREDIT_NOTE") defaultPrefix = `CN-${fyShort}-`;
   else if (documentType === "RECEIPT") defaultPrefix = `REC-${fyShort}-`;
   else if (documentType === "RESERVATION") defaultPrefix = `RES-${fyShort}-`;
+  else if (documentType === "GRC") defaultPrefix = `GRC-${fyShort}-`;
   else if (documentType === "KOT") defaultPrefix = `KOT-`;
   else if (documentType === "ORDER") defaultPrefix = `ORD-`;
   else if (documentType === "MAINTENANCE") defaultPrefix = `MNT-`;

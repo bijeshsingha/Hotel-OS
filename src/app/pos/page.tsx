@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { useHotel } from "@/lib/context/hotel-context";
 import { formatINR, calculateGST } from "@/lib/gst/calculator";
+import { PrintableKotSlipModal, KotPrintData } from "@/components/pos/printable-kot-slip";
 import {
   UtensilsCrossed,
   Flame,
@@ -18,6 +19,15 @@ import {
   User,
   Phone,
   ChefHat,
+  Printer,
+  History,
+  ShoppingBag,
+  Layers,
+  Sparkles,
+  AlertCircle,
+  Check,
+  ArrowRight,
+  Filter,
 } from "lucide-react";
 
 export default function POSPage() {
@@ -27,18 +37,36 @@ export default function POSPage() {
   const [kots, setKots] = useState<any[]>([]);
   const [stays, setStays] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<"tables" | "kds">("tables");
+  
+  // Navigation Tabs: "pad" (Order Punching), "kds" (Live Kitchen Display), "history" (KOT Register)
+  const [activeTab, setActiveTab] = useState<"pad" | "kds" | "history">("pad");
 
-  // Active Order / Table Cart State
+  // Service Mode: "DINE_IN" (Table), "ROOM_SERVICE" (In-Room), "TAKEAWAY"
+  const [serviceMode, setServiceMode] = useState<"DINE_IN" | "ROOM_SERVICE" | "TAKEAWAY">("DINE_IN");
   const [selectedTable, setSelectedTable] = useState<any>(null);
-  const [cartItems, setCartItems] = useState<any[]>([]);
+  const [selectedStay, setSelectedStay] = useState<any>(null);
+  const [customerName, setCustomerName] = useState("");
+  const [customerPhone, setCustomerPhone] = useState("");
+
+  // Menu Search & Category Filter
   const [selectedCategory, setSelectedCategory] = useState<string>("ALL");
   const [menuSearch, setMenuSearch] = useState("");
 
-  // Room Posting Modal
-  const [showRoomPostModal, setShowRoomPostModal] = useState(false);
-  const [selectedStayId, setSelectedStayId] = useState("");
+  // Active Cart: Array of { id, name, unitPrice, qty, stationId, isVeg, notes }
+  const [cartItems, setCartItems] = useState<any[]>([]);
+
+  // Printable KOT Slip Modal
+  const [printKotData, setPrintKotData] = useState<KotPrintData | null>(null);
+  const [showPrintModal, setShowPrintModal] = useState(false);
+
+  // Action Loading
   const [actionLoading, setActionLoading] = useState(false);
+  const [successToast, setSuccessToast] = useState<string | null>(null);
+
+  const triggerToast = (msg: string) => {
+    setSuccessToast(msg);
+    setTimeout(() => setSuccessToast(null), 3500);
+  };
 
   const loadData = async () => {
     if (!activeProperty) return;
@@ -75,24 +103,28 @@ export default function POSPage() {
     loadData();
   }, [activeProperty, refreshKey]);
 
-  // Live polling for KDS updates
+  // Live polling for KDS updates every 6 seconds
   useEffect(() => {
     if (activeTab !== "kds" || !activeProperty) return;
     const interval = setInterval(() => {
       loadData();
-    }, 5000);
+    }, 6000);
     return () => clearInterval(interval);
   }, [activeTab, activeProperty]);
 
   const activeOutlet = config?.outlets?.[0];
   const tables = activeOutlet?.tables || [];
   const categories = activeOutlet?.categories || [];
+  const kitchenStations = activeOutlet?.kitchenStations || [];
 
   const allMenuItems = categories.flatMap((c: any) =>
     c.items.map((i: any) => ({
       ...i,
       categoryName: c.name,
-      variant: i.variants[0],
+      variant: i.variants?.[0],
+      price: i.variants?.[0]?.price || 200,
+      stationId: i.variants?.[0]?.stationId,
+      isVeg: i.description === "Pure Vegetarian" || !i.name.toLowerCase().includes("chicken") && !i.name.toLowerCase().includes("mutton") && !i.name.toLowerCase().includes("fish") && !i.name.toLowerCase().includes("egg") && !i.name.toLowerCase().includes("omelet"),
     }))
   );
 
@@ -102,6 +134,7 @@ export default function POSPage() {
     return matchesCat && matchesSearch;
   });
 
+  // Cart Operations
   const addToCart = (item: any) => {
     const existing = cartItems.find((c) => c.id === item.id);
     if (existing) {
@@ -112,9 +145,10 @@ export default function POSPage() {
         {
           id: item.id,
           name: item.name,
-          unitPrice: item.variant?.price || 350,
-          stationId: item.variant?.stationId,
+          unitPrice: item.price,
+          stationId: item.stationId,
           qty: 1,
+          notes: "",
         },
       ]);
     }
@@ -134,33 +168,70 @@ export default function POSPage() {
     );
   };
 
+  const updateItemNotes = (itemId: string, notes: string) => {
+    setCartItems(cartItems.map((c) => (c.id === itemId ? { ...c, notes } : c)));
+  };
+
+  const removeItem = (itemId: string) => {
+    setCartItems(cartItems.filter((c) => c.id !== itemId));
+  };
+
+  const clearCart = () => {
+    setCartItems([]);
+  };
+
+  // Financial calculations
   const cartSubtotal = cartItems.reduce((sum, item) => sum + item.unitPrice * item.qty, 0);
   const gst = calculateGST({
     grossOrBaseAmount: cartSubtotal,
     isInclusive: false,
-    sacHsn: "996331",
+    sacHsn: "996331", // Restaurant Food & Beverage 5% GST
     supplierStateCode: activeProperty?.stateCode || "18",
   });
 
+  // Fire KOT Action
   const handleFireKOT = async () => {
-    if (!selectedTable && !showRoomPostModal) {
-      alert("Please select a table or service mode first.");
+    if (serviceMode === "DINE_IN" && !selectedTable) {
+      alert("Please select a dining table for Dine-In service.");
+      return;
+    }
+    if (serviceMode === "ROOM_SERVICE" && !selectedStay) {
+      alert("Please select an in-house room for Room Service delivery.");
       return;
     }
     if (cartItems.length === 0) {
-      alert("Please add items to order.");
+      alert("Cart is empty. Please add items from the menu.");
       return;
     }
 
     setActionLoading(true);
     try {
+      let custName = "";
+      let custPhone = "";
+      let targetRoomNumber = "";
+
+      if (serviceMode === "ROOM_SERVICE" && selectedStay) {
+        targetRoomNumber = selectedStay.roomAssignments?.[0]?.room?.number || "";
+        custName = `${selectedStay.primaryGuest?.name || "Guest"} (Room ${targetRoomNumber})`;
+        custPhone = selectedStay.primaryGuest?.phone || "";
+      } else if (serviceMode === "DINE_IN" && selectedTable) {
+        custName = `Dine-In (${selectedTable.name})`;
+      } else {
+        custName = customerName || "Takeaway Customer";
+        custPhone = customerPhone;
+      }
+
+      // 1. Create POS Order
       const orderRes = await fetch(`/api/v1/pos/outlets/${activeOutlet.id}/orders`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           propertyId: activeProperty?.id,
-          tableId: selectedTable?.id,
-          mode: "DINE_IN",
+          tableId: serviceMode === "DINE_IN" ? selectedTable?.id : undefined,
+          stayId: serviceMode === "ROOM_SERVICE" ? selectedStay?.id : undefined,
+          mode: serviceMode,
+          customerName: custName,
+          customerContact: custPhone,
           covers: selectedTable?.capacity || 2,
         }),
       });
@@ -168,12 +239,14 @@ export default function POSPage() {
       const orderData = await orderRes.json();
       if (!orderRes.ok) throw new Error(orderData.error || "Failed to create order");
 
+      // 2. Add Items with Notes
       await fetch(`/api/v1/pos/orders/${orderData.id}/items`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ items: cartItems }),
       });
 
+      // 3. Fire KOT
       const kotRes = await fetch(`/api/v1/pos/orders/${orderData.id}/fire-kot`, {
         method: "POST",
       });
@@ -181,9 +254,32 @@ export default function POSPage() {
       const kotData = await kotRes.json();
       if (!kotRes.ok) throw new Error(kotData.error || "Failed to fire KOT");
 
-      alert(`KOT fired successfully (${kotData.kots?.length} tickets generated).`);
+      const generatedKots = kotData.kots || [];
+      const primaryKot = generatedKots[0];
+
+      // Setup instant printable slip preview
+      if (primaryKot) {
+        setPrintKotData({
+          kotNo: primaryKot.kotNo || "KOT-001",
+          orderNo: orderData.orderNo || "ORD-001",
+          outletName: activeOutlet?.name || "Grand Saffron Restaurant",
+          stationName: kitchenStations.find((s: any) => s.id === primaryKot.stationId)?.name || "Main Kitchen",
+          mode: serviceMode,
+          roomNumber: targetRoomNumber,
+          tableName: selectedTable?.name,
+          guestName: selectedStay?.primaryGuest?.name || custName,
+          firedAt: new Date(),
+          lines: cartItems.map((c) => ({
+            name: c.name,
+            qty: c.qty,
+            notes: c.notes,
+          })),
+        });
+        setShowPrintModal(true);
+      }
+
+      triggerToast(`KOT fired successfully (${generatedKots.length} ticket generated)`);
       setCartItems([]);
-      setSelectedTable(null);
       await loadData();
       await refreshData();
     } catch (err: any) {
@@ -193,51 +289,68 @@ export default function POSPage() {
     }
   };
 
-  const handleRoomPost = async () => {
-    if (!selectedStayId) {
-      alert("Please select an active in-house stay.");
+  // Direct Room Folio Posting
+  const handlePostToRoomFolio = async () => {
+    if (!selectedStay) {
+      alert("Please select an active in-house stay to post charges.");
+      return;
+    }
+    if (cartItems.length === 0) {
+      alert("Cart is empty. Please add items.");
       return;
     }
 
+    const roomNo = selectedStay.roomAssignments?.[0]?.room?.number || "Room";
+    const confirmed = confirm(
+      `Post total F&B bill of ${formatINR(gst.totalAmount)} (incl. 5% GST) directly to Room ${roomNo} Folio of ${selectedStay.primaryGuest?.name}?`
+    );
+    if (!confirmed) return;
+
     setActionLoading(true);
     try {
+      // 1. Create Order
       const orderRes = await fetch(`/api/v1/pos/outlets/${activeOutlet.id}/orders`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           propertyId: activeProperty?.id,
-          stayId: selectedStayId,
+          stayId: selectedStay.id,
           mode: "ROOM_SERVICE",
+          customerName: `${selectedStay.primaryGuest?.name} (Room ${roomNo})`,
+          customerContact: selectedStay.primaryGuest?.phone,
         }),
       });
       const orderData = await orderRes.json();
+      if (!orderRes.ok) throw new Error(orderData.error || "Order creation failed");
 
+      // 2. Add Items
       await fetch(`/api/v1/pos/orders/${orderData.id}/items`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ items: cartItems }),
       });
 
+      // 3. Post to Room Folio
       const postRes = await fetch(`/api/v1/pos/orders/${orderData.id}/post-to-room`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ stayId: selectedStayId }),
+        body: JSON.stringify({ stayId: selectedStay.id }),
       });
       const postData = await postRes.json();
       if (!postRes.ok) throw new Error(postData.error || "Room posting failed");
 
-      alert(`F&B Charge of ${formatINR(postData.totalPosted)} posted to Room Folio.`);
+      triggerToast(`${formatINR(gst.totalAmount)} posted to Room ${roomNo} Folio`);
       setCartItems([]);
-      setShowRoomPostModal(false);
       await loadData();
       await refreshData();
     } catch (err: any) {
-      alert(`Room posting error: ${err.message}`);
+      alert(`Folio Posting Error: ${err.message}`);
     } finally {
       setActionLoading(false);
     }
   };
 
+  // KDS Status Transition
   const handleKdsStatus = async (kotId: string, status: string) => {
     try {
       await fetch("/api/v1/kots", {
@@ -251,30 +364,26 @@ export default function POSPage() {
     }
   };
 
+  // Helper to extract KOT display data
   const getKotInfo = (kot: any) => {
     const stay = kot.order?.stay;
     const roomAssignment = stay?.roomAssignments?.[0];
 
-    // 1. Room Number
     let roomNumber = roomAssignment?.room?.number ? String(roomAssignment.room.number) : "";
     if (!roomNumber && kot.order?.customerName) {
       const match = kot.order.customerName.match(/Room\s*([A-Za-z0-9_-]+)/i);
       if (match) roomNumber = match[1];
     }
 
-    // 2. Guest Name
     let guestName = stay?.primaryGuest?.name || "";
     if (!guestName && kot.order?.customerName) {
       guestName = kot.order.customerName.replace(/\s*\(Room\s*[^\)]+\)/i, "").trim();
     }
     if (!guestName && !roomNumber) {
-      guestName = kot.order?.table?.name || "Dine-In Guest";
+      guestName = kot.order?.table?.name || "Dine-In Table";
     }
 
-    // 3. Contact Number
     const contactNumber = kot.order?.customerContact || stay?.primaryGuest?.phone || "";
-
-    // 4. Elapsed Time
     const firedAt = kot.firedAt ? new Date(kot.firedAt) : new Date();
     const elapsedMins = Math.max(0, Math.floor((Date.now() - firedAt.getTime()) / 60000));
     const firedTimeStr = firedAt.toLocaleTimeString("en-IN", {
@@ -297,660 +406,997 @@ export default function POSPage() {
     };
   };
 
+  const openKotSlip = (kot: any) => {
+    const info = getKotInfo(kot);
+    setPrintKotData({
+      kotNo: kot.kotNo,
+      orderNo: info.orderNo,
+      outletName: activeOutlet?.name || "Grand Saffron Restaurant",
+      stationName: kot.station?.name || "Hot Kitchen",
+      mode: info.isRoomService ? "ROOM_SERVICE" : "DINE_IN",
+      roomNumber: info.roomNumber,
+      tableName: info.tableName,
+      guestName: info.guestName,
+      firedAt: kot.firedAt || new Date(),
+      lines: (kot.lines || []).map((l: any) => ({
+        name: l.orderItem?.nameSnapshot || "Dish",
+        qty: l.qty,
+        notes: l.notesSnapshot || l.orderItem?.notes,
+      })),
+    });
+    setShowPrintModal(true);
+  };
+
+  const queuedKots = kots.filter((k) => k.status === "QUEUED");
+  const preparingKots = kots.filter((k) => k.status === "PREPARING");
+  const readyKots = kots.filter((k) => k.status === "READY");
+
   return (
-    <div className="space-y-4 max-w-7xl mx-auto">
-      {/* Top Banner */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3.5 rounded-lg bg-[#111114] border border-zinc-800">
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-base font-semibold text-zinc-100 flex items-center gap-2">
-              <UtensilsCrossed className="h-4 w-4 text-zinc-400" />
-              {activeOutlet?.name || "Restaurant POS"}
-            </h1>
-            <span className="rounded px-1.5 py-0.2 text-[10px] font-mono text-zinc-400 bg-zinc-900 border border-zinc-800">
-              F01–F11
-            </span>
+    <div className="space-y-5 max-w-7xl mx-auto pb-16">
+      
+      {/* Toast Notification */}
+      {successToast && (
+        <div className="fixed top-5 right-5 z-50 rounded-xl bg-zinc-900 text-zinc-100 border border-zinc-700 px-5 py-3.5 shadow-2xl flex items-center gap-2.5 text-sm font-semibold animate-in fade-in slide-in-from-top-3">
+          <CheckCircle2 className="h-5 w-5 text-emerald-400" />
+          <span>{successToast}</span>
+        </div>
+      )}
+
+      {/* TOP HEADER / WORKSPACE BAR */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-2xl bg-[#111114] border border-zinc-800 shadow-sm">
+        <div className="flex items-center gap-3.5">
+          <div className="h-11 w-11 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-300 shrink-0">
+            <ChefHat className="h-5 w-5" />
           </div>
-          <p className="text-xs text-zinc-500 font-mono mt-0.5">
-            Dine-in tables, menu orders & live KDS tickets
-          </p>
+          <div>
+            <div className="flex items-center gap-2.5">
+              <h1 className="text-base font-bold text-zinc-100 tracking-tight">
+                {activeProperty?.displayName || "Hotel Ambarish Grand Residency"}
+              </h1>
+              <span className="rounded bg-zinc-900 border border-zinc-800 px-2.5 py-0.5 text-xs font-mono text-zinc-400 font-semibold">
+                Restaurant & In-Room Dining
+              </span>
+            </div>
+            <p className="text-xs text-zinc-500 font-medium mt-0.5">
+              Breakfast: 8:00 AM – 11:00 AM • À La Carte: 12:00 PM – 10:45 PM
+            </p>
+          </div>
         </div>
 
-        <div className="flex items-center gap-1.5">
+        {/* 3 Main Navigation Tabs (Large, Touch-Friendly, Unified Zinc Style) */}
+        <div className="flex items-center gap-2 bg-zinc-950 p-1.5 rounded-xl border border-zinc-800">
           <button
-            onClick={() => setActiveTab("tables")}
-            className={`rounded-md px-3 py-1.5 text-xs font-medium transition ${
-              activeTab === "tables"
-                ? "bg-zinc-800 text-zinc-100 border border-zinc-700"
-                : "text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200"
+            onClick={() => setActiveTab("pad")}
+            className={`rounded-xl px-4 py-2.5 text-xs font-bold transition flex items-center gap-2 ${
+              activeTab === "pad"
+                ? "bg-zinc-800 text-zinc-100 border border-zinc-700 shadow-sm"
+                : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900"
             }`}
           >
-            Table & Menu Pad
+            <UtensilsCrossed className="h-4 w-4" />
+            <span>Order Pad</span>
           </button>
+
           <button
             onClick={() => setActiveTab("kds")}
-            className={`rounded-md px-3 py-1.5 text-xs font-medium transition flex items-center gap-1.5 ${
+            className={`rounded-xl px-4 py-2.5 text-xs font-bold transition flex items-center gap-2 ${
               activeTab === "kds"
-                ? "bg-zinc-800 text-zinc-100 border border-zinc-700"
-                : "text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200"
+                ? "bg-zinc-800 text-zinc-100 border border-zinc-700 shadow-sm"
+                : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900"
             }`}
           >
-            <Flame className="h-3.5 w-3.5 text-amber-400" />
-            KDS ({kots.length})
+            <Flame className="h-4 w-4 text-zinc-400" />
+            <span>Live KDS</span>
+            {kots.length > 0 && (
+              <span className="rounded bg-zinc-900 border border-zinc-700 text-zinc-300 px-2 py-0.5 text-xs font-mono font-bold">
+                {kots.length}
+              </span>
+            )}
+          </button>
+
+          <button
+            onClick={() => setActiveTab("history")}
+            className={`rounded-xl px-4 py-2.5 text-xs font-bold transition flex items-center gap-2 ${
+              activeTab === "history"
+                ? "bg-zinc-800 text-zinc-100 border border-zinc-700 shadow-sm"
+                : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900"
+            }`}
+          >
+            <History className="h-4 w-4" />
+            <span>KOT History</span>
           </button>
         </div>
       </div>
 
-      {/* TAB 1: TABLES & MENU ORDERING */}
-      {activeTab === "tables" && (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5">
-          {/* Left: Tables & Menu */}
-          <div className="lg:col-span-8 space-y-3">
-            {/* Tables Grid */}
-            <div className="p-3 rounded-lg bg-[#111114] border border-zinc-800 space-y-2">
-              <div className="flex items-center justify-between text-xs">
-                <span className="font-medium text-zinc-300">Dining Tables</span>
-                <span className="text-zinc-500 font-mono">
-                  {selectedTable ? `Table: ${selectedTable.name}` : "Click table to start order"}
+      {/* ========================================================================= */}
+      {/* TAB 1: ORDER PUNCHING PAD                                                  */}
+      {/* ========================================================================= */}
+      {activeTab === "pad" && (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+          
+          {/* LEFT 8 COLS: Table/Room Selector & Menu Catalog */}
+          <div className="lg:col-span-8 space-y-4">
+            
+            {/* 1. SERVICE MODE & DESTINATION SELECTOR */}
+            <div className="rounded-2xl bg-[#111114] border border-zinc-800 p-4 space-y-3.5">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-800 pb-3">
+                <span className="text-xs font-bold uppercase text-zinc-300 tracking-wider flex items-center gap-2">
+                  <Layers className="h-4 w-4 text-zinc-400" />
+                  Destination & Service Mode
                 </span>
-              </div>
 
-              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
-                {tables.map((table: any) => {
-                  const isSelected = selectedTable?.id === table.id;
-                  return (
-                    <button
-                      key={table.id}
-                      onClick={() => setSelectedTable(table)}
-                      className={`rounded-md p-2 border text-center transition ${
-                        isSelected
-                          ? "bg-zinc-800 border-blue-500 text-zinc-100"
-                          : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200"
-                      }`}
-                    >
-                      <div className="text-xs font-semibold font-mono">{table.name}</div>
-                      <div className="text-[10px] text-zinc-500">{table.capacity}pax</div>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Menu Items */}
-            <div className="p-3 rounded-lg bg-[#111114] border border-zinc-800 space-y-3">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                <div className="flex items-center gap-1 overflow-x-auto pb-0.5">
+                <div className="flex items-center gap-1.5 bg-zinc-950 p-1 rounded-xl border border-zinc-800">
                   <button
-                    onClick={() => setSelectedCategory("ALL")}
-                    className={`rounded-md px-2.5 py-1 text-xs font-medium whitespace-nowrap transition ${
-                      selectedCategory === "ALL"
-                        ? "bg-zinc-800 text-zinc-100 border border-zinc-700"
+                    type="button"
+                    onClick={() => {
+                      setServiceMode("DINE_IN");
+                      setSelectedStay(null);
+                    }}
+                    className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-2 ${
+                      serviceMode === "DINE_IN"
+                        ? "bg-zinc-800 text-zinc-100 border border-zinc-700 shadow-sm"
                         : "text-zinc-400 hover:text-zinc-200"
                     }`}
                   >
-                    All
+                    <UtensilsCrossed className="h-3.5 w-3.5" />
+                    <span>Dine-In Table</span>
                   </button>
-                  {categories.map((cat: any) => (
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setServiceMode("ROOM_SERVICE");
+                      setSelectedTable(null);
+                    }}
+                    className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-2 ${
+                      serviceMode === "ROOM_SERVICE"
+                        ? "bg-zinc-800 text-zinc-100 border border-zinc-700 shadow-sm"
+                        : "text-zinc-400 hover:text-zinc-200"
+                    }`}
+                  >
+                    <BedDouble className="h-3.5 w-3.5" />
+                    <span>In-Room Dining</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setServiceMode("TAKEAWAY");
+                      setSelectedTable(null);
+                      setSelectedStay(null);
+                    }}
+                    className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-2 ${
+                      serviceMode === "TAKEAWAY"
+                        ? "bg-zinc-800 text-zinc-100 border border-zinc-700 shadow-sm"
+                        : "text-zinc-400 hover:text-zinc-200"
+                    }`}
+                  >
+                    <ShoppingBag className="h-3.5 w-3.5" />
+                    <span>Takeaway</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* MODE A: DINE-IN TABLE CARDS */}
+              {serviceMode === "DINE_IN" && (
+                <div className="space-y-2">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    {tables.map((tbl: any) => {
+                      const isSelected = selectedTable?.id === tbl.id;
+                      const hasActiveOrder = orders.some((o: any) => o.tableId === tbl.id && o.status !== "PAID" && o.status !== "CANCELLED");
+
+                      return (
+                        <button
+                          key={tbl.id}
+                          type="button"
+                          onClick={() => setSelectedTable(tbl)}
+                          className={`p-3.5 rounded-xl border text-left transition relative flex flex-col justify-between ${
+                            isSelected
+                              ? "bg-zinc-800 border-zinc-400 text-white shadow ring-1 ring-zinc-400"
+                              : hasActiveOrder
+                              ? "bg-zinc-900 border-zinc-700 text-zinc-200 hover:border-zinc-600"
+                              : "bg-zinc-900/40 border-zinc-800 text-zinc-400 hover:border-zinc-700 hover:bg-zinc-900/80"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="font-mono font-bold text-sm text-zinc-100">{tbl.name}</span>
+                            <span className="text-[11px] font-mono text-zinc-400">{tbl.capacity} Pax</span>
+                          </div>
+                          
+                          <div className="mt-2 flex items-center justify-between text-xs font-mono">
+                            <span className="text-zinc-500">{tbl.section || "Main"}</span>
+                            {hasActiveOrder ? (
+                              <span className="text-zinc-300 font-semibold flex items-center gap-1">
+                                <span className="h-1.5 w-1.5 rounded-full bg-zinc-400" /> Dining
+                              </span>
+                            ) : (
+                              <span className="text-zinc-500">Available</span>
+                            )}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* MODE B: IN-ROOM DINING (ROOM SERVICE) */}
+              {serviceMode === "ROOM_SERVICE" && (
+                <div className="space-y-2.5">
+                  <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wide">
+                    Select Active In-House Guest Room *
+                  </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    {stays.map((stay: any) => {
+                      const roomNo = stay.roomAssignments?.[0]?.room?.number || "303";
+                      const isSelected = selectedStay?.id === stay.id;
+                      return (
+                        <button
+                          key={stay.id}
+                          type="button"
+                          onClick={() => setSelectedStay(stay)}
+                          className={`p-3.5 rounded-xl border text-left transition flex items-center gap-3.5 ${
+                            isSelected
+                              ? "bg-zinc-800 border-zinc-400 text-white shadow ring-1 ring-zinc-400"
+                              : "bg-zinc-900/40 border-zinc-800 text-zinc-300 hover:border-zinc-700 hover:bg-zinc-900/80"
+                          }`}
+                        >
+                          <div className="h-10 w-10 rounded-xl bg-zinc-900 border border-zinc-700 flex items-center justify-center font-mono font-bold text-zinc-100 text-base shrink-0">
+                            {roomNo}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="font-bold text-xs text-zinc-100 truncate">
+                              {stay.primaryGuest?.name || "Guest"}
+                            </div>
+                            <div className="text-[11px] font-mono text-zinc-400 truncate">
+                              Ph: {stay.primaryGuest?.phone || "N/A"}
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* MODE C: TAKEAWAY */}
+              {serviceMode === "TAKEAWAY" && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-bold text-zinc-400 uppercase">Customer Name</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Suman Roy"
+                      value={customerName}
+                      onChange={(e) => setCustomerName(e.target.value)}
+                      className="w-full h-11 px-3.5 rounded-xl bg-zinc-900 border border-zinc-700 text-white text-xs font-semibold focus:border-zinc-500 focus:outline-none"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-bold text-zinc-400 uppercase">Mobile Phone</label>
+                    <input
+                      type="tel"
+                      placeholder="e.g. 9864341211"
+                      value={customerPhone}
+                      onChange={(e) => setCustomerPhone(e.target.value)}
+                      className="w-full h-11 px-3.5 rounded-xl bg-zinc-900 border border-zinc-700 text-white font-mono text-xs focus:border-zinc-500 focus:outline-none"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* 2. MENU CATALOG & LARGE SEARCH */}
+            <div className="rounded-2xl bg-[#111114] border border-zinc-800 p-5 space-y-4">
+              
+              {/* Category Filter & Search Bar */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3.5">
+                
+                {/* Large Category Pills */}
+                <div className="flex items-center gap-2 overflow-x-auto pb-1.5 sm:pb-0 scrollbar-none">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedCategory("ALL")}
+                    className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition ${
+                      selectedCategory === "ALL"
+                        ? "bg-zinc-200 text-zinc-950 shadow"
+                        : "bg-zinc-900/80 border border-zinc-800 text-zinc-300 hover:text-white hover:border-zinc-700"
+                    }`}
+                  >
+                    All Items ({allMenuItems.length})
+                  </button>
+
+                  {categories.map((c: any) => (
                     <button
-                      key={cat.id}
-                      onClick={() => setSelectedCategory(cat.id)}
-                      className={`rounded-md px-2.5 py-1 text-xs font-medium whitespace-nowrap transition ${
-                        selectedCategory === cat.id
-                          ? "bg-zinc-800 text-zinc-100 border border-zinc-700"
-                          : "text-zinc-400 hover:text-zinc-200"
+                      key={c.id}
+                      type="button"
+                      onClick={() => setSelectedCategory(c.id)}
+                      className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition ${
+                        selectedCategory === c.id
+                          ? "bg-zinc-200 text-zinc-950 shadow"
+                          : "bg-zinc-900/80 border border-zinc-800 text-zinc-300 hover:text-white hover:border-zinc-700"
                       }`}
                     >
-                      {cat.name}
+                      {c.name} ({c.items?.length || 0})
                     </button>
                   ))}
                 </div>
 
-                <div className="relative">
-                  <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-zinc-500" />
+                {/* Large Search Bar */}
+                <div className="relative min-w-[240px] sm:min-w-[280px]">
+                  <Search className="absolute left-3.5 top-3.5 h-4 w-4 text-zinc-400" />
                   <input
                     type="text"
-                    placeholder="Search menu..."
+                    placeholder="Search dish (e.g. Biryani, Chicken, Dal)..."
                     value={menuSearch}
                     onChange={(e) => setMenuSearch(e.target.value)}
-                    className="rounded-md bg-zinc-900 border border-zinc-800 pl-8 pr-2.5 py-1 text-xs text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-zinc-700 w-44 font-mono"
+                    className="w-full h-11 pl-10 pr-4 rounded-xl bg-zinc-900 border border-zinc-700 text-white text-xs placeholder:text-zinc-500 focus:border-zinc-500 focus:outline-none font-medium"
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 max-h-[440px] overflow-y-auto pr-1">
-                {filteredMenuItems.map((item: any) => (
-                  <div
-                    key={item.id}
-                    onClick={() => addToCart(item)}
-                    className="rounded-md bg-zinc-900 border border-zinc-800 p-2.5 hover:border-zinc-700 transition cursor-pointer flex flex-col justify-between"
-                  >
-                    <div>
-                      <div className="text-xs font-medium text-zinc-200">{item.name}</div>
-                      <div className="text-[10px] text-zinc-500">{item.categoryName}</div>
+              {/* Menu Dishes Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+                {filteredMenuItems.map((item: any) => {
+                  const inCart = cartItems.find((c) => c.id === item.id);
+
+                  return (
+                    <div
+                      key={item.id}
+                      className="p-4 rounded-xl bg-zinc-900/40 border border-zinc-800 hover:border-zinc-700 transition flex flex-col justify-between space-y-3 group"
+                    >
+                      <div>
+                        <div className="flex items-start justify-between gap-2.5">
+                          <div className="flex items-center gap-2">
+                            {/* Veg / Non-Veg Standard Dot Badge */}
+                            <span
+                              className={`h-3.5 w-3.5 rounded-sm border flex items-center justify-center shrink-0 ${
+                                item.isVeg ? "border-emerald-500 text-emerald-500" : "border-rose-500 text-rose-500"
+                              }`}
+                              title={item.isVeg ? "Pure Vegetarian" : "Non-Vegetarian"}
+                            >
+                              <span className={`h-2 w-2 rounded-full ${item.isVeg ? "bg-emerald-500" : "bg-rose-500"}`} />
+                            </span>
+                            <span className="font-bold text-xs text-zinc-100 group-hover:text-white transition leading-snug">
+                              {item.name}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="mt-1.5 flex items-center justify-between text-[11px] font-mono text-zinc-500">
+                          <span>{item.categoryName}</span>
+                          <span>{item.code}</span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between pt-2.5 border-t border-zinc-800/70">
+                        <span className="font-mono font-black text-sm text-zinc-100">
+                          {formatINR(item.price)}
+                        </span>
+
+                        {inCart ? (
+                          <div className="flex items-center gap-1 bg-zinc-950 border border-zinc-700 rounded-lg p-0.5">
+                            <button
+                              type="button"
+                              onClick={() => updateQty(item.id, -1)}
+                              className="h-7 w-7 rounded bg-zinc-800 hover:bg-zinc-700 text-white flex items-center justify-center font-bold text-xs"
+                            >
+                              -
+                            </button>
+                            <span className="font-mono font-black text-xs px-2 text-zinc-100">
+                              {inCart.qty}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => updateQty(item.id, 1)}
+                              className="h-7 w-7 rounded bg-zinc-800 hover:bg-zinc-700 text-white flex items-center justify-center font-bold text-xs"
+                            >
+                              +
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => addToCart(item)}
+                            className="px-4 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 hover:text-white font-bold text-xs border border-zinc-700 transition flex items-center gap-1.5"
+                          >
+                            <Plus className="h-3.5 w-3.5" />
+                            <span>Add</span>
+                          </button>
+                        )}
+                      </div>
                     </div>
-                    <div className="mt-2.5 flex items-center justify-between pt-2 border-t border-zinc-800/80">
-                      <span className="font-mono text-xs font-medium text-emerald-400 tabular-nums">
-                        {formatINR(item.variant?.price || 350)}
-                      </span>
-                      <span className="rounded bg-zinc-800 p-1 text-zinc-300 hover:text-white">
-                        <Plus className="h-3 w-3" />
-                      </span>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
+
+            </div>
+
+          </div>
+
+          {/* RIGHT 4 COLS: Active Order & Firing Cart */}
+          <div className="lg:col-span-4 space-y-4">
+            <div className="rounded-2xl bg-[#111114] border border-zinc-800 p-5 space-y-4 sticky top-4">
+              
+              {/* Cart Header */}
+              <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
+                <div className="flex items-center gap-2.5">
+                  <ChefHat className="h-4 w-4 text-zinc-400" />
+                  <h3 className="text-xs font-bold uppercase text-zinc-200 tracking-wider">
+                    Kitchen Cart ({cartItems.reduce((s, i) => s + i.qty, 0)})
+                  </h3>
+                </div>
+                {cartItems.length > 0 && (
+                  <button
+                    onClick={clearCart}
+                    className="text-xs font-semibold text-zinc-500 hover:text-zinc-300 transition"
+                  >
+                    Clear All
+                  </button>
+                )}
+              </div>
+
+              {/* Target Location Badge */}
+              <div className="rounded-xl bg-zinc-900/60 border border-zinc-800 p-3.5 flex items-center justify-between text-xs">
+                <div>
+                  <span className="text-[10px] font-mono uppercase text-zinc-500 font-bold block">Service Target</span>
+                  <div className="font-bold text-zinc-100 mt-1">
+                    {serviceMode === "DINE_IN" ? (
+                      selectedTable ? (
+                        <span className="font-mono text-zinc-100">{selectedTable.name} ({selectedTable.section})</span>
+                      ) : (
+                        <span className="text-zinc-500">No Table Selected</span>
+                      )
+                    ) : serviceMode === "ROOM_SERVICE" ? (
+                      selectedStay ? (
+                        <span className="font-mono text-zinc-100">
+                          Room {selectedStay.roomAssignments?.[0]?.room?.number} — {selectedStay.primaryGuest?.name}
+                        </span>
+                      ) : (
+                        <span className="text-zinc-500">No Room Selected</span>
+                      )
+                    ) : (
+                      <span className="text-zinc-300 font-mono">Takeaway Order</span>
+                    )}
+                  </div>
+                </div>
+
+                <span className="rounded bg-zinc-950 border border-zinc-800 px-2.5 py-1 text-[11px] font-mono font-bold text-zinc-400">
+                  {serviceMode}
+                </span>
+              </div>
+
+              {/* Cart Items List */}
+              <div className="space-y-3 max-h-[340px] overflow-y-auto pr-1">
+                {cartItems.length === 0 ? (
+                  <div className="text-center py-12 text-zinc-500 text-xs space-y-1.5">
+                    <UtensilsCrossed className="h-8 w-8 text-zinc-600 mx-auto" />
+                    <p className="font-bold text-zinc-300">Cart is empty</p>
+                    <p className="text-xs">Click "+ Add" on any menu dish to begin order.</p>
+                  </div>
+                ) : (
+                  cartItems.map((item) => (
+                    <div
+                      key={item.id}
+                      className="rounded-xl bg-zinc-900/40 border border-zinc-800 p-3 space-y-2.5 text-xs"
+                    >
+                      <div className="flex items-start justify-between gap-2.5">
+                        <div className="min-w-0 flex-1">
+                          <strong className="text-zinc-100 font-bold block truncate">{item.name}</strong>
+                          <span className="text-xs font-mono text-zinc-400">
+                            {formatINR(item.unitPrice)} each
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-1 bg-zinc-950 border border-zinc-800 rounded-lg p-0.5">
+                          <button
+                            onClick={() => updateQty(item.id, -1)}
+                            className="h-6 w-6 rounded bg-zinc-800 hover:bg-zinc-700 text-white flex items-center justify-center font-bold text-xs"
+                          >
+                            -
+                          </button>
+                          <span className="font-mono font-black text-xs px-2 text-zinc-100">
+                            {item.qty}
+                          </span>
+                          <button
+                            onClick={() => updateQty(item.id, 1)}
+                            className="h-6 w-6 rounded bg-zinc-800 hover:bg-zinc-700 text-white flex items-center justify-center font-bold text-xs"
+                          >
+                            +
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Special Kitchen Cooking Note */}
+                      <div className="pt-0.5">
+                        <input
+                          type="text"
+                          placeholder="Special note (e.g. Less spicy, extra bowls)"
+                          value={item.notes || ""}
+                          onChange={(e) => updateItemNotes(item.id, e.target.value)}
+                          className="w-full h-8 px-2.5 rounded-lg bg-zinc-950 border border-zinc-800 text-zinc-200 placeholder:text-zinc-600 text-xs font-mono focus:border-zinc-600 focus:outline-none"
+                        />
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              {/* Financial Bill & Tax Summary */}
+              {cartItems.length > 0 && (
+                <div className="space-y-2 pt-3 border-t border-zinc-800 text-xs">
+                  <div className="flex justify-between text-zinc-400">
+                    <span>Food Subtotal</span>
+                    <span className="font-mono text-zinc-200 font-bold">{formatINR(gst.taxableAmount)}</span>
+                  </div>
+                  <div className="flex justify-between text-zinc-500">
+                    <span>Restaurant GST 5% (SAC 996331)</span>
+                    <span className="font-mono text-zinc-400">{formatINR(gst.taxAmount)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm font-black text-white pt-1.5 border-t border-zinc-800">
+                    <span>Total Amount</span>
+                    <span className="font-mono text-zinc-100">{formatINR(gst.totalAmount)}</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="space-y-2.5 pt-2">
+                {/* 1. Fire KOT */}
+                <button
+                  onClick={handleFireKOT}
+                  disabled={actionLoading || cartItems.length === 0}
+                  className="w-full h-12 rounded-xl bg-zinc-100 hover:bg-white text-zinc-950 font-black text-xs transition flex items-center justify-center gap-2 disabled:opacity-40 cursor-pointer shadow"
+                >
+                  <Send className="h-4 w-4" />
+                  <span>{actionLoading ? "Sending to Kitchen..." : "Fire KOT to Kitchen"}</span>
+                </button>
+
+                {/* 2. Post to Room Folio (Enabled for Room Service) */}
+                {serviceMode === "ROOM_SERVICE" && selectedStay && (
+                  <button
+                    onClick={handlePostToRoomFolio}
+                    disabled={actionLoading || cartItems.length === 0}
+                    className="w-full h-10 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 font-bold text-xs transition flex items-center justify-center gap-2 disabled:opacity-40 cursor-pointer"
+                  >
+                    <BedDouble className="h-4 w-4 text-zinc-400" />
+                    <span>Post to Room {selectedStay.roomAssignments?.[0]?.room?.number} Folio</span>
+                  </button>
+                )}
+              </div>
+
             </div>
           </div>
 
-          {/* Right: Cart */}
-          <div className="lg:col-span-4 p-3.5 rounded-lg bg-[#111114] border border-zinc-800 flex flex-col justify-between min-h-[500px]">
-            <div>
-              <div className="flex items-center justify-between pb-2.5 border-b border-zinc-800">
-                <div>
-                  <h2 className="text-xs font-semibold text-zinc-200">
-                    {selectedTable ? `Order: ${selectedTable.name}` : "New Order"}
-                  </h2>
-                  <span className="text-[10px] text-zinc-500 font-mono">{cartItems.length} items</span>
-                </div>
-                <button
-                  onClick={() => setCartItems([])}
-                  className="text-[11px] text-zinc-500 hover:text-rose-400 flex items-center gap-1"
-                >
-                  <Trash2 className="h-3 w-3" /> Clear
-                </button>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* TAB 2: LIVE KDS (KITCHEN DISPLAY SYSTEM)                                   */}
+      {/* ========================================================================= */}
+      {activeTab === "kds" && (
+        <div className="space-y-4">
+          
+          <div className="flex items-center justify-between p-4 rounded-xl bg-[#111114] border border-zinc-800">
+            <div className="flex items-center gap-2.5">
+              <ChefHat className="h-4 w-4 text-zinc-400" />
+              <span className="text-xs font-bold text-zinc-200 uppercase tracking-wider">
+                Kitchen Live Order Board ({kots.length} Active Tickets)
+              </span>
+            </div>
+
+            <span className="text-xs font-mono text-zinc-500">
+              Live Auto-Refresh: 6s
+            </span>
+          </div>
+
+          {/* 3-Column Kanban Board */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            
+            {/* COLUMN 1: QUEUED (NEW TICKETS) */}
+            <div className="rounded-2xl bg-[#111114] border border-zinc-800 p-4 space-y-3.5">
+              <div className="flex items-center justify-between pb-3 border-b border-zinc-800 font-mono text-xs font-bold text-zinc-300">
+                <span className="flex items-center gap-2">
+                  <Clock className="h-4 w-4 text-zinc-400" />
+                  1. Queued / New KOTs
+                </span>
+                <span className="bg-zinc-900 border border-zinc-700 px-2.5 py-0.5 rounded-full text-zinc-300 text-xs">
+                  {queuedKots.length}
+                </span>
               </div>
 
-              <div className="space-y-1.5 mt-2.5 max-h-64 overflow-y-auto pr-1">
-                {cartItems.map((item) => (
-                  <div
-                    key={item.id}
-                    className="flex items-center justify-between p-2 rounded-md bg-zinc-900 border border-zinc-800 text-xs"
-                  >
-                    <div>
-                      <div className="font-medium text-zinc-200">{item.name}</div>
-                      <div className="text-[10px] text-zinc-500 font-mono">
-                        {formatINR(item.unitPrice)} × {item.qty}
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2 font-mono">
-                      <div className="flex items-center gap-1 bg-zinc-800 rounded px-1 py-0.5">
-                        <button onClick={() => updateQty(item.id, -1)} className="text-zinc-400 hover:text-zinc-100">
-                          <Minus className="h-3 w-3" />
-                        </button>
-                        <span className="text-zinc-200 text-xs w-3 text-center">{item.qty}</span>
-                        <button onClick={() => updateQty(item.id, 1)} className="text-zinc-400 hover:text-zinc-100">
-                          <Plus className="h-3 w-3" />
-                        </button>
-                      </div>
-                      <span className="text-zinc-200 font-medium w-12 text-right tabular-nums">
-                        {formatINR(item.unitPrice * item.qty)}
-                      </span>
-                    </div>
+              <div className="space-y-3 max-h-[calc(100vh-280px)] overflow-y-auto pr-1">
+                {queuedKots.length === 0 ? (
+                  <div className="text-center py-16 text-zinc-500 text-xs font-semibold">
+                    No new tickets queued.
                   </div>
-                ))}
-                {cartItems.length === 0 && (
-                  <div className="p-6 text-center text-xs text-zinc-600 italic font-mono">Empty order</div>
+                ) : (
+                  queuedKots.map((kot) => {
+                    const info = getKotInfo(kot);
+                    return (
+                      <div
+                        key={kot.id}
+                        className="rounded-xl bg-zinc-900/60 p-4 border border-zinc-800 space-y-3 text-xs hover:border-zinc-700 transition"
+                      >
+                        {/* Header: KOT # & Elapsed Time */}
+                        <div className="flex items-start justify-between gap-2 pb-2.5 border-b border-zinc-800">
+                          <div>
+                            <div className="flex items-center gap-2 font-mono">
+                              <span className="font-bold text-zinc-100 text-sm">{kot.kotNo}</span>
+                              <span className="text-xs text-zinc-500">• Order #{info.orderNo || "N/A"}</span>
+                            </div>
+                            <div className="text-xs text-zinc-400 font-mono flex items-center gap-1.5 mt-1">
+                              <Clock className="h-3.5 w-3.5 text-zinc-500" />
+                              <span>Fired {info.firedTimeStr} ({info.elapsedMins}m ago)</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Location Tag */}
+                        <div className="rounded-lg bg-zinc-950 p-2.5 border border-zinc-800/80 flex items-center justify-between">
+                          {info.isRoomService ? (
+                            <span className="flex items-center gap-1.5 font-mono font-bold text-zinc-200 bg-zinc-900 border border-zinc-700 px-2.5 py-1 rounded text-xs">
+                              <BedDouble className="h-4 w-4 text-zinc-400" />
+                              Room {info.roomNumber || "Service"}
+                            </span>
+                          ) : (
+                            <span className="flex items-center gap-1.5 font-mono font-bold text-zinc-200 bg-zinc-900 border border-zinc-700 px-2.5 py-1 rounded text-xs">
+                              <UtensilsCrossed className="h-4 w-4 text-zinc-400" />
+                              {info.tableName || "Dine-In Table"}
+                            </span>
+                          )}
+                          <span className="text-xs font-bold text-zinc-300 truncate max-w-[130px]">
+                            {info.guestName}
+                          </span>
+                        </div>
+
+                        {/* Ordered Dish Lines */}
+                        <div className="space-y-2 pt-1 border-t border-zinc-800/80">
+                          {kot.lines?.map((line: any) => (
+                            <div key={line.id} className="space-y-0.5">
+                              <div className="flex items-start justify-between gap-2.5 text-zinc-300">
+                                <span className="font-bold text-xs text-zinc-100">{line.orderItem?.nameSnapshot}</span>
+                                <span className="font-mono font-black text-zinc-100 text-xs">×{line.qty}</span>
+                              </div>
+                              {line.notesSnapshot && (
+                                <div className="text-[11px] text-zinc-400 italic font-mono pl-2 border-l border-zinc-700">
+                                  Note: {line.notesSnapshot}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Actions */}
+                        <div className="flex items-center gap-2 pt-2.5 border-t border-zinc-800">
+                          <button
+                            onClick={() => handleKdsStatus(kot.id, "PREPARING")}
+                            className="flex-1 py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-100 border border-zinc-700 font-bold text-xs transition flex items-center justify-center gap-1.5 cursor-pointer"
+                          >
+                            <Flame className="h-4 w-4 text-zinc-400" />
+                            <span>Start Cooking</span>
+                          </button>
+
+                          <button
+                            onClick={() => openKotSlip(kot)}
+                            className="p-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 border border-zinc-800 transition"
+                            title="Print KOT Thermal Slip"
+                          >
+                            <Printer className="h-4 w-4" />
+                          </button>
+                        </div>
+
+                      </div>
+                    );
+                  })
                 )}
               </div>
             </div>
 
-            {/* Totals & Buttons */}
-            <div className="pt-3 border-t border-zinc-800 space-y-2.5 text-xs font-mono">
-              <div className="space-y-1 text-zinc-400">
-                <div className="flex items-center justify-between">
-                  <span>Subtotal</span>
-                  <span className="text-zinc-200 tabular-nums">{formatINR(gst.taxableAmount)}</span>
-                </div>
-                <div className="flex items-center justify-between text-[11px] text-zinc-500">
-                  <span>GST 5% (SAC 996331)</span>
-                  <span className="tabular-nums">{formatINR(gst.taxAmount)}</span>
-                </div>
-                <div className="flex items-center justify-between pt-1.5 border-t border-zinc-800 text-sm font-semibold text-zinc-100">
-                  <span>Total</span>
-                  <span className="text-emerald-400 tabular-nums">{formatINR(gst.totalAmount)}</span>
-                </div>
+            {/* COLUMN 2: PREPARING (ACTIVE COOKING) */}
+            <div className="rounded-2xl bg-[#111114] border border-zinc-800 p-4 space-y-3.5">
+              <div className="flex items-center justify-between pb-3 border-b border-zinc-800 font-mono text-xs font-bold text-zinc-300">
+                <span className="flex items-center gap-2">
+                  <Flame className="h-4 w-4 text-zinc-400" />
+                  2. Preparing / Cooking
+                </span>
+                <span className="bg-zinc-900 border border-zinc-700 px-2.5 py-0.5 rounded-full text-zinc-300 text-xs">
+                  {preparingKots.length}
+                </span>
               </div>
 
-              <div className="space-y-1.5 font-sans">
-                <button
-                  onClick={handleFireKOT}
-                  disabled={actionLoading || cartItems.length === 0}
-                  className="w-full rounded-md bg-zinc-100 hover:bg-white text-zinc-950 py-2 font-medium transition flex items-center justify-center gap-1.5 disabled:opacity-50 text-xs"
-                >
-                  <Send className="h-3.5 w-3.5" /> Fire KOT to Kitchen
-                </button>
+              <div className="space-y-3 max-h-[calc(100vh-280px)] overflow-y-auto pr-1">
+                {preparingKots.length === 0 ? (
+                  <div className="text-center py-16 text-zinc-500 text-xs font-semibold">
+                    No tickets currently in cooking.
+                  </div>
+                ) : (
+                  preparingKots.map((kot) => {
+                    const info = getKotInfo(kot);
+                    return (
+                      <div
+                        key={kot.id}
+                        className="rounded-xl bg-zinc-900/60 p-4 border border-zinc-800 space-y-3 text-xs hover:border-zinc-700 transition"
+                      >
+                        {/* Header: KOT # & Elapsed Time */}
+                        <div className="flex items-start justify-between gap-2 pb-2.5 border-b border-zinc-800">
+                          <div>
+                            <div className="flex items-center gap-2 font-mono">
+                              <span className="font-bold text-zinc-100 text-sm">{kot.kotNo}</span>
+                              <span className="text-xs text-zinc-500">• Order #{info.orderNo || "N/A"}</span>
+                            </div>
+                            <div className="text-xs text-zinc-400 font-mono flex items-center gap-1.5 mt-1 font-semibold">
+                              <Flame className="h-3.5 w-3.5 text-zinc-400" />
+                              <span>Cooking for {info.elapsedMins} mins</span>
+                            </div>
+                          </div>
+                        </div>
 
-                <button
-                  onClick={() => setShowRoomPostModal(true)}
-                  disabled={actionLoading || cartItems.length === 0}
-                  className="w-full rounded-md bg-zinc-800 hover:bg-zinc-700 text-zinc-200 py-1.5 font-medium transition flex items-center justify-center gap-1.5 disabled:opacity-50 text-xs"
-                >
-                  <BedDouble className="h-3.5 w-3.5" /> Post to Room Folio
-                </button>
+                        {/* Location Tag */}
+                        <div className="rounded-lg bg-zinc-950 p-2.5 border border-zinc-800/80 flex items-center justify-between">
+                          {info.isRoomService ? (
+                            <span className="flex items-center gap-1.5 font-mono font-bold text-zinc-200 bg-zinc-900 border border-zinc-700 px-2.5 py-1 rounded text-xs">
+                              <BedDouble className="h-4 w-4 text-zinc-400" />
+                              Room {info.roomNumber || "Service"}
+                            </span>
+                          ) : (
+                            <span className="flex items-center gap-1.5 font-mono font-bold text-zinc-200 bg-zinc-900 border border-zinc-700 px-2.5 py-1 rounded text-xs">
+                              <UtensilsCrossed className="h-4 w-4 text-zinc-400" />
+                              {info.tableName || "Dine-In Table"}
+                            </span>
+                          )}
+                          <span className="text-xs font-bold text-zinc-300 truncate max-w-[130px]">
+                            {info.guestName}
+                          </span>
+                        </div>
+
+                        {/* Ordered Dish Lines */}
+                        <div className="space-y-2 pt-1 border-t border-zinc-800/80">
+                          {kot.lines?.map((line: any) => (
+                            <div key={line.id} className="space-y-0.5">
+                              <div className="flex items-start justify-between gap-2.5 text-zinc-300">
+                                <span className="font-bold text-xs text-zinc-100">{line.orderItem?.nameSnapshot}</span>
+                                <span className="font-mono font-black text-zinc-100 text-xs">×{line.qty}</span>
+                              </div>
+                              {line.notesSnapshot && (
+                                <div className="text-[11px] text-zinc-400 italic font-mono pl-2 border-l border-zinc-700">
+                                  Note: {line.notesSnapshot}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Actions */}
+                        <div className="flex items-center gap-2 pt-2.5 border-t border-zinc-800">
+                          <button
+                            onClick={() => handleKdsStatus(kot.id, "READY")}
+                            className="flex-1 py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-100 border border-zinc-700 font-bold text-xs transition flex items-center justify-center gap-1.5 cursor-pointer"
+                          >
+                            <CheckCircle2 className="h-4 w-4 text-zinc-400" />
+                            <span>Mark Food Ready</span>
+                          </button>
+
+                          <button
+                            onClick={() => openKotSlip(kot)}
+                            className="p-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 border border-zinc-800 transition"
+                            title="Print KOT Thermal Slip"
+                          >
+                            <Printer className="h-4 w-4" />
+                          </button>
+                        </div>
+
+                      </div>
+                    );
+                  })
+                )}
               </div>
             </div>
+
+            {/* COLUMN 3: READY TO SERVE */}
+            <div className="rounded-2xl bg-[#111114] border border-zinc-800 p-4 space-y-3.5">
+              <div className="flex items-center justify-between pb-3 border-b border-zinc-800 font-mono text-xs font-bold text-zinc-300">
+                <span className="flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4 text-zinc-400" />
+                  3. Ready to Serve / Pickup
+                </span>
+                <span className="bg-zinc-900 border border-zinc-700 px-2.5 py-0.5 rounded-full text-zinc-300 text-xs">
+                  {readyKots.length}
+                </span>
+              </div>
+
+              <div className="space-y-3 max-h-[calc(100vh-280px)] overflow-y-auto pr-1">
+                {readyKots.length === 0 ? (
+                  <div className="text-center py-16 text-zinc-500 text-xs font-semibold">
+                    No orders awaiting pickup.
+                  </div>
+                ) : (
+                  readyKots.map((kot) => {
+                    const info = getKotInfo(kot);
+                    return (
+                      <div
+                        key={kot.id}
+                        className="rounded-xl bg-zinc-900/60 p-4 border border-zinc-800 space-y-3 text-xs hover:border-zinc-700 transition"
+                      >
+                        {/* Header: KOT # & Elapsed Time */}
+                        <div className="flex items-start justify-between gap-2 pb-2.5 border-b border-zinc-800">
+                          <div>
+                            <div className="flex items-center gap-2 font-mono">
+                              <span className="font-bold text-zinc-100 text-sm">{kot.kotNo}</span>
+                              <span className="text-xs text-zinc-500">• Order #{info.orderNo || "N/A"}</span>
+                            </div>
+                            <div className="text-xs text-zinc-400 font-mono flex items-center gap-1.5 mt-1 font-semibold">
+                              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
+                              <span>Plated & Ready for Runner</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Location Tag */}
+                        <div className="rounded-lg bg-zinc-950 p-2.5 border border-zinc-800/80 flex items-center justify-between">
+                          {info.isRoomService ? (
+                            <span className="flex items-center gap-1.5 font-mono font-bold text-zinc-200 bg-zinc-900 border border-zinc-700 px-2.5 py-1 rounded text-xs">
+                              <BedDouble className="h-4 w-4 text-zinc-400" />
+                              Room {info.roomNumber || "Service"}
+                            </span>
+                          ) : (
+                            <span className="flex items-center gap-1.5 font-mono font-bold text-zinc-200 bg-zinc-900 border border-zinc-700 px-2.5 py-1 rounded text-xs">
+                              <UtensilsCrossed className="h-4 w-4 text-zinc-400" />
+                              {info.tableName || "Dine-In Table"}
+                            </span>
+                          )}
+                          <span className="text-xs font-bold text-zinc-300 truncate max-w-[130px]">
+                            {info.guestName}
+                          </span>
+                        </div>
+
+                        {/* Ordered Dish Lines */}
+                        <div className="space-y-2 pt-1 border-t border-zinc-800/80">
+                          {kot.lines?.map((line: any) => (
+                            <div key={line.id} className="space-y-0.5">
+                              <div className="flex items-start justify-between gap-2.5 text-zinc-300">
+                                <span className="font-bold text-xs text-zinc-100">{line.orderItem?.nameSnapshot}</span>
+                                <span className="font-mono font-black text-zinc-100 text-xs">×{line.qty}</span>
+                              </div>
+                              {line.notesSnapshot && (
+                                <div className="text-[11px] text-zinc-400 italic font-mono pl-2 border-l border-zinc-700">
+                                  Note: {line.notesSnapshot}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Actions */}
+                        <div className="flex items-center gap-2 pt-2.5 border-t border-zinc-800">
+                          <button
+                            onClick={() => handleKdsStatus(kot.id, "COMPLETED")}
+                            className="flex-1 py-2.5 rounded-xl bg-zinc-100 hover:bg-white text-zinc-950 font-bold text-xs transition flex items-center justify-center gap-1.5 cursor-pointer shadow"
+                          >
+                            <Check className="h-4 w-4" />
+                            <span>Mark Served & Complete</span>
+                          </button>
+
+                          <button
+                            onClick={() => openKotSlip(kot)}
+                            className="p-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 border border-zinc-800 transition"
+                            title="Print KOT Thermal Slip"
+                          >
+                            <Printer className="h-4 w-4" />
+                          </button>
+                        </div>
+
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+
           </div>
         </div>
       )}
 
-      {/* TAB 2: KDS (Kitchen Display System) */}
-      {activeTab === "kds" && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {/* QUEUED */}
-          <div className="rounded-xl bg-[#111114] border border-zinc-800 p-3.5 space-y-3">
-            <div className="flex items-center justify-between pb-2 border-b border-zinc-800 font-mono text-xs font-bold text-amber-400">
-              <span className="flex items-center gap-1.5">
-                <Clock className="h-4 w-4" /> Queued KOTs
-              </span>
-              <span className="bg-amber-400/10 px-2 py-0.5 rounded border border-amber-400/30">
-                {kots.filter((k) => k.status === "QUEUED").length}
-              </span>
-            </div>
-
-            <div className="space-y-3 max-h-[calc(100vh-280px)] overflow-y-auto pr-1">
-              {kots.filter((k) => k.status === "QUEUED").length === 0 ? (
-                <div className="text-center py-12 text-zinc-500 text-xs">No tickets queued.</div>
-              ) : (
-                kots
-                  .filter((k) => k.status === "QUEUED")
-                  .map((kot) => {
-                    const info = getKotInfo(kot);
-                    return (
-                      <div
-                        key={kot.id}
-                        className="rounded-xl bg-[#18181b] p-3.5 border border-zinc-800 space-y-3 text-xs shadow-sm hover:border-zinc-700 transition"
-                      >
-                        {/* Header: KOT #, Order # and Station */}
-                        <div className="flex items-start justify-between gap-2 pb-2 border-b border-zinc-800">
-                          <div>
-                            <div className="flex items-center gap-1.5 font-mono">
-                              <span className="font-bold text-amber-400">#{kot.kotNo}</span>
-                              {info.orderNo && (
-                                <span className="text-[10px] text-zinc-400">• Order #{info.orderNo}</span>
-                              )}
-                            </div>
-                            <div className="text-[10px] text-zinc-400 font-mono flex items-center gap-1 mt-0.5">
-                              <Clock className="h-3 w-3 text-zinc-500" />
-                              <span>{info.firedTimeStr} ({info.elapsedMins}m ago)</span>
-                            </div>
-                          </div>
-                          <span className="rounded bg-zinc-900 border border-zinc-700 px-2 py-0.5 text-[10px] font-mono text-zinc-300 font-medium shrink-0">
-                            {kot.station?.name || "Kitchen"}
-                          </span>
-                        </div>
-
-                        {/* Room, Guest Name & Phone details */}
-                        <div className="rounded-lg bg-zinc-900/90 border border-zinc-800 p-2.5 space-y-1.5">
-                          <div className="flex items-center justify-between gap-2">
-                            {info.isRoomService ? (
-                              <div className="flex items-center gap-1.5">
-                                <span className="flex items-center gap-1 font-mono font-bold text-white bg-blue-600/30 border border-blue-500/50 text-blue-300 px-2 py-0.5 rounded text-xs">
-                                  <BedDouble className="h-3.5 w-3.5" />
-                                  Room {info.roomNumber || "Service"}
-                                </span>
-                                <span className="text-[10px] font-mono text-zinc-400">IN-ROOM</span>
-                              </div>
-                            ) : (
-                              <div className="flex items-center gap-1.5">
-                                <span className="flex items-center gap-1 font-mono font-bold text-white bg-emerald-600/30 border border-emerald-500/50 text-emerald-300 px-2 py-0.5 rounded text-xs">
-                                  <UtensilsCrossed className="h-3.5 w-3.5" />
-                                  {info.tableName || "Dine-In Table"}
-                                </span>
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Guest Name */}
-                          <div className="flex items-center gap-1.5 text-zinc-100 font-semibold text-xs">
-                            <User className="h-3.5 w-3.5 text-zinc-400 shrink-0" />
-                            <span className="truncate">{info.guestName || "Guest"}</span>
-                          </div>
-
-                          {/* Phone Number */}
-                          {info.contactNumber && (
-                            <div className="flex items-center gap-1.5 text-[11px] text-zinc-400 font-mono">
-                              <Phone className="h-3 w-3 text-emerald-400 shrink-0" />
-                              <a
-                                href={`tel:${info.contactNumber}`}
-                                className="text-zinc-300 hover:text-white transition underline underline-offset-2"
-                              >
-                                {info.contactNumber}
-                              </a>
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Ordered Dishes List */}
-                        <div className="space-y-1 pt-1 border-t border-zinc-800/80">
-                          {kot.lines?.map((line: any) => (
-                            <div key={line.id} className="flex items-start justify-between gap-2 text-zinc-200">
-                              <div className="min-w-0 flex-1">
-                                <div className="font-medium text-zinc-200 break-words">
-                                  {line.orderItem?.nameSnapshot}
-                                </div>
-                                {line.orderItem?.notes && (
-                                  <div className="text-[10px] text-amber-400 font-mono mt-0.5">
-                                    Note: {line.orderItem.notes}
-                                  </div>
-                                )}
-                              </div>
-                              <span className="font-mono font-bold text-xs text-amber-400 shrink-0">
-                                ×{line.qty}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-
-                        <button
-                          onClick={() => handleKdsStatus(kot.id, "PREPARING")}
-                          className="w-full rounded-md bg-zinc-800 hover:bg-zinc-700 py-1.5 text-xs font-semibold text-zinc-100 transition flex items-center justify-center gap-1.5"
-                        >
-                          <Flame className="h-3.5 w-3.5 text-amber-400" /> Start Preparing
-                        </button>
-                      </div>
-                    );
-                  })
-              )}
-            </div>
-          </div>
-
-          {/* PREPARING */}
-          <div className="rounded-xl bg-[#111114] border border-zinc-800 p-3.5 space-y-3">
-            <div className="flex items-center justify-between pb-2 border-b border-zinc-800 font-mono text-xs font-bold text-blue-400">
-              <span className="flex items-center gap-1.5">
-                <Flame className="h-4 w-4" /> Preparing / Cooking
-              </span>
-              <span className="bg-blue-400/10 px-2 py-0.5 rounded border border-blue-400/30">
-                {kots.filter((k) => k.status === "PREPARING").length}
-              </span>
-            </div>
-
-            <div className="space-y-3 max-h-[calc(100vh-280px)] overflow-y-auto pr-1">
-              {kots.filter((k) => k.status === "PREPARING").length === 0 ? (
-                <div className="text-center py-12 text-zinc-500 text-xs">No active orders cooking.</div>
-              ) : (
-                kots
-                  .filter((k) => k.status === "PREPARING")
-                  .map((kot) => {
-                    const info = getKotInfo(kot);
-                    return (
-                      <div
-                        key={kot.id}
-                        className="rounded-xl bg-[#18181b] p-3.5 border border-blue-500/30 space-y-3 text-xs shadow-sm hover:border-blue-500/60 transition"
-                      >
-                        {/* Header: KOT #, Order # and Station */}
-                        <div className="flex items-start justify-between gap-2 pb-2 border-b border-zinc-800">
-                          <div>
-                            <div className="flex items-center gap-1.5 font-mono">
-                              <span className="font-bold text-blue-400">#{kot.kotNo}</span>
-                              {info.orderNo && (
-                                <span className="text-[10px] text-zinc-400">• Order #{info.orderNo}</span>
-                              )}
-                            </div>
-                            <div className="text-[10px] text-zinc-400 font-mono flex items-center gap-1 mt-0.5">
-                              <Clock className="h-3 w-3 text-zinc-500" />
-                              <span>{info.firedTimeStr} ({info.elapsedMins}m ago)</span>
-                            </div>
-                          </div>
-                          <span className="rounded bg-zinc-900 border border-zinc-700 px-2 py-0.5 text-[10px] font-mono text-zinc-300 font-medium shrink-0">
-                            {kot.station?.name || "Kitchen"}
-                          </span>
-                        </div>
-
-                        {/* Room, Guest Name & Phone details */}
-                        <div className="rounded-lg bg-zinc-900/90 border border-zinc-800 p-2.5 space-y-1.5">
-                          <div className="flex items-center justify-between gap-2">
-                            {info.isRoomService ? (
-                              <div className="flex items-center gap-1.5">
-                                <span className="flex items-center gap-1 font-mono font-bold text-white bg-blue-600/30 border border-blue-500/50 text-blue-300 px-2 py-0.5 rounded text-xs">
-                                  <BedDouble className="h-3.5 w-3.5" />
-                                  Room {info.roomNumber || "Service"}
-                                </span>
-                                <span className="text-[10px] font-mono text-zinc-400">IN-ROOM</span>
-                              </div>
-                            ) : (
-                              <div className="flex items-center gap-1.5">
-                                <span className="flex items-center gap-1 font-mono font-bold text-white bg-emerald-600/30 border border-emerald-500/50 text-emerald-300 px-2 py-0.5 rounded text-xs">
-                                  <UtensilsCrossed className="h-3.5 w-3.5" />
-                                  {info.tableName || "Dine-In Table"}
-                                </span>
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Guest Name */}
-                          <div className="flex items-center gap-1.5 text-zinc-100 font-semibold text-xs">
-                            <User className="h-3.5 w-3.5 text-zinc-400 shrink-0" />
-                            <span className="truncate">{info.guestName || "Guest"}</span>
-                          </div>
-
-                          {/* Phone Number */}
-                          {info.contactNumber && (
-                            <div className="flex items-center gap-1.5 text-[11px] text-zinc-400 font-mono">
-                              <Phone className="h-3 w-3 text-emerald-400 shrink-0" />
-                              <a
-                                href={`tel:${info.contactNumber}`}
-                                className="text-zinc-300 hover:text-white transition underline underline-offset-2"
-                              >
-                                {info.contactNumber}
-                              </a>
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Ordered Dishes List */}
-                        <div className="space-y-1 pt-1 border-t border-zinc-800/80">
-                          {kot.lines?.map((line: any) => (
-                            <div key={line.id} className="flex items-start justify-between gap-2 text-zinc-200">
-                              <div className="min-w-0 flex-1">
-                                <div className="font-medium text-zinc-200 break-words">
-                                  {line.orderItem?.nameSnapshot}
-                                </div>
-                                {line.orderItem?.notes && (
-                                  <div className="text-[10px] text-amber-400 font-mono mt-0.5">
-                                    Note: {line.orderItem.notes}
-                                  </div>
-                                )}
-                              </div>
-                              <span className="font-mono font-bold text-xs text-blue-400 shrink-0">
-                                ×{line.qty}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-
-                        <button
-                          onClick={() => handleKdsStatus(kot.id, "READY")}
-                          className="w-full rounded-md bg-blue-600 hover:bg-blue-500 py-1.5 text-xs font-semibold text-white transition flex items-center justify-center gap-1.5 shadow-sm shadow-blue-500/20"
-                        >
-                          <CheckCircle2 className="h-3.5 w-3.5" /> Mark Ready (Plated)
-                        </button>
-                      </div>
-                    );
-                  })
-              )}
-            </div>
-          </div>
-
-          {/* READY */}
-          <div className="rounded-xl bg-[#111114] border border-zinc-800 p-3.5 space-y-3">
-            <div className="flex items-center justify-between pb-2 border-b border-zinc-800 font-mono text-xs font-bold text-emerald-400">
-              <span className="flex items-center gap-1.5">
-                <CheckCircle2 className="h-4 w-4" /> Ready to Serve / Dispatch
-              </span>
-              <span className="bg-emerald-400/10 px-2 py-0.5 rounded border border-emerald-400/30">
-                {kots.filter((k) => k.status === "READY").length}
-              </span>
-            </div>
-
-            <div className="space-y-3 max-h-[calc(100vh-280px)] overflow-y-auto pr-1">
-              {kots.filter((k) => k.status === "READY").length === 0 ? (
-                <div className="text-center py-12 text-zinc-500 text-xs">No orders waiting for runner.</div>
-              ) : (
-                kots
-                  .filter((k) => k.status === "READY")
-                  .map((kot) => {
-                    const info = getKotInfo(kot);
-                    return (
-                      <div
-                        key={kot.id}
-                        className="rounded-xl bg-[#18181b] p-3.5 border border-emerald-500/30 space-y-3 text-xs shadow-sm hover:border-emerald-500/60 transition"
-                      >
-                        {/* Header: KOT #, Order # and Station */}
-                        <div className="flex items-start justify-between gap-2 pb-2 border-b border-zinc-800">
-                          <div>
-                            <div className="flex items-center gap-1.5 font-mono">
-                              <span className="font-bold text-emerald-400">#{kot.kotNo}</span>
-                              {info.orderNo && (
-                                <span className="text-[10px] text-zinc-400">• Order #{info.orderNo}</span>
-                              )}
-                            </div>
-                            <div className="text-[10px] text-zinc-400 font-mono flex items-center gap-1 mt-0.5">
-                              <Clock className="h-3 w-3 text-zinc-500" />
-                              <span>{info.firedTimeStr} ({info.elapsedMins}m ago)</span>
-                            </div>
-                          </div>
-                          <span className="rounded bg-zinc-900 border border-zinc-700 px-2 py-0.5 text-[10px] font-mono text-zinc-300 font-medium shrink-0">
-                            {kot.station?.name || "Kitchen"}
-                          </span>
-                        </div>
-
-                        {/* Room, Guest Name & Phone details */}
-                        <div className="rounded-lg bg-zinc-900/90 border border-zinc-800 p-2.5 space-y-1.5">
-                          <div className="flex items-center justify-between gap-2">
-                            {info.isRoomService ? (
-                              <div className="flex items-center gap-1.5">
-                                <span className="flex items-center gap-1 font-mono font-bold text-white bg-blue-600/30 border border-blue-500/50 text-blue-300 px-2 py-0.5 rounded text-xs">
-                                  <BedDouble className="h-3.5 w-3.5" />
-                                  Room {info.roomNumber || "Service"}
-                                </span>
-                                <span className="text-[10px] font-mono text-zinc-400">IN-ROOM</span>
-                              </div>
-                            ) : (
-                              <div className="flex items-center gap-1.5">
-                                <span className="flex items-center gap-1 font-mono font-bold text-white bg-emerald-600/30 border border-emerald-500/50 text-emerald-300 px-2 py-0.5 rounded text-xs">
-                                  <UtensilsCrossed className="h-3.5 w-3.5" />
-                                  {info.tableName || "Dine-In Table"}
-                                </span>
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Guest Name */}
-                          <div className="flex items-center gap-1.5 text-zinc-100 font-semibold text-xs">
-                            <User className="h-3.5 w-3.5 text-zinc-400 shrink-0" />
-                            <span className="truncate">{info.guestName || "Guest"}</span>
-                          </div>
-
-                          {/* Phone Number */}
-                          {info.contactNumber && (
-                            <div className="flex items-center gap-1.5 text-[11px] text-zinc-400 font-mono">
-                              <Phone className="h-3 w-3 text-emerald-400 shrink-0" />
-                              <a
-                                href={`tel:${info.contactNumber}`}
-                                className="text-zinc-300 hover:text-white transition underline underline-offset-2"
-                              >
-                                {info.contactNumber}
-                              </a>
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Ordered Dishes List */}
-                        <div className="space-y-1 pt-1 border-t border-zinc-800/80">
-                          {kot.lines?.map((line: any) => (
-                            <div key={line.id} className="flex items-start justify-between gap-2 text-zinc-200">
-                              <div className="min-w-0 flex-1">
-                                <div className="font-medium text-zinc-200 break-words">
-                                  {line.orderItem?.nameSnapshot}
-                                </div>
-                                {line.orderItem?.notes && (
-                                  <div className="text-[10px] text-amber-400 font-mono mt-0.5">
-                                    Note: {line.orderItem.notes}
-                                  </div>
-                                )}
-                              </div>
-                              <span className="font-mono font-bold text-xs text-emerald-400 shrink-0">
-                                ×{line.qty}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-
-                        <button
-                          onClick={() => handleKdsStatus(kot.id, "COMPLETED")}
-                          className="w-full rounded-md bg-emerald-600 hover:bg-emerald-500 py-1.5 text-xs font-semibold text-white transition flex items-center justify-center gap-1.5 shadow-sm shadow-emerald-500/20"
-                        >
-                          <CheckCircle2 className="h-3.5 w-3.5" /> Complete / Served
-                        </button>
-                      </div>
-                    );
-                  })
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ROOM POSTING MODAL */}
-      {showRoomPostModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-          <div className="w-full max-w-md rounded-lg border border-zinc-800 bg-[#121215] p-5 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between pb-2 border-b border-zinc-800">
-              <h2 className="text-sm font-semibold text-zinc-100 flex items-center gap-2">
-                <BedDouble className="h-4 w-4 text-zinc-400" />
-                Post F&B to Room Folio
+      {/* ========================================================================= */}
+      {/* TAB 3: KOT HISTORY & AUDIT REGISTER                                        */}
+      {/* ========================================================================= */}
+      {activeTab === "history" && (
+        <div className="rounded-2xl bg-[#111114] border border-zinc-800 p-5 space-y-4">
+          <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
+            <div className="flex items-center gap-2">
+              <History className="h-4 w-4 text-zinc-400" />
+              <h2 className="text-xs font-bold text-zinc-200 uppercase tracking-wider">
+                Kitchen Order Ticket (KOT) Register & Logs
               </h2>
-              <button onClick={() => setShowRoomPostModal(false)} className="text-zinc-500 hover:text-zinc-200">
-                <X className="h-4 w-4" />
-              </button>
             </div>
+            <span className="font-mono text-xs text-zinc-500">
+              Total Today: {kots.length} Tickets
+            </span>
+          </div>
 
-            <div className="space-y-3 text-xs">
-              <div className="rounded-md bg-zinc-900 p-2.5 border border-zinc-800 font-mono">
-                <div className="text-zinc-500">Total F&B Charge:</div>
-                <div className="text-base font-semibold text-emerald-400 tabular-nums">{formatINR(gst.totalAmount)}</div>
-              </div>
-
-              <div>
-                <label className="text-zinc-400">Select In-House Room & Guest *</label>
-                <select
-                  required
-                  value={selectedStayId}
-                  onChange={(e) => setSelectedStayId(e.target.value)}
-                  className="mt-1 w-full rounded-md bg-zinc-900 border border-zinc-800 px-2.5 py-1.5 text-zinc-100 focus:outline-none focus:border-zinc-600"
-                >
-                  <option value="">Select guest...</option>
-                  {stays.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      Room {s.roomAssignments[0]?.room?.number} — {s.primaryGuest?.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="pt-2 border-t border-zinc-800 flex items-center justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setShowRoomPostModal(false)}
-                  className="rounded-md px-3 py-1.5 text-zinc-400 hover:text-zinc-200"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={handleRoomPost}
-                  disabled={actionLoading || !selectedStayId}
-                  className="rounded-md bg-zinc-100 px-4 py-1.5 font-medium text-zinc-950 hover:bg-white transition disabled:opacity-50"
-                >
-                  {actionLoading ? "Posting..." : "Confirm Post"}
-                </button>
-              </div>
-            </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs border border-zinc-800 border-collapse">
+              <thead className="bg-zinc-900 text-zinc-400 uppercase font-mono text-[10px]">
+                <tr>
+                  <th className="p-3 border border-zinc-800">KOT #</th>
+                  <th className="p-3 border border-zinc-800">Fired Time</th>
+                  <th className="p-3 border border-zinc-800">Service Mode</th>
+                  <th className="p-3 border border-zinc-800">Table / Room</th>
+                  <th className="p-3 border border-zinc-800">Dishes Ordered</th>
+                  <th className="p-3 border border-zinc-800">Status</th>
+                  <th className="p-3 border border-zinc-800 text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-zinc-800 text-zinc-300">
+                {kots.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="p-8 text-center text-zinc-500 font-semibold">
+                      No KOT records found for today.
+                    </td>
+                  </tr>
+                ) : (
+                  kots.map((kot) => {
+                    const info = getKotInfo(kot);
+                    return (
+                      <tr key={kot.id} className="hover:bg-zinc-900/50 transition">
+                        <td className="p-3 font-mono font-bold text-zinc-100 border border-zinc-800">
+                          {kot.kotNo}
+                        </td>
+                        <td className="p-3 font-mono text-zinc-400 border border-zinc-800">
+                          {info.firedTimeStr}
+                        </td>
+                        <td className="p-3 border border-zinc-800">
+                          <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-zinc-900 border border-zinc-800 text-zinc-300">
+                            {kot.order?.mode || "DINE_IN"}
+                          </span>
+                        </td>
+                        <td className="p-3 border border-zinc-800 font-semibold text-zinc-200">
+                          {info.isRoomService ? `Room ${info.roomNumber}` : info.tableName || "Table"}
+                        </td>
+                        <td className="p-3 border border-zinc-800">
+                          <div className="space-y-0.5">
+                            {kot.lines?.map((l: any, i: number) => (
+                              <div key={i} className="text-xs">
+                                <strong className="text-zinc-200">{l.orderItem?.nameSnapshot}</strong>{" "}
+                                <span className="text-zinc-400 font-mono font-bold">×{l.qty}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </td>
+                        <td className="p-3 border border-zinc-800">
+                          <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-zinc-900 border border-zinc-700 text-zinc-300">
+                            {kot.status}
+                          </span>
+                        </td>
+                        <td className="p-3 border border-zinc-800 text-right">
+                          <button
+                            onClick={() => openKotSlip(kot)}
+                            className="px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 hover:text-white font-semibold text-xs border border-zinc-700 inline-flex items-center gap-1.5 transition"
+                          >
+                            <Printer className="h-3.5 w-3.5 text-zinc-400" />
+                            <span>Reprint</span>
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
       )}
+
+      {/* ========================================================================= */}
+      {/* 3-INCH THERMAL KOT SLIP PRINTER MODAL                                     */}
+      {/* ========================================================================= */}
+      <PrintableKotSlipModal
+        isOpen={showPrintModal}
+        onClose={() => setShowPrintModal(false)}
+        kot={printKotData}
+        hotelName={activeProperty?.displayName || "Hotel Ambarish Grand Residency"}
+      />
+
     </div>
   );
 }

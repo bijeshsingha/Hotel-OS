@@ -13,9 +13,14 @@ export async function POST(request: Request) {
       expectedDepartureAt,
       adults,
       children,
+      paxM,
+      paxF,
+      paxC,
       depositAmount,
       actorId,
       overrideReason,
+      coGuests,
+      foreignDetails,
     } = body;
 
     const result = await checkInGuest({
@@ -27,9 +32,14 @@ export async function POST(request: Request) {
       expectedDepartureAt: new Date(expectedDepartureAt),
       adults: Number(adults) || 2,
       children: Number(children) || 0,
+      paxM: paxM !== undefined ? Number(paxM) : undefined,
+      paxF: paxF !== undefined ? Number(paxF) : undefined,
+      paxC: paxC !== undefined ? Number(paxC) : undefined,
       depositAmount: Number(depositAmount) || 0,
       actorId,
       overrideReason,
+      coGuests,
+      foreignDetails,
     });
 
     return NextResponse.json({ success: true, ...result });

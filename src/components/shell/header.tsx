@@ -19,6 +19,7 @@ import {
   X,
   Sparkles,
   LogOut,
+  Plus,
 } from "lucide-react";
 
 export function AppHeader() {
@@ -112,7 +113,7 @@ export function AppHeader() {
 
   return (
     <>
-      <header className="sticky top-0 z-40 w-full bg-[#09090b]/95 backdrop-blur-md border-b border-[#27272a] px-3.5 sm:px-6 py-2.5">
+      <header className="sticky top-0 z-40 w-full bg-[#09090b]/95 backdrop-blur-md border-b border-[#27272a] px-3.5 sm:px-6 py-2.5 text-zinc-100">
         <div className="flex items-center justify-between gap-4">
           {/* Left: Clean Brand & Property Switcher */}
           <div className="flex items-center gap-3">
@@ -176,6 +177,17 @@ export function AppHeader() {
                       {p.id === activeProperty?.id && <Check className="h-4 w-4 text-emerald-400" />}
                     </button>
                   ))}
+
+                  <div className="pt-1 border-t border-zinc-800">
+                    <Link
+                      href="/onboarding"
+                      onClick={() => setShowPropMenu(false)}
+                      className="w-full text-left rounded-xl px-3 py-2 text-xs flex items-center gap-2 text-blue-400 hover:bg-blue-600/10 hover:text-blue-300 font-bold transition border border-dashed border-blue-500/30"
+                    >
+                      <Plus className="h-4 w-4" />
+                      <span>+ Onboard New Hotel Property</span>
+                    </Link>
+                  </div>
                 </div>
               )}
             </div>

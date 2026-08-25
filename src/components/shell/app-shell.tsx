@@ -23,7 +23,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#09090b]">
+    <div className="min-h-screen flex flex-col bg-[#09090b] text-zinc-100">
       <AppHeader />
       <div className="flex flex-1">
         <AppSidebar />

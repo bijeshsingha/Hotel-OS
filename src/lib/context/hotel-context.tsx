@@ -56,6 +56,15 @@ export function HotelProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
 
+  // Ensure root dark mode is fixed
+  useEffect(() => {
+    if (typeof document !== "undefined") {
+      document.documentElement.classList.remove("light");
+      document.documentElement.classList.add("dark");
+      document.documentElement.setAttribute("data-theme", "dark");
+    }
+  }, []);
+
   const fetchSession = useCallback(async (identifier?: string, propId?: string) => {
     try {
       setIsLoading(true);
