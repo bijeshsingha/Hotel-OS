@@ -55,23 +55,23 @@ export function PrintableKotSlipModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 overflow-y-auto print:p-0 print:bg-white print:static print:inset-auto">
-      <div className="w-full max-w-md rounded-2xl border border-zinc-800 bg-[#121215] text-zinc-100 p-6 shadow-2xl space-y-4 print:max-w-none print:border-none print:shadow-none print:bg-white print:text-black print:p-0">
+      <div className="w-full max-w-md rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121215] text-zinc-900 dark:text-zinc-100 p-6 shadow-2xl space-y-4 print:max-w-none print:border-none print:shadow-none print:bg-white print:text-black print:p-0">
         
         {/* Modal Controls (Hidden in Print) */}
-        <div className="flex items-center justify-between pb-3 border-b border-zinc-800 print:hidden">
+        <div className="flex items-center justify-between pb-3 border-b border-zinc-200 dark:border-zinc-800 print:hidden">
           <div className="flex items-center gap-2">
-            <ChefHat className="h-5 w-5 text-zinc-400" />
-            <h3 className="text-sm font-bold text-white">Kitchen Order Ticket (KOT) Preview</h3>
+            <ChefHat className="h-5 w-5 text-zinc-500 dark:text-zinc-400" />
+            <h3 className="text-sm font-bold text-zinc-900 dark:text-white">Kitchen Order Ticket (KOT) Preview</h3>
           </div>
           <div className="flex items-center gap-2">
             <button
               onClick={handlePrint}
-              className="px-3.5 py-1.5 rounded-xl bg-zinc-100 hover:bg-white text-zinc-950 font-bold text-xs flex items-center gap-1.5 transition shadow"
+              className="px-3.5 py-1.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-100 dark:hover:bg-white text-white dark:text-zinc-950 font-bold text-xs flex items-center gap-1.5 transition shadow-xs cursor-pointer"
             >
               <Printer className="h-4 w-4" />
               <span>Print KOT Slip</span>
             </button>
-            <button onClick={onClose} className="p-1.5 rounded-lg text-zinc-400 hover:text-white transition">
+            <button onClick={onClose} className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-700 dark:hover:text-white transition">
               <X className="h-4 w-4" />
             </button>
           </div>
@@ -159,7 +159,7 @@ export function PrintableKotSlipModal({
           <span className="text-xs text-zinc-500 font-mono">Standard 80mm Thermal Printer Ready</span>
           <button
             onClick={onClose}
-            className="px-4 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-xs font-semibold text-white transition"
+            className="px-4 py-2 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-xs font-semibold text-zinc-800 dark:text-white transition cursor-pointer"
           >
             Close Preview
           </button>

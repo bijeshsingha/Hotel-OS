@@ -57,13 +57,13 @@ export default function DashboardPage() {
   return (
     <div className="space-y-4 max-w-7xl mx-auto">
       {/* Top Property Info Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 rounded-lg bg-[#111114] border border-zinc-800">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 rounded-xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-lg font-semibold text-zinc-100">
+            <h1 className="text-lg font-bold text-zinc-900 dark:text-zinc-100">
               {activeProperty?.displayName}
             </h1>
-            <span className="rounded px-2 py-0.5 text-[10px] font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/20">
+            <span className="rounded px-2 py-0.5 text-[10px] font-mono font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-500/10 border border-emerald-300 dark:border-emerald-500/20">
               LIVE
             </span>
           </div>
@@ -73,13 +73,13 @@ export default function DashboardPage() {
         </div>
 
         <div className="flex items-center gap-2 text-xs font-mono">
-          <div className="rounded-md bg-zinc-900 border border-zinc-800 px-3 py-1.5 text-right">
-            <span className="text-zinc-500 text-[10px] block">BUSINESS DATE</span>
-            <span className="font-medium text-zinc-200">{activeProperty?.businessDate}</span>
+          <div className="rounded-lg bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-3 py-1.5 text-right shadow-xs">
+            <span className="text-zinc-500 text-[10px] block font-bold">BUSINESS DATE</span>
+            <span className="font-bold text-zinc-800 dark:text-zinc-200">{activeProperty?.businessDate}</span>
           </div>
-          <div className="rounded-md bg-zinc-900 border border-zinc-800 px-3 py-1.5 text-right">
-            <span className="text-zinc-500 text-[10px] block">AUDIT CUTOFF</span>
-            <span className="font-medium text-amber-400">03:00 AM</span>
+          <div className="rounded-lg bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-3 py-1.5 text-right shadow-xs">
+            <span className="text-zinc-500 text-[10px] block font-bold">AUDIT CUTOFF</span>
+            <span className="font-bold text-amber-600 dark:text-amber-400">03:00 AM</span>
           </div>
         </div>
       </div>
@@ -87,79 +87,79 @@ export default function DashboardPage() {
       {/* KPI Stats Grid */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {/* Occupancy % */}
-        <div className="p-3.5 rounded-lg bg-[#111114] border border-zinc-800 hover:border-zinc-700 transition">
-          <div className="flex items-center justify-between text-zinc-400">
-            <span className="text-xs font-medium">Occupancy</span>
+        <div className="p-3.5 rounded-xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 transition shadow-xs">
+          <div className="flex items-center justify-between text-zinc-500 dark:text-zinc-400">
+            <span className="text-xs font-bold">Occupancy</span>
             <BedDouble className="h-3.5 w-3.5" />
           </div>
           <div className="mt-1.5 flex items-baseline gap-2">
-            <span className="text-2xl font-semibold text-zinc-100 font-mono tabular-nums">{kpis.occupancyPct}%</span>
-            <span className="text-[11px] text-emerald-400 font-mono flex items-center">
+            <span className="text-2xl font-bold text-zinc-900 dark:text-zinc-100 font-mono tabular-nums">{kpis.occupancyPct}%</span>
+            <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-mono font-bold flex items-center">
               <ArrowUpRight className="h-3 w-3" /> +4.2%
             </span>
           </div>
-          <div className="mt-1 text-[11px] text-zinc-500 font-mono">
+          <div className="mt-1 text-[11px] text-zinc-500 font-mono font-medium">
             {kpis.inHouseStays} / {kpis.totalRooms} rooms occupied
           </div>
         </div>
 
         {/* RevPAR */}
-        <div className="p-3.5 rounded-lg bg-[#111114] border border-zinc-800 hover:border-zinc-700 transition">
-          <div className="flex items-center justify-between text-zinc-400">
-            <span className="text-xs font-medium">RevPAR</span>
+        <div className="p-3.5 rounded-xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 transition shadow-xs">
+          <div className="flex items-center justify-between text-zinc-500 dark:text-zinc-400">
+            <span className="text-xs font-bold">RevPAR</span>
             <TrendingUp className="h-3.5 w-3.5" />
           </div>
           <div className="mt-1.5 flex items-baseline gap-2">
-            <span className="text-2xl font-semibold text-zinc-100 font-mono tabular-nums">{formatINR(kpis.revpar)}</span>
+            <span className="text-2xl font-bold text-zinc-900 dark:text-zinc-100 font-mono tabular-nums">{formatINR(kpis.revpar)}</span>
           </div>
-          <div className="mt-1 text-[11px] text-zinc-500 font-mono">
-            ADR: <span className="text-zinc-300">{formatINR(kpis.adr)}</span>
+          <div className="mt-1 text-[11px] text-zinc-500 font-mono font-medium">
+            ADR: <span className="text-zinc-800 dark:text-zinc-300 font-bold">{formatINR(kpis.adr)}</span>
           </div>
         </div>
 
         {/* Total Day Revenue */}
-        <div className="p-3.5 rounded-lg bg-[#111114] border border-zinc-800 hover:border-zinc-700 transition">
-          <div className="flex items-center justify-between text-zinc-400">
-            <span className="text-xs font-medium">Day Revenue</span>
+        <div className="p-3.5 rounded-xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 transition shadow-xs">
+          <div className="flex items-center justify-between text-zinc-500 dark:text-zinc-400">
+            <span className="text-xs font-bold">Day Revenue</span>
             <DollarSign className="h-3.5 w-3.5" />
           </div>
           <div className="mt-1.5 flex items-baseline gap-2">
-            <span className="text-2xl font-semibold text-zinc-100 font-mono tabular-nums">{formatINR(kpis.grossRevenue)}</span>
+            <span className="text-2xl font-bold text-zinc-900 dark:text-zinc-100 font-mono tabular-nums">{formatINR(kpis.grossRevenue)}</span>
           </div>
-          <div className="mt-1 text-[11px] text-zinc-500 font-mono flex items-center justify-between">
+          <div className="mt-1 text-[11px] text-zinc-500 font-mono font-medium flex items-center justify-between">
             <span>Room: {formatINR(kpis.roomRevenue)}</span>
             <span>F&B: {formatINR(kpis.fbRevenue)}</span>
           </div>
         </div>
 
         {/* Total Taxes & Folios */}
-        <div className="p-3.5 rounded-lg bg-[#111114] border border-zinc-800 hover:border-zinc-700 transition">
-          <div className="flex items-center justify-between text-zinc-400">
-            <span className="text-xs font-medium">GST Collected</span>
+        <div className="p-3.5 rounded-xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 transition shadow-xs">
+          <div className="flex items-center justify-between text-zinc-500 dark:text-zinc-400">
+            <span className="text-xs font-bold">GST Collected</span>
             <Receipt className="h-3.5 w-3.5" />
           </div>
           <div className="mt-1.5 flex items-baseline gap-2">
-            <span className="text-2xl font-semibold text-zinc-100 font-mono tabular-nums">{formatINR(kpis.totalTaxes)}</span>
+            <span className="text-2xl font-bold text-zinc-900 dark:text-zinc-100 font-mono tabular-nums">{formatINR(kpis.totalTaxes)}</span>
           </div>
-          <div className="mt-1 text-[11px] text-zinc-500 font-mono">
-            Folio Balances: <span className="text-rose-400">{formatINR(kpis.outstandingFolioBalance)}</span>
+          <div className="mt-1 text-[11px] text-zinc-500 font-mono font-medium">
+            Folio Balances: <span className="text-rose-600 dark:text-rose-400 font-bold">{formatINR(kpis.outstandingFolioBalance)}</span>
           </div>
         </div>
       </div>
 
       {/* 14-Day Performance Trend Chart & Operational Status */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
-        <div className="lg:col-span-2 p-4 rounded-lg bg-[#111114] border border-zinc-800 space-y-3">
+        <div className="lg:col-span-2 p-4 rounded-xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 space-y-3 shadow-xs">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-sm font-semibold text-zinc-100">Revenue Trend (14 Days)</h2>
+              <h2 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">Revenue Trend (14 Days)</h2>
               <p className="text-[11px] text-zinc-500">Daily room and F&B progression</p>
             </div>
-            <div className="flex items-center gap-3 text-xs font-mono">
-              <span className="flex items-center gap-1.5 text-blue-400">
+            <div className="flex items-center gap-3 text-xs font-mono font-bold">
+              <span className="flex items-center gap-1.5 text-blue-600 dark:text-blue-400">
                 <span className="h-2 w-2 rounded-full bg-blue-500" /> Room
               </span>
-              <span className="flex items-center gap-1.5 text-emerald-400">
+              <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
                 <span className="h-2 w-2 rounded-full bg-emerald-500" /> F&B
               </span>
             </div>
@@ -178,7 +178,7 @@ export default function DashboardPage() {
                     <stop offset="95%" stopColor="#10b981" stopOpacity={0.0} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="2 2" stroke="#27272a" opacity={0.6} />
+                <CartesianGrid strokeDasharray="2 2" stroke="#71717a" opacity={0.2} />
                 <XAxis
                   dataKey="date"
                   tickFormatter={(val) => val.slice(5)}
@@ -190,8 +190,8 @@ export default function DashboardPage() {
                 <Tooltip
                   contentStyle={{
                     backgroundColor: "#18181b",
-                    borderColor: "#27272a",
-                    borderRadius: "0.375rem",
+                    borderColor: "#3f3f46",
+                    borderRadius: "0.5rem",
                     fontSize: "11px",
                     fontFamily: "JetBrains Mono",
                     color: "#f4f4f5",
@@ -203,7 +203,7 @@ export default function DashboardPage() {
                   dataKey="ROOM_REVENUE"
                   name="Room Rev"
                   stroke="#3b82f6"
-                  strokeWidth={1.5}
+                  strokeWidth={2}
                   fillOpacity={1}
                   fill="url(#colorRoom)"
                 />
@@ -212,7 +212,7 @@ export default function DashboardPage() {
                   dataKey="FB_REVENUE"
                   name="F&B Rev"
                   stroke="#10b981"
-                  strokeWidth={1.5}
+                  strokeWidth={2}
                   fillOpacity={1}
                   fill="url(#colorFb)"
                 />
@@ -222,56 +222,56 @@ export default function DashboardPage() {
         </div>
 
         {/* Operational Status */}
-        <div className="p-4 rounded-lg bg-[#111114] border border-zinc-800 space-y-3">
+        <div className="p-4 rounded-xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 space-y-3 shadow-xs">
           <div>
-            <h2 className="text-sm font-semibold text-zinc-100">Live Status</h2>
+            <h2 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">Live Status</h2>
             <p className="text-[11px] text-zinc-500">Room and outlet status</p>
           </div>
 
           <div className="space-y-2 font-mono text-xs">
-            <div className="flex items-center justify-between p-2.5 rounded-md bg-zinc-900 border border-zinc-800">
+            <div className="flex items-center justify-between p-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xs">
               <div className="flex items-center gap-2">
-                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
-                <span className="text-zinc-300">Clean & Inspected</span>
+                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                <span className="text-zinc-800 dark:text-zinc-300 font-semibold">Clean & Inspected</span>
               </div>
-              <span className="font-semibold text-emerald-400 tabular-nums">{kpis.inspectedRooms}</span>
+              <span className="font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">{kpis.inspectedRooms}</span>
             </div>
 
-            <div className="flex items-center justify-between p-2.5 rounded-md bg-zinc-900 border border-zinc-800">
+            <div className="flex items-center justify-between p-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xs">
               <div className="flex items-center gap-2">
-                <Sparkles className="h-3.5 w-3.5 text-amber-400" />
-                <span className="text-zinc-300">Dirty / Cleaning</span>
+                <Sparkles className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+                <span className="text-zinc-800 dark:text-zinc-300 font-semibold">Dirty / Cleaning</span>
               </div>
-              <span className="font-semibold text-amber-400 tabular-nums">{kpis.dirtyRooms}</span>
+              <span className="font-bold text-amber-600 dark:text-amber-400 tabular-nums">{kpis.dirtyRooms}</span>
             </div>
 
-            <div className="flex items-center justify-between p-2.5 rounded-md bg-zinc-900 border border-zinc-800">
+            <div className="flex items-center justify-between p-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xs">
               <div className="flex items-center gap-2">
-                <AlertTriangle className="h-3.5 w-3.5 text-rose-400" />
-                <span className="text-zinc-300">Out of Order</span>
+                <AlertTriangle className="h-3.5 w-3.5 text-rose-600 dark:text-rose-400" />
+                <span className="text-zinc-800 dark:text-zinc-300 font-semibold">Out of Order</span>
               </div>
-              <span className="font-semibold text-rose-400 tabular-nums">{kpis.outOfOrderRooms}</span>
+              <span className="font-bold text-rose-600 dark:text-rose-400 tabular-nums">{kpis.outOfOrderRooms}</span>
             </div>
 
-            <div className="flex items-center justify-between p-2.5 rounded-md bg-zinc-900 border border-zinc-800">
+            <div className="flex items-center justify-between p-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xs">
               <div className="flex items-center gap-2">
-                <UtensilsCrossed className="h-3.5 w-3.5 text-blue-400" />
-                <span className="text-zinc-300">Open KOTs</span>
+                <UtensilsCrossed className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
+                <span className="text-zinc-800 dark:text-zinc-300 font-semibold">Open KOTs</span>
               </div>
-              <span className="font-semibold text-blue-400 tabular-nums">{kpis.openKots}</span>
+              <span className="font-bold text-blue-600 dark:text-blue-400 tabular-nums">{kpis.openKots}</span>
             </div>
           </div>
         </div>
       </div>
 
       {/* Multi-Property Overview */}
-      <div className="p-4 rounded-lg bg-[#111114] border border-zinc-800 space-y-3">
+      <div className="p-4 rounded-xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 space-y-3 shadow-xs">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-sm font-semibold text-zinc-100">Properties in Portfolio</h2>
+            <h2 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">Properties in Portfolio</h2>
             <p className="text-[11px] text-zinc-500 font-mono">Brahmaputra Hospitality Pvt Ltd</p>
           </div>
-          <span className="rounded px-2 py-0.5 text-[10px] font-mono text-zinc-400 bg-zinc-900 border border-zinc-800">
+          <span className="rounded-lg px-2 py-0.5 text-[10px] font-mono font-bold text-zinc-600 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800">
             2 PROPERTIES
           </span>
         </div>
@@ -280,43 +280,43 @@ export default function DashboardPage() {
           {propertiesComparison.map((prop: any) => (
             <div
               key={prop.id}
-              className={`rounded-md p-3 border transition flex flex-col justify-between ${
+              className={`rounded-xl p-3.5 border transition flex flex-col justify-between shadow-xs ${
                 prop.id === activeProperty?.id
-                  ? "bg-zinc-900/80 border-blue-500/40"
-                  : "bg-zinc-900/30 border-zinc-800 hover:border-zinc-700"
+                  ? "bg-blue-50/50 dark:bg-zinc-900/80 border-blue-400 dark:border-blue-500/40"
+                  : "bg-zinc-50 dark:bg-zinc-900/30 border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700"
               }`}
             >
               <div className="flex items-start justify-between">
                 <div>
-                  <div className="font-medium text-xs text-zinc-100 flex items-center gap-1.5">
-                    <Building2 className="h-3.5 w-3.5 text-zinc-400" />
+                  <div className="font-bold text-xs text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5">
+                    <Building2 className="h-3.5 w-3.5 text-zinc-500 dark:text-zinc-400" />
                     {prop.name}
                   </div>
                   <div className="text-[11px] text-zinc-500 font-mono mt-0.5">{prop.city} • Code: {prop.code}</div>
                 </div>
                 {prop.id === activeProperty?.id ? (
-                  <span className="rounded bg-blue-500/10 border border-blue-500/20 px-1.5 py-0.2 text-[9px] font-mono text-blue-400">
+                  <span className="rounded bg-blue-100 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 px-1.5 py-0.5 text-[9px] font-mono font-bold text-blue-700 dark:text-blue-400">
                     SELECTED
                   </span>
                 ) : (
-                  <span className="rounded bg-zinc-800 px-1.5 py-0.2 text-[9px] font-mono text-zinc-400">
+                  <span className="rounded bg-zinc-200 dark:bg-zinc-800 px-1.5 py-0.5 text-[9px] font-mono font-bold text-zinc-700 dark:text-zinc-400">
                     ACTIVE
                   </span>
                 )}
               </div>
 
-              <div className="grid grid-cols-3 gap-2 mt-3 pt-2.5 border-t border-zinc-800/80 text-center font-mono text-xs">
+              <div className="grid grid-cols-3 gap-2 mt-3 pt-2.5 border-t border-zinc-200 dark:border-zinc-800/80 text-center font-mono text-xs">
                 <div>
-                  <div className="text-[10px] text-zinc-500">Rooms</div>
-                  <div className="font-semibold text-zinc-200 tabular-nums">{prop.totalRooms}</div>
+                  <div className="text-[10px] text-zinc-500 font-medium">Rooms</div>
+                  <div className="font-bold text-zinc-800 dark:text-zinc-200 tabular-nums">{prop.totalRooms}</div>
                 </div>
                 <div>
-                  <div className="text-[10px] text-zinc-500">In-House</div>
-                  <div className="font-semibold text-blue-400 tabular-nums">{prop.inHouseStays}</div>
+                  <div className="text-[10px] text-zinc-500 font-medium">In-House</div>
+                  <div className="font-bold text-blue-600 dark:text-blue-400 tabular-nums">{prop.inHouseStays}</div>
                 </div>
                 <div>
-                  <div className="text-[10px] text-zinc-500">Occupancy</div>
-                  <div className="font-semibold text-emerald-400 tabular-nums">{prop.occupancyPct}%</div>
+                  <div className="text-[10px] text-zinc-500 font-medium">Occupancy</div>
+                  <div className="font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">{prop.occupancyPct}%</div>
                 </div>
               </div>
             </div>

@@ -16,14 +16,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   if (isKioskOrGuestPage) {
     return (
-      <main className="min-h-screen bg-[#09090b] text-zinc-100 selection:bg-blue-600 selection:text-white">
+      <main className="min-h-screen bg-slate-50 text-slate-900 dark:bg-[#09090b] dark:text-zinc-100 selection:bg-blue-600 selection:text-white transition-colors duration-150">
         {children}
       </main>
     );
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#09090b] text-zinc-100">
+    <div className="min-h-screen flex flex-col bg-slate-100/60 dark:bg-[#09090b] text-slate-900 dark:text-zinc-100 transition-colors duration-150">
       <AppHeader />
       <div className="flex flex-1">
         <AppSidebar />

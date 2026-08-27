@@ -443,17 +443,17 @@ export default function POSPage() {
       )}
 
       {/* TOP HEADER / WORKSPACE BAR */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-2xl bg-[#111114] border border-zinc-800 shadow-sm">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs">
         <div className="flex items-center gap-3.5">
-          <div className="h-11 w-11 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-300 shrink-0">
+          <div className="h-11 w-11 rounded-xl bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 flex items-center justify-center text-zinc-700 dark:text-zinc-300 shrink-0">
             <ChefHat className="h-5 w-5" />
           </div>
           <div>
             <div className="flex items-center gap-2.5">
-              <h1 className="text-base font-bold text-zinc-100 tracking-tight">
+              <h1 className="text-base font-bold text-zinc-900 dark:text-zinc-100 tracking-tight">
                 {activeProperty?.displayName || "Hotel Ambarish Grand Residency"}
               </h1>
-              <span className="rounded bg-zinc-900 border border-zinc-800 px-2.5 py-0.5 text-xs font-mono text-zinc-400 font-semibold">
+              <span className="rounded bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-2.5 py-0.5 text-xs font-mono text-zinc-600 dark:text-zinc-400 font-semibold">
                 Restaurant & In-Room Dining
               </span>
             </div>
@@ -463,14 +463,14 @@ export default function POSPage() {
           </div>
         </div>
 
-        {/* 3 Main Navigation Tabs (Large, Touch-Friendly, Unified Zinc Style) */}
-        <div className="flex items-center gap-2 bg-zinc-950 p-1.5 rounded-xl border border-zinc-800">
+        {/* 3 Main Navigation Tabs (Large, Touch-Friendly, Unified Style) */}
+        <div className="flex items-center gap-2 bg-zinc-100 dark:bg-zinc-950 p-1.5 rounded-xl border border-zinc-200 dark:border-zinc-800">
           <button
             onClick={() => setActiveTab("pad")}
             className={`rounded-xl px-4 py-2.5 text-xs font-bold transition flex items-center gap-2 ${
               activeTab === "pad"
-                ? "bg-zinc-800 text-zinc-100 border border-zinc-700 shadow-sm"
-                : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900"
+                ? "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 border border-zinc-300 dark:border-zinc-700 shadow-xs"
+                : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 hover:bg-zinc-200/50 dark:hover:bg-zinc-900"
             }`}
           >
             <UtensilsCrossed className="h-4 w-4" />
@@ -481,14 +481,14 @@ export default function POSPage() {
             onClick={() => setActiveTab("kds")}
             className={`rounded-xl px-4 py-2.5 text-xs font-bold transition flex items-center gap-2 ${
               activeTab === "kds"
-                ? "bg-zinc-800 text-zinc-100 border border-zinc-700 shadow-sm"
-                : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900"
+                ? "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 border border-zinc-300 dark:border-zinc-700 shadow-xs"
+                : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 hover:bg-zinc-200/50 dark:hover:bg-zinc-900"
             }`}
           >
-            <Flame className="h-4 w-4 text-zinc-400" />
+            <Flame className="h-4 w-4 text-amber-600 dark:text-amber-400" />
             <span>Live KDS</span>
             {kots.length > 0 && (
-              <span className="rounded bg-zinc-900 border border-zinc-700 text-zinc-300 px-2 py-0.5 text-xs font-mono font-bold">
+              <span className="rounded bg-zinc-200 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-800 dark:text-zinc-300 px-2 py-0.5 text-xs font-mono font-bold">
                 {kots.length}
               </span>
             )}
@@ -498,8 +498,8 @@ export default function POSPage() {
             onClick={() => setActiveTab("history")}
             className={`rounded-xl px-4 py-2.5 text-xs font-bold transition flex items-center gap-2 ${
               activeTab === "history"
-                ? "bg-zinc-800 text-zinc-100 border border-zinc-700 shadow-sm"
-                : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900"
+                ? "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 border border-zinc-300 dark:border-zinc-700 shadow-xs"
+                : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 hover:bg-zinc-200/50 dark:hover:bg-zinc-900"
             }`}
           >
             <History className="h-4 w-4" />
@@ -518,14 +518,14 @@ export default function POSPage() {
           <div className="lg:col-span-8 space-y-4">
             
             {/* 1. SERVICE MODE & DESTINATION SELECTOR */}
-            <div className="rounded-2xl bg-[#111114] border border-zinc-800 p-4 space-y-3.5">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-800 pb-3">
-                <span className="text-xs font-bold uppercase text-zinc-300 tracking-wider flex items-center gap-2">
-                  <Layers className="h-4 w-4 text-zinc-400" />
+            <div className="rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 p-4 space-y-3.5 shadow-xs">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-200 dark:border-zinc-800 pb-3">
+                <span className="text-xs font-bold uppercase text-zinc-800 dark:text-zinc-300 tracking-wider flex items-center gap-2">
+                  <Layers className="h-4 w-4 text-zinc-500 dark:text-zinc-400" />
                   Destination & Service Mode
                 </span>
 
-                <div className="flex items-center gap-1.5 bg-zinc-950 p-1 rounded-xl border border-zinc-800">
+                <div className="flex items-center gap-1.5 bg-zinc-100 dark:bg-zinc-950 p-1 rounded-xl border border-zinc-200 dark:border-zinc-800">
                   <button
                     type="button"
                     onClick={() => {
@@ -534,8 +534,8 @@ export default function POSPage() {
                     }}
                     className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-2 ${
                       serviceMode === "DINE_IN"
-                        ? "bg-zinc-800 text-zinc-100 border border-zinc-700 shadow-sm"
-                        : "text-zinc-400 hover:text-zinc-200"
+                        ? "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 border border-zinc-300 dark:border-zinc-700 shadow-xs"
+                        : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200"
                     }`}
                   >
                     <UtensilsCrossed className="h-3.5 w-3.5" />
@@ -550,8 +550,8 @@ export default function POSPage() {
                     }}
                     className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-2 ${
                       serviceMode === "ROOM_SERVICE"
-                        ? "bg-zinc-800 text-zinc-100 border border-zinc-700 shadow-sm"
-                        : "text-zinc-400 hover:text-zinc-200"
+                        ? "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 border border-zinc-300 dark:border-zinc-700 shadow-xs"
+                        : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200"
                     }`}
                   >
                     <BedDouble className="h-3.5 w-3.5" />
@@ -567,8 +567,8 @@ export default function POSPage() {
                     }}
                     className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-2 ${
                       serviceMode === "TAKEAWAY"
-                        ? "bg-zinc-800 text-zinc-100 border border-zinc-700 shadow-sm"
-                        : "text-zinc-400 hover:text-zinc-200"
+                        ? "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 border border-zinc-300 dark:border-zinc-700 shadow-xs"
+                        : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200"
                     }`}
                   >
                     <ShoppingBag className="h-3.5 w-3.5" />
@@ -592,25 +592,25 @@ export default function POSPage() {
                           onClick={() => setSelectedTable(tbl)}
                           className={`p-3.5 rounded-xl border text-left transition relative flex flex-col justify-between ${
                             isSelected
-                              ? "bg-zinc-800 border-zinc-400 text-white shadow ring-1 ring-zinc-400"
+                              ? "bg-blue-50 dark:bg-zinc-800 border-blue-500 text-zinc-900 dark:text-white shadow-xs ring-1 ring-blue-500"
                               : hasActiveOrder
-                              ? "bg-zinc-900 border-zinc-700 text-zinc-200 hover:border-zinc-600"
-                              : "bg-zinc-900/40 border-zinc-800 text-zinc-400 hover:border-zinc-700 hover:bg-zinc-900/80"
+                              ? "bg-amber-50/60 dark:bg-zinc-900 border-amber-300 dark:border-zinc-700 text-zinc-800 dark:text-zinc-200 hover:border-zinc-400"
+                              : "bg-zinc-50 dark:bg-zinc-900/40 border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400 hover:border-zinc-300 dark:hover:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-900/80"
                           }`}
                         >
                           <div className="flex items-center justify-between">
-                            <span className="font-mono font-bold text-sm text-zinc-100">{tbl.name}</span>
-                            <span className="text-[11px] font-mono text-zinc-400">{tbl.capacity} Pax</span>
+                            <span className="font-mono font-bold text-sm text-zinc-900 dark:text-zinc-100">{tbl.name}</span>
+                            <span className="text-[11px] font-mono text-zinc-500 dark:text-zinc-400">{tbl.capacity} Pax</span>
                           </div>
                           
                           <div className="mt-2 flex items-center justify-between text-xs font-mono">
                             <span className="text-zinc-500">{tbl.section || "Main"}</span>
                             {hasActiveOrder ? (
-                              <span className="text-zinc-300 font-semibold flex items-center gap-1">
-                                <span className="h-1.5 w-1.5 rounded-full bg-zinc-400" /> Dining
+                              <span className="text-amber-800 dark:text-zinc-300 font-semibold flex items-center gap-1">
+                                <span className="h-1.5 w-1.5 rounded-full bg-amber-500 dark:bg-zinc-400" /> Dining
                               </span>
                             ) : (
-                              <span className="text-zinc-500">Available</span>
+                              <span className="text-emerald-700 dark:text-zinc-500">Available</span>
                             )}
                           </div>
                         </button>
@@ -623,7 +623,7 @@ export default function POSPage() {
               {/* MODE B: IN-ROOM DINING (ROOM SERVICE) */}
               {serviceMode === "ROOM_SERVICE" && (
                 <div className="space-y-2.5">
-                  <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wide">
+                  <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-400 uppercase tracking-wide">
                     Select Active In-House Guest Room *
                   </label>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -637,18 +637,18 @@ export default function POSPage() {
                           onClick={() => setSelectedStay(stay)}
                           className={`p-3.5 rounded-xl border text-left transition flex items-center gap-3.5 ${
                             isSelected
-                              ? "bg-zinc-800 border-zinc-400 text-white shadow ring-1 ring-zinc-400"
-                              : "bg-zinc-900/40 border-zinc-800 text-zinc-300 hover:border-zinc-700 hover:bg-zinc-900/80"
+                              ? "bg-blue-50 dark:bg-zinc-800 border-blue-500 text-zinc-900 dark:text-white shadow-xs ring-1 ring-blue-500"
+                              : "bg-zinc-50 dark:bg-zinc-900/40 border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 hover:border-zinc-300 dark:hover:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-900/80"
                           }`}
                         >
-                          <div className="h-10 w-10 rounded-xl bg-zinc-900 border border-zinc-700 flex items-center justify-center font-mono font-bold text-zinc-100 text-base shrink-0">
+                          <div className="h-10 w-10 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 flex items-center justify-center font-mono font-bold text-zinc-900 dark:text-zinc-100 text-base shrink-0">
                             {roomNo}
                           </div>
                           <div className="min-w-0 flex-1">
-                            <div className="font-bold text-xs text-zinc-100 truncate">
+                            <div className="font-bold text-xs text-zinc-900 dark:text-zinc-100 truncate">
                               {stay.primaryGuest?.name || "Guest"}
                             </div>
-                            <div className="text-[11px] font-mono text-zinc-400 truncate">
+                            <div className="text-[11px] font-mono text-zinc-500 dark:text-zinc-400 truncate">
                               Ph: {stay.primaryGuest?.phone || "N/A"}
                             </div>
                           </div>
@@ -663,23 +663,23 @@ export default function POSPage() {
               {serviceMode === "TAKEAWAY" && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                   <div className="space-y-1.5">
-                    <label className="block text-xs font-bold text-zinc-400 uppercase">Customer Name</label>
+                    <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-400 uppercase">Customer Name</label>
                     <input
                       type="text"
                       placeholder="e.g. Suman Roy"
                       value={customerName}
                       onChange={(e) => setCustomerName(e.target.value)}
-                      className="w-full h-11 px-3.5 rounded-xl bg-zinc-900 border border-zinc-700 text-white text-xs font-semibold focus:border-zinc-500 focus:outline-none"
+                      className="w-full h-11 px-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white text-xs font-semibold focus:border-blue-500 focus:outline-none"
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="block text-xs font-bold text-zinc-400 uppercase">Mobile Phone</label>
+                    <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-400 uppercase">Mobile Phone</label>
                     <input
                       type="tel"
                       placeholder="e.g. 9864341211"
                       value={customerPhone}
                       onChange={(e) => setCustomerPhone(e.target.value)}
-                      className="w-full h-11 px-3.5 rounded-xl bg-zinc-900 border border-zinc-700 text-white font-mono text-xs focus:border-zinc-500 focus:outline-none"
+                      className="w-full h-11 px-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white font-mono text-xs focus:border-blue-500 focus:outline-none"
                     />
                   </div>
                 </div>
@@ -687,7 +687,7 @@ export default function POSPage() {
             </div>
 
             {/* 2. MENU CATALOG & LARGE SEARCH */}
-            <div className="rounded-2xl bg-[#111114] border border-zinc-800 p-5 space-y-4">
+            <div className="rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 p-5 space-y-4 shadow-xs">
               
               {/* Category Filter & Search Bar */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3.5">
@@ -699,8 +699,8 @@ export default function POSPage() {
                     onClick={() => setSelectedCategory("ALL")}
                     className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition ${
                       selectedCategory === "ALL"
-                        ? "bg-zinc-200 text-zinc-950 shadow"
-                        : "bg-zinc-900/80 border border-zinc-800 text-zinc-300 hover:text-white hover:border-zinc-700"
+                        ? "bg-zinc-900 text-white dark:bg-zinc-200 dark:text-zinc-950 shadow-xs"
+                        : "bg-zinc-100 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white hover:border-zinc-300 dark:hover:border-zinc-700"
                     }`}
                   >
                     All Items ({allMenuItems.length})
@@ -713,8 +713,8 @@ export default function POSPage() {
                       onClick={() => setSelectedCategory(c.id)}
                       className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition ${
                         selectedCategory === c.id
-                          ? "bg-zinc-200 text-zinc-950 shadow"
-                          : "bg-zinc-900/80 border border-zinc-800 text-zinc-300 hover:text-white hover:border-zinc-700"
+                          ? "bg-zinc-900 text-white dark:bg-zinc-200 dark:text-zinc-950 shadow-xs"
+                          : "bg-zinc-100 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white hover:border-zinc-300 dark:hover:border-zinc-700"
                       }`}
                     >
                       {c.name} ({c.items?.length || 0})
@@ -730,7 +730,7 @@ export default function POSPage() {
                     placeholder="Search dish (e.g. Biryani, Chicken, Dal)..."
                     value={menuSearch}
                     onChange={(e) => setMenuSearch(e.target.value)}
-                    className="w-full h-11 pl-10 pr-4 rounded-xl bg-zinc-900 border border-zinc-700 text-white text-xs placeholder:text-zinc-500 focus:border-zinc-500 focus:outline-none font-medium"
+                    className="w-full h-11 pl-10 pr-4 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white text-xs placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:border-blue-500 focus:outline-none font-medium"
                   />
                 </div>
               </div>
@@ -743,7 +743,7 @@ export default function POSPage() {
                   return (
                     <div
                       key={item.id}
-                      className="p-4 rounded-xl bg-zinc-900/40 border border-zinc-800 hover:border-zinc-700 transition flex flex-col justify-between space-y-3 group"
+                      className="p-4 rounded-xl bg-zinc-50/70 dark:bg-zinc-900/40 border border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 transition flex flex-col justify-between space-y-3 group shadow-xs"
                     >
                       <div>
                         <div className="flex items-start justify-between gap-2.5">
@@ -751,13 +751,13 @@ export default function POSPage() {
                             {/* Veg / Non-Veg Standard Dot Badge */}
                             <span
                               className={`h-3.5 w-3.5 rounded-sm border flex items-center justify-center shrink-0 ${
-                                item.isVeg ? "border-emerald-500 text-emerald-500" : "border-rose-500 text-rose-500"
+                                item.isVeg ? "border-emerald-600 text-emerald-600 dark:border-emerald-500 dark:text-emerald-500" : "border-rose-600 text-rose-600 dark:border-rose-500 dark:text-rose-500"
                               }`}
                               title={item.isVeg ? "Pure Vegetarian" : "Non-Vegetarian"}
                             >
-                              <span className={`h-2 w-2 rounded-full ${item.isVeg ? "bg-emerald-500" : "bg-rose-500"}`} />
+                              <span className={`h-2 w-2 rounded-full ${item.isVeg ? "bg-emerald-600 dark:bg-emerald-500" : "bg-rose-600 dark:bg-rose-500"}`} />
                             </span>
-                            <span className="font-bold text-xs text-zinc-100 group-hover:text-white transition leading-snug">
+                            <span className="font-bold text-xs text-zinc-900 dark:text-zinc-100 group-hover:text-blue-600 dark:group-hover:text-white transition leading-snug">
                               {item.name}
                             </span>
                           </div>
@@ -769,27 +769,27 @@ export default function POSPage() {
                         </div>
                       </div>
 
-                      <div className="flex items-center justify-between pt-2.5 border-t border-zinc-800/70">
-                        <span className="font-mono font-black text-sm text-zinc-100">
+                      <div className="flex items-center justify-between pt-2.5 border-t border-zinc-200 dark:border-zinc-800/70">
+                        <span className="font-mono font-black text-sm text-zinc-900 dark:text-zinc-100">
                           {formatINR(item.price)}
                         </span>
 
                         {inCart ? (
-                          <div className="flex items-center gap-1 bg-zinc-950 border border-zinc-700 rounded-lg p-0.5">
+                          <div className="flex items-center gap-1 bg-white dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700 rounded-lg p-0.5">
                             <button
                               type="button"
                               onClick={() => updateQty(item.id, -1)}
-                              className="h-7 w-7 rounded bg-zinc-800 hover:bg-zinc-700 text-white flex items-center justify-center font-bold text-xs"
+                              className="h-7 w-7 rounded bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-800 dark:text-white flex items-center justify-center font-bold text-xs"
                             >
                               -
                             </button>
-                            <span className="font-mono font-black text-xs px-2 text-zinc-100">
+                            <span className="font-mono font-black text-xs px-2 text-zinc-900 dark:text-zinc-100">
                               {inCart.qty}
                             </span>
                             <button
                               type="button"
                               onClick={() => updateQty(item.id, 1)}
-                              className="h-7 w-7 rounded bg-zinc-800 hover:bg-zinc-700 text-white flex items-center justify-center font-bold text-xs"
+                              className="h-7 w-7 rounded bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-800 dark:text-white flex items-center justify-center font-bold text-xs"
                             >
                               +
                             </button>
@@ -798,7 +798,7 @@ export default function POSPage() {
                           <button
                             type="button"
                             onClick={() => addToCart(item)}
-                            className="px-4 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 hover:text-white font-bold text-xs border border-zinc-700 transition flex items-center gap-1.5"
+                            className="px-4 py-1.5 rounded-lg bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 hover:text-zinc-900 dark:hover:text-white font-bold text-xs border border-zinc-300 dark:border-zinc-700 transition flex items-center gap-1.5 shadow-xs"
                           >
                             <Plus className="h-3.5 w-3.5" />
                             <span>Add</span>
@@ -816,20 +816,20 @@ export default function POSPage() {
 
           {/* RIGHT 4 COLS: Active Order & Firing Cart */}
           <div className="lg:col-span-4 space-y-4">
-            <div className="rounded-2xl bg-[#111114] border border-zinc-800 p-5 space-y-4 sticky top-4">
+            <div className="rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 p-5 space-y-4 sticky top-4 shadow-xs">
               
               {/* Cart Header */}
-              <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
+              <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 pb-3">
                 <div className="flex items-center gap-2.5">
-                  <ChefHat className="h-4 w-4 text-zinc-400" />
-                  <h3 className="text-xs font-bold uppercase text-zinc-200 tracking-wider">
+                  <ChefHat className="h-4 w-4 text-zinc-500 dark:text-zinc-400" />
+                  <h3 className="text-xs font-bold uppercase text-zinc-800 dark:text-zinc-200 tracking-wider">
                     Kitchen Cart ({cartItems.reduce((s, i) => s + i.qty, 0)})
                   </h3>
                 </div>
                 {cartItems.length > 0 && (
                   <button
                     onClick={clearCart}
-                    className="text-xs font-semibold text-zinc-500 hover:text-zinc-300 transition"
+                    className="text-xs font-semibold text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300 transition"
                   >
                     Clear All
                   </button>
@@ -837,31 +837,31 @@ export default function POSPage() {
               </div>
 
               {/* Target Location Badge */}
-              <div className="rounded-xl bg-zinc-900/60 border border-zinc-800 p-3.5 flex items-center justify-between text-xs">
+              <div className="rounded-xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 p-3.5 flex items-center justify-between text-xs">
                 <div>
                   <span className="text-[10px] font-mono uppercase text-zinc-500 font-bold block">Service Target</span>
-                  <div className="font-bold text-zinc-100 mt-1">
+                  <div className="font-bold text-zinc-900 dark:text-zinc-100 mt-1">
                     {serviceMode === "DINE_IN" ? (
                       selectedTable ? (
-                        <span className="font-mono text-zinc-100">{selectedTable.name} ({selectedTable.section})</span>
+                        <span className="font-mono text-zinc-900 dark:text-zinc-100">{selectedTable.name} ({selectedTable.section})</span>
                       ) : (
                         <span className="text-zinc-500">No Table Selected</span>
                       )
                     ) : serviceMode === "ROOM_SERVICE" ? (
                       selectedStay ? (
-                        <span className="font-mono text-zinc-100">
+                        <span className="font-mono text-zinc-900 dark:text-zinc-100">
                           Room {selectedStay.roomAssignments?.[0]?.room?.number} — {selectedStay.primaryGuest?.name}
                         </span>
                       ) : (
                         <span className="text-zinc-500">No Room Selected</span>
                       )
                     ) : (
-                      <span className="text-zinc-300 font-mono">Takeaway Order</span>
+                      <span className="text-zinc-800 dark:text-zinc-300 font-mono">Takeaway Order</span>
                     )}
                   </div>
                 </div>
 
-                <span className="rounded bg-zinc-950 border border-zinc-800 px-2.5 py-1 text-[11px] font-mono font-bold text-zinc-400">
+                <span className="rounded bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 px-2.5 py-1 text-[11px] font-mono font-bold text-zinc-700 dark:text-zinc-400">
                   {serviceMode}
                 </span>
               </div>
@@ -870,37 +870,37 @@ export default function POSPage() {
               <div className="space-y-3 max-h-[340px] overflow-y-auto pr-1">
                 {cartItems.length === 0 ? (
                   <div className="text-center py-12 text-zinc-500 text-xs space-y-1.5">
-                    <UtensilsCrossed className="h-8 w-8 text-zinc-600 mx-auto" />
-                    <p className="font-bold text-zinc-300">Cart is empty</p>
+                    <UtensilsCrossed className="h-8 w-8 text-zinc-400 dark:text-zinc-600 mx-auto" />
+                    <p className="font-bold text-zinc-700 dark:text-zinc-300">Cart is empty</p>
                     <p className="text-xs">Click "+ Add" on any menu dish to begin order.</p>
                   </div>
                 ) : (
                   cartItems.map((item) => (
                     <div
                       key={item.id}
-                      className="rounded-xl bg-zinc-900/40 border border-zinc-800 p-3 space-y-2.5 text-xs"
+                      className="rounded-xl bg-zinc-50 dark:bg-zinc-900/40 border border-zinc-200 dark:border-zinc-800 p-3 space-y-2.5 text-xs shadow-xs"
                     >
                       <div className="flex items-start justify-between gap-2.5">
                         <div className="min-w-0 flex-1">
-                          <strong className="text-zinc-100 font-bold block truncate">{item.name}</strong>
-                          <span className="text-xs font-mono text-zinc-400">
+                          <strong className="text-zinc-900 dark:text-zinc-100 font-bold block truncate">{item.name}</strong>
+                          <span className="text-xs font-mono text-zinc-500 dark:text-zinc-400">
                             {formatINR(item.unitPrice)} each
                           </span>
                         </div>
 
-                        <div className="flex items-center gap-1 bg-zinc-950 border border-zinc-800 rounded-lg p-0.5">
+                        <div className="flex items-center gap-1 bg-white dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-800 rounded-lg p-0.5">
                           <button
                             onClick={() => updateQty(item.id, -1)}
-                            className="h-6 w-6 rounded bg-zinc-800 hover:bg-zinc-700 text-white flex items-center justify-center font-bold text-xs"
+                            className="h-6 w-6 rounded bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-800 dark:text-white flex items-center justify-center font-bold text-xs"
                           >
                             -
                           </button>
-                          <span className="font-mono font-black text-xs px-2 text-zinc-100">
+                          <span className="font-mono font-black text-xs px-2 text-zinc-900 dark:text-zinc-100">
                             {item.qty}
                           </span>
                           <button
                             onClick={() => updateQty(item.id, 1)}
-                            className="h-6 w-6 rounded bg-zinc-800 hover:bg-zinc-700 text-white flex items-center justify-center font-bold text-xs"
+                            className="h-6 w-6 rounded bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-800 dark:text-white flex items-center justify-center font-bold text-xs"
                           >
                             +
                           </button>
@@ -914,7 +914,7 @@ export default function POSPage() {
                           placeholder="Special note (e.g. Less spicy, extra bowls)"
                           value={item.notes || ""}
                           onChange={(e) => updateItemNotes(item.id, e.target.value)}
-                          className="w-full h-8 px-2.5 rounded-lg bg-zinc-950 border border-zinc-800 text-zinc-200 placeholder:text-zinc-600 text-xs font-mono focus:border-zinc-600 focus:outline-none"
+                          className="w-full h-8 px-2.5 rounded-lg bg-white dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-800 text-zinc-800 dark:text-zinc-200 placeholder:text-zinc-400 dark:placeholder:text-zinc-600 text-xs font-mono focus:border-blue-500 focus:outline-none"
                         />
                       </div>
                     </div>
@@ -924,18 +924,18 @@ export default function POSPage() {
 
               {/* Financial Bill & Tax Summary */}
               {cartItems.length > 0 && (
-                <div className="space-y-2 pt-3 border-t border-zinc-800 text-xs">
-                  <div className="flex justify-between text-zinc-400">
+                <div className="space-y-2 pt-3 border-t border-zinc-200 dark:border-zinc-800 text-xs">
+                  <div className="flex justify-between text-zinc-500 dark:text-zinc-400">
                     <span>Food Subtotal</span>
-                    <span className="font-mono text-zinc-200 font-bold">{formatINR(gst.taxableAmount)}</span>
+                    <span className="font-mono text-zinc-800 dark:text-zinc-200 font-bold">{formatINR(gst.taxableAmount)}</span>
                   </div>
                   <div className="flex justify-between text-zinc-500">
                     <span>Restaurant GST 5% (SAC 996331)</span>
-                    <span className="font-mono text-zinc-400">{formatINR(gst.taxAmount)}</span>
+                    <span className="font-mono text-zinc-600 dark:text-zinc-400">{formatINR(gst.taxAmount)}</span>
                   </div>
-                  <div className="flex justify-between text-sm font-black text-white pt-1.5 border-t border-zinc-800">
+                  <div className="flex justify-between text-sm font-black text-zinc-900 dark:text-white pt-1.5 border-t border-zinc-200 dark:border-zinc-800">
                     <span>Total Amount</span>
-                    <span className="font-mono text-zinc-100">{formatINR(gst.totalAmount)}</span>
+                    <span className="font-mono text-zinc-900 dark:text-zinc-100">{formatINR(gst.totalAmount)}</span>
                   </div>
                 </div>
               )}
@@ -946,7 +946,7 @@ export default function POSPage() {
                 <button
                   onClick={handleFireKOT}
                   disabled={actionLoading || cartItems.length === 0}
-                  className="w-full h-12 rounded-xl bg-zinc-100 hover:bg-white text-zinc-950 font-black text-xs transition flex items-center justify-center gap-2 disabled:opacity-40 cursor-pointer shadow"
+                  className="w-full h-12 rounded-xl bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-100 dark:hover:bg-white text-white dark:text-zinc-950 font-black text-xs transition flex items-center justify-center gap-2 disabled:opacity-40 cursor-pointer shadow-sm"
                 >
                   <Send className="h-4 w-4" />
                   <span>{actionLoading ? "Sending to Kitchen..." : "Fire KOT to Kitchen"}</span>
@@ -957,9 +957,9 @@ export default function POSPage() {
                   <button
                     onClick={handlePostToRoomFolio}
                     disabled={actionLoading || cartItems.length === 0}
-                    className="w-full h-10 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 font-bold text-xs transition flex items-center justify-center gap-2 disabled:opacity-40 cursor-pointer"
+                    className="w-full h-10 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 border border-zinc-300 dark:border-zinc-700 font-bold text-xs transition flex items-center justify-center gap-2 disabled:opacity-40 cursor-pointer shadow-xs"
                   >
-                    <BedDouble className="h-4 w-4 text-zinc-400" />
+                    <BedDouble className="h-4 w-4 text-zinc-500 dark:text-zinc-400" />
                     <span>Post to Room {selectedStay.roomAssignments?.[0]?.room?.number} Folio</span>
                   </button>
                 )}
@@ -977,10 +977,10 @@ export default function POSPage() {
       {activeTab === "kds" && (
         <div className="space-y-4">
           
-          <div className="flex items-center justify-between p-4 rounded-xl bg-[#111114] border border-zinc-800">
+          <div className="flex items-center justify-between p-4 rounded-xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs">
             <div className="flex items-center gap-2.5">
-              <ChefHat className="h-4 w-4 text-zinc-400" />
-              <span className="text-xs font-bold text-zinc-200 uppercase tracking-wider">
+              <ChefHat className="h-4 w-4 text-zinc-500 dark:text-zinc-400" />
+              <span className="text-xs font-bold text-zinc-900 dark:text-zinc-200 uppercase tracking-wider">
                 Kitchen Live Order Board ({kots.length} Active Tickets)
               </span>
             </div>
@@ -994,20 +994,20 @@ export default function POSPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             
             {/* COLUMN 1: QUEUED (NEW TICKETS) */}
-            <div className="rounded-2xl bg-[#111114] border border-zinc-800 p-4 space-y-3.5">
-              <div className="flex items-center justify-between pb-3 border-b border-zinc-800 font-mono text-xs font-bold text-zinc-300">
+            <div className="rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 p-4 space-y-3.5 shadow-xs">
+              <div className="flex items-center justify-between pb-3 border-b border-zinc-200 dark:border-zinc-800 font-mono text-xs font-bold text-zinc-800 dark:text-zinc-300">
                 <span className="flex items-center gap-2">
-                  <Clock className="h-4 w-4 text-zinc-400" />
+                  <Clock className="h-4 w-4 text-zinc-500 dark:text-zinc-400" />
                   1. Queued / New KOTs
                 </span>
-                <span className="bg-zinc-900 border border-zinc-700 px-2.5 py-0.5 rounded-full text-zinc-300 text-xs">
+                <span className="bg-zinc-100 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 px-2.5 py-0.5 rounded-full text-zinc-800 dark:text-zinc-300 text-xs">
                   {queuedKots.length}
                 </span>
               </div>
 
               <div className="space-y-3 max-h-[calc(100vh-280px)] overflow-y-auto pr-1">
                 {queuedKots.length === 0 ? (
-                  <div className="text-center py-16 text-zinc-500 text-xs font-semibold">
+                  <div className="text-center py-16 text-zinc-400 dark:text-zinc-500 text-xs font-semibold">
                     No new tickets queued.
                   </div>
                 ) : (
@@ -1016,50 +1016,50 @@ export default function POSPage() {
                     return (
                       <div
                         key={kot.id}
-                        className="rounded-xl bg-zinc-900/60 p-4 border border-zinc-800 space-y-3 text-xs hover:border-zinc-700 transition"
+                        className="rounded-xl bg-zinc-50 dark:bg-zinc-900/60 p-4 border border-zinc-200 dark:border-zinc-800 space-y-3 text-xs hover:border-zinc-300 dark:hover:border-zinc-700 transition shadow-xs"
                       >
                         {/* Header: KOT # & Elapsed Time */}
-                        <div className="flex items-start justify-between gap-2 pb-2.5 border-b border-zinc-800">
+                        <div className="flex items-start justify-between gap-2 pb-2.5 border-b border-zinc-200 dark:border-zinc-800">
                           <div>
                             <div className="flex items-center gap-2 font-mono">
-                              <span className="font-bold text-zinc-100 text-sm">{kot.kotNo}</span>
+                              <span className="font-bold text-zinc-900 dark:text-zinc-100 text-sm">{kot.kotNo}</span>
                               <span className="text-xs text-zinc-500">• Order #{info.orderNo || "N/A"}</span>
                             </div>
-                            <div className="text-xs text-zinc-400 font-mono flex items-center gap-1.5 mt-1">
-                              <Clock className="h-3.5 w-3.5 text-zinc-500" />
+                            <div className="text-xs text-zinc-600 dark:text-zinc-400 font-mono flex items-center gap-1.5 mt-1">
+                              <Clock className="h-3.5 w-3.5 text-zinc-400 dark:text-zinc-500" />
                               <span>Fired {info.firedTimeStr} ({info.elapsedMins}m ago)</span>
                             </div>
                           </div>
                         </div>
 
                         {/* Location Tag */}
-                        <div className="rounded-lg bg-zinc-950 p-2.5 border border-zinc-800/80 flex items-center justify-between">
+                        <div className="rounded-lg bg-white dark:bg-zinc-950 p-2.5 border border-zinc-200 dark:border-zinc-800/80 flex items-center justify-between">
                           {info.isRoomService ? (
-                            <span className="flex items-center gap-1.5 font-mono font-bold text-zinc-200 bg-zinc-900 border border-zinc-700 px-2.5 py-1 rounded text-xs">
-                              <BedDouble className="h-4 w-4 text-zinc-400" />
+                            <span className="flex items-center gap-1.5 font-mono font-bold text-zinc-800 dark:text-zinc-200 bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 px-2.5 py-1 rounded text-xs">
+                              <BedDouble className="h-4 w-4 text-zinc-500 dark:text-zinc-400" />
                               Room {info.roomNumber || "Service"}
                             </span>
                           ) : (
-                            <span className="flex items-center gap-1.5 font-mono font-bold text-zinc-200 bg-zinc-900 border border-zinc-700 px-2.5 py-1 rounded text-xs">
-                              <UtensilsCrossed className="h-4 w-4 text-zinc-400" />
+                            <span className="flex items-center gap-1.5 font-mono font-bold text-zinc-800 dark:text-zinc-200 bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 px-2.5 py-1 rounded text-xs">
+                              <UtensilsCrossed className="h-4 w-4 text-zinc-500 dark:text-zinc-400" />
                               {info.tableName || "Dine-In Table"}
                             </span>
                           )}
-                          <span className="text-xs font-bold text-zinc-300 truncate max-w-[130px]">
+                          <span className="text-xs font-bold text-zinc-800 dark:text-zinc-300 truncate max-w-[130px]">
                             {info.guestName}
                           </span>
                         </div>
 
                         {/* Ordered Dish Lines */}
-                        <div className="space-y-2 pt-1 border-t border-zinc-800/80">
+                        <div className="space-y-2 pt-1 border-t border-zinc-200 dark:border-zinc-800/80">
                           {kot.lines?.map((line: any) => (
                             <div key={line.id} className="space-y-0.5">
-                              <div className="flex items-start justify-between gap-2.5 text-zinc-300">
-                                <span className="font-bold text-xs text-zinc-100">{line.orderItem?.nameSnapshot}</span>
-                                <span className="font-mono font-black text-zinc-100 text-xs">×{line.qty}</span>
+                              <div className="flex items-start justify-between gap-2.5 text-zinc-700 dark:text-zinc-300">
+                                <span className="font-bold text-xs text-zinc-900 dark:text-zinc-100">{line.orderItem?.nameSnapshot}</span>
+                                <span className="font-mono font-black text-zinc-900 dark:text-zinc-100 text-xs">×{line.qty}</span>
                               </div>
                               {line.notesSnapshot && (
-                                <div className="text-[11px] text-zinc-400 italic font-mono pl-2 border-l border-zinc-700">
+                                <div className="text-[11px] text-zinc-500 dark:text-zinc-400 italic font-mono pl-2 border-l border-zinc-300 dark:border-zinc-700">
                                   Note: {line.notesSnapshot}
                                 </div>
                               )}
@@ -1068,18 +1068,18 @@ export default function POSPage() {
                         </div>
 
                         {/* Actions */}
-                        <div className="flex items-center gap-2 pt-2.5 border-t border-zinc-800">
+                        <div className="flex items-center gap-2 pt-2.5 border-t border-zinc-200 dark:border-zinc-800">
                           <button
                             onClick={() => handleKdsStatus(kot.id, "PREPARING")}
-                            className="flex-1 py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-100 border border-zinc-700 font-bold text-xs transition flex items-center justify-center gap-1.5 cursor-pointer"
+                            className="flex-1 py-2.5 rounded-xl bg-zinc-900 text-white hover:bg-zinc-800 dark:bg-zinc-800 dark:text-zinc-100 dark:hover:bg-zinc-700 border border-zinc-900 dark:border-zinc-700 font-bold text-xs transition flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
                           >
-                            <Flame className="h-4 w-4 text-zinc-400" />
+                            <Flame className="h-4 w-4 text-amber-500 dark:text-zinc-400" />
                             <span>Start Cooking</span>
                           </button>
 
                           <button
                             onClick={() => openKotSlip(kot)}
-                            className="p-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 border border-zinc-800 transition"
+                            className="p-2.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-900 dark:hover:bg-zinc-800 text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200 border border-zinc-300 dark:border-zinc-800 transition"
                             title="Print KOT Thermal Slip"
                           >
                             <Printer className="h-4 w-4" />
@@ -1094,20 +1094,20 @@ export default function POSPage() {
             </div>
 
             {/* COLUMN 2: PREPARING (ACTIVE COOKING) */}
-            <div className="rounded-2xl bg-[#111114] border border-zinc-800 p-4 space-y-3.5">
-              <div className="flex items-center justify-between pb-3 border-b border-zinc-800 font-mono text-xs font-bold text-zinc-300">
+            <div className="rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 p-4 space-y-3.5 shadow-xs">
+              <div className="flex items-center justify-between pb-3 border-b border-zinc-200 dark:border-zinc-800 font-mono text-xs font-bold text-zinc-800 dark:text-zinc-300">
                 <span className="flex items-center gap-2">
-                  <Flame className="h-4 w-4 text-zinc-400" />
+                  <Flame className="h-4 w-4 text-amber-600 dark:text-zinc-400" />
                   2. Preparing / Cooking
                 </span>
-                <span className="bg-zinc-900 border border-zinc-700 px-2.5 py-0.5 rounded-full text-zinc-300 text-xs">
+                <span className="bg-zinc-100 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 px-2.5 py-0.5 rounded-full text-zinc-800 dark:text-zinc-300 text-xs">
                   {preparingKots.length}
                 </span>
               </div>
 
               <div className="space-y-3 max-h-[calc(100vh-280px)] overflow-y-auto pr-1">
                 {preparingKots.length === 0 ? (
-                  <div className="text-center py-16 text-zinc-500 text-xs font-semibold">
+                  <div className="text-center py-16 text-zinc-400 dark:text-zinc-500 text-xs font-semibold">
                     No tickets currently in cooking.
                   </div>
                 ) : (
@@ -1116,50 +1116,50 @@ export default function POSPage() {
                     return (
                       <div
                         key={kot.id}
-                        className="rounded-xl bg-zinc-900/60 p-4 border border-zinc-800 space-y-3 text-xs hover:border-zinc-700 transition"
+                        className="rounded-xl bg-zinc-50 dark:bg-zinc-900/60 p-4 border border-zinc-200 dark:border-zinc-800 space-y-3 text-xs hover:border-zinc-300 dark:hover:border-zinc-700 transition shadow-xs"
                       >
                         {/* Header: KOT # & Elapsed Time */}
-                        <div className="flex items-start justify-between gap-2 pb-2.5 border-b border-zinc-800">
+                        <div className="flex items-start justify-between gap-2 pb-2.5 border-b border-zinc-200 dark:border-zinc-800">
                           <div>
                             <div className="flex items-center gap-2 font-mono">
-                              <span className="font-bold text-zinc-100 text-sm">{kot.kotNo}</span>
+                              <span className="font-bold text-zinc-900 dark:text-zinc-100 text-sm">{kot.kotNo}</span>
                               <span className="text-xs text-zinc-500">• Order #{info.orderNo || "N/A"}</span>
                             </div>
-                            <div className="text-xs text-zinc-400 font-mono flex items-center gap-1.5 mt-1 font-semibold">
-                              <Flame className="h-3.5 w-3.5 text-zinc-400" />
+                            <div className="text-xs text-zinc-600 dark:text-zinc-400 font-mono flex items-center gap-1.5 mt-1 font-semibold">
+                              <Flame className="h-3.5 w-3.5 text-amber-600 dark:text-zinc-400" />
                               <span>Cooking for {info.elapsedMins} mins</span>
                             </div>
                           </div>
                         </div>
 
                         {/* Location Tag */}
-                        <div className="rounded-lg bg-zinc-950 p-2.5 border border-zinc-800/80 flex items-center justify-between">
+                        <div className="rounded-lg bg-white dark:bg-zinc-950 p-2.5 border border-zinc-200 dark:border-zinc-800/80 flex items-center justify-between">
                           {info.isRoomService ? (
-                            <span className="flex items-center gap-1.5 font-mono font-bold text-zinc-200 bg-zinc-900 border border-zinc-700 px-2.5 py-1 rounded text-xs">
-                              <BedDouble className="h-4 w-4 text-zinc-400" />
+                            <span className="flex items-center gap-1.5 font-mono font-bold text-zinc-800 dark:text-zinc-200 bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 px-2.5 py-1 rounded text-xs">
+                              <BedDouble className="h-4 w-4 text-zinc-500 dark:text-zinc-400" />
                               Room {info.roomNumber || "Service"}
                             </span>
                           ) : (
-                            <span className="flex items-center gap-1.5 font-mono font-bold text-zinc-200 bg-zinc-900 border border-zinc-700 px-2.5 py-1 rounded text-xs">
-                              <UtensilsCrossed className="h-4 w-4 text-zinc-400" />
+                            <span className="flex items-center gap-1.5 font-mono font-bold text-zinc-800 dark:text-zinc-200 bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 px-2.5 py-1 rounded text-xs">
+                              <UtensilsCrossed className="h-4 w-4 text-zinc-500 dark:text-zinc-400" />
                               {info.tableName || "Dine-In Table"}
                             </span>
                           )}
-                          <span className="text-xs font-bold text-zinc-300 truncate max-w-[130px]">
+                          <span className="text-xs font-bold text-zinc-800 dark:text-zinc-300 truncate max-w-[130px]">
                             {info.guestName}
                           </span>
                         </div>
 
                         {/* Ordered Dish Lines */}
-                        <div className="space-y-2 pt-1 border-t border-zinc-800/80">
+                        <div className="space-y-2 pt-1 border-t border-zinc-200 dark:border-zinc-800/80">
                           {kot.lines?.map((line: any) => (
                             <div key={line.id} className="space-y-0.5">
-                              <div className="flex items-start justify-between gap-2.5 text-zinc-300">
-                                <span className="font-bold text-xs text-zinc-100">{line.orderItem?.nameSnapshot}</span>
-                                <span className="font-mono font-black text-zinc-100 text-xs">×{line.qty}</span>
+                              <div className="flex items-start justify-between gap-2.5 text-zinc-700 dark:text-zinc-300">
+                                <span className="font-bold text-xs text-zinc-900 dark:text-zinc-100">{line.orderItem?.nameSnapshot}</span>
+                                <span className="font-mono font-black text-zinc-900 dark:text-zinc-100 text-xs">×{line.qty}</span>
                               </div>
                               {line.notesSnapshot && (
-                                <div className="text-[11px] text-zinc-400 italic font-mono pl-2 border-l border-zinc-700">
+                                <div className="text-[11px] text-zinc-500 dark:text-zinc-400 italic font-mono pl-2 border-l border-zinc-300 dark:border-zinc-700">
                                   Note: {line.notesSnapshot}
                                 </div>
                               )}
@@ -1168,18 +1168,18 @@ export default function POSPage() {
                         </div>
 
                         {/* Actions */}
-                        <div className="flex items-center gap-2 pt-2.5 border-t border-zinc-800">
+                        <div className="flex items-center gap-2 pt-2.5 border-t border-zinc-200 dark:border-zinc-800">
                           <button
                             onClick={() => handleKdsStatus(kot.id, "READY")}
-                            className="flex-1 py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-100 border border-zinc-700 font-bold text-xs transition flex items-center justify-center gap-1.5 cursor-pointer"
+                            className="flex-1 py-2.5 rounded-xl bg-zinc-900 text-white hover:bg-zinc-800 dark:bg-zinc-800 dark:text-zinc-100 dark:hover:bg-zinc-700 border border-zinc-900 dark:border-zinc-700 font-bold text-xs transition flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
                           >
-                            <CheckCircle2 className="h-4 w-4 text-zinc-400" />
+                            <CheckCircle2 className="h-4 w-4 text-emerald-400" />
                             <span>Mark Food Ready</span>
                           </button>
 
                           <button
                             onClick={() => openKotSlip(kot)}
-                            className="p-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 border border-zinc-800 transition"
+                            className="p-2.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-900 dark:hover:bg-zinc-800 text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200 border border-zinc-300 dark:border-zinc-800 transition"
                             title="Print KOT Thermal Slip"
                           >
                             <Printer className="h-4 w-4" />
@@ -1194,20 +1194,20 @@ export default function POSPage() {
             </div>
 
             {/* COLUMN 3: READY TO SERVE */}
-            <div className="rounded-2xl bg-[#111114] border border-zinc-800 p-4 space-y-3.5">
-              <div className="flex items-center justify-between pb-3 border-b border-zinc-800 font-mono text-xs font-bold text-zinc-300">
+            <div className="rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 p-4 space-y-3.5 shadow-xs">
+              <div className="flex items-center justify-between pb-3 border-b border-zinc-200 dark:border-zinc-800 font-mono text-xs font-bold text-zinc-800 dark:text-zinc-300">
                 <span className="flex items-center gap-2">
-                  <CheckCircle2 className="h-4 w-4 text-zinc-400" />
+                  <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
                   3. Ready to Serve / Pickup
                 </span>
-                <span className="bg-zinc-900 border border-zinc-700 px-2.5 py-0.5 rounded-full text-zinc-300 text-xs">
+                <span className="bg-zinc-100 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 px-2.5 py-0.5 rounded-full text-zinc-800 dark:text-zinc-300 text-xs">
                   {readyKots.length}
                 </span>
               </div>
 
               <div className="space-y-3 max-h-[calc(100vh-280px)] overflow-y-auto pr-1">
                 {readyKots.length === 0 ? (
-                  <div className="text-center py-16 text-zinc-500 text-xs font-semibold">
+                  <div className="text-center py-16 text-zinc-400 dark:text-zinc-500 text-xs font-semibold">
                     No orders awaiting pickup.
                   </div>
                 ) : (
@@ -1216,50 +1216,50 @@ export default function POSPage() {
                     return (
                       <div
                         key={kot.id}
-                        className="rounded-xl bg-zinc-900/60 p-4 border border-zinc-800 space-y-3 text-xs hover:border-zinc-700 transition"
+                        className="rounded-xl bg-zinc-50 dark:bg-zinc-900/60 p-4 border border-zinc-200 dark:border-zinc-800 space-y-3 text-xs hover:border-zinc-300 dark:hover:border-zinc-700 transition shadow-xs"
                       >
                         {/* Header: KOT # & Elapsed Time */}
-                        <div className="flex items-start justify-between gap-2 pb-2.5 border-b border-zinc-800">
+                        <div className="flex items-start justify-between gap-2 pb-2.5 border-b border-zinc-200 dark:border-zinc-800">
                           <div>
                             <div className="flex items-center gap-2 font-mono">
-                              <span className="font-bold text-zinc-100 text-sm">{kot.kotNo}</span>
+                              <span className="font-bold text-zinc-900 dark:text-zinc-100 text-sm">{kot.kotNo}</span>
                               <span className="text-xs text-zinc-500">• Order #{info.orderNo || "N/A"}</span>
                             </div>
-                            <div className="text-xs text-zinc-400 font-mono flex items-center gap-1.5 mt-1 font-semibold">
-                              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
+                            <div className="text-xs text-zinc-600 dark:text-zinc-400 font-mono flex items-center gap-1.5 mt-1 font-semibold">
+                              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
                               <span>Plated & Ready for Runner</span>
                             </div>
                           </div>
                         </div>
 
                         {/* Location Tag */}
-                        <div className="rounded-lg bg-zinc-950 p-2.5 border border-zinc-800/80 flex items-center justify-between">
+                        <div className="rounded-lg bg-white dark:bg-zinc-950 p-2.5 border border-zinc-200 dark:border-zinc-800/80 flex items-center justify-between">
                           {info.isRoomService ? (
-                            <span className="flex items-center gap-1.5 font-mono font-bold text-zinc-200 bg-zinc-900 border border-zinc-700 px-2.5 py-1 rounded text-xs">
-                              <BedDouble className="h-4 w-4 text-zinc-400" />
+                            <span className="flex items-center gap-1.5 font-mono font-bold text-zinc-800 dark:text-zinc-200 bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 px-2.5 py-1 rounded text-xs">
+                              <BedDouble className="h-4 w-4 text-zinc-500 dark:text-zinc-400" />
                               Room {info.roomNumber || "Service"}
                             </span>
                           ) : (
-                            <span className="flex items-center gap-1.5 font-mono font-bold text-zinc-200 bg-zinc-900 border border-zinc-700 px-2.5 py-1 rounded text-xs">
-                              <UtensilsCrossed className="h-4 w-4 text-zinc-400" />
+                            <span className="flex items-center gap-1.5 font-mono font-bold text-zinc-800 dark:text-zinc-200 bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 px-2.5 py-1 rounded text-xs">
+                              <UtensilsCrossed className="h-4 w-4 text-zinc-500 dark:text-zinc-400" />
                               {info.tableName || "Dine-In Table"}
                             </span>
                           )}
-                          <span className="text-xs font-bold text-zinc-300 truncate max-w-[130px]">
+                          <span className="text-xs font-bold text-zinc-800 dark:text-zinc-300 truncate max-w-[130px]">
                             {info.guestName}
                           </span>
                         </div>
 
                         {/* Ordered Dish Lines */}
-                        <div className="space-y-2 pt-1 border-t border-zinc-800/80">
+                        <div className="space-y-2 pt-1 border-t border-zinc-200 dark:border-zinc-800/80">
                           {kot.lines?.map((line: any) => (
                             <div key={line.id} className="space-y-0.5">
-                              <div className="flex items-start justify-between gap-2.5 text-zinc-300">
-                                <span className="font-bold text-xs text-zinc-100">{line.orderItem?.nameSnapshot}</span>
-                                <span className="font-mono font-black text-zinc-100 text-xs">×{line.qty}</span>
+                              <div className="flex items-start justify-between gap-2.5 text-zinc-700 dark:text-zinc-300">
+                                <span className="font-bold text-xs text-zinc-900 dark:text-zinc-100">{line.orderItem?.nameSnapshot}</span>
+                                <span className="font-mono font-black text-zinc-900 dark:text-zinc-100 text-xs">×{line.qty}</span>
                               </div>
                               {line.notesSnapshot && (
-                                <div className="text-[11px] text-zinc-400 italic font-mono pl-2 border-l border-zinc-700">
+                                <div className="text-[11px] text-zinc-500 dark:text-zinc-400 italic font-mono pl-2 border-l border-zinc-300 dark:border-zinc-700">
                                   Note: {line.notesSnapshot}
                                 </div>
                               )}
@@ -1268,10 +1268,10 @@ export default function POSPage() {
                         </div>
 
                         {/* Actions */}
-                        <div className="flex items-center gap-2 pt-2.5 border-t border-zinc-800">
+                        <div className="flex items-center gap-2 pt-2.5 border-t border-zinc-200 dark:border-zinc-800">
                           <button
                             onClick={() => handleKdsStatus(kot.id, "COMPLETED")}
-                            className="flex-1 py-2.5 rounded-xl bg-zinc-100 hover:bg-white text-zinc-950 font-bold text-xs transition flex items-center justify-center gap-1.5 cursor-pointer shadow"
+                            className="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
                           >
                             <Check className="h-4 w-4" />
                             <span>Mark Served & Complete</span>
@@ -1279,7 +1279,7 @@ export default function POSPage() {
 
                           <button
                             onClick={() => openKotSlip(kot)}
-                            className="p-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 border border-zinc-800 transition"
+                            className="p-2.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-900 dark:hover:bg-zinc-800 text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200 border border-zinc-300 dark:border-zinc-800 transition"
                             title="Print KOT Thermal Slip"
                           >
                             <Printer className="h-4 w-4" />
@@ -1301,11 +1301,11 @@ export default function POSPage() {
       {/* TAB 3: KOT HISTORY & AUDIT REGISTER                                        */}
       {/* ========================================================================= */}
       {activeTab === "history" && (
-        <div className="rounded-2xl bg-[#111114] border border-zinc-800 p-5 space-y-4">
-          <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
+        <div className="rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 p-5 space-y-4 shadow-xs">
+          <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 pb-3">
             <div className="flex items-center gap-2">
-              <History className="h-4 w-4 text-zinc-400" />
-              <h2 className="text-xs font-bold text-zinc-200 uppercase tracking-wider">
+              <History className="h-4 w-4 text-zinc-500 dark:text-zinc-400" />
+              <h2 className="text-xs font-bold text-zinc-900 dark:text-zinc-200 uppercase tracking-wider">
                 Kitchen Order Ticket (KOT) Register & Logs
               </h2>
             </div>
@@ -1315,19 +1315,19 @@ export default function POSPage() {
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs border border-zinc-800 border-collapse">
-              <thead className="bg-zinc-900 text-zinc-400 uppercase font-mono text-[10px]">
+            <table className="w-full text-left text-xs border border-zinc-200 dark:border-zinc-800 border-collapse">
+              <thead className="bg-zinc-100 dark:bg-zinc-900 text-zinc-700 dark:text-zinc-400 uppercase font-mono text-[10px]">
                 <tr>
-                  <th className="p-3 border border-zinc-800">KOT #</th>
-                  <th className="p-3 border border-zinc-800">Fired Time</th>
-                  <th className="p-3 border border-zinc-800">Service Mode</th>
-                  <th className="p-3 border border-zinc-800">Table / Room</th>
-                  <th className="p-3 border border-zinc-800">Dishes Ordered</th>
-                  <th className="p-3 border border-zinc-800">Status</th>
-                  <th className="p-3 border border-zinc-800 text-right">Action</th>
+                  <th className="p-3 border border-zinc-200 dark:border-zinc-800">KOT #</th>
+                  <th className="p-3 border border-zinc-200 dark:border-zinc-800">Fired Time</th>
+                  <th className="p-3 border border-zinc-200 dark:border-zinc-800">Service Mode</th>
+                  <th className="p-3 border border-zinc-200 dark:border-zinc-800">Table / Room</th>
+                  <th className="p-3 border border-zinc-200 dark:border-zinc-800">Dishes Ordered</th>
+                  <th className="p-3 border border-zinc-200 dark:border-zinc-800">Status</th>
+                  <th className="p-3 border border-zinc-200 dark:border-zinc-800 text-right">Action</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-zinc-800 text-zinc-300">
+              <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800 text-zinc-800 dark:text-zinc-300">
                 {kots.length === 0 ? (
                   <tr>
                     <td colSpan={7} className="p-8 text-center text-zinc-500 font-semibold">
@@ -1338,42 +1338,42 @@ export default function POSPage() {
                   kots.map((kot) => {
                     const info = getKotInfo(kot);
                     return (
-                      <tr key={kot.id} className="hover:bg-zinc-900/50 transition">
-                        <td className="p-3 font-mono font-bold text-zinc-100 border border-zinc-800">
+                      <tr key={kot.id} className="hover:bg-zinc-50 dark:hover:bg-zinc-900/50 transition">
+                        <td className="p-3 font-mono font-bold text-zinc-900 dark:text-zinc-100 border border-zinc-200 dark:border-zinc-800">
                           {kot.kotNo}
                         </td>
-                        <td className="p-3 font-mono text-zinc-400 border border-zinc-800">
+                        <td className="p-3 font-mono text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-800">
                           {info.firedTimeStr}
                         </td>
-                        <td className="p-3 border border-zinc-800">
-                          <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-zinc-900 border border-zinc-800 text-zinc-300">
+                        <td className="p-3 border border-zinc-200 dark:border-zinc-800">
+                          <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-800 dark:text-zinc-300">
                             {kot.order?.mode || "DINE_IN"}
                           </span>
                         </td>
-                        <td className="p-3 border border-zinc-800 font-semibold text-zinc-200">
+                        <td className="p-3 border border-zinc-200 dark:border-zinc-800 font-semibold text-zinc-800 dark:text-zinc-200">
                           {info.isRoomService ? `Room ${info.roomNumber}` : info.tableName || "Table"}
                         </td>
-                        <td className="p-3 border border-zinc-800">
+                        <td className="p-3 border border-zinc-200 dark:border-zinc-800">
                           <div className="space-y-0.5">
                             {kot.lines?.map((l: any, i: number) => (
                               <div key={i} className="text-xs">
-                                <strong className="text-zinc-200">{l.orderItem?.nameSnapshot}</strong>{" "}
-                                <span className="text-zinc-400 font-mono font-bold">×{l.qty}</span>
+                                <strong className="text-zinc-900 dark:text-zinc-200">{l.orderItem?.nameSnapshot}</strong>{" "}
+                                <span className="text-zinc-500 dark:text-zinc-400 font-mono font-bold">×{l.qty}</span>
                               </div>
                             ))}
                           </div>
                         </td>
-                        <td className="p-3 border border-zinc-800">
-                          <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-zinc-900 border border-zinc-700 text-zinc-300">
+                        <td className="p-3 border border-zinc-200 dark:border-zinc-800">
+                          <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-zinc-100 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-800 dark:text-zinc-300">
                             {kot.status}
                           </span>
                         </td>
-                        <td className="p-3 border border-zinc-800 text-right">
+                        <td className="p-3 border border-zinc-200 dark:border-zinc-800 text-right">
                           <button
                             onClick={() => openKotSlip(kot)}
-                            className="px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 hover:text-white font-semibold text-xs border border-zinc-700 inline-flex items-center gap-1.5 transition"
+                            className="px-3 py-1.5 rounded-lg bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 hover:text-zinc-900 dark:hover:text-white font-semibold text-xs border border-zinc-300 dark:border-zinc-700 inline-flex items-center gap-1.5 transition shadow-xs"
                           >
-                            <Printer className="h-3.5 w-3.5 text-zinc-400" />
+                            <Printer className="h-3.5 w-3.5 text-zinc-500 dark:text-zinc-400" />
                             <span>Reprint</span>
                           </button>
                         </td>

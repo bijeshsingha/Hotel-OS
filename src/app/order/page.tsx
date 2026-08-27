@@ -421,36 +421,36 @@ function GuestOrderContent() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#09090b] flex flex-col items-center justify-center text-zinc-100 space-y-3 px-4">
-        <div className="h-8 w-8 border-2 border-zinc-500 border-t-zinc-100 rounded-full animate-spin" />
-        <div className="text-xs font-mono font-medium text-zinc-400">Loading Dining Menu...</div>
+      <div className="min-h-screen bg-zinc-50 dark:bg-[#09090b] flex flex-col items-center justify-center text-zinc-900 dark:text-zinc-100 space-y-3 px-4">
+        <div className="h-8 w-8 border-2 border-zinc-400 dark:border-zinc-500 border-t-zinc-900 dark:border-t-zinc-100 rounded-full animate-spin" />
+        <div className="text-xs font-mono font-bold text-zinc-500 dark:text-zinc-400">Loading Dining Menu...</div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen w-full max-w-full overflow-x-hidden bg-[#09090b] text-zinc-100 font-sans pb-36 selection:bg-blue-600 selection:text-white">
+    <div className="min-h-screen w-full max-w-full overflow-x-hidden bg-zinc-50 dark:bg-[#09090b] text-zinc-900 dark:text-zinc-100 font-sans pb-36 selection:bg-blue-600 selection:text-white">
       {/* 1. TOP HEADER */}
-      <header className="sticky top-0 z-40 bg-[#09090b]/95 backdrop-blur-md border-b border-[#27272a] px-4 sm:px-8 py-3 w-full">
+      <header className="sticky top-0 z-40 bg-white/95 dark:bg-[#09090b]/95 backdrop-blur-md border-b border-zinc-200 dark:border-[#27272a] px-4 sm:px-8 py-3 w-full shadow-xs">
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-3 sm:gap-4 w-full">
           {/* Top Row: Hotel Brand & Details */}
           <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white text-zinc-950 font-black text-xs sm:text-sm tracking-tight shadow-sm">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-zinc-900 text-white dark:bg-white dark:text-zinc-950 font-black text-xs sm:text-sm tracking-tight shadow-xs">
               {menuData?.property?.displayName?.[0] || menuData?.property?.name?.[0] || "H"}
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-1.5 min-w-0">
-                <h1 className="text-xs sm:text-sm font-bold tracking-tight text-white truncate">
+                <h1 className="text-xs sm:text-sm font-bold tracking-tight text-zinc-900 dark:text-white truncate">
                   {menuData?.property?.displayName || menuData?.property?.name || "Hotel OS"}
                 </h1>
                 {menuData?.property?.code && (
-                  <span className="bg-zinc-800 text-zinc-300 border border-zinc-700 text-[9px] sm:text-[10px] font-mono font-bold px-1.5 py-0.2 rounded shrink-0">
+                  <span className="bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 text-[9px] sm:text-[10px] font-mono font-bold px-1.5 py-0.5 rounded shrink-0">
                     {menuData.property.code}
                   </span>
                 )}
               </div>
-              <div className="flex items-center gap-1.5 text-[10px] sm:text-[11px] text-zinc-400">
-                <span className="text-emerald-400 font-medium font-mono">Kitchen Live</span>
+              <div className="flex items-center gap-1.5 text-[10px] sm:text-[11px] text-zinc-500 dark:text-zinc-400">
+                <span className="text-emerald-600 dark:text-emerald-400 font-bold font-mono">Kitchen Live</span>
                 <span>•</span>
                 <span>Ext 9</span>
               </div>
@@ -467,15 +467,15 @@ function GuestOrderContent() {
                   setSelectedOrderForTracking(activeOrders[0]);
                   setShowTrackingModal(true);
                 }}
-                className="flex items-center gap-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 px-2.5 py-1.5 text-xs text-white transition shadow-sm active:scale-95 animate-in fade-in"
+                className="flex items-center gap-1.5 rounded-lg bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-900 dark:hover:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 px-2.5 py-1.5 text-xs text-zinc-900 dark:text-white transition shadow-xs active:scale-95 animate-in fade-in cursor-pointer"
               >
                 <span className="relative flex h-2 w-2 shrink-0">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                 </span>
-                <Clock className="h-3.5 w-3.5 text-zinc-300 shrink-0" />
-                <span className="hidden sm:inline font-semibold">Status</span>
-                <span className="bg-zinc-800 text-emerald-400 border border-emerald-500/30 px-1.5 py-0.2 rounded font-mono font-bold text-[10px]">
+                <Clock className="h-3.5 w-3.5 text-zinc-600 dark:text-zinc-300 shrink-0" />
+                <span className="hidden sm:inline font-bold">Status</span>
+                <span className="bg-emerald-100 dark:bg-zinc-800 text-emerald-800 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-500/30 px-1.5 py-0.5 rounded font-mono font-bold text-[10px]">
                   ~{activeOrders[0].estimatedMinutesRemaining}m
                 </span>
               </button>
@@ -487,21 +487,21 @@ function GuestOrderContent() {
                   setSelectedOrderForTracking(pastOrders[0]);
                   setShowTrackingModal(true);
                 }}
-                className="flex items-center gap-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 px-2.5 py-1.5 text-xs text-zinc-300 hover:text-white transition"
+                className="flex items-center gap-1.5 rounded-lg bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-900 dark:hover:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 px-2.5 py-1.5 text-xs text-zinc-700 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white transition cursor-pointer shadow-xs"
               >
-                <History className="h-3.5 w-3.5 text-zinc-400 shrink-0" />
-                <span className="font-mono text-[11px]">Orders</span>
+                <History className="h-3.5 w-3.5 text-zinc-500 dark:text-zinc-400 shrink-0" />
+                <span className="font-mono text-[11px] font-bold">Orders</span>
               </button>
             ) : null}
 
             {/* Locked Room Badge — not changeable by guest */}
-            <div className="flex items-center gap-1.5 rounded-lg bg-[#18181b] border border-zinc-700 px-2.5 sm:px-3 py-1.5 text-xs text-white shadow-sm shrink-0">
-              <BedDouble className="h-3.5 w-3.5 text-zinc-400 shrink-0" />
+            <div className="flex items-center gap-1.5 rounded-lg bg-zinc-100 dark:bg-[#18181b] border border-zinc-300 dark:border-zinc-700 px-2.5 sm:px-3 py-1.5 text-xs text-zinc-900 dark:text-white shadow-xs shrink-0">
+              <BedDouble className="h-3.5 w-3.5 text-zinc-500 dark:text-zinc-400 shrink-0" />
               <span className="font-bold font-mono text-[11px] sm:text-xs">
                 {roomNumber ? `Rm ${roomNumber}` : "Room"}
               </span>
               {activeSelectedRoom?.isOccupied && (
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 shrink-0" />
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" />
               )}
             </div>
           </div>
@@ -511,42 +511,42 @@ function GuestOrderContent() {
       {/* 2. MAIN CONTAINER */}
       <main className="max-w-7xl mx-auto px-4 sm:px-8 pt-4 sm:pt-6 pb-48 space-y-4 sm:space-y-6 w-full">
         {/* ROOM BANNER WITH AUTO-SYNCED GUEST DETAILS */}
-        <div className="rounded-2xl bg-[#121215] border border-zinc-800 p-4 shadow-sm min-w-0 w-full space-y-3">
+        <div className="rounded-2xl bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 p-4 shadow-xs min-w-0 w-full space-y-3">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-center gap-3 min-w-0 flex-1">
-              <div className="h-10 w-10 shrink-0 rounded-xl bg-zinc-800 border border-zinc-700/60 flex items-center justify-center text-zinc-300">
+              <div className="h-10 w-10 shrink-0 rounded-xl bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700/60 flex items-center justify-center text-zinc-700 dark:text-zinc-300">
                 <BedDouble className="h-5 w-5" />
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-xs sm:text-sm font-bold text-white">
+                  <span className="text-xs sm:text-sm font-bold text-zinc-900 dark:text-white">
                     Delivering to Room {roomNumber || "..."}
                   </span>
                   {activeSelectedRoom?.isOccupied && (
-                    <span className="rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 text-[10px] font-medium font-mono">
+                    <span className="rounded-md bg-emerald-100 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/30 px-2 py-0.5 text-[10px] font-bold font-mono">
                       ● Synced to Folio
                     </span>
                   )}
                 </div>
-                <p className="text-xs text-zinc-400 truncate mt-0.5">
-                  Guest: <strong className="text-white">{customerName || "In-House Guest"}</strong>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400 truncate mt-0.5 font-medium">
+                  Guest: <strong className="text-zinc-900 dark:text-white">{customerName || "In-House Guest"}</strong>
                   {customerPhone && ` • ${customerPhone}`}
                 </p>
               </div>
             </div>
 
-            <div className="flex items-center gap-2 text-xs text-zinc-400 font-mono self-start sm:self-auto bg-zinc-900 px-3 py-1.5 rounded-lg border border-zinc-800 shrink-0">
+            <div className="flex items-center gap-2 text-xs text-zinc-600 dark:text-zinc-400 font-mono self-start sm:self-auto bg-zinc-100 dark:bg-zinc-900 px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 shrink-0 shadow-xs">
               <Clock className="h-3.5 w-3.5 text-zinc-500" />
-              <span>Prep Time: <strong className="text-white">~40 Mins</strong></span>
+              <span>Prep Time: <strong className="text-zinc-900 dark:text-white font-bold">~40 Mins</strong></span>
             </div>
           </div>
 
           {/* Mismatch contact row */}
-          <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-zinc-500 pt-2 border-t border-zinc-800/80">
+          <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-zinc-500 pt-2 border-t border-zinc-200 dark:border-zinc-800/80">
             <span>Mismatch in room or guest details?</span>
             <a
               href={`tel:${menuData?.property?.phone || "+916901741211"}`}
-              className="text-emerald-400 hover:text-emerald-300 font-semibold flex items-center gap-1 font-mono transition"
+              className="text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 font-bold flex items-center gap-1 font-mono transition"
             >
               <Phone className="h-3 w-3 shrink-0" />
               <span>Dial Ext 9 / {menuData?.property?.phone || "+91 69017 41211"}</span>
@@ -559,18 +559,18 @@ function GuestOrderContent() {
           <div className="flex flex-col sm:flex-row gap-2">
             {/* Search Input */}
             <div className="relative flex-1">
-              <Search className="absolute left-3.5 top-3 h-4 w-4 text-zinc-500" />
+              <Search className="absolute left-3.5 top-3 h-4 w-4 text-zinc-400" />
               <input
                 type="text"
                 placeholder="Search food items, tea, biryani, paneer, fish..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full rounded-xl bg-[#121215] border border-zinc-800 pl-10 pr-9 py-2.5 text-xs sm:text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-zinc-600 transition"
+                className="w-full rounded-xl bg-white dark:bg-[#121215] border border-zinc-300 dark:border-zinc-800 pl-10 pr-9 py-2.5 text-xs sm:text-sm text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none focus:border-blue-500 shadow-xs transition"
               />
               {searchQuery && (
                 <button
                   onClick={() => setSearchQuery("")}
-                  className="absolute right-3 top-3 text-zinc-500 hover:text-white"
+                  className="absolute right-3 top-3 text-zinc-400 hover:text-zinc-700 dark:hover:text-white"
                 >
                   <X className="h-4 w-4" />
                 </button>
@@ -578,14 +578,14 @@ function GuestOrderContent() {
             </div>
 
             {/* Veg / Non-Veg Filter (Full width on mobile) */}
-            <div className="grid grid-cols-3 sm:flex items-center rounded-xl bg-[#121215] border border-zinc-800 p-1 gap-1">
+            <div className="grid grid-cols-3 sm:flex items-center rounded-xl bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 p-1 gap-1 shadow-xs">
               <button
                 type="button"
                 onClick={() => setVegFilter("ALL")}
-                className={`rounded-lg py-1.5 px-3 text-xs font-bold transition text-center ${
+                className={`rounded-lg py-1.5 px-3 text-xs font-bold transition text-center cursor-pointer ${
                   vegFilter === "ALL"
-                    ? "bg-white text-zinc-950 shadow-sm"
-                    : "text-zinc-400 hover:text-white"
+                    ? "bg-zinc-900 text-white dark:bg-white dark:text-zinc-950 shadow-xs"
+                    : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
                 }`}
               >
                 All
@@ -593,21 +593,21 @@ function GuestOrderContent() {
               <button
                 type="button"
                 onClick={() => setVegFilter("VEG")}
-                className={`flex items-center justify-center gap-1.5 rounded-lg py-1.5 px-3 text-xs font-bold transition ${
+                className={`flex items-center justify-center gap-1.5 rounded-lg py-1.5 px-3 text-xs font-bold transition cursor-pointer ${
                   vegFilter === "VEG"
-                    ? "bg-emerald-600 text-white shadow-sm"
-                    : "text-zinc-400 hover:text-white"
+                    ? "bg-emerald-600 text-white shadow-xs"
+                    : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
                 }`}
               >
-                <span className="h-2 w-2 rounded-sm bg-emerald-400" /> Pure Veg
+                <span className="h-2 w-2 rounded-xs bg-emerald-400" /> Pure Veg
               </button>
               <button
                 type="button"
                 onClick={() => setVegFilter("NON_VEG")}
-                className={`flex items-center justify-center gap-1.5 rounded-lg py-1.5 px-3 text-xs font-bold transition ${
+                className={`flex items-center justify-center gap-1.5 rounded-lg py-1.5 px-3 text-xs font-bold transition cursor-pointer ${
                   vegFilter === "NON_VEG"
-                    ? "bg-rose-600 text-white shadow-sm"
-                    : "text-zinc-400 hover:text-white"
+                    ? "bg-rose-600 text-white shadow-xs"
+                    : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
                 }`}
               >
                 <span className="h-2 w-2 rounded-full bg-rose-400" /> Non-Veg
@@ -619,10 +619,10 @@ function GuestOrderContent() {
           <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none snap-x active:cursor-grabbing">
             <button
               onClick={() => setSelectedCategory("ALL")}
-              className={`rounded-xl px-3.5 py-2 text-xs font-bold whitespace-nowrap transition snap-start flex items-center gap-1.5 ${
+              className={`rounded-xl px-3.5 py-2 text-xs font-bold whitespace-nowrap transition snap-start flex items-center gap-1.5 cursor-pointer shadow-xs ${
                 selectedCategory === "ALL"
-                  ? "bg-white text-zinc-950 shadow-md"
-                  : "bg-[#121215] text-zinc-300 hover:text-white border border-zinc-800"
+                  ? "bg-zinc-900 text-white dark:bg-white dark:text-zinc-950 shadow-sm"
+                  : "bg-white dark:bg-[#121215] text-zinc-700 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white border border-zinc-200 dark:border-zinc-800"
               }`}
             >
               All Items
@@ -634,10 +634,10 @@ function GuestOrderContent() {
                 <button
                   key={cat.id}
                   onClick={() => setSelectedCategory(cat.id)}
-                  className={`rounded-xl px-3.5 py-2 text-xs font-bold whitespace-nowrap transition snap-start flex items-center gap-1.5 ${
+                  className={`rounded-xl px-3.5 py-2 text-xs font-bold whitespace-nowrap transition snap-start flex items-center gap-1.5 cursor-pointer shadow-xs ${
                     isSelected
-                      ? "bg-white text-zinc-950 shadow-md"
-                      : "bg-[#121215] text-zinc-300 hover:text-white border border-zinc-800"
+                      ? "bg-zinc-900 text-white dark:bg-white dark:text-zinc-950 shadow-sm"
+                      : "bg-white dark:bg-[#121215] text-zinc-700 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white border border-zinc-200 dark:border-zinc-800"
                   }`}
                 >
                   {isBreakfast ? <Coffee className="h-3.5 w-3.5" /> : <UtensilsCrossed className="h-3.5 w-3.5" />}
@@ -656,12 +656,12 @@ function GuestOrderContent() {
             return (
               <section key={cat.id} className="space-y-3">
                 {/* Category Header */}
-                <div className="flex items-center justify-between pb-2 border-b border-zinc-800">
+                <div className="flex items-center justify-between pb-2 border-b border-zinc-200 dark:border-zinc-800">
                   <div className="flex items-center gap-2">
-                    <h2 className="text-xs sm:text-sm font-black text-white uppercase tracking-wider">
+                    <h2 className="text-xs sm:text-sm font-black text-zinc-900 dark:text-white uppercase tracking-wider">
                       {cat.name}
                     </h2>
-                    <span className="text-[11px] text-zinc-500 font-mono">
+                    <span className="text-[11px] text-zinc-500 font-mono font-bold">
                       ({cat.filteredItems.length})
                     </span>
                   </div>
@@ -682,10 +682,10 @@ function GuestOrderContent() {
                     return (
                       <div
                         key={item.id}
-                        className={`rounded-2xl p-3.5 sm:p-4 border transition flex flex-col justify-between ${
+                        className={`rounded-2xl p-3.5 sm:p-4 border transition flex flex-col justify-between shadow-xs ${
                           inCartQty > 0
-                            ? "bg-[#18181b] border-zinc-600 shadow-md"
-                            : "bg-[#121215] border-zinc-800/90 hover:border-zinc-700"
+                            ? "bg-zinc-50 dark:bg-[#18181b] border-zinc-400 dark:border-zinc-600 shadow-sm"
+                            : "bg-white dark:bg-[#121215] border-zinc-200 dark:border-zinc-800/90 hover:border-zinc-300 dark:hover:border-zinc-700"
                         }`}
                       >
                         <div className="space-y-1.5">
@@ -693,26 +693,26 @@ function GuestOrderContent() {
                             <div className="flex items-start gap-2.5 min-w-0">
                               {/* Veg / Non-Veg Marker */}
                               <div
-                                className={`mt-0.5 h-4 w-4 rounded-sm border flex items-center justify-center shrink-0 ${
+                                className={`mt-0.5 h-4 w-4 rounded-xs border flex items-center justify-center shrink-0 ${
                                   item.isVeg
-                                    ? "border-emerald-500 bg-emerald-950/50"
-                                    : "border-rose-500 bg-rose-950/50"
+                                    ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/50"
+                                    : "border-rose-500 bg-rose-50 dark:bg-rose-950/50"
                                 }`}
                                 title={item.isVeg ? "Vegetarian" : "Non-Vegetarian"}
                               >
                                 <span
                                   className={`h-2 w-2 rounded-full ${
-                                    item.isVeg ? "bg-emerald-400" : "bg-rose-400"
+                                    item.isVeg ? "bg-emerald-500" : "bg-rose-500"
                                   }`}
                                 />
                               </div>
 
                               <div className="min-w-0">
-                                <h3 className="text-xs sm:text-sm font-bold text-white leading-snug">
+                                <h3 className="text-xs sm:text-sm font-bold text-zinc-900 dark:text-white leading-snug">
                                   {item.name}
                                 </h3>
                                 {item.portionSize && (
-                                  <span className="text-[10px] text-zinc-400 font-mono block mt-0.5">
+                                  <span className="text-[10px] text-zinc-500 dark:text-zinc-400 font-mono block mt-0.5">
                                     Portion: {item.portionSize}
                                   </span>
                                 )}
@@ -720,13 +720,13 @@ function GuestOrderContent() {
                             </div>
 
                             {/* Price */}
-                            <span className="font-mono font-black text-sm text-white shrink-0">
+                            <span className="font-mono font-black text-sm text-zinc-900 dark:text-white shrink-0">
                               {formatINR(price)}
                             </span>
                           </div>
 
                           {item.description && (
-                            <p className="text-xs text-zinc-400 pl-6 leading-relaxed">
+                            <p className="text-xs text-zinc-600 dark:text-zinc-400 pl-6 leading-relaxed font-medium">
                               {item.description}
                             </p>
                           )}
@@ -734,20 +734,20 @@ function GuestOrderContent() {
 
                         {/* Special Note Input (Expandable) */}
                         {inCartQty > 0 && (
-                          <div className="mt-2.5 pt-2 border-t border-zinc-800">
+                          <div className="mt-2.5 pt-2 border-t border-zinc-200 dark:border-zinc-800">
                             {isNoteOpen ? (
                               <input
                                 type="text"
                                 placeholder="Special instruction (e.g. less spicy, extra lemon)..."
                                 value={cartItem?.notes || ""}
                                 onChange={(e) => updateItemNotes(item.id, e.target.value)}
-                                className="w-full rounded-lg bg-zinc-950 border border-zinc-700 px-2.5 py-1.5 text-xs text-white placeholder-zinc-600 focus:outline-none focus:border-white transition"
+                                className="w-full rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700 px-2.5 py-1.5 text-xs text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-600 focus:outline-none focus:border-blue-500 transition shadow-xs"
                               />
                             ) : (
                               <button
                                 type="button"
                                 onClick={() => setActiveNoteItemId(item.id)}
-                                className="flex items-center gap-1 text-[11px] text-zinc-400 hover:text-white transition"
+                                className="flex items-center gap-1 text-[11px] text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition cursor-pointer font-medium"
                               >
                                 <MessageSquarePlus className="h-3 w-3" />
                                 <span>Add preparation note</span>
@@ -757,8 +757,8 @@ function GuestOrderContent() {
                         )}
 
                         {/* Add / Quantity Button Row */}
-                        <div className="mt-3 pt-2.5 border-t border-zinc-800/80 flex items-center justify-between">
-                          <span className="text-[11px] text-zinc-500 font-mono flex items-center gap-1">
+                        <div className="mt-3 pt-2.5 border-t border-zinc-200 dark:border-zinc-800/80 flex items-center justify-between">
+                          <span className="text-[11px] text-zinc-500 font-mono flex items-center gap-1 font-semibold">
                             <Clock className="h-3 w-3" /> 40 mins
                           </span>
 
@@ -766,28 +766,28 @@ function GuestOrderContent() {
                             <button
                               type="button"
                               onClick={() => addToCart(item)}
-                              className="flex items-center gap-1.5 rounded-xl bg-white text-zinc-950 hover:bg-zinc-200 px-4 py-2 text-xs font-bold transition shadow-sm active:scale-95"
+                              className="flex items-center gap-1.5 rounded-xl bg-zinc-900 text-white hover:bg-zinc-800 dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-200 px-4 py-2 text-xs font-bold transition shadow-xs active:scale-95 cursor-pointer"
                             >
                               <Plus className="h-3.5 w-3.5" />
                               <span>Add</span>
                             </button>
                           ) : (
-                            <div className="flex items-center gap-2.5 bg-zinc-900 rounded-xl p-1 border border-zinc-700 shadow-sm">
+                            <div className="flex items-center gap-2.5 bg-zinc-100 dark:bg-zinc-900 rounded-xl p-1 border border-zinc-300 dark:border-zinc-700 shadow-xs">
                               <button
                                 type="button"
                                 onClick={() => removeFromCart(item.id)}
-                                className="h-7 w-7 rounded-lg bg-zinc-800 hover:bg-zinc-700 flex items-center justify-center text-white active:scale-90 transition"
+                                className="h-7 w-7 rounded-lg bg-white dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 flex items-center justify-center text-zinc-900 dark:text-white active:scale-90 transition cursor-pointer shadow-xs"
                                 title="Decrease quantity"
                               >
                                 <Minus className="h-3.5 w-3.5" />
                               </button>
-                              <span className="font-bold text-white text-xs w-5 text-center font-mono">
+                              <span className="font-bold text-zinc-900 dark:text-white text-xs w-5 text-center font-mono">
                                 {inCartQty}
                               </span>
                               <button
                                 type="button"
                                 onClick={() => addToCart(item)}
-                                className="h-7 w-7 rounded-lg bg-zinc-800 hover:bg-zinc-700 flex items-center justify-center text-white active:scale-90 transition"
+                                className="h-7 w-7 rounded-lg bg-white dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 flex items-center justify-center text-zinc-900 dark:text-white active:scale-90 transition cursor-pointer shadow-xs"
                                 title="Increase quantity"
                               >
                                 <Plus className="h-3.5 w-3.5" />
@@ -804,8 +804,8 @@ function GuestOrderContent() {
           })}
 
           {filteredCategories.length === 0 && (
-            <div className="rounded-2xl bg-[#121215] border border-zinc-800 p-8 text-center text-xs text-zinc-400 space-y-2">
-              <p className="font-semibold text-zinc-200">No dishes matched your search.</p>
+            <div className="rounded-2xl bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 p-8 text-center text-xs text-zinc-500 space-y-2 shadow-xs">
+              <p className="font-bold text-zinc-800 dark:text-zinc-200">No dishes matched your search.</p>
               <button
                 type="button"
                 onClick={() => {
@@ -813,7 +813,7 @@ function GuestOrderContent() {
                   setVegFilter("ALL");
                   setSelectedCategory("ALL");
                 }}
-                className="text-xs text-blue-400 hover:underline font-medium"
+                className="text-xs text-blue-600 dark:text-blue-400 hover:underline font-bold cursor-pointer"
               >
                 Clear all filters
               </button>
@@ -827,17 +827,17 @@ function GuestOrderContent() {
         <div className="fixed bottom-4 inset-x-3 sm:inset-x-auto sm:left-1/2 sm:-translate-x-1/2 sm:w-full sm:max-w-md z-40 animate-in slide-in-from-bottom-5 duration-150">
           <div
             onClick={() => setIsCartOpen(true)}
-            className="rounded-2xl bg-white text-zinc-950 p-3.5 shadow-2xl cursor-pointer flex items-center justify-between border border-zinc-200 hover:bg-zinc-100 transition active:scale-[0.99]"
+            className="rounded-2xl bg-zinc-900 text-white dark:bg-white dark:text-zinc-950 p-3.5 shadow-2xl cursor-pointer flex items-center justify-between border border-zinc-800 dark:border-zinc-200 hover:bg-zinc-800 dark:hover:bg-zinc-100 transition active:scale-[0.99]"
           >
             <div className="flex items-center gap-3">
-              <div className="h-8 w-8 rounded-xl bg-zinc-950 text-white flex items-center justify-center font-black text-xs font-mono shadow-sm">
+              <div className="h-8 w-8 rounded-xl bg-white text-zinc-950 dark:bg-zinc-950 dark:text-white flex items-center justify-center font-black text-xs font-mono shadow-xs">
                 {totalItemCount}
               </div>
               <div>
                 <div className="text-xs sm:text-sm font-black">
                   View Tray • Room {roomNumber}
                 </div>
-                <div className="text-[11px] text-zinc-600 font-medium">
+                <div className="text-[11px] text-zinc-300 dark:text-zinc-600 font-medium">
                   {totalItemCount} item{totalItemCount > 1 ? "s" : ""} in order
                 </div>
               </div>
@@ -845,7 +845,7 @@ function GuestOrderContent() {
 
             <div className="flex items-center gap-2 font-mono">
               <span className="text-sm font-black">{formatINR(gst.totalAmount)}</span>
-              <ChevronRight className="h-5 w-5 text-zinc-950" />
+              <ChevronRight className="h-5 w-5 text-white dark:text-zinc-950" />
             </div>
           </div>
         </div>
@@ -853,23 +853,23 @@ function GuestOrderContent() {
 
       {/* 6. CART & CHECKOUT DRAWER / BOTTOM SHEET */}
       {isCartOpen && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-150">
-          <div className="w-full max-w-md max-h-[92vh] flex flex-col rounded-t-3xl sm:rounded-3xl border border-zinc-700 bg-[#121215] shadow-2xl text-zinc-200 overflow-hidden">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 dark:bg-black/80 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-150">
+          <div className="w-full max-w-md max-h-[92vh] flex flex-col rounded-t-3xl sm:rounded-3xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-[#121215] shadow-2xl text-zinc-900 dark:text-zinc-200 overflow-hidden">
             {/* Grab Handle for Mobile */}
-            <div className="w-12 h-1 rounded-full bg-zinc-700 mx-auto mt-2.5 sm:hidden" />
+            <div className="w-12 h-1 rounded-full bg-zinc-300 dark:bg-zinc-700 mx-auto mt-2.5 sm:hidden" />
 
             {/* Header */}
-            <div className="flex items-center justify-between p-4 sm:p-5 border-b border-zinc-800">
+            <div className="flex items-center justify-between p-4 sm:p-5 border-b border-zinc-200 dark:border-zinc-800">
               <div className="flex items-center gap-2.5">
-                <ShoppingBag className="h-5 w-5 text-white" />
+                <ShoppingBag className="h-5 w-5 text-zinc-900 dark:text-white" />
                 <div>
-                  <h3 className="text-sm font-bold text-white">Order Tray (Room {roomNumber})</h3>
-                  <p className="text-[11px] text-zinc-400">Review items before kitchen confirmation</p>
+                  <h3 className="text-sm font-bold text-zinc-900 dark:text-white">Order Tray (Room {roomNumber})</h3>
+                  <p className="text-[11px] text-zinc-500 dark:text-zinc-400">Review items before kitchen confirmation</p>
                 </div>
               </div>
               <button
                 onClick={() => setIsCartOpen(false)}
-                className="h-8 w-8 rounded-xl bg-zinc-800 flex items-center justify-center text-zinc-400 hover:text-white transition"
+                className="h-8 w-8 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 flex items-center justify-center text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition cursor-pointer"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -884,35 +884,35 @@ function GuestOrderContent() {
                   return (
                     <div
                       key={item.id}
-                      className="rounded-xl bg-[#18181b] p-3 border border-zinc-800 space-y-2 text-xs"
+                      className="rounded-xl bg-zinc-50 dark:bg-[#18181b] p-3 border border-zinc-200 dark:border-zinc-800 space-y-2 text-xs shadow-xs"
                     >
                       <div className="flex items-start justify-between gap-2">
                         <div>
-                          <div className="font-bold text-white">{item.name}</div>
-                          <div className="text-[11px] text-zinc-400 font-mono">
+                          <div className="font-bold text-zinc-900 dark:text-white">{item.name}</div>
+                          <div className="text-[11px] text-zinc-500 dark:text-zinc-400 font-mono">
                             {formatINR(price)} × {qty}
                           </div>
                         </div>
 
                         <div className="flex items-center gap-2.5">
-                          <div className="flex items-center gap-1.5 bg-zinc-900 rounded-lg p-1 border border-zinc-700">
+                          <div className="flex items-center gap-1.5 bg-zinc-100 dark:bg-zinc-900 rounded-lg p-1 border border-zinc-300 dark:border-zinc-700 shadow-xs">
                             <button
                               type="button"
                               onClick={() => removeFromCart(item.id)}
-                              className="h-6 w-6 rounded bg-zinc-800 hover:bg-zinc-700 flex items-center justify-center text-white"
+                              className="h-6 w-6 rounded bg-white dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 flex items-center justify-center text-zinc-900 dark:text-white cursor-pointer shadow-xs"
                             >
                               <Minus className="h-3 w-3" />
                             </button>
-                            <span className="font-bold text-white w-4 text-center font-mono">{qty}</span>
+                            <span className="font-bold text-zinc-900 dark:text-white w-4 text-center font-mono">{qty}</span>
                             <button
                               type="button"
                               onClick={() => addToCart(item)}
-                              className="h-6 w-6 rounded bg-zinc-800 hover:bg-zinc-700 flex items-center justify-center text-white"
+                              className="h-6 w-6 rounded bg-white dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 flex items-center justify-center text-zinc-900 dark:text-white cursor-pointer shadow-xs"
                             >
                               <Plus className="h-3 w-3" />
                             </button>
                           </div>
-                          <span className="font-mono font-bold text-white w-14 text-right">
+                          <span className="font-mono font-bold text-zinc-900 dark:text-white w-14 text-right">
                             {formatINR(price * qty)}
                           </span>
                         </div>
@@ -923,7 +923,7 @@ function GuestOrderContent() {
                         placeholder="Special instruction (e.g. less spicy)..."
                         value={notes}
                         onChange={(e) => updateItemNotes(item.id, e.target.value)}
-                        className="w-full rounded-lg bg-zinc-950 border border-zinc-700 px-2.5 py-1.5 text-xs text-white placeholder-zinc-600 focus:outline-none focus:border-white"
+                        className="w-full rounded-lg bg-white dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700 px-2.5 py-1.5 text-xs text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-600 focus:outline-none focus:border-blue-500 shadow-xs"
                       />
                     </div>
                   );
@@ -931,63 +931,63 @@ function GuestOrderContent() {
               </div>
 
               {/* Bill Breakdown with 5% GST */}
-              <div className="rounded-xl bg-zinc-900 p-3.5 border border-zinc-800 space-y-1.5 text-xs text-zinc-300">
+              <div className="rounded-xl bg-zinc-50 dark:bg-zinc-900 p-3.5 border border-zinc-200 dark:border-zinc-800 space-y-1.5 text-xs text-zinc-700 dark:text-zinc-300 shadow-xs">
                 <div className="flex justify-between">
                   <span>Subtotal</span>
-                  <span className="font-mono font-medium">{formatINR(gst.taxableAmount)}</span>
+                  <span className="font-mono font-bold text-zinc-900 dark:text-zinc-100">{formatINR(gst.taxableAmount)}</span>
                 </div>
-                <div className="flex justify-between text-zinc-400 text-[11px]">
+                <div className="flex justify-between text-zinc-500 dark:text-zinc-400 text-[11px]">
                   <span>GST (5% SAC 996331)</span>
-                  <span className="font-mono">{formatINR(gst.taxAmount)}</span>
+                  <span className="font-mono font-semibold">{formatINR(gst.taxAmount)}</span>
                 </div>
-                <div className="flex justify-between font-bold text-sm text-white pt-2 border-t border-zinc-800">
+                <div className="flex justify-between font-bold text-sm text-zinc-900 dark:text-white pt-2 border-t border-zinc-200 dark:border-zinc-800">
                   <span>Total Amount</span>
-                  <span className="font-mono text-white">{formatINR(gst.totalAmount)}</span>
+                  <span className="font-mono text-zinc-900 dark:text-white">{formatINR(gst.totalAmount)}</span>
                 </div>
               </div>
 
               {/* Delivery Details & Room Verification */}
               <form onSubmit={handlePlaceOrder} className="space-y-3.5 text-xs">
                 {/* 1. Verified Room Delivery Card */}
-                <div className="rounded-2xl bg-[#18181b] border border-zinc-700/90 p-3.5 space-y-2.5">
+                <div className="rounded-2xl bg-zinc-50 dark:bg-[#18181b] border border-zinc-300 dark:border-zinc-700/90 p-3.5 space-y-2.5 shadow-xs">
                   <div className="flex items-center justify-between">
-                    <span className="text-[10px] uppercase font-mono tracking-wider text-zinc-400 font-bold">
+                    <span className="text-[10px] uppercase font-mono tracking-wider text-zinc-500 dark:text-zinc-400 font-bold">
                       Delivery Destination
                     </span>
                     {/* Room is locked — not changeable by guest */}
-                    <span className="flex items-center gap-1 text-[10px] font-mono text-emerald-400">
-                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                    <span className="flex items-center gap-1 text-[10px] font-mono text-emerald-600 dark:text-emerald-400 font-bold">
+                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
                       Rm {roomNumber} Verified
                     </span>
                   </div>
 
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex items-center gap-2.5 min-w-0">
-                      <div className="h-10 w-10 rounded-xl bg-zinc-900 border border-zinc-700 flex items-center justify-center text-white shrink-0 shadow-sm">
+                      <div className="h-10 w-10 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 flex items-center justify-center text-zinc-900 dark:text-white shrink-0 shadow-xs">
                         <BedDouble className="h-5 w-5" />
                       </div>
                       <div className="min-w-0">
-                        <div className="text-sm font-black text-white font-mono flex items-center gap-2">
+                        <div className="text-sm font-black text-zinc-900 dark:text-white font-mono flex items-center gap-2">
                           <span>Room {roomNumber || "..."}</span>
                           {activeSelectedRoom?.isOccupied && (
-                            <span className="text-[10px] text-emerald-400 font-mono font-medium">
+                            <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-mono font-bold">
                               ● In-House Verified
                             </span>
                           )}
                         </div>
-                        <div className="text-xs text-zinc-300 font-medium truncate mt-0.5">
-                          Guest: <strong className="text-white">{customerName || "In-House Guest"}</strong>
+                        <div className="text-xs text-zinc-600 dark:text-zinc-300 font-medium truncate mt-0.5">
+                          Guest: <strong className="text-zinc-900 dark:text-white">{customerName || "In-House Guest"}</strong>
                         </div>
                       </div>
                     </div>
                   </div>
 
                   {/* Phone contact for mismatch */}
-                  <div className="pt-2 border-t border-zinc-800/80 flex flex-wrap items-center justify-between gap-1 text-[11px] text-zinc-400">
+                  <div className="pt-2 border-t border-zinc-200 dark:border-zinc-800/80 flex flex-wrap items-center justify-between gap-1 text-[11px] text-zinc-500 dark:text-zinc-400 font-medium">
                     <span>Not your room?</span>
                     <a
                       href={`tel:${menuData?.property?.phone || "+916901741211"}`}
-                      className="text-emerald-400 hover:text-emerald-300 font-semibold flex items-center gap-1 font-mono transition"
+                      className="text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 font-bold flex items-center gap-1 font-mono transition"
                     >
                       <Phone className="h-3 w-3 shrink-0" />
                       <span>Dial Ext 9 / {menuData?.property?.phone || "+91 69017 41211"}</span>
@@ -996,57 +996,57 @@ function GuestOrderContent() {
                 </div>
 
                 {/* 2. Room Verification Checkbox */}
-                <label className="flex items-start gap-2.5 p-3 rounded-xl bg-zinc-900 border border-zinc-800 cursor-pointer hover:border-zinc-700 transition">
+                <label className="flex items-start gap-2.5 p-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 cursor-pointer hover:border-zinc-300 dark:hover:border-zinc-700 transition shadow-xs">
                   <input
                     type="checkbox"
                     required
                     checked={isRoomVerified}
                     onChange={(e) => setIsRoomVerified(e.target.checked)}
-                    className="mt-0.5 h-4 w-4 rounded border-zinc-700 bg-zinc-800 text-emerald-500 accent-emerald-500 focus:ring-0"
+                    className="mt-0.5 h-4 w-4 rounded border-zinc-300 dark:border-zinc-700 text-emerald-600 accent-emerald-600 focus:ring-0 cursor-pointer"
                   />
-                  <span className="text-zinc-200 font-medium leading-relaxed text-xs">
-                    I confirm that this order is for <strong className="text-white">Room {roomNumber}</strong> ({customerName || "In-House Guest"}).
+                  <span className="text-zinc-700 dark:text-zinc-200 font-semibold leading-relaxed text-xs">
+                    I confirm that this order is for <strong className="text-zinc-900 dark:text-white font-bold">Room {roomNumber}</strong> ({customerName || "In-House Guest"}).
                   </span>
                 </label>
 
                 {/* 3. Payment Mode */}
                 <div className="space-y-2">
-                  <label className="text-zinc-200 font-bold block">Bill Settlement</label>
+                  <label className="text-zinc-800 dark:text-zinc-200 font-bold block">Bill Settlement</label>
                   <div className="space-y-2">
                     <label
                       onClick={() => setPaymentPref("POST_TO_ROOM")}
-                      className={`flex items-center justify-between p-3 rounded-xl border cursor-pointer transition ${
+                      className={`flex items-center justify-between p-3 rounded-xl border cursor-pointer transition shadow-xs ${
                         paymentPref === "POST_TO_ROOM"
-                          ? "bg-zinc-800 border-zinc-500 text-white font-bold"
-                          : "bg-zinc-900 border-zinc-800 text-zinc-400"
+                          ? "bg-zinc-100 dark:bg-zinc-800 border-zinc-400 dark:border-zinc-500 text-zinc-900 dark:text-white font-bold"
+                          : "bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400"
                       }`}
                     >
                       <div className="flex items-center gap-2.5">
-                        <BedDouble className="h-4 w-4 text-zinc-300" />
+                        <BedDouble className="h-4 w-4 text-zinc-600 dark:text-zinc-300" />
                         <div>
-                          <div className="text-xs">Post to Room Bill (Room {roomNumber})</div>
-                          <div className="text-[10px] text-zinc-400 font-normal">Auto-calculated & paid at checkout</div>
+                          <div className="text-xs font-bold">Post to Room Bill (Room {roomNumber})</div>
+                          <div className="text-[10px] text-zinc-500 dark:text-zinc-400 font-medium">Auto-calculated & paid at checkout</div>
                         </div>
                       </div>
-                      {paymentPref === "POST_TO_ROOM" && <Check className="h-4 w-4 text-emerald-400" />}
+                      {paymentPref === "POST_TO_ROOM" && <Check className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />}
                     </label>
 
                     <label
                       onClick={() => setPaymentPref("UPI_ON_DELIVERY")}
-                      className={`flex items-center justify-between p-3 rounded-xl border cursor-pointer transition ${
+                      className={`flex items-center justify-between p-3 rounded-xl border cursor-pointer transition shadow-xs ${
                         paymentPref === "UPI_ON_DELIVERY"
-                          ? "bg-zinc-800 border-zinc-500 text-white font-bold"
-                          : "bg-zinc-900 border-zinc-800 text-zinc-400"
+                          ? "bg-zinc-100 dark:bg-zinc-800 border-zinc-400 dark:border-zinc-500 text-zinc-900 dark:text-white font-bold"
+                          : "bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400"
                       }`}
                     >
                       <div className="flex items-center gap-2.5">
-                        <span className="font-mono text-zinc-300 font-black text-xs">UPI</span>
+                        <span className="font-mono text-zinc-700 dark:text-zinc-300 font-black text-xs">UPI</span>
                         <div>
-                          <div className="text-xs">UPI / QR Code on Delivery</div>
-                          <div className="text-[10px] text-zinc-400 font-normal">Scan QR when delivered</div>
+                          <div className="text-xs font-bold">UPI / QR Code on Delivery</div>
+                          <div className="text-[10px] text-zinc-500 dark:text-zinc-400 font-medium">Scan QR when delivered</div>
                         </div>
                       </div>
-                      {paymentPref === "UPI_ON_DELIVERY" && <Check className="h-4 w-4 text-emerald-400" />}
+                      {paymentPref === "UPI_ON_DELIVERY" && <Check className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />}
                     </label>
                   </div>
                 </div>
@@ -1055,7 +1055,7 @@ function GuestOrderContent() {
                 <button
                   type="submit"
                   disabled={submitting || !roomNumber || !isRoomVerified}
-                  className="w-full rounded-xl bg-white text-zinc-950 hover:bg-zinc-200 py-3.5 font-black text-xs sm:text-sm shadow-xl transition flex items-center justify-center gap-2 disabled:opacity-50 active:scale-95"
+                  className="w-full rounded-xl bg-zinc-900 text-white hover:bg-zinc-800 dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-200 py-3.5 font-black text-xs sm:text-sm shadow-xl transition flex items-center justify-center gap-2 disabled:opacity-50 active:scale-95 cursor-pointer"
                 >
                   {submitting ? (
                     "Sending to Kitchen..."
@@ -1086,28 +1086,28 @@ function GuestOrderContent() {
               setSelectedOrderForTracking(activeOrders[0]);
               setShowTrackingModal(true);
             }}
-            className="rounded-2xl bg-[#18181b]/95 border border-zinc-700 p-3 shadow-2xl backdrop-blur-xl cursor-pointer hover:border-zinc-500 transition text-white flex items-center justify-between gap-2.5 active:scale-[0.99] min-w-0 w-full"
+            className="rounded-2xl bg-white/95 dark:bg-[#18181b]/95 border border-zinc-300 dark:border-zinc-700 p-3 shadow-2xl backdrop-blur-xl cursor-pointer hover:border-zinc-400 dark:hover:border-zinc-500 transition text-zinc-900 dark:text-white flex items-center justify-between gap-2.5 active:scale-[0.99] min-w-0 w-full"
           >
             <div className="flex items-center gap-2.5 min-w-0 flex-1">
-              <div className="h-9 w-9 rounded-xl bg-zinc-900 border border-zinc-700 flex items-center justify-center text-emerald-400 shrink-0 shadow-inner">
+              <div className="h-9 w-9 rounded-xl bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shrink-0 shadow-inner">
                 <Clock className="h-4 w-4 animate-pulse" />
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-1.5 min-w-0">
-                  <span className="text-[9px] font-mono font-bold uppercase text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20 shrink-0">
+                  <span className="text-[9px] font-mono font-bold uppercase text-emerald-700 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-200 dark:border-emerald-500/20 shrink-0">
                     {activeOrders[0].statusLabel}
                   </span>
-                  <span className="text-[9px] text-zinc-400 font-mono truncate">
+                  <span className="text-[9px] text-zinc-500 dark:text-zinc-400 font-mono truncate">
                     #{activeOrders[0].orderNo}
                   </span>
                 </div>
-                <p className="text-[11px] font-semibold text-zinc-200 truncate mt-0.5">
-                  ETA: <span className="text-white font-bold">~{activeOrders[0].estimatedMinutesRemaining}m</span> • Expected {activeOrders[0].estimatedDeliveryTime}
+                <p className="text-[11px] font-bold text-zinc-800 dark:text-zinc-200 truncate mt-0.5">
+                  ETA: <span className="text-zinc-900 dark:text-white font-extrabold">~{activeOrders[0].estimatedMinutesRemaining}m</span> • Expected {activeOrders[0].estimatedDeliveryTime}
                 </p>
               </div>
             </div>
 
-            <div className="flex items-center gap-1 text-xs font-bold text-zinc-950 bg-white hover:bg-zinc-200 px-3 py-1.5 rounded-xl transition shadow shrink-0">
+            <div className="flex items-center gap-1 text-xs font-bold text-white bg-zinc-900 hover:bg-zinc-800 dark:text-zinc-950 dark:bg-white dark:hover:bg-zinc-200 px-3 py-1.5 rounded-xl transition shadow-xs shrink-0 cursor-pointer">
               <span>Track</span>
               <ChevronRight className="h-3.5 w-3.5" />
             </div>
@@ -1117,25 +1117,25 @@ function GuestOrderContent() {
 
       {/* 8. COMPREHENSIVE LIVE ORDER TRACKING MODAL (MOBILE BOTTOM SHEET & DESKTOP DIALOG) */}
       {showTrackingModal && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-sm p-0 sm:p-4 overflow-hidden animate-in fade-in duration-150">
-          <div className="w-full max-w-lg rounded-t-3xl sm:rounded-3xl border-t sm:border border-zinc-800 bg-[#121215] shadow-2xl flex flex-col max-h-[90vh] sm:max-h-[85vh] text-zinc-200 text-xs overflow-hidden">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 dark:bg-black/80 backdrop-blur-sm p-0 sm:p-4 overflow-hidden animate-in fade-in duration-150">
+          <div className="w-full max-w-lg rounded-t-3xl sm:rounded-3xl border-t sm:border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121215] shadow-2xl flex flex-col max-h-[90vh] sm:max-h-[85vh] text-zinc-800 dark:text-zinc-200 text-xs overflow-hidden">
             {/* Mobile Sheet Drag Handle */}
-            <div className="w-10 h-1 rounded-full bg-zinc-700 mx-auto mt-2.5 sm:hidden shrink-0" />
+            <div className="w-10 h-1 rounded-full bg-zinc-300 dark:bg-zinc-700 mx-auto mt-2.5 sm:hidden shrink-0" />
 
             {/* Modal Header */}
-            <div className="flex items-center justify-between px-3.5 sm:px-6 py-3 border-b border-zinc-800 shrink-0 min-w-0 w-full">
+            <div className="flex items-center justify-between px-3.5 sm:px-6 py-3 border-b border-zinc-200 dark:border-zinc-800 shrink-0 min-w-0 w-full">
               <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                <div className="h-8 w-8 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-100 flex items-center justify-center shrink-0">
+                <div className="h-8 w-8 rounded-xl bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 flex items-center justify-center shrink-0">
                   <UtensilsCrossed className="h-4 w-4" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <h2 className="text-xs sm:text-sm font-bold text-white flex items-center gap-1.5 min-w-0">
+                  <h2 className="text-xs sm:text-sm font-bold text-zinc-900 dark:text-white flex items-center gap-1.5 min-w-0">
                     <span className="truncate">In-Room Dining Tracker</span>
-                    <span className="text-[10px] font-mono text-zinc-300 bg-zinc-800 border border-zinc-700 px-1.5 py-0.2 rounded font-medium shrink-0">
+                    <span className="text-[10px] font-mono text-zinc-700 dark:text-zinc-300 bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 px-1.5 py-0.5 rounded font-bold shrink-0">
                       Room {roomNumber}
                     </span>
                   </h2>
-                  <p className="text-[10px] text-zinc-400 font-mono truncate">
+                  <p className="text-[10px] text-zinc-500 dark:text-zinc-400 font-mono truncate">
                     Live updates synced with kitchen workstation
                   </p>
                 </div>
@@ -1145,7 +1145,7 @@ function GuestOrderContent() {
                 <button
                   type="button"
                   onClick={() => fetchRoomOrders(roomNumber)}
-                  className="h-7 w-7 sm:h-8 sm:w-8 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-400 hover:text-white transition"
+                  className="h-7 w-7 sm:h-8 sm:w-8 rounded-lg bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 flex items-center justify-center text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition cursor-pointer"
                   title="Refresh order status"
                 >
                   <RefreshCw className="h-3.5 w-3.5" />
@@ -1153,7 +1153,7 @@ function GuestOrderContent() {
                 <button
                   type="button"
                   onClick={() => setShowTrackingModal(false)}
-                  className="h-7 w-7 sm:h-8 sm:w-8 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-400 hover:text-white transition"
+                  className="h-7 w-7 sm:h-8 sm:w-8 rounded-lg bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 flex items-center justify-center text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition cursor-pointer"
                 >
                   <X className="h-4 w-4" />
                 </button>
@@ -1164,20 +1164,20 @@ function GuestOrderContent() {
             <div className="overflow-y-auto overflow-x-hidden px-3.5 sm:px-6 py-3.5 space-y-3 flex-1 min-w-0 w-full">
               {/* Active vs Past Orders Tab Switcher (If both exist) */}
               {(activeOrders.length > 0 || pastOrders.length > 0) && (
-                <div className="grid grid-cols-2 gap-1 p-1 rounded-xl bg-zinc-900 border border-zinc-800 w-full min-w-0">
+                <div className="grid grid-cols-2 gap-1 p-1 rounded-xl bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 w-full min-w-0">
                   <button
                     type="button"
                     onClick={() => {
                       setTrackingTab("ACTIVE");
                       if (activeOrders.length > 0) setSelectedOrderForTracking(activeOrders[0]);
                     }}
-                    className={`py-1.5 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 min-w-0 truncate ${
+                    className={`py-1.5 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 min-w-0 truncate cursor-pointer ${
                       trackingTab === "ACTIVE"
-                        ? "bg-zinc-800 text-white shadow-sm border border-zinc-700"
-                        : "text-zinc-400 hover:text-white"
+                        ? "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-xs border border-zinc-200 dark:border-zinc-700"
+                        : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
                     }`}
                   >
-                    <Clock className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
+                    <Clock className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
                     <span className="truncate">Active ({activeOrders.length})</span>
                   </button>
 
@@ -1187,13 +1187,13 @@ function GuestOrderContent() {
                       setTrackingTab("PAST");
                       if (pastOrders.length > 0) setSelectedOrderForTracking(pastOrders[0]);
                     }}
-                    className={`py-1.5 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 min-w-0 truncate ${
+                    className={`py-1.5 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 min-w-0 truncate cursor-pointer ${
                       trackingTab === "PAST"
-                        ? "bg-zinc-800 text-white shadow-sm border border-zinc-700"
-                        : "text-zinc-400 hover:text-white"
+                        ? "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-xs border border-zinc-200 dark:border-zinc-700"
+                        : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
                     }`}
                   >
-                    <History className="h-3.5 w-3.5 text-zinc-400 shrink-0" />
+                    <History className="h-3.5 w-3.5 text-zinc-500 dark:text-zinc-400 shrink-0" />
                     <span className="truncate">Past ({pastOrders.length})</span>
                   </button>
                 </div>
@@ -1207,32 +1207,13 @@ function GuestOrderContent() {
                       key={o.id}
                       type="button"
                       onClick={() => setSelectedOrderForTracking(o)}
-                      className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold whitespace-nowrap transition shrink-0 ${
+                      className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold whitespace-nowrap transition shrink-0 cursor-pointer ${
                         selectedOrderForTracking?.id === o.id
-                          ? "bg-white text-zinc-950 shadow"
-                          : "bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white"
+                          ? "bg-zinc-900 text-white dark:bg-white dark:text-zinc-950 shadow-xs"
+                          : "bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
                       }`}
                     >
                       #{o.orderNo} (~{o.estimatedMinutesRemaining}m)
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              {trackingTab === "PAST" && pastOrders.length > 1 && (
-                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 min-w-0 w-full">
-                  {pastOrders.map((o) => (
-                    <button
-                      key={o.id}
-                      type="button"
-                      onClick={() => setSelectedOrderForTracking(o)}
-                      className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold whitespace-nowrap transition shrink-0 ${
-                        selectedOrderForTracking?.id === o.id
-                          ? "bg-white text-zinc-950 shadow"
-                          : "bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white"
-                      }`}
-                    >
-                      #{o.orderNo} ({o.orderedAtFormatted})
                     </button>
                   ))}
                 </div>
@@ -1242,12 +1223,12 @@ function GuestOrderContent() {
               {selectedOrderForTracking ? (
                 <div className="space-y-3 min-w-0 w-full">
                   {/* 1. HERO ESTIMATED TIME & STATUS BANNER */}
-                  <div className="rounded-2xl bg-zinc-900/90 border border-zinc-800 p-3.5 sm:p-4 text-center space-y-2.5 min-w-0 w-full">
+                  <div className="rounded-2xl bg-zinc-50 dark:bg-zinc-900/90 border border-zinc-200 dark:border-zinc-800 p-3.5 sm:p-4 text-center space-y-2.5 min-w-0 w-full shadow-xs">
                     <div className="flex items-center justify-between text-[11px] font-mono gap-2 min-w-0">
-                      <span className="text-zinc-400 truncate">
-                        Order <strong className="text-white font-mono">#{selectedOrderForTracking.orderNo}</strong>
+                      <span className="text-zinc-600 dark:text-zinc-400 truncate font-semibold">
+                        Order <strong className="text-zinc-900 dark:text-white font-mono font-bold">#{selectedOrderForTracking.orderNo}</strong>
                       </span>
-                      <span className="px-2 py-0.5 rounded font-bold uppercase text-[9px] sm:text-[10px] font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shrink-0">
+                      <span className="px-2 py-0.5 rounded font-bold uppercase text-[9px] sm:text-[10px] font-mono bg-emerald-100 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20 shrink-0">
                         {selectedOrderForTracking.statusLabel}
                       </span>
                     </div>
@@ -1256,21 +1237,21 @@ function GuestOrderContent() {
                     <div className="py-0.5">
                       {selectedOrderForTracking.step < 4 ? (
                         <div>
-                          <div className="text-2xl sm:text-3xl font-black text-white font-mono tracking-tight flex items-center justify-center gap-2">
-                            <Clock className="h-5 w-5 sm:h-6 sm:w-6 text-emerald-400 animate-pulse shrink-0" />
+                          <div className="text-2xl sm:text-3xl font-black text-zinc-900 dark:text-white font-mono tracking-tight flex items-center justify-center gap-2">
+                            <Clock className="h-5 w-5 sm:h-6 sm:w-6 text-emerald-600 dark:text-emerald-400 animate-pulse shrink-0" />
                             <span>~{selectedOrderForTracking.estimatedMinutesRemaining} Minutes</span>
                           </div>
-                          <p className="text-[11px] sm:text-xs text-zinc-400 mt-1 font-medium leading-normal">
-                            Estimated Delivery: <strong className="text-white font-bold font-mono">{selectedOrderForTracking.estimatedDeliveryTime}</strong> to Room {roomNumber}
+                          <p className="text-[11px] sm:text-xs text-zinc-500 dark:text-zinc-400 mt-1 font-medium leading-normal">
+                            Estimated Delivery: <strong className="text-zinc-900 dark:text-white font-bold font-mono">{selectedOrderForTracking.estimatedDeliveryTime}</strong> to Room {roomNumber}
                           </p>
                         </div>
                       ) : (
                         <div>
-                          <div className="text-2xl sm:text-3xl font-black text-emerald-400 tracking-tight flex items-center justify-center gap-2">
-                            <CheckCircle2 className="h-6 w-6 sm:h-7 sm:w-7 text-emerald-400 shrink-0" />
+                          <div className="text-2xl sm:text-3xl font-black text-emerald-600 dark:text-emerald-400 tracking-tight flex items-center justify-center gap-2">
+                            <CheckCircle2 className="h-6 w-6 sm:h-7 sm:w-7 text-emerald-600 dark:text-emerald-400 shrink-0" />
                             <span>Delivered to Room {roomNumber}</span>
                           </div>
-                          <p className="text-[11px] sm:text-xs text-zinc-400 mt-1 font-mono">
+                          <p className="text-[11px] sm:text-xs text-zinc-500 dark:text-zinc-400 mt-1 font-mono">
                             Delivered at {selectedOrderForTracking.orderedAtFormatted} • Enjoy your meal!
                           </p>
                         </div>
@@ -1279,27 +1260,27 @@ function GuestOrderContent() {
 
                     {/* Clean Progress Bar */}
                     <div className="space-y-1 pt-0.5">
-                      <div className="h-1.5 w-full rounded-full bg-zinc-800 overflow-hidden">
+                      <div className="h-1.5 w-full rounded-full bg-zinc-200 dark:bg-zinc-800 overflow-hidden">
                         <div
                           className="h-full bg-emerald-500 rounded-full transition-all duration-500"
                           style={{ width: `${selectedOrderForTracking.progressPercentage}%` }}
                         />
                       </div>
-                      <div className="flex items-center justify-between text-[10px] text-zinc-400 font-mono gap-1 min-w-0">
+                      <div className="flex items-center justify-between text-[10px] text-zinc-500 dark:text-zinc-400 font-mono gap-1 min-w-0 font-semibold">
                         <span className="truncate">Ordered {selectedOrderForTracking.orderedAtFormatted}</span>
-                        <span className="shrink-0 font-medium">Step {selectedOrderForTracking.step}/4: {selectedOrderForTracking.statusLabel}</span>
+                        <span className="shrink-0">Step {selectedOrderForTracking.step}/4: {selectedOrderForTracking.statusLabel}</span>
                       </div>
                     </div>
                   </div>
 
                   {/* 2. 4-STEP LIVE TIMELINE */}
-                  <div className="rounded-2xl bg-zinc-900/90 border border-zinc-800 p-3 sm:p-4 space-y-3 text-xs min-w-0 w-full">
-                    <div className="font-bold text-white flex items-center justify-between border-b border-zinc-800 pb-2">
+                  <div className="rounded-2xl bg-zinc-50 dark:bg-zinc-900/90 border border-zinc-200 dark:border-zinc-800 p-3 sm:p-4 space-y-3 text-xs min-w-0 w-full shadow-xs">
+                    <div className="font-bold text-zinc-900 dark:text-white flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 pb-2">
                       <div className="flex items-center gap-1.5">
-                        <Clock className="h-3.5 w-3.5 text-zinc-400" />
+                        <Clock className="h-3.5 w-3.5 text-zinc-500 dark:text-zinc-400" />
                         <span>Live Kitchen & Delivery Timeline</span>
                       </div>
-                      <span className="text-[10px] font-mono text-zinc-400">
+                      <span className="text-[10px] font-mono text-zinc-500 dark:text-zinc-400 font-bold">
                         Room {roomNumber}
                       </span>
                     </div>
@@ -1309,20 +1290,20 @@ function GuestOrderContent() {
                       <div
                         className={`h-5 w-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 mt-0.5 ${
                           selectedOrderForTracking.step >= 1
-                            ? "bg-emerald-500 text-zinc-950"
-                            : "bg-zinc-800 text-zinc-500"
+                            ? "bg-emerald-500 text-white"
+                            : "bg-zinc-200 dark:bg-zinc-800 text-zinc-400"
                         }`}
                       >
                         ✓
                       </div>
                       <div className="min-w-0 flex-1">
-                        <div className="font-bold text-white flex items-center justify-between gap-2">
+                        <div className="font-bold text-zinc-900 dark:text-white flex items-center justify-between gap-2">
                           <span className="truncate">1. Order Confirmed in Kitchen</span>
-                          <span className="text-[10px] font-mono text-zinc-400 font-normal shrink-0">
+                          <span className="text-[10px] font-mono text-zinc-500 dark:text-zinc-400 font-normal shrink-0">
                             {selectedOrderForTracking.orderedAtFormatted}
                           </span>
                         </div>
-                        <div className="text-[11px] text-zinc-400 leading-snug break-words mt-0.5">
+                        <div className="text-[11px] text-zinc-500 dark:text-zinc-400 leading-snug break-words mt-0.5 font-medium">
                           KOT ticket printed and assigned to kitchen workstation
                         </div>
                       </div>
@@ -1333,26 +1314,26 @@ function GuestOrderContent() {
                       <div
                         className={`h-5 w-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 mt-0.5 ${
                           selectedOrderForTracking.step > 2
-                            ? "bg-emerald-500 text-zinc-950"
+                            ? "bg-emerald-500 text-white"
                             : selectedOrderForTracking.step === 2
-                            ? "bg-white text-zinc-950 ring-2 ring-white/20"
-                            : "bg-zinc-800 text-zinc-500"
+                            ? "bg-zinc-900 text-white dark:bg-white dark:text-zinc-950 ring-2 ring-zinc-400/20"
+                            : "bg-zinc-200 dark:bg-zinc-800 text-zinc-400"
                         }`}
                       >
                         {selectedOrderForTracking.step > 2 ? "✓" : "2"}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <div className="font-bold text-white flex items-center justify-between gap-2">
-                          <span className={selectedOrderForTracking.step === 2 ? "text-white font-black truncate" : "text-zinc-300 font-bold truncate"}>
+                        <div className="font-bold text-zinc-900 dark:text-white flex items-center justify-between gap-2">
+                          <span className={selectedOrderForTracking.step === 2 ? "text-zinc-900 dark:text-white font-black truncate" : "text-zinc-600 dark:text-zinc-300 font-bold truncate"}>
                             2. Chefs Cooking Fresh Meal
                           </span>
                           {selectedOrderForTracking.step === 2 && (
-                            <span className="text-[10px] font-mono text-emerald-400 font-bold shrink-0">
+                            <span className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 font-bold shrink-0">
                               ~{selectedOrderForTracking.estimatedMinutesRemaining}m
                             </span>
                           )}
                         </div>
-                        <div className="text-[11px] text-zinc-400 leading-snug break-words mt-0.5">
+                        <div className="text-[11px] text-zinc-500 dark:text-zinc-400 leading-snug break-words mt-0.5 font-medium">
                           Chefs actively preparing fresh ingredients on tandoor & wok
                         </div>
                       </div>
@@ -1363,26 +1344,26 @@ function GuestOrderContent() {
                       <div
                         className={`h-5 w-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 mt-0.5 ${
                           selectedOrderForTracking.step > 3
-                            ? "bg-emerald-500 text-zinc-950"
+                            ? "bg-emerald-500 text-white"
                             : selectedOrderForTracking.step === 3
-                            ? "bg-white text-zinc-950 ring-2 ring-white/20"
-                            : "bg-zinc-800 text-zinc-500"
+                            ? "bg-zinc-900 text-white dark:bg-white dark:text-zinc-950 ring-2 ring-zinc-400/20"
+                            : "bg-zinc-200 dark:bg-zinc-800 text-zinc-400"
                         }`}
                       >
                         {selectedOrderForTracking.step > 3 ? "✓" : "3"}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <div className="font-bold text-white flex items-center justify-between gap-2">
-                          <span className={selectedOrderForTracking.step === 3 ? "text-white font-black truncate" : "text-zinc-300 font-bold truncate"}>
+                        <div className="font-bold text-zinc-900 dark:text-white flex items-center justify-between gap-2">
+                          <span className={selectedOrderForTracking.step === 3 ? "text-zinc-900 dark:text-white font-black truncate" : "text-zinc-600 dark:text-zinc-300 font-bold truncate"}>
                             3. Dispatched & Out for Delivery
                           </span>
                           {selectedOrderForTracking.step === 3 && (
-                            <span className="text-[10px] font-mono text-emerald-400 font-bold shrink-0">
+                            <span className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 font-bold shrink-0">
                               On the Way (~5m)
                             </span>
                           )}
                         </div>
-                        <div className="text-[11px] text-zinc-400 leading-snug break-words mt-0.5">
+                        <div className="text-[11px] text-zinc-500 dark:text-zinc-400 leading-snug break-words mt-0.5 font-medium">
                           Food plated warm; room service runner bringing tray to Room {roomNumber}
                         </div>
                       </div>
@@ -1393,15 +1374,15 @@ function GuestOrderContent() {
                       <div
                         className={`h-5 w-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 mt-0.5 ${
                           selectedOrderForTracking.step === 4
-                            ? "bg-emerald-500 text-zinc-950"
-                            : "bg-zinc-800 text-zinc-500"
+                            ? "bg-emerald-500 text-white"
+                            : "bg-zinc-200 dark:bg-zinc-800 text-zinc-400"
                         }`}
                       >
                         {selectedOrderForTracking.step === 4 ? "✓" : "4"}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <div className="font-bold text-white">4. Delivered to Room</div>
-                        <div className="text-[11px] text-zinc-400 leading-snug break-words mt-0.5">
+                        <div className="font-bold text-zinc-900 dark:text-white">4. Delivered to Room</div>
+                        <div className="text-[11px] text-zinc-500 dark:text-zinc-400 leading-snug break-words mt-0.5 font-medium">
                           Meal received in room. Bill posted to room folio / settled.
                         </div>
                       </div>
@@ -1409,47 +1390,47 @@ function GuestOrderContent() {
                   </div>
 
                   {/* 3. ORDER ITEMS BREAKDOWN (GENUINE DATABASE ITEMS) */}
-                  <div className="rounded-2xl bg-zinc-900/90 border border-zinc-800 p-3 sm:p-4 space-y-2 text-xs min-w-0 w-full">
-                    <div className="font-bold text-white flex items-center justify-between border-b border-zinc-800 pb-2">
+                  <div className="rounded-2xl bg-zinc-50 dark:bg-zinc-900/90 border border-zinc-200 dark:border-zinc-800 p-3 sm:p-4 space-y-2 text-xs min-w-0 w-full shadow-xs">
+                    <div className="font-bold text-zinc-900 dark:text-white flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 pb-2">
                       <span>Ordered Dishes ({selectedOrderForTracking.items?.length || 0} items)</span>
-                      <span className="font-mono text-emerald-400 font-bold">
+                      <span className="font-mono text-emerald-600 dark:text-emerald-400 font-bold">
                         {formatINR(selectedOrderForTracking.totalAmount)}
                       </span>
                     </div>
 
                     <div className="space-y-1.5 max-h-40 overflow-y-auto pr-0.5 min-w-0 w-full">
                       {selectedOrderForTracking.items?.map((it: any) => (
-                        <div key={it.id} className="flex items-center justify-between gap-2 text-xs py-1 border-b border-zinc-800/40 min-w-0 w-full">
+                        <div key={it.id} className="flex items-center justify-between gap-2 text-xs py-1 border-b border-zinc-200 dark:border-zinc-800/40 min-w-0 w-full">
                           <div className="flex items-center gap-2 min-w-0 flex-1">
-                            <span className="font-mono font-bold text-zinc-400 shrink-0">{it.qty}x</span>
+                            <span className="font-mono font-bold text-zinc-500 dark:text-zinc-400 shrink-0">{it.qty}x</span>
                             <div className="min-w-0 flex-1">
-                              <span className="text-white font-medium truncate block">{it.name}</span>
+                              <span className="text-zinc-900 dark:text-white font-medium truncate block">{it.name}</span>
                               {it.notes && (
-                                <span className="text-[10px] text-zinc-400 block font-mono truncate">
+                                <span className="text-[10px] text-zinc-500 dark:text-zinc-400 block font-mono truncate">
                                   Note: {it.notes}
                                 </span>
                               )}
                             </div>
                           </div>
-                          <span className="font-mono text-zinc-300 shrink-0">{formatINR(it.total)}</span>
+                          <span className="font-mono font-bold text-zinc-800 dark:text-zinc-300 shrink-0">{formatINR(it.total)}</span>
                         </div>
                       ))}
                     </div>
 
-                    <div className="pt-2 border-t border-zinc-800 flex items-center justify-between text-[11px] text-zinc-400 font-mono">
+                    <div className="pt-2 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-between text-[11px] text-zinc-600 dark:text-zinc-400 font-mono">
                       <span>GST (5% SAC 996331): {formatINR(selectedOrderForTracking.taxTotal)}</span>
-                      <span className="text-white font-bold">Total: {formatINR(selectedOrderForTracking.totalAmount)}</span>
+                      <span className="text-zinc-900 dark:text-white font-bold">Total: {formatINR(selectedOrderForTracking.totalAmount)}</span>
                     </div>
                   </div>
                 </div>
               ) : (
-                <div className="py-8 text-center text-zinc-500 space-y-2">
-                  <UtensilsCrossed className="h-8 w-8 mx-auto text-zinc-600" />
+                <div className="py-8 text-center text-zinc-400 space-y-2 font-medium">
+                  <UtensilsCrossed className="h-8 w-8 mx-auto text-zinc-400" />
                   <p>No active food orders found for Room {roomNumber}.</p>
                   <button
                     type="button"
                     onClick={() => setShowTrackingModal(false)}
-                    className="rounded-xl bg-white text-zinc-950 font-bold px-4 py-2 text-xs shadow-md"
+                    className="rounded-xl bg-zinc-900 text-white dark:bg-white dark:text-zinc-950 font-bold px-4 py-2 text-xs shadow-xs cursor-pointer"
                   >
                     Browse Menu & Place Order
                   </button>
@@ -1458,11 +1439,11 @@ function GuestOrderContent() {
             </div>
 
             {/* Modal Sticky Bottom Footer */}
-            <div className="p-3.5 sm:p-4 border-t border-zinc-800 bg-[#121215] shrink-0 w-full">
+            <div className="p-3.5 sm:p-4 border-t border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121215] shrink-0 w-full">
               <button
                 type="button"
                 onClick={() => setShowTrackingModal(false)}
-                className="w-full rounded-xl bg-white text-zinc-950 hover:bg-zinc-200 py-3 text-xs font-bold transition active:scale-95 shadow-md"
+                className="w-full rounded-xl bg-zinc-900 text-white hover:bg-zinc-800 dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-200 py-3 text-xs font-bold transition active:scale-95 shadow-xs cursor-pointer"
               >
                 Close & Continue Dining
               </button>
@@ -1473,35 +1454,35 @@ function GuestOrderContent() {
 
       {/* 8. WELCOME ROOM SELECTOR MODAL (FOR GENERIC QR SCANS) */}
       {showWelcomeModal && !roomNumber && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4 animate-in fade-in">
-          <div className="w-full max-w-md rounded-3xl border border-zinc-700 bg-[#121215] p-5 sm:p-6 shadow-2xl space-y-4 text-zinc-200">
-            <div className="text-center space-y-1.5 pb-2 border-b border-zinc-800">
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-zinc-950 font-black text-base tracking-tight mx-auto mb-2 shadow-md">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 dark:bg-black/85 backdrop-blur-md p-4 animate-in fade-in">
+          <div className="w-full max-w-md rounded-3xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-[#121215] p-5 sm:p-6 shadow-2xl space-y-4 text-zinc-900 dark:text-zinc-200">
+            <div className="text-center space-y-1.5 pb-2 border-b border-zinc-200 dark:border-zinc-800">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-zinc-900 text-white dark:bg-white dark:text-zinc-950 font-black text-base tracking-tight mx-auto mb-2 shadow-xs">
                 A
               </div>
-              <h2 className="text-base sm:text-lg font-black text-white">
+              <h2 className="text-base sm:text-lg font-black text-zinc-900 dark:text-white">
                 In-Room Dining
               </h2>
-              <p className="text-xs text-zinc-400">
+              <p className="text-xs text-zinc-500 dark:text-zinc-400 font-medium">
                 Please select your room to explore the menu and order directly to your room.
               </p>
             </div>
 
             {/* Room Search */}
             <div className="relative">
-              <Search className="absolute left-3.5 top-3 h-4 w-4 text-zinc-500" />
+              <Search className="absolute left-3.5 top-3 h-4 w-4 text-zinc-400" />
               <input
                 type="text"
                 placeholder="Search room number or your name..."
                 value={roomSearchQuery}
                 onChange={(e) => setRoomSearchQuery(e.target.value)}
-                className="w-full rounded-xl bg-zinc-900 border border-zinc-700 pl-10 pr-3 py-2.5 text-xs sm:text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-white"
+                className="w-full rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 pl-10 pr-3 py-2.5 text-xs sm:text-sm text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none focus:border-blue-500 shadow-xs"
               />
             </div>
 
             {/* Occupied In-House Rooms (1-Tap Selection) */}
             <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
-              <div className="text-[10px] uppercase font-mono tracking-wider text-zinc-400 font-bold">
+              <div className="text-[10px] uppercase font-mono tracking-wider text-zinc-500 dark:text-zinc-400 font-bold">
                 In-House Rooms
               </div>
 
@@ -1512,16 +1493,16 @@ function GuestOrderContent() {
                     handleSelectRoom(r);
                     setShowWelcomeModal(false);
                   }}
-                  className="p-3 rounded-2xl bg-zinc-900/90 hover:bg-zinc-800 border border-zinc-800 hover:border-zinc-600 cursor-pointer transition flex items-center justify-between text-xs"
+                  className="p-3 rounded-2xl bg-zinc-50 dark:bg-zinc-900/90 hover:bg-zinc-100 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-600 cursor-pointer transition flex items-center justify-between text-xs shadow-xs"
                 >
                   <div className="space-y-0.5">
                     <div className="flex items-center gap-2">
-                      <span className="font-bold text-white font-mono">Room {r.number}</span>
-                      <span className="text-[10px] text-zinc-400">• {r.roomTypeName}</span>
+                      <span className="font-bold text-zinc-900 dark:text-white font-mono">Room {r.number}</span>
+                      <span className="text-[10px] text-zinc-500 dark:text-zinc-400">• {r.roomTypeName}</span>
                     </div>
                     {r.guestName && (
-                      <div className="text-[11px] text-blue-400 font-medium flex items-center gap-1">
-                        <User className="h-3 w-3 text-blue-400" /> {r.guestName}
+                      <div className="text-[11px] text-blue-600 dark:text-blue-400 font-bold flex items-center gap-1">
+                        <User className="h-3 w-3 text-blue-600 dark:text-blue-400" /> {r.guestName}
                       </div>
                     )}
                   </div>
@@ -1529,8 +1510,8 @@ function GuestOrderContent() {
                   <span
                     className={`rounded-md px-2 py-0.5 text-[9px] font-mono font-bold ${
                       r.isOccupied
-                        ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
-                        : "bg-zinc-800 text-zinc-500"
+                        ? "bg-emerald-100 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20"
+                        : "bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-500"
                     }`}
                   >
                     {r.isOccupied ? "Occupied" : "Vacant"}
@@ -1541,7 +1522,7 @@ function GuestOrderContent() {
 
             <button
               onClick={() => setShowWelcomeModal(false)}
-              className="w-full rounded-xl bg-zinc-800 hover:bg-zinc-700 py-3 text-xs font-bold text-zinc-300 transition"
+              className="w-full rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 py-3 text-xs font-bold text-zinc-700 dark:text-zinc-300 transition cursor-pointer shadow-xs"
             >
               Browse Menu First
             </button>
@@ -1556,7 +1537,7 @@ export default function GuestOrderPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen bg-[#09090b] flex items-center justify-center text-zinc-400 text-xs font-mono">
+        <div className="min-h-screen bg-zinc-50 dark:bg-[#09090b] flex items-center justify-center text-zinc-500 dark:text-zinc-400 text-xs font-mono font-bold">
           Loading Menu...
         </div>
       }

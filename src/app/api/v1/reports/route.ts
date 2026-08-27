@@ -119,7 +119,7 @@ export async function GET(request: Request) {
           folioId: p.folioId || "—",
           amount: p.amount,
           method: p.method, // UPI, CASH, CARD, OTA_VCC, BANK_TRANSFER, DIRECT_BILL
-          reference: p.reference || "N/A",
+          reference: p.reference && !p.reference.startsWith("GRC-DEPOSIT-") ? p.reference : "—",
           status: p.status,
           receivedBy: "Front Desk Cashier",
         };

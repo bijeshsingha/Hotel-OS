@@ -168,7 +168,9 @@ export async function checkInGuest({
   propertyId,
   reservationId,
   guestData,
-  roomId,
+  roomIds,
+  groupBilling = true,
+  roomRates,
   arrivalAt,
   expectedDepartureAt,
   adults = 2,
@@ -178,6 +180,9 @@ export async function checkInGuest({
   paxC,
   ratePlanId,
   depositAmount = 0,
+  agreedTariff,
+  extraBeds = 0,
+  extraBedRate = 500,
   actorId,
   overrideReason,
   coGuests,
@@ -211,7 +216,9 @@ export async function checkInGuest({
     age?: number;
     gender?: string;
   };
-  roomId: string;
+  roomIds: string[];
+  groupBilling?: boolean;
+  roomRates?: Record<string, number | string>;
   arrivalAt?: Date;
   expectedDepartureAt: Date;
   adults?: number;
@@ -221,6 +228,9 @@ export async function checkInGuest({
   paxC?: number;
   ratePlanId?: string;
   depositAmount?: number;
+  agreedTariff?: number;
+  extraBeds?: number;
+  extraBedRate?: number;
   actorId?: string;
   overrideReason?: string;
   coGuests?: any[];
@@ -230,18 +240,24 @@ export async function checkInGuest({
     where: { id: propertyId },
   });
 
-  // Verify room exists and check cleanliness
-  const room = await prisma.room.findUniqueOrThrow({
-    where: { id: roomId },
+  // Verify rooms exist and check cleanliness
+  const rooms = await prisma.room.findMany({
+    where: { id: { in: roomIds } },
     include: { roomState: true, roomType: true },
   });
 
-  if (room.roomState?.occupancyStatus === "OCCUPIED") {
-    throw new Error(`Room ${room.number} is already occupied.`);
+  if (rooms.length !== roomIds.length) {
+    throw new Error("One or more rooms not found.");
   }
 
-  if (room.roomState?.sellabilityStatus !== "SELLABLE" && !overrideReason) {
-    throw new Error(`Room ${room.number} is ${room.roomState?.sellabilityStatus}. Override reason required.`);
+  for (const room of rooms) {
+    if (room.roomState?.occupancyStatus === "OCCUPIED") {
+      throw new Error(`Room ${room.number} is already occupied.`);
+    }
+
+    if (room.roomState?.sellabilityStatus !== "SELLABLE" && !overrideReason) {
+      throw new Error(`Room ${room.number} is ${room.roomState?.sellabilityStatus}. Override reason required.`);
+    }
   }
 
   // 1. Find or create Guest
@@ -328,125 +344,240 @@ export async function checkInGuest({
     });
   }
 
-  // 3. Create Stay
-  const stay = await prisma.stay.create({
-    data: {
-      organizationId: property.organizationId,
-      propertyId,
-      primaryGuestId: guest.id,
-      status: "IN_HOUSE",
-      arrivalAt: arrivalAt || new Date(),
-      expectedDepartureAt,
-      adults,
-      children,
-    },
-  });
-
-  // 4. Create Room Assignment
-  await prisma.roomAssignment.create({
-    data: {
-      stayId: stay.id,
-      roomId: room.id,
-      startsAt: new Date(),
-      rateHandling: "RETAIN_RATE",
-    },
-  });
-
-  // 5. Update Room State to OCCUPIED
-  await prisma.roomState.upsert({
-    where: { roomId: room.id },
-    create: {
-      organizationId: property.organizationId,
-      propertyId,
-      roomId: room.id,
-      occupancyStatus: "OCCUPIED",
-      housekeepingStatus: room.roomState?.housekeepingStatus || "CLEAN",
-      sellabilityStatus: "SELLABLE",
-    },
-    update: {
-      occupancyStatus: "OCCUPIED",
-      lastChangedAt: new Date(),
-    },
-  });
-
-  // 6. Create Primary Folio and Guest Window
-  const folio = await prisma.folio.create({
-    data: {
-      organizationId: property.organizationId,
-      propertyId,
-      stayId: stay.id,
-      status: "OPEN",
-      currency: property.currency,
-      balance: 0,
-    },
-  });
-
-  const guestWindow = await prisma.folioWindow.create({
-    data: {
-      folioId: folio.id,
-      name: "Guest Window",
-      windowNumber: 1,
-      payerType: "GUEST",
-      guestOrCompanySnapshot: JSON.stringify({
-        name: guest.name,
-        phone: guest.phone,
-        gstin: guest.gstin,
-      }),
-      status: "OPEN",
-    },
-  });
-
-  // Update stay with folio ID
-  await prisma.stay.update({
-    where: { id: stay.id },
-    data: { folioId: folio.id },
-  });
-
-  // 7. Post Initial Room Tariff Charge (SAC 996311)
-  let roomBasePrice = 3200;
-  if (room.roomTypeId) {
-    const rateVersion = await prisma.ratePlanVersion.findFirst({
-      where: { roomTypeId: room.roomTypeId, active: true },
-      orderBy: { createdAt: "desc" },
-    });
-    if (rateVersion?.pricingJson) {
-      try {
-        const pricing = JSON.parse(rateVersion.pricingJson);
-        if (pricing.basePrice) roomBasePrice = Number(pricing.basePrice);
-      } catch {}
-    }
-  }
-
-  const roomGst = calculateGST({
-    grossOrBaseAmount: roomBasePrice,
-    isInclusive: false,
-    sacHsn: "996311",
-    supplierStateCode: property.stateCode || "18",
-  });
-
+  const start = new Date((arrivalAt || new Date()).toISOString().split("T")[0]);
+  const end = new Date(expectedDepartureAt.toISOString().split("T")[0]);
+  const nights = Math.max(1, Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)));
   const serviceDateStr = property.businessDate || new Date().toISOString().split("T")[0];
 
-  await prisma.folioEntry.create({
-    data: {
-      organizationId: property.organizationId,
-      propertyId: property.id,
-      folioId: folio.id,
-      folioWindowId: guestWindow.id,
-      serviceDate: serviceDateStr,
-      type: "CHARGE",
-      chargeCode: "ROOM_TARIFF",
-      description: `Room Tariff - Room ${room.number} (${room.roomType?.name || "Room Charge"})`,
-      qty: 1,
-      unitAmount: roomBasePrice,
-      taxableAmount: roomGst.taxableAmount,
-      taxComponentsJson: JSON.stringify(roomGst.components),
-      totalAmount: roomGst.totalAmount,
-      sourceType: "PMS_NIGHTLY_CHARGE",
-      status: "POSTED",
-    },
-  });
+  let totalBalanceAdded = 0;
+  let stayIdsForDeposit: string[] = [];
+  let masterFolioId: string | null = null;
+  let guestWindowForDeposit: any = null;
 
-  let currentBalance = roomGst.totalAmount;
+  if (groupBilling) {
+    // SINGLE STAY & SINGLE FOLIO FOR ALL ROOMS
+    const stay = await prisma.stay.create({
+      data: {
+        organizationId: property.organizationId,
+        propertyId,
+        primaryGuestId: guest.id,
+        status: "IN_HOUSE",
+        arrivalAt: arrivalAt || new Date(),
+        expectedDepartureAt,
+        adults,
+        children,
+      },
+    });
+    stayIdsForDeposit.push(stay.id);
+
+    const folio = await prisma.folio.create({
+      data: {
+        organizationId: property.organizationId,
+        propertyId,
+        stayId: stay.id,
+        status: "OPEN",
+        currency: property.currency,
+        balance: 0,
+      },
+    });
+    masterFolioId = folio.id;
+
+    const guestWindow = await prisma.folioWindow.create({
+      data: {
+        folioId: folio.id,
+        name: "Guest Window",
+        windowNumber: 1,
+        payerType: "GUEST",
+        guestOrCompanySnapshot: JSON.stringify({
+          name: guest.name,
+          phone: guest.phone,
+          gstin: guest.gstin,
+        }),
+        status: "OPEN",
+      },
+    });
+    guestWindowForDeposit = guestWindow;
+
+    await prisma.stay.update({
+      where: { id: stay.id },
+      data: { folioId: folio.id },
+    });
+
+    for (const room of rooms) {
+      await prisma.roomAssignment.create({
+        data: { stayId: stay.id, roomId: room.id, startsAt: new Date(), rateHandling: "RETAIN_RATE" },
+      });
+
+      await prisma.roomState.upsert({
+        where: { roomId: room.id },
+        create: {
+          organizationId: property.organizationId, propertyId, roomId: room.id, occupancyStatus: "OCCUPIED",
+          housekeepingStatus: room.roomState?.housekeepingStatus || "CLEAN", sellabilityStatus: "SELLABLE",
+        },
+        update: { occupancyStatus: "OCCUPIED", lastChangedAt: new Date() },
+      });
+
+      let roomBasePrice = 3200;
+      if (roomRates && roomRates[room.id] !== undefined && roomRates[room.id] !== "") {
+        roomBasePrice = Number(roomRates[room.id]);
+      } else if (agreedTariff !== undefined && agreedTariff > 0) {
+        roomBasePrice = agreedTariff;
+      } else if (room.roomTypeId) {
+        const rateVersion = await prisma.ratePlanVersion.findFirst({
+          where: { roomTypeId: room.roomTypeId, active: true },
+          orderBy: { createdAt: "desc" },
+        });
+        if (rateVersion?.pricingJson) {
+          try {
+            const pricing = JSON.parse(rateVersion.pricingJson);
+            if (pricing.basePrice) roomBasePrice = Number(pricing.basePrice);
+          } catch {}
+        }
+      }
+
+      const totalStayPrice = roomBasePrice * nights;
+      const roomGst = calculateGST({
+        grossOrBaseAmount: totalStayPrice, isInclusive: true, sacHsn: "996311",
+        supplierStateCode: property.stateCode || "18", customTaxRate: 5,
+      });
+
+      await prisma.folioEntry.create({
+        data: {
+          organizationId: property.organizationId, propertyId, folioId: folio.id, folioWindowId: guestWindow.id,
+          serviceDate: serviceDateStr, type: "CHARGE", chargeCode: "ROOM_TARIFF",
+          description: `Room Tariff - Room ${room.number} (${nights} Night${nights > 1 ? "s" : ""})`,
+          qty: nights, unitAmount: roomBasePrice, taxableAmount: roomGst.taxableAmount,
+          taxComponentsJson: JSON.stringify(roomGst.components), totalAmount: roomGst.totalAmount,
+          sourceType: "PMS_NIGHTLY_CHARGE", status: "POSTED",
+        },
+      });
+
+      totalBalanceAdded += roomGst.totalAmount;
+    }
+
+    // Post Extra Bed Charges if requested (SAC 996311, 5% Flat GST Inclusive)
+    if (extraBeds > 0) {
+      const totalExtraBedGross = extraBeds * extraBedRate * nights;
+      const extraBedGst = calculateGST({
+        grossOrBaseAmount: totalExtraBedGross,
+        isInclusive: true,
+        sacHsn: "996311",
+        supplierStateCode: property.stateCode || "18",
+        customTaxRate: 5,
+      });
+
+      await prisma.folioEntry.create({
+        data: {
+          organizationId: property.organizationId,
+          propertyId,
+          folioId: folio.id,
+          folioWindowId: guestWindow.id,
+          serviceDate: serviceDateStr,
+          type: "CHARGE",
+          chargeCode: "EXTRA_BED",
+          description: `Extra Bed / Mattress (${extraBeds} Bed${extraBeds > 1 ? "s" : ""} x ${nights} Night${nights > 1 ? "s" : ""})`,
+          qty: extraBeds * nights,
+          unitAmount: extraBedRate,
+          taxableAmount: extraBedGst.taxableAmount,
+          taxComponentsJson: JSON.stringify(extraBedGst.components),
+          totalAmount: extraBedGst.totalAmount,
+          sourceType: "PMS_NIGHTLY_CHARGE",
+          status: "POSTED",
+        },
+      });
+
+      totalBalanceAdded += extraBedGst.totalAmount;
+    }
+
+    await prisma.folio.update({
+      where: { id: folio.id },
+      data: { balance: totalBalanceAdded },
+    });
+  } else {
+    // SEPARATE STAYS & FOLIOS FOR EACH ROOM
+    for (const room of rooms) {
+      const stay = await prisma.stay.create({
+        data: {
+          organizationId: property.organizationId, propertyId, primaryGuestId: guest.id,
+          status: "IN_HOUSE", arrivalAt: arrivalAt || new Date(), expectedDepartureAt,
+          adults: Math.max(1, Math.floor(adults / rooms.length)), children: 0,
+        },
+      });
+      stayIdsForDeposit.push(stay.id);
+
+      await prisma.roomAssignment.create({
+        data: { stayId: stay.id, roomId: room.id, startsAt: new Date(), rateHandling: "RETAIN_RATE" },
+      });
+
+      await prisma.roomState.upsert({
+        where: { roomId: room.id },
+        create: {
+          organizationId: property.organizationId, propertyId, roomId: room.id, occupancyStatus: "OCCUPIED",
+          housekeepingStatus: room.roomState?.housekeepingStatus || "CLEAN", sellabilityStatus: "SELLABLE",
+        },
+        update: { occupancyStatus: "OCCUPIED", lastChangedAt: new Date() },
+      });
+
+      const folio = await prisma.folio.create({
+        data: { organizationId: property.organizationId, propertyId, stayId: stay.id, status: "OPEN", currency: property.currency, balance: 0 },
+      });
+      if (!masterFolioId) {
+        masterFolioId = folio.id;
+      }
+
+      const guestWindow = await prisma.folioWindow.create({
+        data: {
+          folioId: folio.id, name: "Guest Window", windowNumber: 1, payerType: "GUEST",
+          guestOrCompanySnapshot: JSON.stringify({ name: guest.name, phone: guest.phone, gstin: guest.gstin }), status: "OPEN",
+        },
+      });
+      if (!guestWindowForDeposit) {
+        guestWindowForDeposit = guestWindow;
+      }
+
+      await prisma.stay.update({ where: { id: stay.id }, data: { folioId: folio.id } });
+
+      let roomBasePrice = 3200;
+      if (roomRates && roomRates[room.id] !== undefined && roomRates[room.id] !== "") {
+        roomBasePrice = Number(roomRates[room.id]);
+      } else if (agreedTariff !== undefined && agreedTariff > 0) {
+        roomBasePrice = agreedTariff;
+      } else if (room.roomTypeId) {
+        const rateVersion = await prisma.ratePlanVersion.findFirst({
+          where: { roomTypeId: room.roomTypeId, active: true }, orderBy: { createdAt: "desc" },
+        });
+        if (rateVersion?.pricingJson) {
+          try {
+            const pricing = JSON.parse(rateVersion.pricingJson);
+            if (pricing.basePrice) roomBasePrice = Number(pricing.basePrice);
+          } catch {}
+        }
+      }
+
+      const totalStayPrice = roomBasePrice * nights;
+      const roomGst = calculateGST({
+        grossOrBaseAmount: totalStayPrice, isInclusive: true, sacHsn: "996311",
+        supplierStateCode: property.stateCode || "18", customTaxRate: 5,
+      });
+
+      await prisma.folioEntry.create({
+        data: {
+          organizationId: property.organizationId, propertyId, folioId: folio.id, folioWindowId: guestWindow.id,
+          serviceDate: serviceDateStr, type: "CHARGE", chargeCode: "ROOM_TARIFF",
+          description: `Room Tariff - Room ${room.number} (${nights} Night${nights > 1 ? "s" : ""})`,
+          qty: nights, unitAmount: roomBasePrice, taxableAmount: roomGst.taxableAmount,
+          taxComponentsJson: JSON.stringify(roomGst.components), totalAmount: roomGst.totalAmount,
+          sourceType: "PMS_NIGHTLY_CHARGE", status: "POSTED",
+        },
+      });
+
+      await prisma.folio.update({
+        where: { id: folio.id },
+        data: { balance: roomGst.totalAmount },
+      });
+      totalBalanceAdded += roomGst.totalAmount;
+    }
+  }
 
   // 8. Handle advance deposit if provided
   if (depositAmount > 0) {
@@ -456,7 +587,7 @@ export async function checkInGuest({
         organizationId: property.organizationId,
         propertyId,
         receiptNo: recSeq.formattedNumber,
-        folioId: folio.id,
+        folioId: masterFolioId!,
         amount: depositAmount,
         method: "CASH",
         status: "SUCCEEDED",
@@ -467,18 +598,16 @@ export async function checkInGuest({
     await prisma.paymentAllocation.create({
       data: {
         paymentId: payment.id,
-        folioWindowId: guestWindow.id,
+        folioWindowId: guestWindowForDeposit.id,
         amount: depositAmount,
       },
     });
 
-    currentBalance -= depositAmount;
+    await prisma.folio.update({
+      where: { id: masterFolioId! },
+      data: { balance: { decrement: depositAmount } },
+    });
   }
-
-  await prisma.folio.update({
-    where: { id: folio.id },
-    data: { balance: currentBalance },
-  });
 
   // 9. Generate GRC Registration Record
   const grcSeq = await getNextDocumentNumber(propertyId, "GRC");
@@ -497,7 +626,7 @@ export async function checkInGuest({
       fatherSpouseName: guestData.fatherSpouseName || "",
       arrivalDateTime: formattedArrival,
       expectedDepartureDate: expectedDepartureAt.toISOString().split("T")[0],
-      preAssignedRoom: room.number,
+      preAssignedRoom: rooms.map(r => r.number).join(", "),
       streetAddress: guestData.streetAddress || guestData.address || "",
       city: guestData.city || "",
       state: guestData.state || "",
@@ -516,9 +645,9 @@ export async function checkInGuest({
       idDocumentType: guestData.idType || "AADHAAR",
       idDocumentNumber: guestData.idLast4 || "",
       foreignPassportDetailsJson: foreignDetails ? JSON.stringify(foreignDetails) : null,
-      assignedRoomId: room.id,
-      assignedRoomNumber: room.number,
-      stayId: stay.id,
+      assignedRoomId: rooms[0].id,
+      assignedRoomNumber: rooms.map((r) => r.number).join(", "),
+      stayId: stayIdsForDeposit[0],
       guestId: guest.id,
       depositAmount: depositAmount,
       processedByUserId: actorId,
@@ -534,9 +663,9 @@ export async function checkInGuest({
       actorName: "Staff",
       action: "CHECK_IN",
       targetType: "STAY",
-      targetId: stay.id,
+      targetId: stayIdsForDeposit[0],
       afterJson: JSON.stringify({
-        roomNumber: room.number,
+        roomNumbers: rooms.map((r) => r.number).join(", "),
         grcNo: grcSeq.formattedNumber,
         guestName: guest.name,
         depositAmount,
@@ -544,7 +673,7 @@ export async function checkInGuest({
     },
   });
 
-  return { stay, guest, folio, registration, room };
+  return { success: true, stayIds: stayIdsForDeposit, guest, masterFolioId, registration };
 }
 
 export async function moveRoom({

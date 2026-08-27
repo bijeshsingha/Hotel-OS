@@ -252,18 +252,18 @@ export default function ReportsPage() {
   return (
     <div className="space-y-4 max-w-7xl mx-auto pb-12">
       {/* Top Banner */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3.5 sm:p-4 rounded-xl bg-[#111114] border border-zinc-800 shadow-sm">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 rounded-xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-base font-bold text-zinc-100 flex items-center gap-2">
-              <BarChart3 className="h-5 w-5 text-emerald-400" />
+            <h1 className="text-base font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+              <BarChart3 className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
               Financial & Operational Intelligence Reports
             </h1>
-            <span className="rounded px-1.5 py-0.2 text-[10px] font-mono font-bold text-emerald-400 bg-emerald-950/40 border border-emerald-800/40">
+            <span className="rounded px-2 py-0.5 text-[10px] font-mono font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/40">
               AUDIT READY
             </span>
           </div>
-          <p className="text-xs text-zinc-400 font-mono mt-0.5">
+          <p className="text-xs text-zinc-500 font-medium mt-0.5">
             Daily cashier collections, petty expenses, guest ledgers & GST Rule 46 journals
           </p>
         </div>
@@ -273,22 +273,22 @@ export default function ReportsPage() {
             <>
               <button
                 onClick={() => setShowAddExpenseModal(true)}
-                className="flex items-center gap-1.5 rounded-lg bg-rose-950/40 border border-rose-800/60 hover:bg-rose-900/50 px-3 py-2 text-xs font-bold text-rose-300 transition shadow-sm"
+                className="flex items-center gap-1.5 rounded-xl bg-rose-50 border border-rose-200 hover:bg-rose-100 dark:bg-rose-950/40 dark:border-rose-800/60 dark:hover:bg-rose-900/50 px-3.5 py-2 text-xs font-bold text-rose-700 dark:text-rose-300 transition shadow-xs cursor-pointer"
               >
                 <Plus className="h-4 w-4" /> Record Expense
               </button>
               <button
                 onClick={() => setShowPrintModal(true)}
-                className="flex items-center gap-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 px-3 py-2 text-xs font-semibold text-zinc-200 transition shadow-sm"
+                className="flex items-center gap-1.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 border border-zinc-300 dark:bg-zinc-800 dark:hover:bg-zinc-700 dark:border-zinc-700 px-3.5 py-2 text-xs font-bold text-zinc-800 dark:text-zinc-200 transition shadow-xs cursor-pointer"
               >
-                <Printer className="h-4 w-4" /> Print Cashier Sheet
+                <Printer className="h-4 w-4 text-zinc-500 dark:text-zinc-400" /> Print Cashier Sheet
               </button>
             </>
           )}
 
           <button
             onClick={exportCSV}
-            className="flex items-center gap-1.5 rounded-lg bg-white hover:bg-zinc-200 text-zinc-950 px-3 py-2 text-xs font-black transition shadow-sm"
+            className="flex items-center gap-1.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-200 dark:text-zinc-950 px-4 py-2 text-xs font-black transition shadow-xs cursor-pointer"
           >
             <Download className="h-4 w-4" /> Export CSV
           </button>
@@ -296,13 +296,13 @@ export default function ReportsPage() {
       </div>
 
       {/* Main Report Navigation Tabs */}
-      <div className="flex items-center gap-1.5 border-b border-zinc-800 pb-3 flex-wrap">
+      <div className="flex items-center gap-1.5 border-b border-zinc-200 dark:border-zinc-800 pb-3 flex-wrap">
         <button
           onClick={() => setReportType("CASHIER_COLLECTIONS_EXPENSES")}
-          className={`flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-bold transition shadow-sm ${
+          className={`flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-bold transition shadow-xs ${
             reportType === "CASHIER_COLLECTIONS_EXPENSES"
-              ? "bg-emerald-500 text-zinc-950 shadow-md"
-              : "text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200 border border-zinc-800/60"
+              ? "bg-emerald-600 text-white dark:bg-emerald-500 dark:text-zinc-950 shadow-sm"
+              : "text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-900 hover:text-zinc-900 dark:hover:text-zinc-200 border border-zinc-200 dark:border-zinc-800/60"
           }`}
         >
           <Wallet className="h-4 w-4" />
@@ -311,10 +311,10 @@ export default function ReportsPage() {
 
         <button
           onClick={() => setReportType("FRONT_OFFICE")}
-          className={`flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-bold transition ${
+          className={`flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-bold transition shadow-xs ${
             reportType === "FRONT_OFFICE"
-              ? "bg-white text-zinc-950 shadow-md"
-              : "text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200 border border-zinc-800/60"
+              ? "bg-zinc-900 text-white dark:bg-white dark:text-zinc-950 shadow-sm"
+              : "text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-900 hover:text-zinc-900 dark:hover:text-zinc-200 border border-zinc-200 dark:border-zinc-800/60"
           }`}
         >
           <Users className="h-4 w-4" />
@@ -323,10 +323,10 @@ export default function ReportsPage() {
 
         <button
           onClick={() => setReportType("REVENUE")}
-          className={`flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-bold transition ${
+          className={`flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-bold transition shadow-xs ${
             reportType === "REVENUE"
-              ? "bg-white text-zinc-950 shadow-md"
-              : "text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200 border border-zinc-800/60"
+              ? "bg-zinc-900 text-white dark:bg-white dark:text-zinc-950 shadow-sm"
+              : "text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-900 hover:text-zinc-900 dark:hover:text-zinc-200 border border-zinc-200 dark:border-zinc-800/60"
           }`}
         >
           <DollarSign className="h-4 w-4" />
@@ -335,10 +335,10 @@ export default function ReportsPage() {
 
         <button
           onClick={() => setReportType("FNB")}
-          className={`flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-bold transition ${
+          className={`flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-bold transition shadow-xs ${
             reportType === "FNB"
-              ? "bg-white text-zinc-950 shadow-md"
-              : "text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200 border border-zinc-800/60"
+              ? "bg-zinc-900 text-white dark:bg-white dark:text-zinc-950 shadow-sm"
+              : "text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-900 hover:text-zinc-900 dark:hover:text-zinc-200 border border-zinc-200 dark:border-zinc-800/60"
           }`}
         >
           <UtensilsCrossed className="h-4 w-4" />
@@ -355,79 +355,79 @@ export default function ReportsPage() {
           {summary && (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
               {/* Card 1: Total Collections */}
-              <div className="rounded-2xl border border-emerald-900/50 bg-[#0d1612] p-4 space-y-2 shadow-sm">
+              <div className="rounded-2xl border border-emerald-200 dark:border-emerald-900/50 bg-emerald-50/70 dark:bg-[#0d1612] p-4 space-y-2 shadow-xs">
                 <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-mono uppercase font-bold text-emerald-400 flex items-center gap-1.5">
-                    <ArrowDownLeft className="h-4 w-4 text-emerald-400" />
+                  <span className="text-[11px] font-mono uppercase font-bold text-emerald-800 dark:text-emerald-400 flex items-center gap-1.5">
+                    <ArrowDownLeft className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
                     Total Collections
                   </span>
-                  <span className="text-[10px] font-mono text-zinc-400 bg-zinc-900 px-1.5 py-0.2 rounded border border-zinc-800">
+                  <span className="text-[10px] font-mono text-zinc-600 dark:text-zinc-400 bg-white dark:bg-zinc-900 px-2 py-0.5 rounded border border-zinc-200 dark:border-zinc-800 font-semibold">
                     {summary.collectionsCount} Receipts
                   </span>
                 </div>
-                <div className="text-2xl font-black text-emerald-400 font-mono tracking-tight">
+                <div className="text-2xl font-black text-emerald-800 dark:text-emerald-400 font-mono tracking-tight">
                   {formatINR(summary.totalCollections)}
                 </div>
-                <div className="pt-1.5 border-t border-emerald-950 text-[10px] font-mono text-zinc-300 flex flex-wrap gap-x-2.5 gap-y-1">
-                  <span>UPI: <strong className="text-white">{formatINR(summary.collectionsByMethod?.UPI || 0)}</strong></span>
-                  <span>CASH: <strong className="text-white">{formatINR(summary.collectionsByMethod?.CASH || 0)}</strong></span>
-                  <span>CARD: <strong className="text-white">{formatINR(summary.collectionsByMethod?.CARD || 0)}</strong></span>
+                <div className="pt-1.5 border-t border-emerald-200/80 dark:border-emerald-950 text-[10px] font-mono text-zinc-600 dark:text-zinc-300 flex flex-wrap gap-x-2.5 gap-y-1">
+                  <span>UPI: <strong className="text-zinc-900 dark:text-white font-bold">{formatINR(summary.collectionsByMethod?.UPI || 0)}</strong></span>
+                  <span>CASH: <strong className="text-zinc-900 dark:text-white font-bold">{formatINR(summary.collectionsByMethod?.CASH || 0)}</strong></span>
+                  <span>CARD: <strong className="text-zinc-900 dark:text-white font-bold">{formatINR(summary.collectionsByMethod?.CARD || 0)}</strong></span>
                 </div>
               </div>
 
               {/* Card 2: Total Expenses */}
-              <div className="rounded-2xl border border-rose-900/50 bg-[#170e10] p-4 space-y-2 shadow-sm">
+              <div className="rounded-2xl border border-rose-200 dark:border-rose-900/50 bg-rose-50/70 dark:bg-[#170e10] p-4 space-y-2 shadow-xs">
                 <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-mono uppercase font-bold text-rose-400 flex items-center gap-1.5">
-                    <ArrowUpRight className="h-4 w-4 text-rose-400" />
+                  <span className="text-[11px] font-mono uppercase font-bold text-rose-800 dark:text-rose-400 flex items-center gap-1.5">
+                    <ArrowUpRight className="h-4 w-4 text-rose-600 dark:text-rose-400" />
                     Total Expenses
                   </span>
-                  <span className="text-[10px] font-mono text-zinc-400 bg-zinc-900 px-1.5 py-0.2 rounded border border-zinc-800">
+                  <span className="text-[10px] font-mono text-zinc-600 dark:text-zinc-400 bg-white dark:bg-zinc-900 px-2 py-0.5 rounded border border-zinc-200 dark:border-zinc-800 font-semibold">
                     {summary.expensesCount} Vouchers
                   </span>
                 </div>
-                <div className="text-2xl font-black text-rose-400 font-mono tracking-tight">
+                <div className="text-2xl font-black text-rose-800 dark:text-rose-400 font-mono tracking-tight">
                   {formatINR(summary.totalExpenses)}
                 </div>
-                <div className="pt-1.5 border-t border-rose-950 text-[10px] font-mono text-zinc-300 flex flex-wrap gap-x-2.5 gap-y-1">
-                  <span>F&B: <strong className="text-white">{formatINR(summary.expensesByCategory?.FB_PURCHASE || 0)}</strong></span>
-                  <span>MNT: <strong className="text-white">{formatINR(summary.expensesByCategory?.MAINTENANCE || 0)}</strong></span>
-                  <span>Petty: <strong className="text-white">{formatINR(summary.expensesByCategory?.PETTY_CASH || 0)}</strong></span>
+                <div className="pt-1.5 border-t border-rose-200/80 dark:border-rose-950 text-[10px] font-mono text-zinc-600 dark:text-zinc-300 flex flex-wrap gap-x-2.5 gap-y-1">
+                  <span>F&B: <strong className="text-zinc-900 dark:text-white font-bold">{formatINR(summary.expensesByCategory?.FB_PURCHASE || 0)}</strong></span>
+                  <span>MNT: <strong className="text-zinc-900 dark:text-white font-bold">{formatINR(summary.expensesByCategory?.MAINTENANCE || 0)}</strong></span>
+                  <span>Petty: <strong className="text-zinc-900 dark:text-white font-bold">{formatINR(summary.expensesByCategory?.PETTY_CASH || 0)}</strong></span>
                 </div>
               </div>
 
               {/* Card 3: Net Cash Flow */}
-              <div className="rounded-2xl border border-blue-900/50 bg-[#0e131b] p-4 space-y-2 shadow-sm">
+              <div className="rounded-2xl border border-blue-200 dark:border-blue-900/50 bg-blue-50/70 dark:bg-[#0e131b] p-4 space-y-2 shadow-xs">
                 <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-mono uppercase font-bold text-blue-400 flex items-center gap-1.5">
-                    <TrendingUp className="h-4 w-4 text-blue-400" />
+                  <span className="text-[11px] font-mono uppercase font-bold text-blue-800 dark:text-blue-400 flex items-center gap-1.5">
+                    <TrendingUp className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                     Net Day Cash Flow
                   </span>
-                  <span className="text-[10px] font-mono text-zinc-400">Inflows - Outflows</span>
+                  <span className="text-[10px] font-mono text-zinc-500 dark:text-zinc-400">Inflows - Outflows</span>
                 </div>
-                <div className="text-2xl font-black text-blue-300 font-mono tracking-tight">
+                <div className="text-2xl font-black text-blue-800 dark:text-blue-300 font-mono tracking-tight">
                   {formatINR(summary.netCashFlow)}
                 </div>
-                <div className="pt-1.5 border-t border-blue-950 text-[10px] font-mono text-zinc-400">
+                <div className="pt-1.5 border-t border-blue-200/80 dark:border-blue-950 text-[10px] font-mono text-zinc-600 dark:text-zinc-400">
                   Bank & Digital + Physical Cash Net
                 </div>
               </div>
 
               {/* Card 4: Physical Cash Drawer In Hand */}
-              <div className="rounded-2xl border border-amber-900/50 bg-[#16130d] p-4 space-y-2 shadow-sm">
+              <div className="rounded-2xl border border-amber-200 dark:border-amber-900/50 bg-amber-50/70 dark:bg-[#16130d] p-4 space-y-2 shadow-xs">
                 <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-mono uppercase font-bold text-amber-400 flex items-center gap-1.5">
-                    <Wallet className="h-4 w-4 text-amber-400" />
+                  <span className="text-[11px] font-mono uppercase font-bold text-amber-800 dark:text-amber-400 flex items-center gap-1.5">
+                    <Wallet className="h-4 w-4 text-amber-600 dark:text-amber-400" />
                     Cash Drawer (In Hand)
                   </span>
-                  <span className="text-[10px] font-mono text-zinc-400">Physical Cash</span>
+                  <span className="text-[10px] font-mono text-zinc-500 dark:text-zinc-400">Physical Cash</span>
                 </div>
-                <div className="text-2xl font-black text-amber-300 font-mono tracking-tight">
+                <div className="text-2xl font-black text-amber-800 dark:text-amber-300 font-mono tracking-tight">
                   {formatINR(summary.cashDrawerPosition?.netCashInHand || 0)}
                 </div>
-                <div className="pt-1.5 border-t border-amber-950 text-[10px] font-mono text-zinc-300 flex justify-between">
-                  <span>Cash In: {formatINR(summary.cashDrawerPosition?.cashIn || 0)}</span>
-                  <span>Cash Out: {formatINR(summary.cashDrawerPosition?.cashOut || 0)}</span>
+                <div className="pt-1.5 border-t border-amber-200/80 dark:border-amber-950 text-[10px] font-mono text-zinc-600 dark:text-zinc-300 flex justify-between">
+                  <span>Cash In: <strong className="text-zinc-900 dark:text-white">{formatINR(summary.cashDrawerPosition?.cashIn || 0)}</strong></span>
+                  <span>Cash Out: <strong className="text-zinc-900 dark:text-white">{formatINR(summary.cashDrawerPosition?.cashOut || 0)}</strong></span>
                 </div>
               </div>
             </div>
@@ -435,15 +435,15 @@ export default function ReportsPage() {
 
           {/* Collection Inflow Bifurcation Strip (Advances / Cash / UPI / Cards / OTA / POS / Folio) */}
           {summary && (
-            <div className="rounded-2xl border border-zinc-800 bg-[#111114] p-4 space-y-3 shadow-sm">
-              <div className="flex items-center justify-between flex-wrap gap-2 border-b border-zinc-800/80 pb-2.5">
+            <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#111114] p-4 space-y-3 shadow-xs">
+              <div className="flex items-center justify-between flex-wrap gap-2 border-b border-zinc-200 dark:border-zinc-800/80 pb-2.5">
                 <div className="flex items-center gap-2">
-                  <Layers className="h-4 w-4 text-emerald-400" />
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-200">
+                  <Layers className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-900 dark:text-zinc-200">
                     Collection Inflow Bifurcation (Advances / Cash / UPI / OTA / POS / Folio)
                   </h3>
                 </div>
-                <span className="text-[10px] font-mono text-zinc-400">
+                <span className="text-[10px] font-mono text-zinc-500 dark:text-zinc-400 font-medium">
                   Click any tile to filter transactions
                 </span>
               </div>
@@ -456,20 +456,20 @@ export default function ReportsPage() {
                     setFlowFilter("INFLOW");
                     setMethodFilter(methodFilter === "ADVANCE" ? "ALL" : "ADVANCE");
                   }}
-                  className={`p-2.5 rounded-xl border text-left transition flex flex-col justify-between space-y-1 ${
+                  className={`p-2.5 rounded-xl border text-left transition flex flex-col justify-between space-y-1 shadow-xs cursor-pointer ${
                     methodFilter === "ADVANCE"
-                      ? "bg-emerald-950/60 border-emerald-500 shadow-md"
-                      : "bg-zinc-900/60 border-zinc-800 hover:border-zinc-700"
+                      ? "bg-emerald-50 dark:bg-emerald-950/60 border-emerald-500 shadow-sm"
+                      : "bg-zinc-50 dark:bg-zinc-900/60 border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700"
                   }`}
                 >
                   <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-mono font-bold text-zinc-400 uppercase">1. Advances</span>
-                    <ShieldCheck className="h-3.5 w-3.5 text-indigo-400" />
+                    <span className="text-[10px] font-mono font-bold text-zinc-600 dark:text-zinc-400 uppercase">1. Advances</span>
+                    <ShieldCheck className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
                   </div>
-                  <div className="text-sm font-black font-mono text-white">
+                  <div className="text-sm font-black font-mono text-zinc-900 dark:text-white">
                     {formatINR(summary.collectionsBySource?.ADVANCE_DEPOSIT || 0)}
                   </div>
-                  <div className="text-[9px] text-zinc-400 font-mono truncate">GRC / Kiosk Deposits</div>
+                  <div className="text-[9px] text-zinc-500 dark:text-zinc-400 font-mono truncate">GRC / Kiosk Deposits</div>
                 </button>
 
                 {/* 2. Cash Drawer Inflow */}
@@ -479,20 +479,20 @@ export default function ReportsPage() {
                     setFlowFilter("INFLOW");
                     setMethodFilter(methodFilter === "CASH" ? "ALL" : "CASH");
                   }}
-                  className={`p-2.5 rounded-xl border text-left transition flex flex-col justify-between space-y-1 ${
+                  className={`p-2.5 rounded-xl border text-left transition flex flex-col justify-between space-y-1 shadow-xs cursor-pointer ${
                     methodFilter === "CASH"
-                      ? "bg-emerald-950/60 border-emerald-500 shadow-md"
-                      : "bg-zinc-900/60 border-zinc-800 hover:border-zinc-700"
+                      ? "bg-emerald-50 dark:bg-emerald-950/60 border-emerald-500 shadow-sm"
+                      : "bg-zinc-50 dark:bg-zinc-900/60 border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700"
                   }`}
                 >
                   <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-mono font-bold text-zinc-400 uppercase">2. Cash Drawer</span>
-                    <Banknote className="h-3.5 w-3.5 text-amber-400" />
+                    <span className="text-[10px] font-mono font-bold text-zinc-600 dark:text-zinc-400 uppercase">2. Cash Drawer</span>
+                    <Banknote className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
                   </div>
-                  <div className="text-sm font-black font-mono text-white">
+                  <div className="text-sm font-black font-mono text-zinc-900 dark:text-white">
                     {formatINR(summary.collectionsByMethod?.CASH || 0)}
                   </div>
-                  <div className="text-[9px] text-zinc-400 font-mono truncate">Physical Currency</div>
+                  <div className="text-[9px] text-zinc-500 dark:text-zinc-400 font-mono truncate">Physical Currency</div>
                 </button>
 
                 {/* 3. UPI / QR / GooglePay */}
@@ -502,20 +502,20 @@ export default function ReportsPage() {
                     setFlowFilter("INFLOW");
                     setMethodFilter(methodFilter === "UPI" ? "ALL" : "UPI");
                   }}
-                  className={`p-2.5 rounded-xl border text-left transition flex flex-col justify-between space-y-1 ${
+                  className={`p-2.5 rounded-xl border text-left transition flex flex-col justify-between space-y-1 shadow-xs cursor-pointer ${
                     methodFilter === "UPI"
-                      ? "bg-emerald-950/60 border-emerald-500 shadow-md"
-                      : "bg-zinc-900/60 border-zinc-800 hover:border-zinc-700"
+                      ? "bg-emerald-50 dark:bg-emerald-950/60 border-emerald-500 shadow-sm"
+                      : "bg-zinc-50 dark:bg-zinc-900/60 border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700"
                   }`}
                 >
                   <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-mono font-bold text-zinc-400 uppercase">3. UPI / QR</span>
-                    <QrCode className="h-3.5 w-3.5 text-emerald-400" />
+                    <span className="text-[10px] font-mono font-bold text-zinc-600 dark:text-zinc-400 uppercase">3. UPI / QR</span>
+                    <QrCode className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
                   </div>
-                  <div className="text-sm font-black font-mono text-white">
+                  <div className="text-sm font-black font-mono text-zinc-900 dark:text-white">
                     {formatINR(summary.collectionsByMethod?.UPI || 0)}
                   </div>
-                  <div className="text-[9px] text-zinc-400 font-mono truncate">GPay / PhonePe / QR</div>
+                  <div className="text-[9px] text-zinc-500 dark:text-zinc-400 font-mono truncate">GPay / PhonePe / QR</div>
                 </button>
 
                 {/* 4. Cards / POS Terminal */}
@@ -525,20 +525,20 @@ export default function ReportsPage() {
                     setFlowFilter("INFLOW");
                     setMethodFilter(methodFilter === "CARD" ? "ALL" : "CARD");
                   }}
-                  className={`p-2.5 rounded-xl border text-left transition flex flex-col justify-between space-y-1 ${
+                  className={`p-2.5 rounded-xl border text-left transition flex flex-col justify-between space-y-1 shadow-xs cursor-pointer ${
                     methodFilter === "CARD"
-                      ? "bg-emerald-950/60 border-emerald-500 shadow-md"
-                      : "bg-zinc-900/60 border-zinc-800 hover:border-zinc-700"
+                      ? "bg-emerald-50 dark:bg-emerald-950/60 border-emerald-500 shadow-sm"
+                      : "bg-zinc-50 dark:bg-zinc-900/60 border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700"
                   }`}
                 >
                   <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-mono font-bold text-zinc-400 uppercase">4. Cards / EDC</span>
-                    <CreditCard className="h-3.5 w-3.5 text-sky-400" />
+                    <span className="text-[10px] font-mono font-bold text-zinc-600 dark:text-zinc-400 uppercase">4. Cards / EDC</span>
+                    <CreditCard className="h-3.5 w-3.5 text-sky-600 dark:text-sky-400" />
                   </div>
-                  <div className="text-sm font-black font-mono text-white">
+                  <div className="text-sm font-black font-mono text-zinc-900 dark:text-white">
                     {formatINR(summary.collectionsByMethod?.CARD || 0)}
                   </div>
-                  <div className="text-[9px] text-zinc-400 font-mono truncate">POS Machine Swipes</div>
+                  <div className="text-[9px] text-zinc-500 dark:text-zinc-400 font-mono truncate">POS Machine Swipes</div>
                 </button>
 
                 {/* 5. OTA / Virtual Cards (VCC) */}
@@ -548,20 +548,20 @@ export default function ReportsPage() {
                     setFlowFilter("INFLOW");
                     setMethodFilter(methodFilter === "OTA" ? "ALL" : "OTA");
                   }}
-                  className={`p-2.5 rounded-xl border text-left transition flex flex-col justify-between space-y-1 ${
+                  className={`p-2.5 rounded-xl border text-left transition flex flex-col justify-between space-y-1 shadow-xs cursor-pointer ${
                     methodFilter === "OTA"
-                      ? "bg-emerald-950/60 border-emerald-500 shadow-md"
-                      : "bg-zinc-900/60 border-zinc-800 hover:border-zinc-700"
+                      ? "bg-emerald-50 dark:bg-emerald-950/60 border-emerald-500 shadow-sm"
+                      : "bg-zinc-50 dark:bg-zinc-900/60 border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700"
                   }`}
                 >
                   <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-mono font-bold text-zinc-400 uppercase">5. OTA / VCC</span>
-                    <Globe className="h-3.5 w-3.5 text-cyan-400" />
+                    <span className="text-[10px] font-mono font-bold text-zinc-600 dark:text-zinc-400 uppercase">5. OTA / VCC</span>
+                    <Globe className="h-3.5 w-3.5 text-cyan-600 dark:text-cyan-400" />
                   </div>
-                  <div className="text-sm font-black font-mono text-white">
+                  <div className="text-sm font-black font-mono text-zinc-900 dark:text-white">
                     {formatINR((summary.collectionsBySource?.OTA_COLLECTION || 0) + (summary.collectionsByMethod?.OTA_VCC || 0))}
                   </div>
-                  <div className="text-[9px] text-zinc-400 font-mono truncate">MMT / Booking / VCC</div>
+                  <div className="text-[9px] text-zinc-500 dark:text-zinc-400 font-mono truncate">MMT / Booking / VCC</div>
                 </button>
 
                 {/* 6. Restaurant / POS Direct Sales */}
@@ -571,20 +571,20 @@ export default function ReportsPage() {
                     setFlowFilter("INFLOW");
                     setMethodFilter(methodFilter === "POS" ? "ALL" : "POS");
                   }}
-                  className={`p-2.5 rounded-xl border text-left transition flex flex-col justify-between space-y-1 ${
+                  className={`p-2.5 rounded-xl border text-left transition flex flex-col justify-between space-y-1 shadow-xs cursor-pointer ${
                     methodFilter === "POS"
-                      ? "bg-emerald-950/60 border-emerald-500 shadow-md"
-                      : "bg-zinc-900/60 border-zinc-800 hover:border-zinc-700"
+                      ? "bg-emerald-50 dark:bg-emerald-950/60 border-emerald-500 shadow-sm"
+                      : "bg-zinc-50 dark:bg-zinc-900/60 border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700"
                   }`}
                 >
                   <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-mono font-bold text-zinc-400 uppercase">6. POS / F&B</span>
-                    <UtensilsCrossed className="h-3.5 w-3.5 text-amber-400" />
+                    <span className="text-[10px] font-mono font-bold text-zinc-600 dark:text-zinc-400 uppercase">6. POS / F&B</span>
+                    <UtensilsCrossed className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
                   </div>
-                  <div className="text-sm font-black font-mono text-white">
+                  <div className="text-sm font-black font-mono text-zinc-900 dark:text-white">
                     {formatINR(summary.collectionsBySource?.POS_RESTAURANT || 0)}
                   </div>
-                  <div className="text-[9px] text-zinc-400 font-mono truncate">Direct Outlet Sales</div>
+                  <div className="text-[9px] text-zinc-500 dark:text-zinc-400 font-mono truncate">Direct Outlet Sales</div>
                 </button>
 
                 {/* 7. Room Folio Settlements */}
@@ -594,59 +594,59 @@ export default function ReportsPage() {
                     setFlowFilter("INFLOW");
                     setMethodFilter(methodFilter === "FOLIO" ? "ALL" : "FOLIO");
                   }}
-                  className={`p-2.5 rounded-xl border text-left transition flex flex-col justify-between space-y-1 ${
+                  className={`p-2.5 rounded-xl border text-left transition flex flex-col justify-between space-y-1 shadow-xs cursor-pointer ${
                     methodFilter === "FOLIO"
-                      ? "bg-emerald-950/60 border-emerald-500 shadow-md"
-                      : "bg-zinc-900/60 border-zinc-800 hover:border-zinc-700"
+                      ? "bg-emerald-50 dark:bg-emerald-950/60 border-emerald-500 shadow-sm"
+                      : "bg-zinc-50 dark:bg-zinc-900/60 border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700"
                   }`}
                 >
                   <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-mono font-bold text-zinc-400 uppercase">7. Folio Settle</span>
-                    <Building2 className="h-3.5 w-3.5 text-purple-400" />
+                    <span className="text-[10px] font-mono font-bold text-zinc-600 dark:text-zinc-400 uppercase">7. Folio Settle</span>
+                    <Building2 className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
                   </div>
-                  <div className="text-sm font-black font-mono text-white">
+                  <div className="text-sm font-black font-mono text-zinc-900 dark:text-white">
                     {formatINR(summary.collectionsBySource?.FOLIO_SETTLEMENT || 0)}
                   </div>
-                  <div className="text-[9px] text-zinc-400 font-mono truncate">Room Checkout Bills</div>
+                  <div className="text-[9px] text-zinc-500 dark:text-zinc-400 font-mono truncate">Room Checkout Bills</div>
                 </button>
               </div>
             </div>
           )}
 
           {/* Filter & Search Bar */}
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 p-3 rounded-2xl bg-[#111114] border border-zinc-800">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 p-3.5 rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs">
             {/* Flow Type Tabs */}
             <div className="flex items-center gap-1 flex-wrap">
               <button
                 onClick={() => setFlowFilter("ALL")}
-                className={`rounded-xl px-3 py-1.5 text-xs font-bold transition ${
+                className={`rounded-xl px-3 py-1.5 text-xs font-bold transition shadow-xs cursor-pointer ${
                   flowFilter === "ALL"
-                    ? "bg-white text-zinc-950 shadow-sm"
-                    : "text-zinc-400 hover:text-white"
+                    ? "bg-zinc-900 text-white dark:bg-white dark:text-zinc-950 shadow-xs"
+                    : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
                 }`}
               >
                 All Records ({data?.allTransactions?.length || 0})
               </button>
               <button
                 onClick={() => setFlowFilter("INFLOW")}
-                className={`rounded-xl px-3 py-1.5 text-xs font-bold transition flex items-center gap-1.5 ${
+                className={`rounded-xl px-3 py-1.5 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
                   flowFilter === "INFLOW"
-                    ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm"
-                    : "text-zinc-400 hover:text-white"
+                    ? "bg-emerald-50 text-emerald-800 border border-emerald-300 dark:bg-emerald-500/20 dark:text-emerald-300 dark:border-emerald-500/40 shadow-xs"
+                    : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
                 }`}
               >
-                <ArrowDownLeft className="h-3.5 w-3.5 text-emerald-400" />
+                <ArrowDownLeft className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
                 <span>Collections ({data?.collections?.length || 0})</span>
               </button>
               <button
                 onClick={() => setFlowFilter("OUTFLOW")}
-                className={`rounded-xl px-3 py-1.5 text-xs font-bold transition flex items-center gap-1.5 ${
+                className={`rounded-xl px-3 py-1.5 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
                   flowFilter === "OUTFLOW"
-                    ? "bg-rose-500/20 text-rose-300 border border-rose-500/40 shadow-sm"
-                    : "text-zinc-400 hover:text-white"
+                    ? "bg-rose-50 text-rose-800 border border-rose-300 dark:bg-rose-500/20 dark:text-rose-300 dark:border-rose-500/40 shadow-xs"
+                    : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
                 }`}
               >
-                <ArrowUpRight className="h-3.5 w-3.5 text-rose-400" />
+                <ArrowUpRight className="h-3.5 w-3.5 text-rose-600 dark:text-rose-400" />
                 <span>Expenses ({data?.expenses?.length || 0})</span>
               </button>
             </div>
@@ -657,7 +657,7 @@ export default function ReportsPage() {
               <select
                 value={methodFilter}
                 onChange={(e) => setMethodFilter(e.target.value)}
-                className="rounded-xl bg-zinc-900 border border-zinc-700 px-3 py-1.5 text-xs text-zinc-200 font-bold focus:outline-none focus:border-zinc-500 font-mono"
+                className="rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 px-3 py-1.5 text-xs text-zinc-900 dark:text-zinc-200 font-bold focus:outline-none focus:border-blue-500 font-mono shadow-xs"
               >
                 <option value="ALL">All Methods & Sources</option>
                 <option value="ADVANCE">📥 Advances & Pre-payments</option>
@@ -672,18 +672,18 @@ export default function ReportsPage() {
 
               {/* Search Box */}
               <div className="relative">
-                <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-zinc-500" />
+                <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-zinc-400" />
                 <input
                   type="text"
                   placeholder="Search guest, payee, receipt #, UTR..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-56 rounded-xl bg-zinc-900 border border-zinc-700 pl-8 pr-7 py-1.5 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-zinc-500 font-mono"
+                  className="w-56 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 pl-8 pr-7 py-1.5 text-xs text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none focus:border-blue-500 font-mono"
                 />
                 {searchQuery && (
                   <button
                     onClick={() => setSearchQuery("")}
-                    className="absolute right-2 top-1.5 text-zinc-500 hover:text-white"
+                    className="absolute right-2 top-2 text-zinc-400 hover:text-zinc-700 dark:hover:text-white"
                   >
                     <X className="h-3.5 w-3.5" />
                   </button>
@@ -693,22 +693,22 @@ export default function ReportsPage() {
           </div>
 
           {/* Transactions Table */}
-          <div className="rounded-2xl border border-zinc-800 bg-[#111114] overflow-hidden shadow-sm">
-            <div className="p-3.5 border-b border-zinc-800 flex items-center justify-between">
+          <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#111114] overflow-hidden shadow-xs">
+            <div className="p-4 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Receipt className="h-4 w-4 text-zinc-400" />
-                <h2 className="text-xs font-bold text-white">
+                <Receipt className="h-4 w-4 text-zinc-500 dark:text-zinc-400" />
+                <h2 className="text-xs font-bold text-zinc-900 dark:text-white uppercase tracking-wider">
                   Chronological Collection & Expense Journal
                 </h2>
               </div>
-              <span className="text-xs text-zinc-400 font-mono">
+              <span className="text-xs text-zinc-500 dark:text-zinc-400 font-mono font-semibold">
                 {filteredCashierTransactions.length} records matching filter
               </span>
             </div>
 
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
-                <thead className="bg-zinc-900/80 text-zinc-400 font-mono text-[10px] uppercase border-b border-zinc-800">
+                <thead className="bg-zinc-100 dark:bg-zinc-900/80 text-zinc-700 dark:text-zinc-400 font-mono text-[10px] uppercase border-b border-zinc-200 dark:border-zinc-800">
                   <tr>
                     <th className="p-3">Receipt / Voucher</th>
                     <th className="p-3">Time & Date</th>
@@ -719,18 +719,18 @@ export default function ReportsPage() {
                     <th className="p-3 text-right">Net Amount</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-zinc-800/60 font-sans">
+                <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800/60 font-sans">
                   {filteredCashierTransactions.map((tx: any, idx: number) => {
                     const isInflow = tx.flow === "INFLOW";
                     return (
-                      <tr key={`cashier-tx-${tx.flow}-${tx.recordId || tx.id || idx}-${idx}`} className="hover:bg-zinc-900/40 transition">
+                      <tr key={`cashier-tx-${tx.flow}-${tx.recordId || tx.id || idx}-${idx}`} className="hover:bg-zinc-50 dark:hover:bg-zinc-900/40 transition">
                         {/* 1. Receipt / Voucher */}
                         <td className="p-3 font-mono font-bold">
                           <span
                             className={
                               isInflow
-                                ? "text-emerald-400 bg-emerald-950/40 border border-emerald-800/40 px-1.5 py-0.5 rounded"
-                                : "text-rose-400 bg-rose-950/40 border border-rose-800/40 px-1.5 py-0.5 rounded"
+                                ? "text-emerald-700 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/40 px-2 py-0.5 rounded"
+                                : "text-rose-700 dark:text-rose-400 bg-rose-100 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/40 px-2 py-0.5 rounded"
                             }
                           >
                             {tx.recordId}
@@ -738,53 +738,53 @@ export default function ReportsPage() {
                         </td>
 
                         {/* 2. Time & Date */}
-                        <td className="p-3 font-mono text-zinc-300 text-[11px]">
-                          <div>{tx.time}</div>
+                        <td className="p-3 font-mono text-zinc-700 dark:text-zinc-300 text-[11px]">
+                          <div className="font-bold">{tx.time}</div>
                           <div className="text-[10px] text-zinc-500">{tx.date}</div>
                         </td>
 
                         {/* 3. Type (Inflow / Outflow) */}
                         <td className="p-3">
                           {isInflow ? (
-                            <span className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-mono font-bold bg-emerald-500/10 text-emerald-300 border border-emerald-500/30">
-                              <ArrowDownLeft className="h-3 w-3 text-emerald-400" />
+                            <span className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-mono font-bold bg-emerald-100 dark:bg-emerald-500/10 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-500/30">
+                              <ArrowDownLeft className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
                               COLLECTION
                             </span>
                           ) : (
-                            <span className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-mono font-bold bg-rose-500/10 text-rose-300 border border-rose-500/30">
-                              <ArrowUpRight className="h-3 w-3 text-rose-400" />
+                            <span className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-mono font-bold bg-rose-100 dark:bg-rose-500/10 text-rose-800 dark:text-rose-300 border border-rose-200 dark:border-rose-500/30">
+                              <ArrowUpRight className="h-3 w-3 text-rose-600 dark:text-rose-400" />
                               EXPENSE
                             </span>
                           )}
                         </td>
 
                         {/* 4. Party / Guest / Payee */}
-                        <td className="p-3 font-bold text-white">
+                        <td className="p-3 font-bold text-zinc-900 dark:text-white">
                           <div className="flex items-center gap-1.5">
-                            <User className="h-3.5 w-3.5 text-zinc-500" />
+                            <User className="h-3.5 w-3.5 text-zinc-400" />
                             <span>{tx.party}</span>
                           </div>
                         </td>
 
                         {/* 5. Particulars & Source Badge */}
-                        <td className="p-3 text-zinc-300 text-[11px]">
+                        <td className="p-3 text-zinc-700 dark:text-zinc-300 text-[11px]">
                           <div className="flex items-center gap-1.5 flex-wrap">
                             {tx.sourceLabel && isInflow && (
-                              <span className="rounded px-1.5 py-0.2 text-[9px] font-mono font-bold bg-zinc-800 text-zinc-300 border border-zinc-700">
+                              <span className="rounded px-1.5 py-0.5 text-[9px] font-mono font-bold bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700">
                                 {tx.sourceLabel}
                               </span>
                             )}
-                            <span>{tx.particulars}</span>
+                            <span className="font-medium">{tx.particulars}</span>
                           </div>
                         </td>
 
                         {/* 6. Method & Reference */}
                         <td className="p-3">
                           <div className="flex items-center gap-1.5">
-                            <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] font-mono font-bold text-zinc-200 border border-zinc-700">
+                            <span className="rounded bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 text-[10px] font-mono font-bold text-zinc-800 dark:text-zinc-200 border border-zinc-200 dark:border-zinc-700">
                               {tx.method}
                             </span>
-                            <span className="text-[11px] font-mono text-zinc-400 truncate max-w-[140px]" title={tx.reference}>
+                            <span className="text-[11px] font-mono text-zinc-500 dark:text-zinc-400 truncate max-w-[140px]" title={tx.reference}>
                               {tx.reference}
                             </span>
                           </div>
@@ -793,9 +793,9 @@ export default function ReportsPage() {
                         {/* 7. Amount */}
                         <td className="p-3 text-right font-mono font-black text-xs sm:text-sm tabular-nums">
                           {isInflow ? (
-                            <span className="text-emerald-400">+{formatINR(tx.amount)}</span>
+                            <span className="text-emerald-600 dark:text-emerald-400">+{formatINR(tx.amount)}</span>
                           ) : (
-                            <span className="text-rose-400">-{formatINR(tx.totalAmount)}</span>
+                            <span className="text-rose-600 dark:text-rose-400">-{formatINR(tx.totalAmount)}</span>
                           )}
                         </td>
                       </tr>
@@ -804,7 +804,7 @@ export default function ReportsPage() {
 
                   {filteredCashierTransactions.length === 0 && (
                     <tr>
-                      <td colSpan={7} className="p-8 text-center text-zinc-500 font-mono text-xs">
+                      <td colSpan={7} className="p-8 text-center text-zinc-400 dark:text-zinc-500 font-mono text-xs">
                         No transactions found for the selected filter.
                       </td>
                     </tr>
@@ -820,15 +820,15 @@ export default function ReportsPage() {
       {/* 2. FRONT OFFICE GUEST LEDGER (D02) */}
       {/* ========================================================================= */}
       {reportType === "FRONT_OFFICE" && (
-        <div className="rounded-2xl border border-zinc-800 bg-[#111114] overflow-hidden shadow-sm">
-          <div className="p-3.5 border-b border-zinc-800 flex items-center justify-between">
-            <h2 className="text-xs font-bold text-white">Front Office In-House Guest Ledger</h2>
-            <span className="text-xs text-zinc-400 font-mono">{data?.rows?.length || 0} in-house stays</span>
+        <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#111114] overflow-hidden shadow-xs">
+          <div className="p-4 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
+            <h2 className="text-xs font-bold text-zinc-900 dark:text-white uppercase tracking-wider">Front Office In-House Guest Ledger</h2>
+            <span className="text-xs text-zinc-500 dark:text-zinc-400 font-mono font-semibold">{data?.rows?.length || 0} in-house stays</span>
           </div>
 
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
-              <thead className="bg-zinc-900/80 text-zinc-400 font-mono text-[10px] uppercase border-b border-zinc-800">
+              <thead className="bg-zinc-100 dark:bg-zinc-900/80 text-zinc-700 dark:text-zinc-400 font-mono text-[10px] uppercase border-b border-zinc-200 dark:border-zinc-800">
                 <tr>
                   <th className="p-3">Guest</th>
                   <th className="p-3">Phone</th>
@@ -839,20 +839,20 @@ export default function ReportsPage() {
                   <th className="p-3 text-right">Folio Balance</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-zinc-800/60">
+              <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800/60">
                 {data?.rows?.map((r: any, idx: number) => (
-                  <tr key={`guest-stay-${r.stayId || idx}-${idx}`} className="hover:bg-zinc-900/40 transition">
-                    <td className="p-3 font-bold text-white">{r.guestName}</td>
-                    <td className="p-3 text-zinc-400 font-mono text-[11px]">{r.phone || "—"}</td>
-                    <td className="p-3 font-mono font-bold text-zinc-200">Room {r.roomNumber}</td>
-                    <td className="p-3 text-zinc-400 font-mono text-[11px]">{r.arrival}</td>
-                    <td className="p-3 text-zinc-400 font-mono text-[11px]">{r.departure}</td>
+                  <tr key={`guest-stay-${r.stayId || idx}-${idx}`} className="hover:bg-zinc-50 dark:hover:bg-zinc-900/40 transition">
+                    <td className="p-3 font-bold text-zinc-900 dark:text-white">{r.guestName}</td>
+                    <td className="p-3 text-zinc-500 dark:text-zinc-400 font-mono text-[11px]">{r.phone || "—"}</td>
+                    <td className="p-3 font-mono font-bold text-zinc-900 dark:text-zinc-200">Room {r.roomNumber}</td>
+                    <td className="p-3 text-zinc-500 dark:text-zinc-400 font-mono text-[11px]">{r.arrival}</td>
+                    <td className="p-3 text-zinc-500 dark:text-zinc-400 font-mono text-[11px]">{r.departure}</td>
                     <td className="p-3">
-                      <span className="rounded px-1.5 py-0.5 text-[9px] font-mono font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                      <span className="rounded px-2 py-0.5 text-[9px] font-mono font-bold bg-emerald-100 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/30">
                         {r.status}
                       </span>
                     </td>
-                    <td className="p-3 font-mono font-black text-rose-400 text-right tabular-nums">
+                    <td className="p-3 font-mono font-black text-rose-600 dark:text-rose-400 text-right tabular-nums">
                       {formatINR(r.folioBalance)}
                     </td>
                   </tr>
@@ -867,15 +867,15 @@ export default function ReportsPage() {
       {/* 3. REVENUE & GST JOURNAL (D03) */}
       {/* ========================================================================= */}
       {reportType === "REVENUE" && (
-        <div className="rounded-2xl border border-zinc-800 bg-[#111114] overflow-hidden shadow-sm">
-          <div className="p-3.5 border-b border-zinc-800 flex items-center justify-between">
-            <h2 className="text-xs font-bold text-white">Revenue & GST Transaction Journal</h2>
-            <span className="text-xs text-zinc-400 font-mono">{data?.rows?.length || 0} entries</span>
+        <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#111114] overflow-hidden shadow-xs">
+          <div className="p-4 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
+            <h2 className="text-xs font-bold text-zinc-900 dark:text-white uppercase tracking-wider">Revenue & GST Transaction Journal</h2>
+            <span className="text-xs text-zinc-500 dark:text-zinc-400 font-mono font-semibold">{data?.rows?.length || 0} entries</span>
           </div>
 
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
-              <thead className="bg-zinc-900/80 text-zinc-400 font-mono text-[10px] uppercase border-b border-zinc-800">
+              <thead className="bg-zinc-100 dark:bg-zinc-900/80 text-zinc-700 dark:text-zinc-400 font-mono text-[10px] uppercase border-b border-zinc-200 dark:border-zinc-800">
                 <tr>
                   <th className="p-3">Date</th>
                   <th className="p-3">SAC Code / Charge</th>
@@ -886,20 +886,20 @@ export default function ReportsPage() {
                   <th className="p-3 text-right">Total (₹)</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-zinc-800/60">
+              <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800/60">
                 {data?.rows?.map((r: any, idx: number) => (
-                  <tr key={`rev-entry-${r.id || idx}-${idx}`} className="hover:bg-zinc-900/40 transition">
-                    <td className="p-3 font-mono text-zinc-400 text-[11px]">{r.serviceDate}</td>
-                    <td className="p-3 font-mono font-bold text-zinc-300">{r.chargeCode}</td>
-                    <td className="p-3 text-zinc-200">{r.description}</td>
-                    <td className="p-3 font-bold text-white">{r.guestName}</td>
-                    <td className="p-3 font-mono text-zinc-300 text-right tabular-nums">
+                  <tr key={`rev-entry-${r.id || idx}-${idx}`} className="hover:bg-zinc-50 dark:hover:bg-zinc-900/40 transition">
+                    <td className="p-3 font-mono text-zinc-500 dark:text-zinc-400 text-[11px]">{r.serviceDate}</td>
+                    <td className="p-3 font-mono font-bold text-zinc-800 dark:text-zinc-300">{r.chargeCode}</td>
+                    <td className="p-3 text-zinc-700 dark:text-zinc-200 font-medium">{r.description}</td>
+                    <td className="p-3 font-bold text-zinc-900 dark:text-white">{r.guestName}</td>
+                    <td className="p-3 font-mono text-zinc-700 dark:text-zinc-300 text-right tabular-nums">
                       {formatINR(r.taxableAmount)}
                     </td>
-                    <td className="p-3 font-mono text-blue-400 text-right tabular-nums">
+                    <td className="p-3 font-mono text-blue-600 dark:text-blue-400 text-right tabular-nums">
                       {formatINR(r.taxAmount)}
                     </td>
-                    <td className="p-3 font-mono font-bold text-white text-right tabular-nums">
+                    <td className="p-3 font-mono font-bold text-zinc-900 dark:text-white text-right tabular-nums">
                       {formatINR(r.totalAmount)}
                     </td>
                   </tr>
@@ -914,15 +914,15 @@ export default function ReportsPage() {
       {/* 4. F&B SALES REPORT (D04) */}
       {/* ========================================================================= */}
       {reportType === "FNB" && (
-        <div className="rounded-2xl border border-zinc-800 bg-[#111114] overflow-hidden shadow-sm">
-          <div className="p-3.5 border-b border-zinc-800 flex items-center justify-between">
-            <h2 className="text-xs font-bold text-white">F&B Outlet Sales & Tickets</h2>
-            <span className="text-xs text-zinc-400 font-mono">{data?.rows?.length || 0} tickets</span>
+        <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#111114] overflow-hidden shadow-xs">
+          <div className="p-4 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
+            <h2 className="text-xs font-bold text-zinc-900 dark:text-white uppercase tracking-wider">F&B Outlet Sales & Tickets</h2>
+            <span className="text-xs text-zinc-500 dark:text-zinc-400 font-mono font-semibold">{data?.rows?.length || 0} tickets</span>
           </div>
 
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
-              <thead className="bg-zinc-900/80 text-zinc-400 font-mono text-[10px] uppercase border-b border-zinc-800">
+              <thead className="bg-zinc-100 dark:bg-zinc-900/80 text-zinc-700 dark:text-zinc-400 font-mono text-[10px] uppercase border-b border-zinc-200 dark:border-zinc-800">
                 <tr>
                   <th className="p-3">Order No</th>
                   <th className="p-3">Outlet</th>
@@ -933,20 +933,20 @@ export default function ReportsPage() {
                   <th className="p-3">Timestamp</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-zinc-800/60">
+              <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800/60">
                 {data?.rows?.map((r: any, idx: number) => (
-                  <tr key={`fnb-order-${r.orderNo || idx}-${idx}`} className="hover:bg-zinc-900/40 transition">
-                    <td className="p-3 font-mono font-bold text-amber-400">{r.orderNo}</td>
-                    <td className="p-3 font-bold text-white">{r.outletName}</td>
+                  <tr key={`fnb-order-${r.orderNo || idx}-${idx}`} className="hover:bg-zinc-50 dark:hover:bg-zinc-900/40 transition">
+                    <td className="p-3 font-mono font-bold text-amber-600 dark:text-amber-400">{r.orderNo}</td>
+                    <td className="p-3 font-bold text-zinc-900 dark:text-white">{r.outletName}</td>
                     <td className="p-3">
-                      <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] font-mono text-zinc-300">
+                      <span className="rounded bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 text-[10px] font-mono text-zinc-700 dark:text-zinc-300 font-bold border border-zinc-200 dark:border-zinc-700">
                         {r.mode}
                       </span>
                     </td>
-                    <td className="p-3 text-zinc-300 font-mono">{r.tableName}</td>
-                    <td className="p-3 font-mono text-zinc-300">{r.itemCount} items</td>
+                    <td className="p-3 text-zinc-700 dark:text-zinc-300 font-mono">{r.tableName}</td>
+                    <td className="p-3 font-mono text-zinc-700 dark:text-zinc-300">{r.itemCount} items</td>
                     <td className="p-3">
-                      <span className="rounded px-1.5 py-0.5 text-[9px] font-mono font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                      <span className="rounded px-2 py-0.5 text-[9px] font-mono font-bold bg-emerald-100 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/30">
                         {r.status}
                       </span>
                     </td>
@@ -963,35 +963,35 @@ export default function ReportsPage() {
       {/* MODAL 1: RECORD PETTY EXPENSE */}
       {/* ========================================================================= */}
       {showAddExpenseModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4 animate-in fade-in">
-          <div className="w-full max-w-lg rounded-3xl border border-zinc-700 bg-[#121215] p-5 sm:p-6 shadow-2xl space-y-4 text-zinc-200">
-            <div className="flex items-center justify-between pb-3 border-b border-zinc-800">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 dark:bg-black/85 backdrop-blur-md p-4 animate-in fade-in">
+          <div className="w-full max-w-lg rounded-3xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-[#121215] p-5 sm:p-6 shadow-2xl space-y-4 text-zinc-900 dark:text-zinc-200">
+            <div className="flex items-center justify-between pb-3 border-b border-zinc-200 dark:border-zinc-800">
               <div>
-                <span className="text-[10px] font-mono font-bold uppercase text-rose-400">
+                <span className="text-[10px] font-mono font-bold uppercase text-rose-600 dark:text-rose-400">
                   Daily Hotel Expense Outflow
                 </span>
-                <h2 className="text-base sm:text-lg font-black text-white mt-0.5">
+                <h2 className="text-base sm:text-lg font-black text-zinc-900 dark:text-white mt-0.5">
                   Record Petty Expense / Vendor Payout
                 </h2>
               </div>
               <button
                 onClick={() => setShowAddExpenseModal(false)}
-                className="h-8 w-8 rounded-xl bg-zinc-800 flex items-center justify-center text-zinc-400 hover:text-white"
+                className="h-8 w-8 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 flex items-center justify-center text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white cursor-pointer"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
 
             {expenseError && (
-              <div className="rounded-xl bg-rose-500/10 border border-rose-500/30 p-3 text-xs text-rose-300 flex items-center gap-2">
-                <AlertCircle className="h-4 w-4 shrink-0" />
+              <div className="rounded-xl bg-rose-50 dark:bg-rose-500/10 border border-rose-200 dark:border-rose-500/30 p-3 text-xs text-rose-800 dark:text-rose-300 flex items-center gap-2">
+                <AlertCircle className="h-4 w-4 shrink-0 text-rose-600 dark:text-rose-400" />
                 <span>{expenseError}</span>
               </div>
             )}
 
             {expenseSuccess && (
-              <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/30 p-3 text-xs text-emerald-300 flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 shrink-0" />
+              <div className="rounded-xl bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/30 p-3 text-xs text-emerald-800 dark:text-emerald-300 flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
                 <span>{expenseSuccess}</span>
               </div>
             )}
@@ -1000,11 +1000,11 @@ export default function ReportsPage() {
               <div className="grid grid-cols-2 gap-3">
                 {/* Category */}
                 <div>
-                  <label className="text-zinc-300 font-bold block mb-1">Expense Head / Category *</label>
+                  <label className="text-zinc-700 dark:text-zinc-300 font-bold block mb-1">Expense Head / Category *</label>
                   <select
                     value={expenseForm.category}
                     onChange={(e) => setExpenseForm({ ...expenseForm, category: e.target.value })}
-                    className="w-full rounded-xl bg-zinc-900 border border-zinc-700 px-3 py-2 text-white font-bold focus:outline-none focus:border-white"
+                    className="w-full rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-zinc-900 dark:text-white font-bold focus:outline-none focus:border-blue-500 shadow-xs"
                   >
                     <option value="VENDOR_PAYMENT">Vendor / Supplier Payment (Dairy, Mandi, Provisions)</option>
                     <option value="STAFF_ADVANCE">Staff Advance / Salary / Allowance</option>
@@ -1021,11 +1021,11 @@ export default function ReportsPage() {
 
                 {/* Payment Method */}
                 <div>
-                  <label className="text-zinc-300 font-bold block mb-1">Payment Method *</label>
+                  <label className="text-zinc-700 dark:text-zinc-300 font-bold block mb-1">Payment Method *</label>
                   <select
                     value={expenseForm.paymentMethod}
                     onChange={(e) => setExpenseForm({ ...expenseForm, paymentMethod: e.target.value })}
-                    className="w-full rounded-xl bg-zinc-900 border border-zinc-700 px-3 py-2 text-white font-bold focus:outline-none focus:border-white"
+                    className="w-full rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-zinc-900 dark:text-white font-bold focus:outline-none focus:border-blue-500 shadow-xs"
                   >
                     <option value="CASH">Cash Drawer Outflow</option>
                     <option value="UPI">UPI (QR / GooglePay)</option>
@@ -1037,7 +1037,7 @@ export default function ReportsPage() {
 
               {/* Dynamic Payee Name */}
               <div>
-                <label className="text-zinc-300 font-bold block mb-1">
+                <label className="text-zinc-700 dark:text-zinc-300 font-bold block mb-1">
                   {expenseForm.category === "DRIVER_COMMISSION"
                     ? "Driver / Agent Name & Vehicle No *"
                     : expenseForm.category === "VENDOR_PAYMENT"
@@ -1080,13 +1080,13 @@ export default function ReportsPage() {
                   }
                   value={expenseForm.payeeName}
                   onChange={(e) => setExpenseForm({ ...expenseForm, payeeName: e.target.value })}
-                  className="w-full rounded-xl bg-zinc-900 border border-zinc-700 px-3 py-2 text-white placeholder-zinc-500 focus:outline-none focus:border-white"
+                  className="w-full rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none focus:border-blue-500 shadow-xs font-medium"
                 />
               </div>
 
               {/* Dynamic Description / Narration */}
               <div>
-                <label className="text-zinc-300 font-bold block mb-1">Description / Narration</label>
+                <label className="text-zinc-700 dark:text-zinc-300 font-bold block mb-1">Description / Narration</label>
                 <input
                   type="text"
                   placeholder={
@@ -1110,47 +1110,47 @@ export default function ReportsPage() {
                   }
                   value={expenseForm.description}
                   onChange={(e) => setExpenseForm({ ...expenseForm, description: e.target.value })}
-                  className="w-full rounded-xl bg-zinc-900 border border-zinc-700 px-3 py-2 text-white placeholder-zinc-500 focus:outline-none focus:border-white"
+                  className="w-full rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none focus:border-blue-500 shadow-xs font-medium"
                 />
               </div>
 
               {/* Amount & Reference */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-zinc-300 font-bold block mb-1">Amount Paid (₹) *</label>
+                  <label className="text-zinc-700 dark:text-zinc-300 font-bold block mb-1">Amount Paid (₹) *</label>
                   <input
                     type="number"
                     required
                     placeholder="0.00"
                     value={expenseForm.amount}
                     onChange={(e) => setExpenseForm({ ...expenseForm, amount: e.target.value })}
-                    className="w-full rounded-xl bg-zinc-900 border border-zinc-700 px-3 py-2 text-white font-mono font-bold focus:outline-none focus:border-white"
+                    className="w-full rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-zinc-900 dark:text-white font-mono font-bold focus:outline-none focus:border-blue-500 shadow-xs"
                   />
                 </div>
                 <div>
-                  <label className="text-zinc-300 font-bold block mb-1">Reference / UTR / Bill No</label>
+                  <label className="text-zinc-700 dark:text-zinc-300 font-bold block mb-1">Reference / UTR / Bill No</label>
                   <input
                     type="text"
                     placeholder="e.g. UPI/MANDI/9942 or Bill #81"
                     value={expenseForm.reference}
                     onChange={(e) => setExpenseForm({ ...expenseForm, reference: e.target.value })}
-                    className="w-full rounded-xl bg-zinc-900 border border-zinc-700 px-3 py-2 text-white font-mono placeholder-zinc-500 focus:outline-none focus:border-white"
+                    className="w-full rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-zinc-900 dark:text-white font-mono placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none focus:border-blue-500 shadow-xs"
                   />
                 </div>
               </div>
 
-              <div className="pt-3 border-t border-zinc-800 flex items-center justify-end gap-2.5">
+              <div className="pt-3 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-end gap-2.5">
                 <button
                   type="button"
                   onClick={() => setShowAddExpenseModal(false)}
-                  className="rounded-xl px-4 py-2 text-zinc-400 hover:text-white font-semibold"
+                  className="rounded-xl px-4 py-2 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white font-semibold cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={expenseSubmitting}
-                  className="rounded-xl bg-rose-500 hover:bg-rose-400 text-zinc-950 px-5 py-2 font-black text-xs shadow-lg transition flex items-center gap-1.5 active:scale-95"
+                  className="rounded-xl bg-rose-600 hover:bg-rose-500 text-white px-5 py-2 font-bold text-xs shadow-xs transition flex items-center gap-1.5 active:scale-95 cursor-pointer"
                 >
                   {expenseSubmitting ? "Saving Voucher..." : "Record Expense Voucher"}
                 </button>

@@ -55,6 +55,7 @@ function BillingContent() {
 
   // Single Modals
   const [showManualChargeModal, setShowManualChargeModal] = useState(false);
+  const [showDiscountModal, setShowDiscountModal] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<any | null>(null);
@@ -65,6 +66,12 @@ function BillingContent() {
     chargeCode: "ROOM_TARIFF",
     description: "Extra Bed & Linen",
     amount: "1000",
+    sacHsn: "996311",
+  });
+
+  const [discountForm, setDiscountForm] = useState({
+    description: "Rate Discount / Rebate",
+    amount: "500",
     sacHsn: "996311",
   });
 
@@ -154,7 +161,7 @@ function BillingContent() {
           setPaymentForm({
             amount: String(Math.max(0, bal)),
             method: "UPI",
-            reference: `UPI/${Date.now().toString().slice(-6)}`,
+            reference: "",
             payerName: activeStay?.primaryGuest?.name || "Guest",
           });
         }
@@ -307,7 +314,7 @@ function BillingContent() {
       setPaymentForm({
         amount: String(currentBalance),
         method: "UPI",
-        reference: `UPI/${Date.now().toString().slice(-6)}`,
+        reference: "",
         payerName: activeStay?.primaryGuest?.name || "Guest",
       });
       setShowPaymentModal(true);
@@ -371,7 +378,7 @@ function BillingContent() {
       companyName: firstGuest?.companyName || "",
       gstin: firstGuest?.gstin || "",
       method: "UPI",
-      reference: `GRP-UPI/${Date.now().toString().slice(-6)}`,
+      reference: "",
       notes: `Group payment covering ${selectedStays.length} rooms: ${selectedStays.map((s) => s.roomAssignments?.[0]?.room?.number || "Unassigned").join(", ")}`,
       allocations: initialAlloc,
     });
@@ -468,18 +475,18 @@ function BillingContent() {
   return (
     <div className="space-y-4 max-w-7xl mx-auto pb-12">
       {/* Top Action Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3.5 sm:p-4 rounded-xl bg-[#111114] border border-zinc-800 shadow-sm">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3.5 sm:p-4 rounded-xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-base font-bold text-zinc-100 flex items-center gap-2">
-              <Receipt className="h-5 w-5 text-zinc-400" />
+            <h1 className="text-base font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+              <Receipt className="h-5 w-5 text-zinc-500 dark:text-zinc-400" />
               Billing, Checkout & Tax Invoices
             </h1>
-            <span className="rounded-md px-2 py-0.5 text-[10px] font-mono font-semibold text-emerald-400 bg-emerald-950/40 border border-emerald-800/50">
+            <span className="rounded-md px-2 py-0.5 text-[10px] font-mono font-semibold text-emerald-800 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800/50">
               Rule 46 GST
             </span>
           </div>
-          <p className="text-xs text-zinc-400 font-mono mt-0.5">
+          <p className="text-xs text-zinc-500 dark:text-zinc-400 font-mono mt-0.5">
             Single & group checkouts, stay-duration billing, and printable tax receipts
           </p>
         </div>
@@ -488,7 +495,7 @@ function BillingContent() {
           {selectedGroupStayIds.length > 0 && (
             <button
               onClick={handleOpenGroupPaymentModal}
-              className="flex items-center gap-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-2 text-xs font-bold transition shadow-sm animate-in fade-in"
+              className="flex items-center gap-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-2 text-xs font-bold transition shadow-xs animate-in fade-in"
             >
               <Users className="h-4 w-4" /> Group Payment ({selectedGroupStayIds.length} Rooms)
             </button>
@@ -497,9 +504,9 @@ function BillingContent() {
           {selectedGroupStayIds.length > 0 && (
             <button
               onClick={handleExecuteGroupCheckout}
-              className="flex items-center gap-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 px-3 py-2 text-xs font-semibold transition shadow-sm"
+              className="flex items-center gap-1.5 rounded-lg bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-xs font-semibold transition shadow-xs"
             >
-              <CheckCircle2 className="h-4 w-4 text-emerald-400" /> Group Checkout
+              <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" /> Group Checkout
             </button>
           )}
 
@@ -507,9 +514,9 @@ function BillingContent() {
             <>
               <button
                 onClick={handleOpenLiveTaxBill}
-                className="flex items-center gap-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 px-3 py-2 text-xs font-semibold text-zinc-200 transition shadow-sm"
+                className="flex items-center gap-1.5 rounded-lg bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-xs font-semibold text-zinc-800 dark:text-zinc-200 transition shadow-xs"
               >
-                <Printer className="h-4 w-4 text-zinc-300" /> Print Tax Bill
+                <Printer className="h-4 w-4 text-zinc-500 dark:text-zinc-300" /> Print Tax Bill
               </button>
 
               <button
@@ -522,9 +529,23 @@ function BillingContent() {
                   });
                   setShowManualChargeModal(true);
                 }}
-                className="flex items-center gap-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 px-3 py-2 text-xs font-semibold text-zinc-200 transition shadow-sm"
+                className="flex items-center gap-1.5 rounded-lg bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-xs font-semibold text-zinc-800 dark:text-zinc-200 transition shadow-xs"
               >
                 <Plus className="h-4 w-4" /> Post Charge
+              </button>
+
+              <button
+                onClick={() => {
+                  setDiscountForm({
+                    description: "Discount / Rebate",
+                    amount: "500",
+                    sacHsn: "996311",
+                  });
+                  setShowDiscountModal(true);
+                }}
+                className="flex items-center gap-1.5 rounded-lg bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-xs font-semibold text-rose-600 dark:text-rose-400 transition shadow-xs"
+              >
+                <Plus className="h-4 w-4" /> Add Discount
               </button>
 
               <button
@@ -532,12 +553,12 @@ function BillingContent() {
                   setPaymentForm({
                     amount: String(Math.max(0, currentBalance)),
                     method: "UPI",
-                    reference: `UPI/${Date.now().toString().slice(-6)}`,
+                    reference: "",
                     payerName: activeStay?.primaryGuest?.name || "Guest",
                   });
                   setShowPaymentModal(true);
                 }}
-                className="flex items-center gap-1.5 rounded-lg bg-white hover:bg-zinc-200 px-3 py-2 text-xs font-black text-zinc-950 transition shadow-sm"
+                className="flex items-center gap-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 dark:bg-white dark:hover:bg-zinc-200 px-3 py-2 text-xs font-black text-white dark:text-zinc-950 transition shadow-xs"
               >
                 <CreditCard className="h-4 w-4" /> Collect Payment
               </button>
@@ -548,10 +569,10 @@ function BillingContent() {
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
         {/* Left: Stays & Folios Directory */}
-        <div className="lg:col-span-4 p-3.5 sm:p-4 rounded-xl bg-[#111114] border border-zinc-800 space-y-3 shadow-sm flex flex-col">
-          <div className="flex items-center justify-between pb-2 border-b border-zinc-800 text-xs">
-            <span className="font-bold text-zinc-200 flex items-center gap-1.5">
-              <Layers className="h-4 w-4 text-zinc-400" />
+        <div className="lg:col-span-4 p-3.5 sm:p-4 rounded-xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 space-y-3 shadow-xs flex flex-col">
+          <div className="flex items-center justify-between pb-2 border-b border-zinc-200 dark:border-zinc-800 text-xs">
+            <span className="font-bold text-zinc-800 dark:text-zinc-200 flex items-center gap-1.5">
+              <Layers className="h-4 w-4 text-zinc-500 dark:text-zinc-400" />
               Rooms Directory
             </span>
             <div className="flex items-center gap-2">
@@ -563,11 +584,11 @@ function BillingContent() {
                     setSelectedGroupStayIds(filteredStays.map((s) => s.id));
                   }
                 }}
-                className="text-[10px] text-blue-400 hover:text-blue-300 font-mono font-medium underline"
+                className="text-[10px] text-blue-600 dark:text-blue-400 hover:text-blue-500 dark:hover:text-blue-300 font-mono font-medium underline"
               >
                 {selectedGroupStayIds.length > 0 ? "Clear Selection" : "Select All"}
               </button>
-              <span className="text-zinc-400 font-mono font-semibold">
+              <span className="text-zinc-500 dark:text-zinc-400 font-mono font-semibold">
                 {filteredStays.length} / {stays.length}
               </span>
             </div>
@@ -575,18 +596,18 @@ function BillingContent() {
 
           {/* Search Bar */}
           <div className="relative">
-            <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-zinc-500" />
+            <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-zinc-400 dark:text-zinc-500" />
             <input
               type="text"
               placeholder="Search room #, guest name, company..."
               value={staySearchQuery}
               onChange={(e) => setStaySearchQuery(e.target.value)}
-              className="w-full rounded-lg bg-zinc-900 border border-zinc-700/80 pl-8 pr-8 py-2 text-xs text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-zinc-500 transition"
+              className="w-full rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700/80 pl-8 pr-8 py-2 text-xs text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none focus:border-blue-500 transition"
             />
             {staySearchQuery && (
               <button
                 onClick={() => setStaySearchQuery("")}
-                className="absolute right-2.5 top-2.5 text-zinc-500 hover:text-white"
+                className="absolute right-2.5 top-2.5 text-zinc-400 hover:text-zinc-700 dark:hover:text-white"
               >
                 <X className="h-3.5 w-3.5" />
               </button>
@@ -594,13 +615,13 @@ function BillingContent() {
           </div>
 
           {/* Quick Filter Tabs */}
-          <div className="grid grid-cols-4 gap-1 p-1 rounded-lg bg-zinc-900/80 border border-zinc-800 text-[10px] font-semibold text-center">
+          <div className="grid grid-cols-4 gap-1 p-1 rounded-lg bg-zinc-100 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 text-[10px] font-semibold text-center">
             <button
               onClick={() => setStayStatusFilter("ALL")}
               className={`rounded py-1 transition ${
                 stayStatusFilter === "ALL"
-                  ? "bg-zinc-800 text-white shadow-sm font-bold"
-                  : "text-zinc-400 hover:text-zinc-200"
+                  ? "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-xs font-bold"
+                  : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200"
               }`}
             >
               All ({stays.length})
@@ -609,8 +630,8 @@ function BillingContent() {
               onClick={() => setStayStatusFilter("IN_HOUSE")}
               className={`rounded py-1 transition ${
                 stayStatusFilter === "IN_HOUSE"
-                  ? "bg-emerald-600 text-white shadow-sm font-bold"
-                  : "text-zinc-400 hover:text-zinc-200"
+                  ? "bg-emerald-600 text-white shadow-xs font-bold"
+                  : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200"
               }`}
             >
               In-House ({stays.filter((s) => s.status === "IN_HOUSE").length})
@@ -619,8 +640,8 @@ function BillingContent() {
               onClick={() => setStayStatusFilter("WITH_BALANCE")}
               className={`rounded py-1 transition ${
                 stayStatusFilter === "WITH_BALANCE"
-                  ? "bg-rose-600 text-white shadow-sm font-bold"
-                  : "text-zinc-400 hover:text-zinc-200"
+                  ? "bg-rose-600 text-white shadow-xs font-bold"
+                  : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200"
               }`}
             >
               Due ({stays.filter((s) => s.folio?.balance > 0).length})
@@ -629,8 +650,8 @@ function BillingContent() {
               onClick={() => setStayStatusFilter("CHECKED_OUT")}
               className={`rounded py-1 transition ${
                 stayStatusFilter === "CHECKED_OUT"
-                  ? "bg-zinc-800 text-white shadow-sm font-bold"
-                  : "text-zinc-400 hover:text-zinc-200"
+                  ? "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-xs font-bold"
+                  : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200"
               }`}
             >
               Departed
@@ -651,8 +672,8 @@ function BillingContent() {
                   onClick={() => setSelectedStayId(s.id)}
                   className={`rounded-xl p-3 border transition cursor-pointer flex items-start gap-2.5 ${
                     isSelected
-                      ? "bg-zinc-800/90 border-blue-500 shadow-md text-zinc-100"
-                      : "bg-zinc-900/90 border-zinc-800/90 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200"
+                      ? "bg-blue-50/80 dark:bg-zinc-800/90 border-blue-500 shadow-xs text-zinc-900 dark:text-zinc-100"
+                      : "bg-zinc-50/60 dark:bg-zinc-900/90 border-zinc-200 dark:border-zinc-800/90 text-zinc-600 dark:text-zinc-400 hover:border-zinc-300 dark:hover:border-zinc-700 hover:text-zinc-900 dark:hover:text-zinc-200"
                   }`}
                 >
                   <input
@@ -660,7 +681,7 @@ function BillingContent() {
                     checked={isGroupChecked}
                     onClick={(e) => e.stopPropagation()}
                     onChange={() => toggleGroupStaySelection(s.id)}
-                    className="mt-1 h-3.5 w-3.5 rounded bg-zinc-800 border-zinc-700 accent-emerald-500 cursor-pointer"
+                    className="mt-1 h-3.5 w-3.5 rounded bg-white dark:bg-zinc-800 border-zinc-300 dark:border-zinc-700 accent-emerald-500 cursor-pointer"
                     title="Select for group payment / checkout"
                   />
 
@@ -668,7 +689,7 @@ function BillingContent() {
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-1.5">
                         <BedDouble className="h-3.5 w-3.5 text-zinc-400 shrink-0" />
-                        <span className="font-bold text-xs text-white font-mono">
+                        <span className="font-bold text-xs text-zinc-900 dark:text-white font-mono">
                           Room {room?.number || "Unassigned"}
                         </span>
                         <span className="text-[10px] text-zinc-500 truncate">
@@ -677,24 +698,24 @@ function BillingContent() {
                       </div>
                       <div className="flex items-center gap-1.5 shrink-0">
                         {balance > 0 ? (
-                          <span className="text-[10px] font-mono font-bold text-rose-400 bg-rose-950/40 border border-rose-800/50 px-1.5 py-0.2 rounded">
+                          <span className="text-[10px] font-mono font-bold text-rose-800 dark:text-rose-400 bg-rose-100 dark:bg-rose-950/40 border border-rose-300 dark:border-rose-800/50 px-1.5 py-0.2 rounded">
                             Due: {formatINR(balance)}
                           </span>
                         ) : (
-                          <span className="text-[10px] font-mono font-bold text-emerald-400 bg-emerald-950/40 border border-emerald-800/50 px-1.5 py-0.2 rounded">
+                          <span className="text-[10px] font-mono font-bold text-emerald-800 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800/50 px-1.5 py-0.2 rounded">
                             Paid
                           </span>
                         )}
                       </div>
                     </div>
 
-                    <div className="text-xs text-zinc-200 font-semibold flex items-center justify-between gap-1">
+                    <div className="text-xs text-zinc-800 dark:text-zinc-200 font-semibold flex items-center justify-between gap-1">
                       <span className="truncate">{s.primaryGuest?.name || "Guest"}</span>
                       <span
                         className={`rounded px-1.5 py-0.2 text-[9px] font-mono font-semibold shrink-0 ${
                           s.status === "IN_HOUSE"
-                            ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
-                            : "bg-zinc-800 text-zinc-400"
+                            ? "bg-emerald-100 dark:bg-emerald-500/10 text-emerald-800 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-500/20"
+                            : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400"
                         }`}
                       >
                         {s.status}
@@ -714,9 +735,9 @@ function BillingContent() {
 
             {filteredStays.length === 0 && (
               <div className="p-8 text-center text-xs text-zinc-500 space-y-1">
-                <AlertCircle className="h-5 w-5 text-zinc-600 mx-auto" />
-                <p className="font-semibold text-zinc-400">No matching folios found</p>
-                <p className="text-[11px] text-zinc-600">Try changing your search term or filter.</p>
+                <AlertCircle className="h-5 w-5 text-zinc-400 dark:text-zinc-600 mx-auto" />
+                <p className="font-semibold text-zinc-700 dark:text-zinc-400">No matching folios found</p>
+                <p className="text-[11px] text-zinc-500 dark:text-zinc-600">Try changing your search term or filter.</p>
               </div>
             )}
           </div>
@@ -727,25 +748,25 @@ function BillingContent() {
           {folioData ? (
             <>
               {/* Active Folio Header & Check-out Status Card */}
-              <div className="p-4 rounded-xl bg-[#111114] border border-zinc-800 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-sm">
+              <div className="p-4 rounded-xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xs">
                 <div className="flex items-center gap-3">
-                  <div className="h-11 w-11 rounded-xl bg-zinc-800 border border-zinc-700 flex items-center justify-center text-white shrink-0">
+                  <div className="h-11 w-11 rounded-xl bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 flex items-center justify-center text-zinc-900 dark:text-white shrink-0">
                     <BedDouble className="h-6 w-6" />
                   </div>
                   <div>
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-sm font-bold text-white font-mono">
+                      <span className="text-sm font-bold text-zinc-900 dark:text-white font-mono">
                         Room {activeStay?.roomAssignments?.[0]?.room?.number || "Unassigned"}
                       </span>
-                      <span className="rounded bg-zinc-800 border border-zinc-700 px-1.5 py-0.2 text-[10px] font-mono text-zinc-400">
+                      <span className="rounded bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 px-1.5 py-0.2 text-[10px] font-mono text-zinc-600 dark:text-zinc-400">
                         {activeStay?.roomAssignments?.[0]?.room?.roomType?.name || "Deluxe AC"}
                       </span>
-                      <span className="rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-1.5 py-0.2 text-[10px] font-mono font-semibold">
+                      <span className="rounded bg-emerald-100 dark:bg-emerald-500/10 text-emerald-800 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-500/20 px-1.5 py-0.2 text-[10px] font-mono font-semibold">
                         {activeStay?.status}
                       </span>
                     </div>
-                    <div className="text-xs text-zinc-300 font-medium mt-0.5">
-                      Guest: <strong className="text-white">{activeStay?.primaryGuest?.name}</strong>
+                    <div className="text-xs text-zinc-700 dark:text-zinc-300 font-medium mt-0.5">
+                      Guest: <strong className="text-zinc-900 dark:text-white">{activeStay?.primaryGuest?.name}</strong>
                       {activeStay?.primaryGuest?.companyName && ` (${activeStay.primaryGuest.companyName})`}
                       {activeStay?.primaryGuest?.phone && ` • ${activeStay.primaryGuest.phone}`}
                     </div>
@@ -754,10 +775,10 @@ function BillingContent() {
 
                 {/* Duration & Checkout Button Block */}
                 <div className="flex flex-wrap items-center gap-2 self-start md:self-auto">
-                  <div className="text-xs text-zinc-300 font-mono bg-zinc-900/90 px-3 py-2 rounded-xl border border-zinc-800 flex items-center gap-2">
-                    <Clock className="h-4 w-4 text-emerald-400" />
+                  <div className="text-xs text-zinc-700 dark:text-zinc-300 font-mono bg-zinc-50 dark:bg-zinc-900/90 px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-800 flex items-center gap-2 shadow-xs">
+                    <Clock className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
                     <div>
-                      <span className="font-bold text-white">{stayCalculations.nights} Night{stayCalculations.nights > 1 ? "s" : ""}</span>
+                      <span className="font-bold text-zinc-900 dark:text-white">{stayCalculations.nights} Night{stayCalculations.nights > 1 ? "s" : ""}</span>
                       <span className="text-[10px] text-zinc-500 block">@ {formatINR(stayCalculations.roomRatePerNight)}/night</span>
                     </div>
                   </div>
@@ -778,7 +799,7 @@ function BillingContent() {
                           setPaymentForm({
                             amount: String(currentBalance),
                             method: "UPI",
-                            reference: `UPI/${Date.now().toString().slice(-6)}`,
+                            reference: "",
                             payerName: activeStay?.primaryGuest?.name || "Guest",
                           });
                           setShowPaymentModal(true);
@@ -792,7 +813,7 @@ function BillingContent() {
                   ) : (
                     <button
                       onClick={handleOpenLiveTaxBill}
-                      className="flex items-center gap-1.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white px-3.5 py-2 text-xs font-bold transition border border-zinc-700"
+                      className="flex items-center gap-1.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-900 dark:text-white px-3.5 py-2 text-xs font-bold transition border border-zinc-300 dark:border-zinc-700"
                     >
                       <Printer className="h-3.5 w-3.5" />
                       <span>Print Tax Invoice</span>
@@ -803,19 +824,19 @@ function BillingContent() {
 
               {/* Summary Cards */}
               <div className="grid grid-cols-3 gap-3 text-center font-mono">
-                <div className="rounded-xl bg-[#111114] p-3 border border-zinc-800 shadow-sm">
+                <div className="rounded-xl bg-white dark:bg-[#111114] p-3 border border-zinc-200 dark:border-zinc-800 shadow-xs">
                   <div className="text-[10px] text-zinc-500 uppercase font-bold">Total Charges</div>
-                  <div className="text-lg font-black text-white mt-0.5 tabular-nums">{formatINR(totalCharges)}</div>
+                  <div className="text-lg font-black text-zinc-900 dark:text-white mt-0.5 tabular-nums">{formatINR(totalCharges)}</div>
                 </div>
-                <div className="rounded-xl bg-[#111114] p-3 border border-zinc-800 shadow-sm">
+                <div className="rounded-xl bg-white dark:bg-[#111114] p-3 border border-zinc-200 dark:border-zinc-800 shadow-xs">
                   <div className="text-[10px] text-zinc-500 uppercase font-bold">Total Payments</div>
-                  <div className="text-lg font-black text-emerald-400 mt-0.5 tabular-nums">{formatINR(totalPayments)}</div>
+                  <div className="text-lg font-black text-emerald-600 dark:text-emerald-400 mt-0.5 tabular-nums">{formatINR(totalPayments)}</div>
                 </div>
-                <div className="rounded-xl bg-[#111114] p-3 border border-zinc-800 shadow-sm">
+                <div className="rounded-xl bg-white dark:bg-[#111114] p-3 border border-zinc-200 dark:border-zinc-800 shadow-xs">
                   <div className="text-[10px] text-zinc-500 uppercase font-bold">Outstanding Balance</div>
                   <div
                     className={`text-lg font-black mt-0.5 tabular-nums ${
-                      currentBalance > 0 ? "text-rose-400" : "text-emerald-400"
+                      currentBalance > 0 ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400"
                     }`}
                   >
                     {formatINR(currentBalance)}
@@ -824,10 +845,10 @@ function BillingContent() {
               </div>
 
               {/* Itemized Charges Table with Search */}
-              <div className="rounded-xl border border-zinc-800 bg-[#111114] overflow-hidden shadow-sm space-y-2.5 p-3.5">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-2 border-b border-zinc-800">
+              <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#111114] overflow-hidden shadow-xs space-y-2.5 p-3.5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-2 border-b border-zinc-200 dark:border-zinc-800">
                   <div>
-                    <h2 className="text-xs font-bold text-white uppercase tracking-wider">Folio Charges Ledger</h2>
+                    <h2 className="text-xs font-bold text-zinc-900 dark:text-white uppercase tracking-wider">Folio Charges Ledger</h2>
                     <p className="text-[10px] text-zinc-500 font-mono">
                       Calculation: {stayCalculations.nights} Night{stayCalculations.nights > 1 ? "s" : ""} stayed x Room Rent
                     </p>
@@ -836,18 +857,18 @@ function BillingContent() {
                   {/* Ledger Search & Type Filter */}
                   <div className="flex items-center gap-2">
                     <div className="relative w-48 sm:w-56">
-                      <Search className="absolute left-2.5 top-2 h-3 w-3 text-zinc-500" />
+                      <Search className="absolute left-2.5 top-2 h-3 w-3 text-zinc-400 dark:text-zinc-500" />
                       <input
                         type="text"
                         placeholder="Filter charges..."
                         value={ledgerSearchQuery}
                         onChange={(e) => setLedgerSearchQuery(e.target.value)}
-                        className="w-full rounded-md bg-zinc-900 border border-zinc-700/80 pl-7 pr-6 py-1 text-[11px] text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-zinc-500"
+                        className="w-full rounded-md bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700/80 pl-7 pr-6 py-1 text-[11px] text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none focus:border-blue-500"
                       />
                       {ledgerSearchQuery && (
                         <button
                           onClick={() => setLedgerSearchQuery("")}
-                          className="absolute right-2 top-1.5 text-zinc-500 hover:text-white"
+                          className="absolute right-2 top-1.5 text-zinc-400 hover:text-zinc-700 dark:hover:text-white"
                         >
                           <X className="h-3 w-3" />
                         </button>
@@ -857,7 +878,7 @@ function BillingContent() {
                     <select
                       value={ledgerTypeFilter}
                       onChange={(e: any) => setLedgerTypeFilter(e.target.value)}
-                      className="rounded-md bg-zinc-900 border border-zinc-700/80 px-2 py-1 text-[11px] text-zinc-200 focus:outline-none focus:border-zinc-500 font-mono"
+                      className="rounded-md bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700/80 px-2 py-1 text-[11px] text-zinc-900 dark:text-zinc-200 focus:outline-none focus:border-blue-500 font-mono"
                     >
                       <option value="ALL">All Types</option>
                       <option value="ROOM_TARIFF">Room Tariffs</option>
@@ -867,9 +888,9 @@ function BillingContent() {
                   </div>
                 </div>
 
-                <div className="overflow-x-auto rounded-lg border border-zinc-800/80">
+                <div className="overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-800/80">
                   <table className="w-full text-left text-xs">
-                    <thead className="bg-zinc-900 text-zinc-400 font-mono text-[10px] uppercase border-b border-zinc-800">
+                    <thead className="bg-zinc-50 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 font-mono text-[10px] uppercase border-b border-zinc-200 dark:border-zinc-800">
                       <tr>
                         <th className="p-2.5">Date</th>
                         <th className="p-2.5">Description</th>
@@ -879,29 +900,29 @@ function BillingContent() {
                         <th className="p-2.5 text-right">Total</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-zinc-800/60">
+                    <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800/60">
                       {entries.map((e: any) => {
                         const taxAmt = (e.totalAmount || 0) - (e.taxableAmount || 0);
                         const isFood = e.chargeCode?.includes("FOOD") || e.chargeCode?.includes("RESTAURANT") || e.chargeCode?.includes("FB");
                         return (
-                          <tr key={e.id} className="hover:bg-zinc-900/50 transition">
-                            <td className="p-2.5 font-mono text-zinc-400 text-[11px]">{e.serviceDate}</td>
-                            <td className="p-2.5 font-medium text-zinc-200">
+                          <tr key={e.id} className="hover:bg-zinc-50 dark:hover:bg-zinc-900/50 transition">
+                            <td className="p-2.5 font-mono text-zinc-600 dark:text-zinc-400 text-[11px]">{e.serviceDate}</td>
+                            <td className="p-2.5 font-medium text-zinc-800 dark:text-zinc-200">
                               <div className="flex items-center gap-1.5">
                                 <span>{e.description}</span>
                                 <span className={`text-[9px] font-mono px-1 py-0.2 rounded ${
-                                  isFood ? "bg-amber-500/10 text-amber-400 border border-amber-500/20" : "bg-blue-500/10 text-blue-400 border border-blue-500/20"
+                                  isFood ? "bg-amber-100 dark:bg-amber-500/10 text-amber-800 dark:text-amber-400 border border-amber-300 dark:border-amber-500/20" : "bg-blue-100 dark:bg-blue-500/10 text-blue-800 dark:text-blue-400 border border-blue-300 dark:border-blue-500/20"
                                 }`}>
                                   {isFood ? "F&B" : "Room"}
                                 </span>
                               </div>
                             </td>
-                            <td className="p-2.5 font-mono text-zinc-400 text-[11px]">
+                            <td className="p-2.5 font-mono text-zinc-600 dark:text-zinc-400 text-[11px]">
                               {isFood ? "996331" : "996311"}
                             </td>
-                            <td className="p-2.5 font-mono tabular-nums text-zinc-300">{formatINR(e.taxableAmount || 0)}</td>
-                            <td className="p-2.5 font-mono text-zinc-400 tabular-nums">{formatINR(taxAmt)}</td>
-                            <td className="p-2.5 font-mono font-bold text-white text-right tabular-nums">
+                            <td className="p-2.5 font-mono tabular-nums text-zinc-700 dark:text-zinc-300">{formatINR(e.taxableAmount || 0)}</td>
+                            <td className="p-2.5 font-mono text-zinc-600 dark:text-zinc-400 tabular-nums">{formatINR(taxAmt)}</td>
+                            <td className="p-2.5 font-mono font-bold text-zinc-900 dark:text-white text-right tabular-nums">
                               {formatINR(e.totalAmount || 0)}
                             </td>
                           </tr>
@@ -920,15 +941,15 @@ function BillingContent() {
               </div>
 
               {/* Payment Receipts Table */}
-              <div className="rounded-xl border border-zinc-800 bg-[#111114] overflow-hidden shadow-sm p-3.5 space-y-2.5">
-                <div className="flex items-center justify-between pb-2 border-b border-zinc-800">
-                  <h2 className="text-xs font-bold text-white uppercase tracking-wider">Payment & Settlement Receipts</h2>
+              <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#111114] overflow-hidden shadow-xs p-3.5 space-y-2.5">
+                <div className="flex items-center justify-between pb-2 border-b border-zinc-200 dark:border-zinc-800">
+                  <h2 className="text-xs font-bold text-zinc-900 dark:text-white uppercase tracking-wider">Payment & Settlement Receipts</h2>
                   <span className="text-[10px] text-zinc-500 font-mono">{payments.length} Payments</span>
                 </div>
 
-                <div className="overflow-x-auto rounded-lg border border-zinc-800/80">
+                <div className="overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-800/80">
                   <table className="w-full text-left text-xs">
-                    <thead className="bg-zinc-900 text-zinc-400 font-mono text-[10px] uppercase border-b border-zinc-800">
+                    <thead className="bg-zinc-50 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 font-mono text-[10px] uppercase border-b border-zinc-200 dark:border-zinc-800">
                       <tr>
                         <th className="p-2.5">Receipt #</th>
                         <th className="p-2.5">Date</th>
@@ -937,27 +958,29 @@ function BillingContent() {
                         <th className="p-2.5 text-right">Amount</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-zinc-800/60">
+                    <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800/60">
                       {payments.map((p: any) => {
                         const isGroup = p.reference?.includes("GRP") || p.receiptNo?.includes("GRP");
                         return (
-                          <tr key={p.id} className="hover:bg-zinc-900/50 transition">
-                            <td className="p-2.5 font-mono text-blue-400 font-bold flex items-center gap-1.5">
+                          <tr key={p.id} className="hover:bg-zinc-50 dark:hover:bg-zinc-900/50 transition">
+                            <td className="p-2.5 font-mono text-blue-600 dark:text-blue-400 font-bold flex items-center gap-1.5">
                               <span>{p.receiptNo}</span>
                               {isGroup && (
-                                <span className="text-[9px] bg-purple-950/50 text-purple-300 border border-purple-800 px-1 py-0.2 rounded font-mono">
+                                <span className="text-[9px] bg-purple-100 dark:bg-purple-950/50 text-purple-800 dark:text-purple-300 border border-purple-300 dark:border-purple-800 px-1 py-0.2 rounded font-mono">
                                   Group
                                 </span>
                               )}
                             </td>
-                            <td className="p-2.5 font-mono text-zinc-400 text-[11px]">{p.receivedAt?.slice(0, 10)}</td>
-                            <td className="p-2.5 font-semibold text-zinc-200">
-                              <span className="rounded bg-zinc-800 border border-zinc-700 px-1.5 py-0.5 font-mono text-[10px]">
+                            <td className="p-2.5 font-mono text-zinc-600 dark:text-zinc-400 text-[11px]">{p.receivedAt?.slice(0, 10)}</td>
+                            <td className="p-2.5 font-semibold text-zinc-800 dark:text-zinc-200">
+                              <span className="rounded bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 px-1.5 py-0.5 font-mono text-[10px]">
                                 {p.method}
                               </span>
                             </td>
-                            <td className="p-2.5 font-mono text-zinc-300 text-[11px]">{p.reference || "—"}</td>
-                            <td className="p-2.5 font-mono font-bold text-emerald-400 text-right tabular-nums">
+                            <td className="p-2.5 font-mono text-zinc-700 dark:text-zinc-300 text-[11px]">
+                              {p.reference && !p.reference.startsWith("GRC-DEPOSIT-") ? p.reference : "—"}
+                            </td>
+                            <td className="p-2.5 font-mono font-bold text-emerald-600 dark:text-emerald-400 text-right tabular-nums">
                               {formatINR(p.amount || 0)}
                             </td>
                           </tr>
@@ -977,29 +1000,29 @@ function BillingContent() {
 
               {/* Invoices List */}
               {invoices.length > 0 && (
-                <div className="rounded-xl border border-zinc-800 bg-[#111114] p-3.5 space-y-2.5 shadow-sm">
-                  <h2 className="text-xs font-bold text-white uppercase tracking-wider">Generated Tax Invoices</h2>
+                <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#111114] p-3.5 space-y-2.5 shadow-xs">
+                  <h2 className="text-xs font-bold text-zinc-900 dark:text-white uppercase tracking-wider">Generated Tax Invoices</h2>
                   {invoices.map((inv: any) => (
                     <div
                       key={inv.id}
-                      className="flex items-center justify-between p-3 rounded-xl bg-zinc-900 border border-zinc-800 text-xs"
+                      className="flex items-center justify-between p-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs"
                     >
                       <div>
-                        <div className="font-mono font-bold text-blue-400">{inv.invoiceNo}</div>
-                        <div className="text-[10px] text-zinc-400 font-mono mt-0.5">
+                        <div className="font-mono font-bold text-blue-600 dark:text-blue-400">{inv.invoiceNo}</div>
+                        <div className="text-[10px] text-zinc-500 dark:text-zinc-400 font-mono mt-0.5">
                           FY: {inv.financialYear} • Issued: {inv.issuedAt?.slice(0, 10)}
                         </div>
                       </div>
 
                       <div className="flex items-center gap-3">
-                        <span className="font-mono font-bold text-emerald-400 tabular-nums">{formatINR(inv.totalAmount || 0)}</span>
+                        <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">{formatINR(inv.totalAmount || 0)}</span>
                         <button
                           onClick={() => {
                             setSelectedInvoice(inv);
                             setIsLiveTaxBillView(false);
                             setShowInvoiceModal(true);
                           }}
-                          className="flex items-center gap-1 rounded-lg bg-white text-zinc-950 hover:bg-zinc-200 px-3 py-1.5 text-xs font-bold transition shadow-sm"
+                          className="flex items-center gap-1 rounded-lg bg-zinc-900 text-white hover:bg-zinc-800 dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-200 px-3 py-1.5 text-xs font-bold transition shadow-xs"
                         >
                           <Printer className="h-3.5 w-3.5" /> Print Tax Invoice
                         </button>
@@ -1010,9 +1033,9 @@ function BillingContent() {
               )}
             </>
           ) : (
-            <div className="rounded-xl border border-zinc-800 bg-[#111114] p-16 text-center text-xs text-zinc-400 font-mono space-y-2">
-              <Receipt className="h-8 w-8 text-zinc-600 mx-auto" />
-              <p className="font-bold text-zinc-300">Select a room from the directory to manage billing</p>
+            <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#111114] p-16 text-center text-xs text-zinc-500 dark:text-zinc-400 font-mono space-y-2">
+              <Receipt className="h-8 w-8 text-zinc-400 dark:text-zinc-600 mx-auto" />
+              <p className="font-bold text-zinc-800 dark:text-zinc-300">Select a room from the directory to manage billing</p>
               <p className="text-zinc-500">Use the directory on the left or select multiple rooms for group payments.</p>
             </div>
           )}
@@ -1021,47 +1044,47 @@ function BillingContent() {
 
       {/* POST MANUAL CHARGE MODAL */}
       {showManualChargeModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 animate-in fade-in">
-          <div className="w-full max-w-md rounded-2xl border border-zinc-700 bg-[#121215] p-5 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between pb-2.5 border-b border-zinc-800">
-              <h2 className="text-sm font-bold text-white flex items-center gap-2">
-                <Plus className="h-4 w-4 text-zinc-400" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-xs p-4 animate-in fade-in">
+          <div className="w-full max-w-md rounded-2xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-[#121215] p-5 shadow-2xl space-y-4 text-zinc-900 dark:text-white">
+            <div className="flex items-center justify-between pb-2.5 border-b border-zinc-200 dark:border-zinc-800">
+              <h2 className="text-sm font-bold text-zinc-900 dark:text-white flex items-center gap-2">
+                <Plus className="h-4 w-4 text-zinc-500 dark:text-zinc-400" />
                 Post Manual Charge to Room {activeStay?.roomAssignments?.[0]?.room?.number}
               </h2>
-              <button onClick={() => setShowManualChargeModal(false)} className="text-zinc-400 hover:text-white">
+              <button onClick={() => setShowManualChargeModal(false)} className="text-zinc-400 hover:text-zinc-700 dark:hover:text-white">
                 <X className="h-4 w-4" />
               </button>
             </div>
 
             <form onSubmit={handlePostCharge} className="space-y-3.5 text-xs">
               <div>
-                <label className="text-zinc-300 font-semibold block mb-1">Description *</label>
+                <label className="text-zinc-700 dark:text-zinc-300 font-semibold block mb-1">Description *</label>
                 <input
                   type="text"
                   required
                   value={chargeForm.description}
                   onChange={(e) => setChargeForm({ ...chargeForm, description: e.target.value })}
-                  className="w-full rounded-xl bg-zinc-900 border border-zinc-700 px-3 py-2 text-white placeholder-zinc-500 focus:outline-none focus:border-white"
+                  className="w-full rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none focus:border-blue-500"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-2.5">
                 <div>
-                  <label className="text-zinc-300 font-semibold block mb-1">Base Amount (₹) *</label>
+                  <label className="text-zinc-700 dark:text-zinc-300 font-semibold block mb-1">Base Amount (₹) *</label>
                   <input
                     type="number"
                     required
                     value={chargeForm.amount}
                     onChange={(e) => setChargeForm({ ...chargeForm, amount: e.target.value })}
-                    className="w-full rounded-xl bg-zinc-900 border border-zinc-700 px-3 py-2 text-white placeholder-zinc-500 focus:outline-none focus:border-white font-mono font-bold"
+                    className="w-full rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none focus:border-blue-500 font-mono font-bold"
                   />
                 </div>
                 <div>
-                  <label className="text-zinc-300 font-semibold block mb-1">SAC Code</label>
+                  <label className="text-zinc-700 dark:text-zinc-300 font-semibold block mb-1">SAC Code</label>
                   <select
                     value={chargeForm.sacHsn}
                     onChange={(e) => setChargeForm({ ...chargeForm, sacHsn: e.target.value })}
-                    className="w-full rounded-xl bg-zinc-900 border border-zinc-700 px-3 py-2 text-white focus:outline-none focus:border-white font-mono"
+                    className="w-full rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-zinc-900 dark:text-white focus:outline-none focus:border-blue-500 font-mono"
                   >
                     <option value="996311">SAC 996311 (Room 12%)</option>
                     <option value="996331">SAC 996331 (F&B 5%)</option>
@@ -1069,18 +1092,18 @@ function BillingContent() {
                 </div>
               </div>
 
-              <div className="pt-3 border-t border-zinc-800 flex items-center justify-end gap-2">
+              <div className="pt-3 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => setShowManualChargeModal(false)}
-                  className="rounded-xl px-3 py-2 text-zinc-400 hover:text-white font-semibold"
+                  className="rounded-xl px-3 py-2 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white font-semibold"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={actionLoading}
-                  className="rounded-xl bg-white px-4 py-2 font-black text-zinc-950 hover:bg-zinc-200 transition disabled:opacity-50"
+                  className="rounded-xl bg-zinc-900 text-white hover:bg-zinc-800 dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-200 px-4 py-2 font-black transition disabled:opacity-50 shadow-xs"
                 >
                   {actionLoading ? "Posting..." : "Post Charge"}
                 </button>
@@ -1090,16 +1113,137 @@ function BillingContent() {
         </div>
       )}
 
+      {/* ADD DISCOUNT MODAL */}
+      {showDiscountModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-xs p-4 animate-in fade-in">
+          <div className="w-full max-w-md rounded-2xl border border-rose-200 dark:border-rose-900/50 bg-white dark:bg-[#121215] p-5 shadow-2xl space-y-4 text-zinc-900 dark:text-white">
+            <div className="flex items-center justify-between pb-2.5 border-b border-zinc-200 dark:border-zinc-800">
+              <h2 className="text-sm font-bold text-zinc-900 dark:text-white flex items-center gap-2">
+                <Plus className="h-4 w-4 text-rose-600 dark:text-rose-400" />
+                Add Discount / Rebate to Room {activeStay?.roomAssignments?.[0]?.room?.number}
+              </h2>
+              <button onClick={() => setShowDiscountModal(false)} className="text-zinc-400 hover:text-zinc-700 dark:hover:text-white">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                setActionLoading(true);
+                try {
+                  const numAmt = Number(discountForm.amount);
+                  if (numAmt <= 0) {
+                    alert("Please enter a positive amount to discount.");
+                    setActionLoading(false);
+                    return;
+                  }
+                  
+                  // Post a negative charge
+                  const res = await fetch(`/api/v1/folios/${folioData.id}/charges`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      folioWindowId: folioData.windows[0].id,
+                      chargeCode: "DISCOUNT",
+                      description: discountForm.description,
+                      qty: 1,
+                      amount: -numAmt,
+                      isInclusive: true,
+                      sacHsn: discountForm.sacHsn,
+                    }),
+                  });
+
+                  if (!res.ok) {
+                    const errData = await res.json().catch(() => ({}));
+                    throw new Error(errData.error || "Failed to post discount");
+                  }
+                  await loadFolio(folioData.id);
+                  await loadStays();
+                  setShowDiscountModal(false);
+                } catch (err) {
+                  alert(err);
+                } finally {
+                  setActionLoading(false);
+                }
+              }}
+              className="space-y-3.5 text-xs"
+            >
+              <div>
+                <label className="text-zinc-700 dark:text-zinc-300 font-semibold block mb-1">Reason / Description *</label>
+                <select
+                  required
+                  value={discountForm.description}
+                  onChange={(e) => setDiscountForm({ ...discountForm, description: e.target.value })}
+                  className="w-full rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-zinc-900 dark:text-white focus:outline-none focus:border-blue-500 font-medium cursor-pointer"
+                >
+                  <option value="Discount / Rebate">General Discount / Rebate</option>
+                  <option value="Early Checkout Rebate">Early Checkout Rebate</option>
+                  <option value="Corporate Rate Discount">Corporate Rate Discount</option>
+                  <option value="Service Recovery (Apology Discount)">Service Recovery (Apology Discount)</option>
+                  <option value="Complimentary Upgrade Adjustment">Complimentary Upgrade Adjustment</option>
+                  <option value="Long Stay Discount">Long Stay Discount</option>
+                  <option value="Staff / Family Discount">Staff / Family Discount</option>
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2.5">
+                <div>
+                  <label className="text-zinc-700 dark:text-zinc-300 font-semibold block mb-1">Discount Amount (₹) *</label>
+                  <input
+                    type="number"
+                    required
+                    min="1"
+                    value={discountForm.amount}
+                    onChange={(e) => setDiscountForm({ ...discountForm, amount: e.target.value })}
+                    className="w-full rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-rose-300 dark:border-rose-900/50 px-3 py-2 text-zinc-900 dark:text-white focus:outline-none focus:border-rose-500 font-mono font-bold"
+                  />
+                  <p className="text-[10px] text-zinc-500 mt-1">This will deduct from the total bill.</p>
+                </div>
+                <div>
+                  <label className="text-zinc-700 dark:text-zinc-300 font-semibold block mb-1">SAC / Tax Rule (Optional)</label>
+                  <select
+                    value={discountForm.sacHsn}
+                    onChange={(e) => setDiscountForm({ ...discountForm, sacHsn: e.target.value })}
+                    className="w-full rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-zinc-900 dark:text-white focus:outline-none focus:border-blue-500 font-mono"
+                  >
+                    <option value="996311">SAC 996311 (Room 12%)</option>
+                    <option value="996331">SAC 996331 (F&B 5%)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="pt-3 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowDiscountModal(false)}
+                  className="rounded-xl px-3 py-2 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white font-semibold"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={actionLoading}
+                  className="rounded-xl bg-rose-600 hover:bg-rose-500 px-4 py-2 font-black text-white transition disabled:opacity-50 shadow-xs"
+                >
+                  {actionLoading ? "Applying..." : "Apply Discount"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* COLLECT SINGLE PAYMENT MODAL */}
       {showPaymentModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 animate-in fade-in">
-          <div className="w-full max-w-md rounded-2xl border border-zinc-700 bg-[#121215] p-5 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between pb-2.5 border-b border-zinc-800">
-              <h2 className="text-sm font-bold text-white flex items-center gap-2">
-                <CreditCard className="h-4 w-4 text-zinc-400" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-xs p-4 animate-in fade-in">
+          <div className="w-full max-w-md rounded-2xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-[#121215] p-5 shadow-2xl space-y-4 text-zinc-900 dark:text-white">
+            <div className="flex items-center justify-between pb-2.5 border-b border-zinc-200 dark:border-zinc-800">
+              <h2 className="text-sm font-bold text-zinc-900 dark:text-white flex items-center gap-2">
+                <CreditCard className="h-4 w-4 text-zinc-500 dark:text-zinc-400" />
                 Collect Payment for Room {activeStay?.roomAssignments?.[0]?.room?.number}
               </h2>
-              <button onClick={() => setShowPaymentModal(false)} className="text-zinc-400 hover:text-white">
+              <button onClick={() => setShowPaymentModal(false)} className="text-zinc-400 hover:text-zinc-700 dark:hover:text-white">
                 <X className="h-4 w-4" />
               </button>
             </div>
@@ -1107,11 +1251,11 @@ function BillingContent() {
             <form onSubmit={handleRecordPayment} className="space-y-3.5 text-xs">
               <div className="grid grid-cols-2 gap-2.5">
                 <div>
-                  <label className="text-zinc-300 font-semibold block mb-1">Payment Method *</label>
+                  <label className="text-zinc-700 dark:text-zinc-300 font-semibold block mb-1">Payment Method *</label>
                   <select
                     value={paymentForm.method}
                     onChange={(e) => setPaymentForm({ ...paymentForm, method: e.target.value })}
-                    className="w-full rounded-xl bg-zinc-900 border border-zinc-700 px-3 py-2 text-white focus:outline-none focus:border-white"
+                    className="w-full rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-zinc-900 dark:text-white focus:outline-none focus:border-blue-500"
                   >
                     <option value="UPI">UPI / QR Code</option>
                     <option value="CARD">Debit / Credit Card</option>
@@ -1121,51 +1265,51 @@ function BillingContent() {
                   </select>
                 </div>
                 <div>
-                  <label className="text-zinc-300 font-semibold block mb-1">Amount (₹) *</label>
+                  <label className="text-zinc-700 dark:text-zinc-300 font-semibold block mb-1">Amount (₹) *</label>
                   <input
                     type="number"
                     required
                     step="0.01"
                     value={paymentForm.amount}
                     onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })}
-                    className="w-full rounded-xl bg-zinc-900 border border-zinc-700 px-3 py-2 text-white focus:outline-none focus:border-white font-mono font-bold"
+                    className="w-full rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-zinc-900 dark:text-white focus:outline-none focus:border-blue-500 font-mono font-bold"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="text-zinc-300 font-semibold block mb-1">Reference / UTR / Auth Code</label>
+                <label className="text-zinc-700 dark:text-zinc-300 font-semibold block mb-1">Reference / UTR / Auth Code</label>
                 <input
                   type="text"
                   placeholder="e.g. UTR/98127391823 or Cash Ref"
                   value={paymentForm.reference}
                   onChange={(e) => setPaymentForm({ ...paymentForm, reference: e.target.value })}
-                  className="w-full rounded-xl bg-zinc-900 border border-zinc-700 px-3 py-2 text-white focus:outline-none focus:border-white font-mono"
+                  className="w-full rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-zinc-900 dark:text-white focus:outline-none focus:border-blue-500 font-mono"
                 />
               </div>
 
               <div>
-                <label className="text-zinc-300 font-semibold block mb-1">Payer Name</label>
+                <label className="text-zinc-700 dark:text-zinc-300 font-semibold block mb-1">Payer Name</label>
                 <input
                   type="text"
                   value={paymentForm.payerName}
                   onChange={(e) => setPaymentForm({ ...paymentForm, payerName: e.target.value })}
-                  className="w-full rounded-xl bg-zinc-900 border border-zinc-700 px-3 py-2 text-white focus:outline-none focus:border-white"
+                  className="w-full rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-zinc-900 dark:text-white focus:outline-none focus:border-blue-500"
                 />
               </div>
 
-              <div className="pt-3 border-t border-zinc-800 flex items-center justify-end gap-2">
+              <div className="pt-3 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => setShowPaymentModal(false)}
-                  className="rounded-xl px-3 py-2 text-zinc-400 hover:text-white font-semibold"
+                  className="rounded-xl px-3 py-2 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white font-semibold"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={actionLoading}
-                  className="rounded-xl bg-white px-4 py-2 font-black text-zinc-950 hover:bg-zinc-200 transition disabled:opacity-50"
+                  className="rounded-xl bg-zinc-900 text-white hover:bg-zinc-800 dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-200 px-4 py-2 font-black transition disabled:opacity-50 shadow-xs"
                 >
                   {actionLoading ? "Recording..." : "Record Payment & Settle"}
                 </button>
@@ -1177,19 +1321,19 @@ function BillingContent() {
 
       {/* GROUP / MULTI-ROOM SETTLEMENT MODAL */}
       {showGroupPaymentModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 overflow-y-auto animate-in fade-in">
-          <div className="w-full max-w-xl rounded-2xl border border-zinc-700 bg-[#121215] p-5 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between pb-2.5 border-b border-zinc-800">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-xs p-4 overflow-y-auto animate-in fade-in">
+          <div className="w-full max-w-xl rounded-2xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-[#121215] p-5 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto text-zinc-900 dark:text-white">
+            <div className="flex items-center justify-between pb-2.5 border-b border-zinc-200 dark:border-zinc-800">
               <div>
-                <h2 className="text-sm font-bold text-white flex items-center gap-2">
-                  <Users className="h-4 w-4 text-emerald-400" />
+                <h2 className="text-sm font-bold text-zinc-900 dark:text-white flex items-center gap-2">
+                  <Users className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
                   Group Multi-Room Payment Settlement
                 </h2>
-                <p className="text-[11px] text-zinc-400 font-mono mt-0.5">
+                <p className="text-[11px] text-zinc-500 dark:text-zinc-400 font-mono mt-0.5">
                   Record a single payment distributed across {selectedGroupStayIds.length} room folios
                 </p>
               </div>
-              <button onClick={() => setShowGroupPaymentModal(false)} className="text-zinc-400 hover:text-white">
+              <button onClick={() => setShowGroupPaymentModal(false)} className="text-zinc-400 hover:text-zinc-700 dark:hover:text-white">
                 <X className="h-4 w-4" />
               </button>
             </div>
@@ -1197,22 +1341,22 @@ function BillingContent() {
             <form onSubmit={handleSubmitGroupPayment} className="space-y-4 text-xs">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="text-zinc-300 font-semibold block mb-1">Group Payer Name *</label>
+                  <label className="text-zinc-700 dark:text-zinc-300 font-semibold block mb-1">Group Payer Name *</label>
                   <input
                     type="text"
                     required
                     placeholder="e.g. Vikram Sharma (Group Head)"
                     value={groupPaymentForm.payerName}
                     onChange={(e) => setGroupPaymentForm({ ...groupPaymentForm, payerName: e.target.value })}
-                    className="w-full rounded-xl bg-zinc-900 border border-zinc-700 px-3 py-2 text-white focus:outline-none focus:border-white"
+                    className="w-full rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-zinc-900 dark:text-white focus:outline-none focus:border-blue-500"
                   />
                 </div>
                 <div>
-                  <label className="text-zinc-300 font-semibold block mb-1">Payment Method *</label>
+                  <label className="text-zinc-700 dark:text-zinc-300 font-semibold block mb-1">Payment Method *</label>
                   <select
                     value={groupPaymentForm.method}
                     onChange={(e) => setGroupPaymentForm({ ...groupPaymentForm, method: e.target.value })}
-                    className="w-full rounded-xl bg-zinc-900 border border-zinc-700 px-3 py-2 text-white focus:outline-none focus:border-white font-semibold"
+                    className="w-full rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-zinc-900 dark:text-white focus:outline-none focus:border-blue-500 font-semibold"
                   >
                     <option value="UPI">UPI / QR Code</option>
                     <option value="CARD">Debit / Credit Card</option>
@@ -1225,44 +1369,44 @@ function BillingContent() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="text-zinc-300 font-semibold block mb-1">Company Name (Optional)</label>
+                  <label className="text-zinc-700 dark:text-zinc-300 font-semibold block mb-1">Company Name (Optional)</label>
                   <input
                     type="text"
                     placeholder="e.g. Singhania Tech Ltd"
                     value={groupPaymentForm.companyName}
                     onChange={(e) => setGroupPaymentForm({ ...groupPaymentForm, companyName: e.target.value })}
-                    className="w-full rounded-xl bg-zinc-900 border border-zinc-700 px-3 py-2 text-white focus:outline-none focus:border-white"
+                    className="w-full rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-zinc-900 dark:text-white focus:outline-none focus:border-blue-500"
                   />
                 </div>
                 <div>
-                  <label className="text-zinc-300 font-semibold block mb-1">Company GSTIN (Optional)</label>
+                  <label className="text-zinc-700 dark:text-zinc-300 font-semibold block mb-1">Company GSTIN (Optional)</label>
                   <input
                     type="text"
                     placeholder="e.g. 18AAAAA0000A1Z5"
                     value={groupPaymentForm.gstin}
                     onChange={(e) => setGroupPaymentForm({ ...groupPaymentForm, gstin: e.target.value })}
-                    className="w-full rounded-xl bg-zinc-900 border border-zinc-700 px-3 py-2 text-white focus:outline-none focus:border-white font-mono"
+                    className="w-full rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-zinc-900 dark:text-white focus:outline-none focus:border-blue-500 font-mono"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="text-zinc-300 font-semibold block mb-1">Transaction Ref / UTR / Cheque # *</label>
+                <label className="text-zinc-700 dark:text-zinc-300 font-semibold block mb-1">Transaction Ref / UTR / Cheque # *</label>
                 <input
                   type="text"
                   required
                   placeholder="e.g. UTR/98127391823"
                   value={groupPaymentForm.reference}
                   onChange={(e) => setGroupPaymentForm({ ...groupPaymentForm, reference: e.target.value })}
-                  className="w-full rounded-xl bg-zinc-900 border border-zinc-700 px-3 py-2 text-white focus:outline-none focus:border-white font-mono"
+                  className="w-full rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-zinc-900 dark:text-white focus:outline-none focus:border-blue-500 font-mono"
                 />
               </div>
 
               {/* Allocated Rooms Breakdown */}
-              <div className="space-y-2 pt-2 border-t border-zinc-800">
-                <div className="flex items-center justify-between text-xs font-bold text-white">
+              <div className="space-y-2 pt-2 border-t border-zinc-200 dark:border-zinc-800">
+                <div className="flex items-center justify-between text-xs font-bold text-zinc-900 dark:text-white">
                   <span>Room Allocations ({selectedGroupStayIds.length} Rooms)</span>
-                  <span className="font-mono text-emerald-400">
+                  <span className="font-mono text-emerald-600 dark:text-emerald-400">
                     Total Group Settlement:{" "}
                     {formatINR(
                       Object.values(groupPaymentForm.allocations).reduce((sum: number, val: any) => sum + (Number(val) || 0), 0)
@@ -1281,11 +1425,11 @@ function BillingContent() {
                       return (
                         <div
                           key={s.id}
-                          className="flex items-center justify-between p-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-xs"
+                          className="flex items-center justify-between p-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs"
                         >
                           <div className="min-w-0">
-                            <div className="font-bold text-white font-mono">Room {roomNo}</div>
-                            <div className="text-[10px] text-zinc-400 truncate">
+                            <div className="font-bold text-zinc-900 dark:text-white font-mono">Room {roomNo}</div>
+                            <div className="text-[10px] text-zinc-500 dark:text-zinc-400 truncate">
                               {s.primaryGuest?.name} • Due: {formatINR(bal)}
                             </div>
                           </div>
@@ -1307,7 +1451,7 @@ function BillingContent() {
                                   },
                                 });
                               }}
-                              className="w-24 rounded-lg bg-zinc-950 border border-zinc-700 px-2 py-1 text-right text-white font-mono font-bold focus:outline-none focus:border-white"
+                              className="w-24 rounded-lg bg-white dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700 px-2 py-1 text-right text-zinc-900 dark:text-white font-mono font-bold focus:outline-none focus:border-blue-500"
                             />
                           </div>
                         </div>
@@ -1316,18 +1460,18 @@ function BillingContent() {
                 </div>
               </div>
 
-              <div className="pt-3 border-t border-zinc-800 flex items-center justify-end gap-2">
+              <div className="pt-3 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => setShowGroupPaymentModal(false)}
-                  className="rounded-xl px-3 py-2 text-zinc-400 hover:text-white font-semibold"
+                  className="rounded-xl px-3 py-2 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white font-semibold"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={actionLoading}
-                  className="rounded-xl bg-emerald-600 px-4 py-2 font-black text-white hover:bg-emerald-500 transition disabled:opacity-50 shadow-md"
+                  className="rounded-xl bg-emerald-600 px-4 py-2 font-black text-white hover:bg-emerald-500 transition disabled:opacity-50 shadow-xs"
                 >
                   {actionLoading ? "Processing..." : "Confirm Group Payment"}
                 </button>
@@ -1478,19 +1622,21 @@ function BillingContent() {
                   <tbody className="divide-y divide-zinc-300">
                     {rawEntries.map((e: any) => {
                       const isFood = e.chargeCode?.includes("FOOD") || e.chargeCode?.includes("RESTAURANT");
+                      const isExtraBed = e.chargeCode?.includes("EXTRA_BED");
+                      const isRoomTariff = e.chargeCode?.includes("ROOM_TARIFF");
                       const taxHalf = ((e.totalAmount || 0) - (e.taxableAmount || 0)) / 2;
                       return (
                         <tr key={e.id}>
                           <td className="p-1 border-r border-zinc-300">{e.serviceDate}</td>
-                          <td className="p-1 border-r border-zinc-300 text-right">{(e.taxableAmount || 0).toFixed(2)}</td>
+                          <td className="p-1 border-r border-zinc-300 text-right">{isRoomTariff ? (e.taxableAmount || 0).toFixed(2) : "0.00"}</td>
                           <td className="p-1 border-r border-zinc-300 text-right">0.00</td>
-                          <td className="p-1 border-r border-zinc-300 text-right">{(e.taxableAmount || 0).toFixed(2)}</td>
-                          <td className="p-1 border-r border-zinc-300 text-right">0.00</td>
+                          <td className="p-1 border-r border-zinc-300 text-right">{isRoomTariff ? (e.taxableAmount || 0).toFixed(2) : "0.00"}</td>
+                          <td className="p-1 border-r border-zinc-300 text-right">{isExtraBed ? (e.taxableAmount || 0).toFixed(2) : "0.00"}</td>
                           <td className="p-1 border-r border-zinc-300 text-right">{taxHalf.toFixed(2)}</td>
                           <td className="p-1 border-r border-zinc-300 text-right">{taxHalf.toFixed(2)}</td>
                           <td className="p-1 border-r border-zinc-300 text-right">0.00</td>
                           <td className="p-1 border-r border-zinc-300 text-right">{isFood ? (e.totalAmount || 0).toFixed(2) : "0.00"}</td>
-                          <td className="p-1 border-r border-zinc-300 text-right">{totalPayments > 0 ? totalPayments.toFixed(2) : "0.00"}</td>
+                          <td className="p-1 border-r border-zinc-300 text-right">0.00</td>
                           <td className="p-1 text-right font-bold">{(e.totalAmount || 0).toFixed(2)}</td>
                         </tr>
                       );
@@ -1502,9 +1648,17 @@ function BillingContent() {
                         STAY DURATION: {stayCalculations.nights} NIGHT{stayCalculations.nights > 1 ? "S" : ""}
                       </td>
                       <td className="p-1 border-r border-zinc-400 text-right">
-                        {totalTaxable.toFixed(2)}
+                        {rawEntries
+                          .filter((e: any) => e.chargeCode?.includes("ROOM_TARIFF"))
+                          .reduce((acc: number, e: any) => acc + (e.taxableAmount || 0), 0)
+                          .toFixed(2)}
                       </td>
-                      <td className="p-1 border-r border-zinc-400 text-right">0.00</td>
+                      <td className="p-1 border-r border-zinc-400 text-right">
+                        {rawEntries
+                          .filter((e: any) => e.chargeCode?.includes("EXTRA_BED"))
+                          .reduce((acc: number, e: any) => acc + (e.taxableAmount || 0), 0)
+                          .toFixed(2)}
+                      </td>
                       <td className="p-1 border-r border-zinc-400 text-right">
                         {(totalTaxes / 2).toFixed(2)}
                       </td>
@@ -1538,7 +1692,7 @@ function BillingContent() {
                       </thead>
                       <tbody>
                         <tr>
-                          <td className="p-1 border-r border-zinc-300 font-bold">12.00</td>
+                          <td className="p-1 border-r border-zinc-300 font-bold">5.00</td>
                           <td className="p-1 border-r border-zinc-300 text-right">
                             {totalTaxable.toFixed(2)}
                           </td>
@@ -1622,7 +1776,7 @@ function BillingContent() {
 
               {/* 4. AMOUNT IN WORDS */}
               <div className="font-mono text-[11px] font-bold uppercase pt-1">
-                Amount : {numberToWordsINR(totalCharges)}
+                Amount : {numberToWordsINR(Math.max(0, Math.round(totalCharges - totalPayments)))}
               </div>
 
               {/* 5. HOTEL POLICIES & SIGNATURE BLOCK */}

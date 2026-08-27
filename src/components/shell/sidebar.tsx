@@ -34,7 +34,7 @@ function SidebarNav() {
 
   return (
     <div className="space-y-1">
-      <div className="px-2.5 py-1 text-[10px] font-mono uppercase tracking-wider text-zinc-400 font-bold">
+      <div className="px-2.5 py-1 text-[10px] font-mono uppercase tracking-wider text-zinc-500 dark:text-zinc-400 font-bold">
         Modules
       </div>
       {navItems.map((item) => {
@@ -50,19 +50,23 @@ function SidebarNav() {
             href={item.href}
             className={`flex items-center justify-between rounded-xl px-3 py-2 text-xs transition ${
               isActive
-                ? "bg-zinc-800 text-white font-bold border border-zinc-700 shadow-sm"
-                : "text-zinc-300 hover:bg-zinc-800/70 hover:text-white border border-transparent"
+                ? "bg-blue-50 dark:bg-zinc-800 text-blue-950 dark:text-white font-black border border-blue-200 dark:border-zinc-700 shadow-sm"
+                : "text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800/70 hover:text-zinc-950 dark:hover:text-white border border-transparent font-medium"
             }`}
           >
             <div className="flex items-center gap-2.5">
-              <Icon className={`h-4 w-4 shrink-0 ${isActive ? "text-white" : "text-zinc-400"}`} />
+              <Icon
+                className={`h-4 w-4 shrink-0 ${
+                  isActive ? "text-blue-600 dark:text-white" : "text-zinc-400 dark:text-zinc-500"
+                }`}
+              />
               <span className="truncate">{item.label}</span>
             </div>
             <span
               className={`rounded-md px-1.5 py-0.5 text-[9px] font-mono font-bold ${
                 isActive
-                  ? "bg-zinc-700 text-white border border-zinc-600"
-                  : "bg-zinc-900 text-zinc-400 border border-zinc-800"
+                  ? "bg-blue-600 text-white dark:bg-zinc-700 dark:text-white dark:border-zinc-600"
+                  : "bg-zinc-100 text-zinc-600 dark:bg-zinc-900 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-800"
               }`}
             >
               {item.badge}
@@ -76,21 +80,21 @@ function SidebarNav() {
 
 export function AppSidebar() {
   return (
-    <aside className="w-60 shrink-0 border-r border-[#27272a] bg-[#09090b] min-h-[calc(100vh-49px)] p-3 flex flex-col justify-between">
-      <Suspense fallback={<div className="p-3 text-xs text-zinc-500 font-mono">Loading Navigation...</div>}>
+    <aside className="w-60 shrink-0 border-r border-zinc-200 dark:border-[#27272a] bg-white dark:bg-[#09090b] min-h-[calc(100vh-49px)] p-3 flex flex-col justify-between transition-colors duration-150 shadow-sm">
+      <Suspense fallback={<div className="p-3 text-xs text-zinc-400 font-mono">Loading Navigation...</div>}>
         <SidebarNav />
       </Suspense>
 
       {/* Footer Info Box */}
-      <div className="rounded-xl border border-zinc-800 bg-[#121215] p-3 text-[11px] text-zinc-400 space-y-1 shadow-sm">
-        <div className="font-bold text-white flex items-center justify-between">
+      <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-[#121215] p-3 text-[11px] text-zinc-600 dark:text-zinc-400 space-y-1 shadow-sm">
+        <div className="font-bold text-zinc-900 dark:text-white flex items-center justify-between">
           <span>Hotel OS</span>
-          <span className="text-[10px] text-emerald-400 font-mono flex items-center gap-1">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+          <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-mono flex items-center gap-1">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
             ONLINE
           </span>
         </div>
-        <div className="text-[10px] text-zinc-500 font-mono">
+        <div className="text-[10px] text-zinc-500 dark:text-zinc-500 font-mono">
           GST Rule 46 • Multi-Property
         </div>
       </div>
