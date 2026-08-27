@@ -436,6 +436,51 @@ export class OnboardingService {
       usersCreated++;
     }
 
+    // Automatically grant Bijesh Singha (Multi-Property Super Admin) access to this new property
+    try {
+      const bijeshUser = await prisma.user.findFirst({
+        where: { email: "bijesh.singha@hotelos.in" },
+      });
+      const ownerRole = await prisma.role.findUnique({
+        where: { code: "ORG_OWNER" },
+      });
+
+      if (bijeshUser && ownerRole) {
+        const bijeshMembership = await prisma.membership.upsert({
+          where: {
+            userId_organizationId: {
+              userId: bijeshUser.id,
+              organizationId: org.id,
+            },
+          },
+          update: { status: "ACTIVE" },
+          create: {
+            userId: bijeshUser.id,
+            organizationId: org.id,
+            status: "ACTIVE",
+          },
+        });
+
+        await prisma.propertyGrant.upsert({
+          where: {
+            membershipId_propertyId_roleId: {
+              membershipId: bijeshMembership.id,
+              propertyId: property.id,
+              roleId: ownerRole.id,
+            },
+          },
+          update: {},
+          create: {
+            membershipId: bijeshMembership.id,
+            propertyId: property.id,
+            roleId: ownerRole.id,
+          },
+        });
+      }
+    } catch (err) {
+      console.warn("Failed to link Bijesh Singha to new property:", err);
+    }
+
     return {
       success: true,
       propertyId: property.id,

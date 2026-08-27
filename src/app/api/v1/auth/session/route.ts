@@ -9,12 +9,16 @@ export async function GET(request: Request) {
 
     // Map clean usernames to email addresses
     const usernameAliases: Record<string, string> = {
+      "bijesh": "bijesh.singha@hotelos.in",
+      "bijesh_singha": "bijesh.singha@hotelos.in",
+      "atanu": "atanu.chowdhury@hotelambarish.com",
+      "atanu_chowdhury": "atanu.chowdhury@hotelambarish.com",
       "ambarish_frontdesk": "reception.ambarish@hotelos.in",
       "ambarish_reception": "reception.ambarish@hotelos.in",
       "divine_frontdesk": "reception.divine@hotelos.in",
       "divine_reception": "reception.divine@hotelos.in",
       "general_manager": "gm@brahmaputra.com",
-      "admin": "gm@brahmaputra.com",
+      "admin": "bijesh.singha@hotelos.in",
     };
 
     const targetEmail = requestedIdentifier ? (usernameAliases[requestedIdentifier.toLowerCase()] || requestedIdentifier) : null;
@@ -47,6 +51,21 @@ export async function GET(request: Request) {
 
     if (!user) {
       user = await prisma.user.findFirst({
+        where: { email: "bijesh.singha@hotelos.in" },
+        include: {
+          memberships: {
+            include: {
+              organization: true,
+              propertyGrants: {
+                include: {
+                  property: true,
+                  role: true,
+                },
+              },
+            },
+          },
+        },
+      }) || await prisma.user.findFirst({
         include: {
           memberships: {
             include: {
@@ -98,6 +117,8 @@ export async function GET(request: Request) {
     const activeRole = activeGrant?.role?.code || "ORG_OWNER";
 
     const getUsername = (email: string) => {
+      if (email.includes("bijesh")) return "bijesh_singha";
+      if (email.includes("atanu")) return "atanu_chowdhury";
       if (email.includes("reception.ambarish")) return "ambarish_frontdesk";
       if (email.includes("reception.divine")) return "divine_frontdesk";
       if (email.includes("gm@")) return "general_manager";
