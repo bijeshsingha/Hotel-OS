@@ -32,6 +32,10 @@ export async function GET(request: Request) {
         hkTasks: {
           where: { status: { in: ["OPEN", "ASSIGNED", "IN_PROGRESS"] } },
         },
+        maintenanceIssues: {
+          where: { status: { notIn: ["RESOLVED", "VERIFIED", "CLOSED", "CANCELLED"] } },
+          orderBy: [{ priority: "desc" }, { createdAt: "desc" }],
+        },
       },
       orderBy: [{ floor: "asc" }, { number: "asc" }],
     });

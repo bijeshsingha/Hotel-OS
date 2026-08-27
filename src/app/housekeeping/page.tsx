@@ -10,6 +10,7 @@ import {
   ShieldCheck,
   ArrowRight,
   X,
+  Wrench,
 } from "lucide-react";
 
 export default function HousekeepingPage() {
@@ -87,10 +88,33 @@ export default function HousekeepingPage() {
     }
   };
 
-  const dirtyRooms = rooms.filter((r) => r.roomState?.housekeepingStatus === "DIRTY");
-  const cleanRooms = rooms.filter((r) => r.roomState?.housekeepingStatus === "CLEAN");
-  const inspectedRooms = rooms.filter((r) => r.roomState?.housekeepingStatus === "INSPECTED");
-  const outOfOrderRooms = rooms.filter((r) => r.roomState?.sellabilityStatus === "OUT_OF_ORDER");
+  const outOfOrderRooms = rooms.filter(
+    (r) =>
+      r.roomState?.sellabilityStatus === "OUT_OF_ORDER" ||
+      (r.blocks && r.blocks.length > 0) ||
+      (r.maintenanceIssues && r.maintenanceIssues.length > 0)
+  );
+  const dirtyRooms = rooms.filter(
+    (r) =>
+      r.roomState?.housekeepingStatus === "DIRTY" &&
+      r.roomState?.sellabilityStatus !== "OUT_OF_ORDER" &&
+      (!r.blocks || r.blocks.length === 0) &&
+      (!r.maintenanceIssues || r.maintenanceIssues.length === 0)
+  );
+  const cleanRooms = rooms.filter(
+    (r) =>
+      r.roomState?.housekeepingStatus === "CLEAN" &&
+      r.roomState?.sellabilityStatus !== "OUT_OF_ORDER" &&
+      (!r.blocks || r.blocks.length === 0) &&
+      (!r.maintenanceIssues || r.maintenanceIssues.length === 0)
+  );
+  const inspectedRooms = rooms.filter(
+    (r) =>
+      r.roomState?.housekeepingStatus === "INSPECTED" &&
+      r.roomState?.sellabilityStatus !== "OUT_OF_ORDER" &&
+      (!r.blocks || r.blocks.length === 0) &&
+      (!r.maintenanceIssues || r.maintenanceIssues.length === 0)
+  );
 
   return (
     <div className="space-y-4 max-w-7xl mx-auto">
@@ -287,26 +311,40 @@ export default function HousekeepingPage() {
               </div>
 
               <div className="space-y-2.5 mt-2.5 max-h-[580px] overflow-y-auto pr-1">
-                {outOfOrderRooms.map((room) => (
-                  <div
-                    key={room.id}
-                    className="rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-3 space-y-2 text-xs shadow-xs"
-                  >
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <div className="font-bold text-zinc-900 dark:text-zinc-100 font-mono text-sm">Room {room.number}</div>
-                        <div className="text-[11px] text-zinc-500">{room.roomType.name}</div>
+                {outOfOrderRooms.map((room) => {
+                  const activeIssue = room.maintenanceIssues?.[0];
+                  return (
+                    <div
+                      key={room.id}
+                      className="rounded-lg bg-rose-50/60 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-800/60 p-3 space-y-2 text-xs shadow-xs"
+                    >
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <div className="font-bold text-zinc-900 dark:text-zinc-100 font-mono text-sm">Room {room.number}</div>
+                          <div className="text-[11px] text-zinc-500">{room.roomType?.name}</div>
+                        </div>
+                        <span className="rounded px-1.5 py-0.5 text-[9px] font-mono font-bold text-rose-700 dark:text-rose-400 bg-rose-100 dark:bg-rose-500/10 border border-rose-200 dark:border-rose-500/20 flex items-center gap-1">
+                          <Wrench className="h-3 w-3" />
+                          <span>{activeIssue?.issueNo || "OOO"}</span>
+                        </span>
                       </div>
-                      <span className="rounded px-1.5 py-0.5 text-[9px] font-mono font-bold text-rose-700 dark:text-rose-400 bg-rose-100 dark:bg-rose-500/10 border border-rose-200 dark:border-rose-500/20">
-                        OOO
-                      </span>
-                    </div>
 
-                    <div className="text-[11px] font-medium text-rose-600 dark:text-rose-400 pt-2 border-t border-zinc-200 dark:border-zinc-800">
-                      {room.blocks[0]?.reason || "Maintenance repair"}
+                      <div className="text-[11px] font-medium text-rose-700 dark:text-rose-300 pt-2 border-t border-rose-200/60 dark:border-rose-900/40">
+                        {activeIssue ? (
+                          <div className="space-y-1">
+                            <div className="font-bold flex items-center justify-between">
+                              <span className="truncate">{activeIssue.assetText ? `${activeIssue.assetText} • ` : ""}{activeIssue.category}</span>
+                              <span className="text-[9px] uppercase font-mono px-1 py-0.2 rounded bg-rose-200 dark:bg-rose-900 font-bold shrink-0">{activeIssue.priority}</span>
+                            </div>
+                            <p className="text-[11px] text-rose-700 dark:text-rose-300 line-clamp-2 leading-tight">{activeIssue.description}</p>
+                          </div>
+                        ) : (
+                          <span>{room.blocks?.[0]?.reason || "Maintenance repair in progress"}</span>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           </div>
