@@ -707,15 +707,6 @@ function PMSFrontDeskContent() {
             <div className="text-[11px] text-amber-800 dark:text-amber-300 font-medium">Dirty / Turnover</div>
           </div>
 
-          <div className="rounded-xl bg-zinc-50 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 p-3.5 space-y-1 shadow-xs">
-            <div className="text-[11px] uppercase font-mono font-bold tracking-wider text-cyan-700 dark:text-cyan-400 flex items-center justify-between">
-              <span>Expected Arrivals</span>
-              <ArrowRightLeft className="h-3 w-3 text-cyan-600 dark:text-cyan-400" />
-            </div>
-            <div className="text-2xl font-black text-cyan-700 dark:text-cyan-300 font-mono">0</div>
-            <div className="text-[11px] text-zinc-500">Due In Today</div>
-          </div>
-
           <div
             onClick={() => setStatusFilter(statusFilter === "OUT_OF_ORDER" ? "ALL" : "OUT_OF_ORDER")}
             className={`rounded-xl border-2 p-3.5 space-y-1 cursor-pointer transition ${
@@ -730,6 +721,15 @@ function PMSFrontDeskContent() {
             </div>
             <div className="text-2xl font-black text-rose-700 dark:text-rose-400 font-mono">{metrics.outOfOrder}</div>
             <div className="text-[11px] text-rose-800 dark:text-rose-300 font-medium">Blocked / Repairs</div>
+          </div>
+
+          <div className="rounded-xl bg-zinc-50 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 p-3.5 space-y-1 shadow-xs">
+            <div className="text-[11px] uppercase font-mono font-bold tracking-wider text-cyan-700 dark:text-cyan-400 flex items-center justify-between">
+              <span>Expected Arrivals</span>
+              <ArrowRightLeft className="h-3 w-3 text-cyan-600 dark:text-cyan-400" />
+            </div>
+            <div className="text-2xl font-black text-cyan-700 dark:text-cyan-300 font-mono">0</div>
+            <div className="text-[11px] text-zinc-500">Due In Today</div>
           </div>
         </div>
       </div>
