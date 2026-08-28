@@ -500,22 +500,22 @@ function BillingContent() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-[#09090b] text-zinc-900 dark:text-zinc-100 p-3 sm:p-6 space-y-6 transition-colors duration-150">
+    <div className="min-h-screen bg-slate-50 dark:bg-[#09090b] text-zinc-900 dark:text-zinc-100 p-3 sm:p-4 xl:p-5 space-y-4 xl:space-y-5 transition-colors duration-150">
       
-      {/* 1. MASTER TOP HEADER & ACTIONS (MATCHING PMS VISUAL SCALE) */}
-      <div className="rounded-2xl bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 p-4 sm:p-6 shadow-sm dark:shadow-xl space-y-4">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+      {/* 1. MASTER TOP HEADER & ACTIONS (RESPONSIVE FOR 1440x900 & HIGH-DPI) */}
+      <div className="rounded-2xl bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 p-3.5 sm:p-4 xl:p-5 shadow-xs dark:shadow-xl space-y-3">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 sm:gap-4">
           <div>
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 sm:h-11 sm:w-11 rounded-xl bg-blue-600 dark:bg-white text-white dark:text-zinc-950 font-black text-lg flex items-center justify-center shadow-md">
+            <div className="flex items-center gap-2.5 sm:gap-3">
+              <div className="h-9 w-9 sm:h-10 sm:w-10 xl:h-11 xl:w-11 rounded-xl bg-blue-600 dark:bg-white text-white dark:text-zinc-950 font-black text-base sm:text-lg flex items-center justify-center shadow-sm">
                 B
               </div>
               <div>
-                <div className="flex items-center gap-2">
-                  <h1 className="text-xl sm:text-2xl font-black text-zinc-900 dark:text-white tracking-tight flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h1 className="text-lg sm:text-xl xl:text-2xl font-black text-zinc-900 dark:text-white tracking-tight flex items-center gap-2">
                     Folio, Billing & Tax Invoices
                   </h1>
-                  <span className="rounded-md px-2 py-0.5 text-[11px] font-mono font-bold text-emerald-800 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-800/50 uppercase">
+                  <span className="rounded-md px-2 py-0.5 text-[10.5px] font-mono font-bold text-emerald-800 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-800/50 uppercase">
                     Rule 46 GST
                   </span>
                 </div>
@@ -534,21 +534,21 @@ function BillingContent() {
           </div>
 
           {/* Action Toolbar */}
-          <div className="flex flex-wrap items-center gap-2.5">
+          <div className="flex flex-wrap items-center gap-2">
             {selectedGroupStayIds.length > 0 && (
               <button
                 onClick={handleOpenGroupPaymentModal}
-                className="h-10 sm:h-11 px-4 sm:px-5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs sm:text-sm flex items-center gap-2 transition shadow-md shadow-emerald-600/30 animate-in fade-in"
+                className="h-9 sm:h-10 px-3.5 sm:px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs sm:text-sm flex items-center gap-1.5 transition shadow-sm cursor-pointer animate-in fade-in"
               >
                 <Users className="h-4 w-4" />
-                <span>Group Payment ({selectedGroupStayIds.length} Rooms)</span>
+                <span>Group Payment ({selectedGroupStayIds.length})</span>
               </button>
             )}
 
             {selectedGroupStayIds.length > 0 && (
               <button
                 onClick={handleExecuteGroupCheckout}
-                className="h-10 sm:h-11 px-4 sm:px-5 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-900 dark:text-white border border-zinc-300 dark:border-zinc-700 font-bold text-xs sm:text-sm flex items-center gap-2 transition shadow-xs"
+                className="h-9 sm:h-10 px-3.5 sm:px-4 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-900 dark:text-white border border-zinc-300 dark:border-zinc-700 font-bold text-xs sm:text-sm flex items-center gap-1.5 transition shadow-xs cursor-pointer"
               >
                 <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
                 <span>Group Checkout</span>
@@ -559,7 +559,7 @@ function BillingContent() {
               <>
                 <button
                   onClick={handleOpenLiveTaxBill}
-                  className="h-10 sm:h-11 px-4 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 hover:border-zinc-400 dark:hover:border-zinc-500 font-bold text-xs sm:text-sm text-zinc-800 dark:text-zinc-200 flex items-center gap-2 transition shadow-xs"
+                  className="h-9 sm:h-10 px-3.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 hover:border-zinc-400 dark:hover:border-zinc-500 font-bold text-xs sm:text-sm text-zinc-800 dark:text-zinc-200 flex items-center gap-1.5 transition shadow-xs cursor-pointer"
                 >
                   <Printer className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                   <span>Print Tax Bill</span>
@@ -575,7 +575,7 @@ function BillingContent() {
                     });
                     setShowManualChargeModal(true);
                   }}
-                  className="h-10 sm:h-11 px-4 rounded-xl bg-amber-50 dark:bg-amber-500/10 hover:bg-amber-100 dark:hover:bg-amber-500/20 border border-amber-300 dark:border-amber-500/30 text-amber-900 dark:text-amber-300 font-bold text-xs sm:text-sm flex items-center gap-2 transition shadow-xs"
+                  className="h-9 sm:h-10 px-3.5 rounded-xl bg-amber-50 dark:bg-amber-500/10 hover:bg-amber-100 dark:hover:bg-amber-500/20 border border-amber-300 dark:border-amber-500/30 text-amber-900 dark:text-amber-300 font-bold text-xs sm:text-sm flex items-center gap-1.5 transition shadow-xs cursor-pointer"
                 >
                   <Plus className="h-4 w-4 text-amber-600 dark:text-amber-400" />
                   <span>Post Charge</span>
@@ -590,7 +590,7 @@ function BillingContent() {
                     });
                     setShowDiscountModal(true);
                   }}
-                  className="h-10 sm:h-11 px-4 rounded-xl bg-rose-50 dark:bg-rose-500/10 hover:bg-rose-100 dark:hover:bg-rose-500/20 border border-rose-300 dark:border-rose-500/30 text-rose-900 dark:text-rose-300 font-bold text-xs sm:text-sm flex items-center gap-2 transition shadow-xs"
+                  className="h-9 sm:h-10 px-3.5 rounded-xl bg-rose-50 dark:bg-rose-500/10 hover:bg-rose-100 dark:hover:bg-rose-500/20 border border-rose-300 dark:border-rose-500/30 text-rose-900 dark:text-rose-300 font-bold text-xs sm:text-sm flex items-center gap-1.5 transition shadow-xs cursor-pointer"
                 >
                   <Plus className="h-4 w-4 text-rose-600 dark:text-rose-400" />
                   <span>Add Discount</span>
@@ -611,7 +611,7 @@ function BillingContent() {
                     });
                     setShowPaymentModal(true);
                   }}
-                  className="h-10 sm:h-11 px-5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-xs sm:text-sm flex items-center gap-2 transition shadow-lg shadow-blue-600/30"
+                  className="h-9 sm:h-10 px-4 sm:px-5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-xs sm:text-sm flex items-center gap-1.5 transition shadow-md shadow-blue-600/30 cursor-pointer"
                 >
                   <CreditCard className="h-4 w-4" />
                   <span>Collect Payment</span>
@@ -623,17 +623,17 @@ function BillingContent() {
       </div>
 
       {/* 2. MAIN 2-COLUMN OPERATIONAL GRID */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 xl:gap-5 items-start">
         
         {/* LEFT COLUMN: ROOMS DIRECTORY & GROUP SELECTOR (4 COLS) */}
-        <div className="lg:col-span-4 rounded-2xl bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 p-4 sm:p-5 shadow-sm dark:shadow-xl space-y-4 flex flex-col">
+        <div className="lg:col-span-4 rounded-2xl bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 p-3.5 sm:p-4 shadow-xs dark:shadow-xl space-y-3 flex flex-col">
           
-          <div className="flex items-center justify-between pb-3 border-b border-zinc-200 dark:border-zinc-800">
-            <span className="font-extrabold text-sm text-zinc-900 dark:text-white flex items-center gap-2 uppercase tracking-wider font-mono">
+          <div className="flex items-center justify-between pb-2.5 border-b border-zinc-200 dark:border-zinc-800">
+            <span className="font-extrabold text-xs sm:text-sm text-zinc-900 dark:text-white flex items-center gap-2 uppercase tracking-wider font-mono">
               <Layers className="h-4 w-4 text-blue-600 dark:text-blue-400" />
               Rooms Directory
             </span>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2.5">
               <button
                 onClick={() => {
                   if (selectedGroupStayIds.length === filteredStays.length) {
@@ -642,11 +642,11 @@ function BillingContent() {
                     setSelectedGroupStayIds(filteredStays.map((s) => s.id));
                   }
                 }}
-                className="text-xs text-blue-600 dark:text-blue-400 hover:underline font-mono font-bold"
+                className="text-xs text-blue-600 dark:text-blue-400 hover:underline font-mono font-bold cursor-pointer"
               >
                 {selectedGroupStayIds.length > 0 ? "Clear" : "Select All"}
               </button>
-              <span className="text-xs text-zinc-500 dark:text-zinc-400 font-mono font-bold bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 rounded-md">
+              <span className="text-[11px] text-zinc-500 dark:text-zinc-400 font-mono font-bold bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 rounded-md">
                 {filteredStays.length} / {stays.length}
               </span>
             </div>
@@ -654,18 +654,18 @@ function BillingContent() {
 
           {/* Search Bar */}
           <div className="relative">
-            <Search className="absolute left-3.5 top-3 h-4 w-4 text-zinc-400 dark:text-zinc-500" />
+            <Search className="absolute left-3 top-2.5 h-4 w-4 text-zinc-400 dark:text-zinc-500" />
             <input
               type="text"
               placeholder="Search room #, guest name, company..."
               value={staySearchQuery}
               onChange={(e) => setStaySearchQuery(e.target.value)}
-              className="w-full h-11 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700/80 pl-10 pr-9 text-sm text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none focus:border-blue-500 font-medium transition"
+              className="w-full h-10 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700/80 pl-9 pr-8 text-xs sm:text-sm text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none focus:border-blue-500 font-medium transition"
             />
             {staySearchQuery && (
               <button
                 onClick={() => setStaySearchQuery("")}
-                className="absolute right-3 top-3 text-zinc-400 hover:text-zinc-700 dark:hover:text-white"
+                className="absolute right-2.5 top-2.5 text-zinc-400 hover:text-zinc-700 dark:hover:text-white cursor-pointer"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -673,10 +673,10 @@ function BillingContent() {
           </div>
 
           {/* Quick Filter Tabs */}
-          <div className="grid grid-cols-4 gap-1.5 p-1 rounded-xl bg-zinc-100 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 text-xs font-semibold text-center">
+          <div className="grid grid-cols-4 gap-1 p-1 rounded-xl bg-zinc-100 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 text-[11px] font-semibold text-center">
             <button
               onClick={() => setStayStatusFilter("ALL")}
-              className={`rounded-lg py-2 transition ${
+              className={`rounded-lg py-1.5 transition cursor-pointer ${
                 stayStatusFilter === "ALL"
                   ? "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-xs font-black"
                   : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200"
@@ -686,7 +686,7 @@ function BillingContent() {
             </button>
             <button
               onClick={() => setStayStatusFilter("IN_HOUSE")}
-              className={`rounded-lg py-2 transition ${
+              className={`rounded-lg py-1.5 transition cursor-pointer ${
                 stayStatusFilter === "IN_HOUSE"
                   ? "bg-emerald-600 text-white shadow-xs font-black"
                   : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200"
@@ -696,7 +696,7 @@ function BillingContent() {
             </button>
             <button
               onClick={() => setStayStatusFilter("WITH_BALANCE")}
-              className={`rounded-lg py-2 transition ${
+              className={`rounded-lg py-1.5 transition cursor-pointer ${
                 stayStatusFilter === "WITH_BALANCE"
                   ? "bg-rose-600 text-white shadow-xs font-black"
                   : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200"
@@ -706,7 +706,7 @@ function BillingContent() {
             </button>
             <button
               onClick={() => setStayStatusFilter("CHECKED_OUT")}
-              className={`rounded-lg py-2 transition ${
+              className={`rounded-lg py-1.5 transition cursor-pointer ${
                 stayStatusFilter === "CHECKED_OUT"
                   ? "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-xs font-black"
                   : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200"
@@ -717,7 +717,7 @@ function BillingContent() {
           </div>
 
           {/* Stays List with High-Legibility Cards */}
-          <div className="space-y-2.5 max-h-[640px] overflow-y-auto pr-1 flex-1">
+          <div className="space-y-2 max-h-[calc(100vh-270px)] overflow-y-auto pr-1 flex-1">
             {filteredStays.map((s) => {
               const isSelected = s.id === selectedStayId;
               const isGroupChecked = selectedGroupStayIds.includes(s.id);
@@ -729,9 +729,9 @@ function BillingContent() {
                 <div
                   key={s.id}
                   onClick={() => setSelectedStayId(s.id)}
-                  className={`rounded-2xl p-3.5 sm:p-4 border-2 transition-all cursor-pointer flex items-start gap-3 shadow-xs hover:shadow-md ${
+                  className={`rounded-xl p-3 border-2 transition-all cursor-pointer flex items-start gap-2.5 shadow-xs hover:shadow-sm ${
                     isSelected
-                      ? "bg-blue-50/90 dark:bg-[#101928] border-blue-500 shadow-md text-zinc-900 dark:text-zinc-100"
+                      ? "bg-blue-50/90 dark:bg-[#101928] border-blue-500 shadow-sm text-zinc-900 dark:text-zinc-100"
                       : "bg-zinc-50/70 dark:bg-zinc-900/60 border-zinc-200 dark:border-zinc-800/80 text-zinc-600 dark:text-zinc-400 hover:border-zinc-300 dark:hover:border-zinc-700"
                   }`}
                 >
@@ -740,29 +740,29 @@ function BillingContent() {
                     checked={isGroupChecked}
                     onClick={(e) => e.stopPropagation()}
                     onChange={() => toggleGroupStaySelection(s.id)}
-                    className="mt-1 h-4 w-4 rounded bg-white dark:bg-zinc-800 border-zinc-300 dark:border-zinc-700 accent-emerald-500 cursor-pointer shrink-0"
+                    className="mt-0.5 h-3.5 w-3.5 rounded bg-white dark:bg-zinc-800 border-zinc-300 dark:border-zinc-700 accent-emerald-500 cursor-pointer shrink-0"
                     title="Select for group settlement"
                   />
 
-                  <div className="flex-1 min-w-0 space-y-1.5">
+                  <div className="flex-1 min-w-0 space-y-1">
                     {/* Top Row: Big Room Number & Due/Paid Badge */}
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xl sm:text-2xl font-black font-mono tracking-tight text-zinc-900 dark:text-white">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-lg sm:text-xl font-black font-mono tracking-tight text-zinc-900 dark:text-white">
                           {room?.number || "Unassigned"}
                         </span>
-                        <span className="text-xs text-zinc-500 font-bold truncate">
+                        <span className="text-[11px] text-zinc-500 font-bold truncate">
                           {room?.roomType?.name || "Deluxe Room"}
                         </span>
                       </div>
 
                       <div className="shrink-0">
                         {balance > 0 ? (
-                          <span className="text-xs font-mono font-black text-rose-800 dark:text-rose-300 bg-rose-100 dark:bg-rose-950/70 border border-rose-300 dark:border-rose-800/60 px-2.5 py-1 rounded-lg shadow-xs">
+                          <span className="text-[11px] font-mono font-black text-rose-800 dark:text-rose-300 bg-rose-100 dark:bg-rose-950/70 border border-rose-300 dark:border-rose-800/60 px-2 py-0.5 rounded-md shadow-xs">
                             Due: {formatINR(balance)}
                           </span>
                         ) : (
-                          <span className="text-xs font-mono font-black text-emerald-800 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-950/70 border border-emerald-300 dark:border-emerald-800/60 px-2.5 py-1 rounded-lg shadow-xs">
+                          <span className="text-[11px] font-mono font-black text-emerald-800 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-950/70 border border-emerald-300 dark:border-emerald-800/60 px-2 py-0.5 rounded-md shadow-xs">
                             ✓ Settled
                           </span>
                         )}
@@ -770,12 +770,12 @@ function BillingContent() {
                     </div>
 
                     {/* Middle Row: Guest Name & In-House Tag */}
-                    <div className="flex items-center justify-between gap-1.5 pt-0.5">
-                      <span className="text-sm font-bold text-zinc-900 dark:text-zinc-100 truncate">
+                    <div className="flex items-center justify-between gap-1.5">
+                      <span className="text-xs sm:text-sm font-bold text-zinc-900 dark:text-zinc-100 truncate">
                         {s.primaryGuest?.name || "Guest"}
                       </span>
                       <span
-                        className={`rounded-md px-2 py-0.5 text-[10px] font-mono font-bold uppercase shrink-0 ${
+                        className={`rounded-md px-1.5 py-0.5 text-[9.5px] font-mono font-bold uppercase shrink-0 ${
                           s.status === "IN_HOUSE"
                             ? "bg-emerald-100 dark:bg-emerald-500/10 text-emerald-800 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-500/20"
                             : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700"
@@ -787,14 +787,14 @@ function BillingContent() {
 
                     {/* Corporate Entity if present */}
                     {hasCompany && (
-                      <div className="flex items-center gap-1.5 text-xs text-amber-800 dark:text-amber-300 font-semibold truncate bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/50 px-2 py-0.5 rounded-md">
+                      <div className="flex items-center gap-1 text-[11px] text-amber-800 dark:text-amber-300 font-semibold truncate bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/50 px-1.5 py-0.5 rounded-md">
                         <Building2 className="h-3 w-3 shrink-0 text-amber-600 dark:text-amber-400" />
                         <span className="truncate">{s.primaryGuest.companyName}</span>
                       </div>
                     )}
 
                     {/* Bottom Row: Dates & Phone */}
-                    <div className="flex items-center justify-between text-xs text-zinc-500 dark:text-zinc-400 font-mono pt-0.5">
+                    <div className="flex items-center justify-between text-[10.5px] text-zinc-500 dark:text-zinc-400 font-mono">
                       <span>
                         {s.arrivalAt?.slice(0, 10)} → {s.expectedDepartureAt?.slice(0, 10)}
                       </span>
@@ -806,41 +806,41 @@ function BillingContent() {
             })}
 
             {filteredStays.length === 0 && (
-              <div className="p-12 text-center text-xs text-zinc-500 space-y-2">
-                <AlertCircle className="h-8 w-8 text-zinc-400 dark:text-zinc-600 mx-auto" />
-                <p className="font-bold text-zinc-800 dark:text-zinc-300 text-sm">No matching folios found</p>
-                <p className="text-zinc-500">Try changing your search term or filter status.</p>
+              <div className="p-8 text-center text-xs text-zinc-500 space-y-2">
+                <AlertCircle className="h-7 w-7 text-zinc-400 dark:text-zinc-600 mx-auto" />
+                <p className="font-bold text-zinc-800 dark:text-zinc-300 text-xs sm:text-sm">No matching folios found</p>
+                <p className="text-zinc-500 text-[11px]">Try changing your search term or filter status.</p>
               </div>
             )}
           </div>
         </div>
 
         {/* RIGHT COLUMN: FOLIO HERO, KPI CARDS & LEDGER (8 COLS) */}
-        <div className="lg:col-span-8 space-y-6">
+        <div className="lg:col-span-8 space-y-4 xl:space-y-5">
           {folioData ? (
             <>
               {/* 1. ACTIVE STAY HERO OVERVIEW CARD */}
-              <div className="p-5 sm:p-6 rounded-2xl bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 shadow-sm dark:shadow-xl space-y-4">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                  <div className="flex items-start sm:items-center gap-4">
-                    <div className="h-14 w-14 rounded-2xl bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-700/60 flex items-center justify-center text-blue-600 dark:text-blue-400 shrink-0">
-                      <BedDouble className="h-7 w-7" />
+              <div className="p-4 xl:p-5 rounded-2xl bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 shadow-xs dark:shadow-xl space-y-3">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4">
+                  <div className="flex items-start sm:items-center gap-3 sm:gap-4">
+                    <div className="h-12 w-12 rounded-xl bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-700/60 flex items-center justify-center text-blue-600 dark:text-blue-400 shrink-0">
+                      <BedDouble className="h-6 w-6" />
                     </div>
                     <div>
-                      <div className="flex items-center gap-2.5 flex-wrap">
-                        <span className="text-2xl sm:text-3xl font-black font-mono text-zinc-900 dark:text-white tracking-tight">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-xl sm:text-2xl font-black font-mono text-zinc-900 dark:text-white tracking-tight">
                           Room {activeStay?.roomAssignments?.[0]?.room?.number || "Unassigned"}
                         </span>
-                        <span className="rounded-lg bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 px-2.5 py-0.5 text-xs font-mono font-bold text-zinc-700 dark:text-zinc-300">
+                        <span className="rounded-lg bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 px-2 py-0.5 text-[11px] font-mono font-bold text-zinc-700 dark:text-zinc-300">
                           {activeStay?.roomAssignments?.[0]?.room?.roomType?.name || "Deluxe AC"}
                         </span>
-                        <span className="rounded-lg bg-emerald-100 dark:bg-emerald-500/10 text-emerald-800 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-500/20 px-2.5 py-0.5 text-xs font-mono font-black">
+                        <span className="rounded-lg bg-emerald-100 dark:bg-emerald-500/10 text-emerald-800 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-500/20 px-2 py-0.5 text-[11px] font-mono font-black">
                           {activeStay?.status}
                         </span>
                       </div>
 
-                      <div className="text-sm font-bold text-zinc-800 dark:text-zinc-200 mt-1 flex items-center gap-2 flex-wrap">
-                        <span>Guest: <strong className="text-zinc-950 dark:text-white text-base">{activeStay?.primaryGuest?.name}</strong></span>
+                      <div className="text-xs sm:text-sm font-bold text-zinc-800 dark:text-zinc-200 mt-0.5 flex items-center gap-2 flex-wrap">
+                        <span>Guest: <strong className="text-zinc-950 dark:text-white text-sm sm:text-base">{activeStay?.primaryGuest?.name}</strong></span>
                         {activeStay?.primaryGuest?.phone && (
                           <span className="text-xs text-zinc-500 font-mono font-normal">({activeStay.primaryGuest.phone})</span>
                         )}
@@ -850,8 +850,8 @@ function BillingContent() {
                       </div>
 
                       {activeStay?.primaryGuest?.companyName && (
-                        <div className="inline-flex items-center gap-1.5 mt-1.5 px-2.5 py-1 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-700/60 text-xs font-bold text-amber-900 dark:text-amber-200 font-mono">
-                          <Building2 className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+                        <div className="inline-flex items-center gap-1.5 mt-1 px-2 py-0.5 rounded-md bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-700/60 text-xs font-bold text-amber-900 dark:text-amber-200 font-mono">
+                          <Building2 className="h-3 w-3 text-amber-600 dark:text-amber-400" />
                           <span>Bill to Company: {activeStay.primaryGuest.companyName}</span>
                           {activeStay.primaryGuest.gstin && <span>• GSTIN: {activeStay.primaryGuest.gstin}</span>}
                         </div>
@@ -860,15 +860,15 @@ function BillingContent() {
                   </div>
 
                   {/* Duration & Primary Settle Button */}
-                  <div className="flex flex-wrap items-center gap-3">
-                    <div className="text-xs text-zinc-700 dark:text-zinc-300 font-mono bg-zinc-50 dark:bg-zinc-900 px-4 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 flex items-center gap-3 shadow-xs">
-                      <Clock className="h-5 w-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                  <div className="flex flex-wrap items-center gap-2.5">
+                    <div className="text-xs text-zinc-700 dark:text-zinc-300 font-mono bg-zinc-50 dark:bg-zinc-900 px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-800 flex items-center gap-2.5 shadow-xs">
+                      <Clock className="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
                       <div>
-                        <span className="font-bold text-sm text-zinc-900 dark:text-white block">
+                        <span className="font-bold text-xs sm:text-sm text-zinc-900 dark:text-white block">
                           {stayCalculations.nights} Night{stayCalculations.nights > 1 ? "s" : ""}
                         </span>
-                        <span className="text-[11px] text-zinc-500 block">
-                          Tariff: {formatINR(stayCalculations.roomRatePerNight)}/night
+                        <span className="text-[10.5px] text-zinc-500 block">
+                          {formatINR(stayCalculations.roomRatePerNight)}/night
                         </span>
                       </div>
                     </div>
@@ -878,10 +878,10 @@ function BillingContent() {
                         <button
                           onClick={handleExecuteCheckout}
                           disabled={actionLoading}
-                          className="h-12 px-6 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-black transition shadow-lg shadow-emerald-600/30 flex items-center gap-2 disabled:opacity-50"
+                          className="h-10 sm:h-11 px-4 sm:px-5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs sm:text-sm font-black transition shadow-md shadow-emerald-600/30 flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
                         >
-                          <CheckCircle2 className="h-5 w-5" />
-                          <span>{actionLoading ? "Checking Out..." : "Check Out & Issue Invoice"}</span>
+                          <CheckCircle2 className="h-4 w-4" />
+                          <span>{actionLoading ? "Checking Out..." : "Check Out & Invoice"}</span>
                         </button>
                       ) : (
                         <button
@@ -898,16 +898,16 @@ function BillingContent() {
                             });
                             setShowPaymentModal(true);
                           }}
-                          className="h-12 px-6 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-sm font-black transition shadow-lg shadow-rose-600/30 flex items-center gap-2"
+                          className="h-10 sm:h-11 px-4 sm:px-5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs sm:text-sm font-black transition shadow-md shadow-rose-600/30 flex items-center gap-1.5 cursor-pointer"
                         >
-                          <CreditCard className="h-5 w-5" />
+                          <CreditCard className="h-4 w-4" />
                           <span>Settle {formatINR(currentBalance)} & Check Out</span>
                         </button>
                       )
                     ) : (
                       <button
                         onClick={handleOpenLiveTaxBill}
-                        className="h-12 px-5 rounded-xl bg-zinc-900 text-white dark:bg-white dark:text-zinc-950 font-black text-sm transition shadow-md flex items-center gap-2"
+                        className="h-10 sm:h-11 px-4 rounded-xl bg-zinc-900 text-white dark:bg-white dark:text-zinc-950 font-black text-xs sm:text-sm transition shadow-xs flex items-center gap-1.5 cursor-pointer"
                       >
                         <Printer className="h-4 w-4" />
                         <span>Print Tax Invoice</span>
@@ -918,33 +918,33 @@ function BillingContent() {
               </div>
 
               {/* 2. THREE LARGE FINANCIAL KPI STAT TILES */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="p-5 rounded-2xl bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 shadow-sm dark:shadow-md space-y-1">
-                  <div className="text-xs text-zinc-500 dark:text-zinc-400 uppercase font-mono font-bold tracking-wider">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 xl:gap-4">
+                <div className="p-3.5 xl:p-4 rounded-2xl bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-0.5">
+                  <div className="text-[11px] text-zinc-500 dark:text-zinc-400 uppercase font-mono font-bold tracking-wider">
                     Total Charges Posted
                   </div>
-                  <div className="text-2xl sm:text-3xl font-black text-zinc-900 dark:text-white font-mono tabular-nums">
+                  <div className="text-xl sm:text-2xl font-black text-zinc-900 dark:text-white font-mono tabular-nums">
                     {formatINR(totalCharges)}
                   </div>
-                  <div className="text-[11px] text-zinc-400 font-mono">
+                  <div className="text-[10.5px] text-zinc-400 font-mono">
                     Taxable: {formatINR(totalTaxable)} + Tax: {formatINR(totalTaxes)}
                   </div>
                 </div>
 
-                <div className="p-5 rounded-2xl bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 shadow-sm dark:shadow-md space-y-1">
-                  <div className="text-xs text-zinc-500 dark:text-zinc-400 uppercase font-mono font-bold tracking-wider">
-                    Payments & Deposits Received
+                <div className="p-3.5 xl:p-4 rounded-2xl bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-0.5">
+                  <div className="text-[11px] text-zinc-500 dark:text-zinc-400 uppercase font-mono font-bold tracking-wider">
+                    Payments Received
                   </div>
-                  <div className="text-2xl sm:text-3xl font-black text-emerald-600 dark:text-emerald-400 font-mono tabular-nums">
+                  <div className="text-xl sm:text-2xl font-black text-emerald-600 dark:text-emerald-400 font-mono tabular-nums">
                     {formatINR(totalPayments)}
                   </div>
-                  <div className="text-[11px] text-zinc-400 font-mono">
+                  <div className="text-[10.5px] text-zinc-400 font-mono">
                     {payments.length} Transaction{payments.length === 1 ? "" : "s"}
                   </div>
                 </div>
 
-                <div className="p-5 rounded-2xl bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 shadow-sm dark:shadow-md space-y-1">
-                  <div className="text-xs text-zinc-500 dark:text-zinc-400 uppercase font-mono font-bold tracking-wider">
+                <div className="p-3.5 xl:p-4 rounded-2xl bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-0.5">
+                  <div className="text-[11px] text-zinc-500 dark:text-zinc-400 uppercase font-mono font-bold tracking-wider">
                     Outstanding Balance Due
                   </div>
                   <div
@@ -1009,14 +1009,14 @@ function BillingContent() {
 
                 <div className="overflow-x-auto rounded-xl border border-zinc-200 dark:border-zinc-800">
                   <table className="w-full text-left text-xs sm:text-sm">
-                    <thead className="bg-zinc-50 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 font-mono text-xs uppercase border-b border-zinc-200 dark:border-zinc-800">
+                    <thead className="bg-zinc-50 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 font-mono text-[11px] uppercase border-b border-zinc-200 dark:border-zinc-800">
                       <tr>
-                        <th className="p-3.5">Date</th>
-                        <th className="p-3.5">Description & Category</th>
-                        <th className="p-3.5">SAC</th>
-                        <th className="p-3.5 text-right">Taxable</th>
-                        <th className="p-3.5 text-right">GST</th>
-                        <th className="p-3.5 text-right">Total Amount</th>
+                        <th className="py-2.5 px-3">Date</th>
+                        <th className="py-2.5 px-3">Description & Category</th>
+                        <th className="py-2.5 px-3">SAC</th>
+                        <th className="py-2.5 px-3 text-right">Taxable</th>
+                        <th className="py-2.5 px-3 text-right">GST</th>
+                        <th className="py-2.5 px-3 text-right">Total Amount</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800/70">
@@ -1028,14 +1028,14 @@ function BillingContent() {
 
                         return (
                           <tr key={e.id} className="hover:bg-zinc-50 dark:hover:bg-zinc-900/50 transition">
-                            <td className="p-3.5 font-mono text-zinc-600 dark:text-zinc-400 text-xs">
+                            <td className="py-2.5 px-3 font-mono text-zinc-600 dark:text-zinc-400 text-xs">
                               {e.serviceDate || e.createdAt?.slice(0, 10)}
                             </td>
-                            <td className="p-3.5 font-semibold text-zinc-900 dark:text-zinc-100">
-                              <div className="flex items-center gap-2 flex-wrap">
+                            <td className="py-2.5 px-3 font-semibold text-zinc-900 dark:text-zinc-100">
+                              <div className="flex items-center gap-1.5 flex-wrap">
                                 <span>{e.description}</span>
                                 <span
-                                  className={`text-[10px] font-mono px-2 py-0.5 rounded-md font-bold uppercase ${
+                                  className={`text-[9.5px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${
                                     isDiscount
                                       ? "bg-rose-100 dark:bg-rose-950/60 text-rose-800 dark:text-rose-300 border border-rose-300 dark:border-rose-700"
                                       : isFood
@@ -1049,16 +1049,16 @@ function BillingContent() {
                                 </span>
                               </div>
                             </td>
-                            <td className="p-3.5 font-mono text-zinc-600 dark:text-zinc-400 text-xs">
+                            <td className="py-2.5 px-3 font-mono text-zinc-600 dark:text-zinc-400 text-xs">
                               {e.sacHsn || (isFood ? "996331" : "996311")}
                             </td>
-                            <td className="p-3.5 font-mono tabular-nums text-zinc-700 dark:text-zinc-300 text-right">
+                            <td className="py-2.5 px-3 font-mono tabular-nums text-zinc-700 dark:text-zinc-300 text-right">
                               {formatINR(e.taxableAmount || 0)}
                             </td>
-                            <td className="p-3.5 font-mono text-zinc-600 dark:text-zinc-400 tabular-nums text-right">
+                            <td className="py-2.5 px-3 font-mono text-zinc-600 dark:text-zinc-400 tabular-nums text-right">
                               {formatINR(taxAmt)}
                             </td>
-                            <td className="p-3.5 font-mono font-bold text-zinc-950 dark:text-white text-right tabular-nums">
+                            <td className="py-2.5 px-3 font-mono font-bold text-zinc-950 dark:text-white text-right tabular-nums">
                               {formatINR(e.totalAmount || 0)}
                             </td>
                           </tr>
@@ -1066,7 +1066,7 @@ function BillingContent() {
                       })}
                       {entries.length === 0 && (
                         <tr>
-                          <td colSpan={6} className="p-8 text-center text-zinc-500 italic font-mono text-xs">
+                          <td colSpan={6} className="p-6 text-center text-zinc-500 italic font-mono text-xs">
                             {rawEntries.length === 0 ? "No charges posted yet" : "No charges match your search filter"}
                           </td>
                         </tr>
@@ -1077,31 +1077,31 @@ function BillingContent() {
               </div>
 
               {/* 4. PAYMENT RECEIPTS TABLE */}
-              <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121215] overflow-hidden shadow-sm dark:shadow-xl p-5 space-y-4">
-                <div className="flex items-center justify-between pb-3 border-b border-zinc-200 dark:border-zinc-800">
+              <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121215] overflow-hidden shadow-xs dark:shadow-xl p-4 xl:p-5 space-y-3">
+                <div className="flex items-center justify-between pb-2.5 border-b border-zinc-200 dark:border-zinc-800">
                   <div>
-                    <h2 className="text-sm font-extrabold text-zinc-900 dark:text-white uppercase tracking-wider font-mono flex items-center gap-2">
+                    <h2 className="text-xs sm:text-sm font-extrabold text-zinc-900 dark:text-white uppercase tracking-wider font-mono flex items-center gap-1.5">
                       <CreditCard className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
                       Payment & Settlement Receipts
                     </h2>
-                    <p className="text-xs text-zinc-500 font-mono mt-0.5">
+                    <p className="text-[11px] text-zinc-500 font-mono mt-0.5">
                       {payments.length} Transaction{payments.length === 1 ? "" : "s"} Recorded for Folio
                     </p>
                   </div>
-                  <span className="text-xs font-mono font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-3 py-1 rounded-lg border border-emerald-300 dark:border-emerald-800">
+                  <span className="text-[11px] font-mono font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-2.5 py-0.5 rounded-lg border border-emerald-300 dark:border-emerald-800">
                     Total Settled: {formatINR(totalPayments)}
                   </span>
                 </div>
 
                 <div className="overflow-x-auto rounded-xl border border-zinc-200 dark:border-zinc-800">
                   <table className="w-full text-left text-xs sm:text-sm">
-                    <thead className="bg-zinc-50 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 font-mono text-xs uppercase border-b border-zinc-200 dark:border-zinc-800">
+                    <thead className="bg-zinc-50 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 font-mono text-[11px] uppercase border-b border-zinc-200 dark:border-zinc-800">
                       <tr>
-                        <th className="p-3.5">Receipt #</th>
-                        <th className="p-3.5">Date & Time</th>
-                        <th className="p-3.5">Payment Method</th>
-                        <th className="p-3.5">Reference / Notes</th>
-                        <th className="p-3.5 text-right">Amount</th>
+                        <th className="py-2.5 px-3">Receipt #</th>
+                        <th className="py-2.5 px-3">Date & Time</th>
+                        <th className="py-2.5 px-3">Payment Method</th>
+                        <th className="py-2.5 px-3">Reference / Notes</th>
+                        <th className="py-2.5 px-3 text-right">Amount</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800/70">
@@ -1111,20 +1111,20 @@ function BillingContent() {
 
                         return (
                           <tr key={p.id} className="hover:bg-zinc-50 dark:hover:bg-zinc-900/50 transition">
-                            <td className="p-3.5 font-mono text-blue-600 dark:text-blue-400 font-bold flex items-center gap-2">
+                            <td className="py-2.5 px-3 font-mono text-blue-600 dark:text-blue-400 font-bold flex items-center gap-1.5">
                               <span>{p.receiptNo}</span>
                               {isGroup && (
-                                <span className="text-[10px] bg-purple-100 dark:bg-purple-950/60 text-purple-800 dark:text-purple-300 border border-purple-300 dark:border-purple-800 px-2 py-0.5 rounded font-mono font-bold">
+                                <span className="text-[9.5px] bg-purple-100 dark:bg-purple-950/60 text-purple-800 dark:text-purple-300 border border-purple-300 dark:border-purple-800 px-1.5 py-0.5 rounded font-mono font-bold">
                                   Group
                                 </span>
                               )}
                             </td>
-                            <td className="p-3.5 font-mono text-zinc-600 dark:text-zinc-400 text-xs">
+                            <td className="py-2.5 px-3 font-mono text-zinc-600 dark:text-zinc-400 text-xs">
                               {p.receivedAt ? new Date(p.receivedAt).toLocaleString("en-GB") : "—"}
                             </td>
-                            <td className="p-3.5 font-semibold text-zinc-800 dark:text-zinc-200">
+                            <td className="py-2.5 px-3 font-semibold text-zinc-800 dark:text-zinc-200">
                               <span
-                                className={`rounded-lg border px-2.5 py-1 font-mono text-xs font-bold inline-flex items-center gap-1.5 ${
+                                className={`rounded-md border px-2 py-0.5 font-mono text-xs font-bold inline-flex items-center gap-1.5 ${
                                   isBTC
                                     ? "bg-amber-100 dark:bg-amber-950/60 text-amber-900 dark:text-amber-200 border-amber-300 dark:border-amber-700 shadow-xs"
                                     : "bg-zinc-100 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 border-zinc-300 dark:border-zinc-700"
@@ -1140,10 +1140,10 @@ function BillingContent() {
                                 )}
                               </span>
                             </td>
-                            <td className="p-3.5 font-mono text-zinc-700 dark:text-zinc-300 text-xs">
+                            <td className="py-2.5 px-3 font-mono text-zinc-700 dark:text-zinc-300 text-xs">
                               {p.reference && !p.reference.startsWith("GRC-DEPOSIT-") ? p.reference : "—"}
                             </td>
-                            <td className="p-3.5 font-mono font-black text-emerald-600 dark:text-emerald-400 text-right tabular-nums text-base">
+                            <td className="py-2.5 px-3 font-mono font-black text-emerald-600 dark:text-emerald-400 text-right tabular-nums text-sm sm:text-base">
                               {formatINR(p.amount || 0)}
                             </td>
                           </tr>
@@ -1151,7 +1151,7 @@ function BillingContent() {
                       })}
                       {payments.length === 0 && (
                         <tr>
-                          <td colSpan={5} className="p-8 text-center text-zinc-500 italic font-mono text-xs">
+                          <td colSpan={5} className="p-6 text-center text-zinc-500 italic font-mono text-xs">
                             No payments recorded yet for this stay.
                           </td>
                         </tr>
