@@ -113,6 +113,55 @@ function CheckInKioskInner() {
   const [submitSuccess, setSubmitSuccess] = useState<any | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [showGrcModal, setShowGrcModal] = useState(false);
+  const [repeatGuest, setRepeatGuest] = useState<any | null>(null);
+  const [isLookingUpPhone, setIsLookingUpPhone] = useState(false);
+
+  const handlePhoneChange = async (val: string) => {
+    setFormData((prev) => ({ ...prev, mobilePhone: val }));
+    const digits = val.replace(/\D/g, "");
+    if (digits.length >= 10) {
+      setIsLookingUpPhone(true);
+      try {
+        const res = await fetch(`/api/v1/guests/lookup?phone=${encodeURIComponent(digits)}`);
+        const data = await res.json();
+        if (data.found && data.guest) {
+          const g = data.guest;
+          setRepeatGuest(g);
+          setFormData((prev) => ({
+            ...prev,
+            mobilePhone: val,
+            fullName: g.fullName || prev.fullName,
+            fatherSpouseName: g.fatherSpouseName || prev.fatherSpouseName,
+            age: g.age ? String(g.age) : prev.age,
+            gender: g.gender || prev.gender,
+            nationality: g.nationality || prev.nationality,
+            alternatePhone: g.alternatePhone || prev.alternatePhone,
+            email: g.email || prev.email,
+            streetAddress: g.streetAddress || prev.streetAddress,
+            city: g.city || prev.city,
+            state: g.state || prev.state,
+            pinZipCode: g.pinZipCode || prev.pinZipCode,
+            country: g.country || prev.country,
+            arrivedFrom: g.arrivedFrom || prev.arrivedFrom,
+            goingTo: g.goingTo || prev.goingTo,
+            purposeOfVisit: g.purposeOfVisit || prev.purposeOfVisit,
+            vehicleNumber: g.vehicleNumber || prev.vehicleNumber,
+            driverName: g.driverName || prev.driverName,
+            idDocumentType: g.idType || prev.idDocumentType,
+            idDocumentNumber: g.idLast4 || prev.idDocumentNumber,
+          }));
+        } else {
+          setRepeatGuest(null);
+        }
+      } catch (e) {
+        console.error("Kiosk phone lookup failed:", e);
+      } finally {
+        setIsLookingUpPhone(false);
+      }
+    } else {
+      setRepeatGuest(null);
+    }
+  };
 
   // GRC Data memo for Kiosk
   const kioskGrcData: GrcData = useMemo(() => {
@@ -600,10 +649,55 @@ function CheckInKioskInner() {
                 </span>
                 <span className="text-base font-bold text-zinc-900 dark:text-zinc-100">Primary Guest Information</span>
               </div>
-              <span className="text-xs font-mono text-zinc-400 font-medium">* Required</span>
+              {isLookingUpPhone ? (
+                <span className="text-xs font-mono text-blue-600 dark:text-blue-400 font-semibold animate-pulse">
+                  Looking up guest profile...
+                </span>
+              ) : (
+                <span className="text-xs font-mono text-zinc-400 font-medium">* Required</span>
+              )}
             </div>
 
+            {/* Returning Guest Banner */}
+            {repeatGuest && (
+              <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-300 dark:border-amber-700/60 flex items-center justify-between gap-3 animate-in fade-in">
+                <div className="flex items-center gap-3">
+                  <span className="text-xl">⭐</span>
+                  <div>
+                    <span className="text-xs font-black text-amber-900 dark:text-amber-200 block">
+                      Welcome Back, {repeatGuest.fullName}!
+                    </span>
+                    <span className="text-[11px] text-amber-700 dark:text-amber-300 font-medium block mt-0.5">
+                      Your details from your previous stay have been automatically filled into this kiosk registration.
+                    </span>
+                  </div>
+                </div>
+                <span className="rounded-lg bg-amber-200 dark:bg-amber-900/80 text-amber-900 dark:text-amber-200 px-2.5 py-1 text-[10px] font-mono font-bold uppercase shrink-0">
+                  Auto-Populated
+                </span>
+              </div>
+            )}
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
+              <div>
+                <label className={labelStyles}>Mobile Phone *</label>
+                <div className="relative flex items-center">
+                  <input
+                    type="tel"
+                    required
+                    value={formData.mobilePhone}
+                    onChange={(e) => handlePhoneChange(e.target.value)}
+                    placeholder="+91 98765 43210"
+                    className={`${inputStyles} font-mono`}
+                  />
+                  {repeatGuest && (
+                    <span className="absolute right-3 text-emerald-500 text-xs font-bold font-mono">
+                      ✓ Auto-Filled
+                    </span>
+                  )}
+                </div>
+              </div>
+
               <div>
                 <label className={labelStyles}>Full Name (Block Letters) *</label>
                 <input
@@ -613,18 +707,6 @@ function CheckInKioskInner() {
                   onChange={(e) => setFormData({ ...formData, fullName: e.target.value.toUpperCase() })}
                   placeholder="e.g. ANUPAM ROY"
                   className={`${inputStyles} uppercase font-bold tracking-wide`}
-                />
-              </div>
-
-              <div>
-                <label className={labelStyles}>Mobile Phone *</label>
-                <input
-                  type="tel"
-                  required
-                  value={formData.mobilePhone}
-                  onChange={(e) => setFormData({ ...formData, mobilePhone: e.target.value })}
-                  placeholder="+91 98765 43210"
-                  className={`${inputStyles} font-mono`}
                 />
               </div>
 

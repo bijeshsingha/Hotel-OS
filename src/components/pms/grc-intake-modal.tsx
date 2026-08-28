@@ -49,6 +49,8 @@ export function GrcIntakeModal({
   const [activeMethod, setActiveMethod] = useState<"PHYSICAL_ENTRY" | "QR_DIGITAL">("PHYSICAL_ENTRY");
   const [loading, setLoading] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
+  const [repeatGuest, setRepeatGuest] = useState<any | null>(null);
+  const [isLookingUpPhone, setIsLookingUpPhone] = useState(false);
 
   // Form State
   const [formData, setFormData] = useState({
@@ -152,10 +154,68 @@ export function GrcIntakeModal({
         arrivalDateTime: currentDateTime,
         departureDate: prev.departureDate || defaultDepDate,
       }));
+      setRepeatGuest(null);
     }
   }, [isOpen, initialRoomId]);
 
   if (!isOpen) return null;
+
+  // Handle Instant Repeat Guest Auto-Fill by Phone Number
+  const handlePhoneChange = async (val: string) => {
+    setFormData((prev) => ({ ...prev, mobilePhone: val }));
+    const digits = val.replace(/\D/g, "");
+    if (digits.length >= 10) {
+      setIsLookingUpPhone(true);
+      try {
+        const res = await fetch(`/api/v1/guests/lookup?phone=${encodeURIComponent(digits)}&propertyId=${activeProperty?.id || ""}`);
+        const data = await res.json();
+        if (data.found && data.guest) {
+          const g = data.guest;
+          setRepeatGuest(g);
+          setFormData((prev) => ({
+            ...prev,
+            mobilePhone: val,
+            fullName: g.fullName || prev.fullName,
+            title: g.title || prev.title,
+            fatherSpouseName: g.fatherSpouseName || prev.fatherSpouseName,
+            age: g.age ? String(g.age) : prev.age,
+            gender: g.gender || prev.gender,
+            nationality: g.nationality || prev.nationality,
+            profession: g.profession || prev.profession,
+            alternatePhone: g.alternatePhone || prev.alternatePhone,
+            email: g.email || prev.email,
+
+            // Address
+            streetAddress: g.streetAddress || prev.streetAddress,
+            policeStation: g.policeStation || prev.policeStation,
+            city: g.city || prev.city,
+            state: g.state || prev.state,
+            pinZipCode: g.pinZipCode || prev.pinZipCode,
+            country: g.country || prev.country,
+
+            // Travel & ID
+            arrivedFrom: g.arrivedFrom || prev.arrivedFrom,
+            goingTo: g.goingTo || prev.goingTo,
+            purposeOfVisit: g.purposeOfVisit || prev.purposeOfVisit,
+            vehicleNumber: g.vehicleNumber || prev.vehicleNumber,
+            driverName: g.driverName || prev.driverName,
+            idType: g.idType || prev.idType,
+            idLast4: g.idLast4 || prev.idLast4,
+            companyName: g.companyName || prev.companyName,
+            guestGstin: g.guestGstin || prev.guestGstin,
+          }));
+        } else {
+          setRepeatGuest(null);
+        }
+      } catch (err) {
+        console.error("Phone auto-lookup failed:", err);
+      } finally {
+        setIsLookingUpPhone(false);
+      }
+    } else {
+      setRepeatGuest(null);
+    }
+  };
 
   // Handle Add Co-Guest Row
   const handleAddCoGuest = () => {
@@ -748,14 +808,78 @@ export function GrcIntakeModal({
 
             {/* 2. PRIMARY GUEST DOSSIER */}
             <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-[#09090b] p-4 space-y-3.5 shadow-xs">
-              <div className="border-b border-zinc-200 dark:border-zinc-800 pb-2">
+              <div className="border-b border-zinc-200 dark:border-zinc-800 pb-2 flex items-center justify-between">
                 <span className="font-bold text-zinc-900 dark:text-white uppercase tracking-wider flex items-center gap-2 text-xs">
                   <Users className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
                   2. Primary Guest Profile (From Physical GRC Card)
                 </span>
+                {isLookingUpPhone && (
+                  <span className="text-[10px] text-blue-600 dark:text-blue-400 font-mono animate-pulse flex items-center gap-1">
+                    <Clock className="h-3 w-3 animate-spin" /> Looking up guest profile...
+                  </span>
+                )}
               </div>
 
+              {/* Repeat Customer Detected Badge */}
+              {repeatGuest && (
+                <div className="p-3 rounded-2xl bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-amber-500/5 border border-amber-300 dark:border-amber-700/70 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs animate-in fade-in slide-in-from-top-2">
+                  <div className="flex items-center gap-3">
+                    <div className="h-9 w-9 rounded-xl bg-amber-500 text-white flex items-center justify-center font-black text-sm shadow-xs shrink-0">
+                      ⭐
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-extrabold text-xs text-amber-950 dark:text-amber-100">
+                          Returning Guest: {repeatGuest.fullName}
+                        </span>
+                        <span className="rounded px-2 py-0.5 text-[10px] font-bold font-mono uppercase bg-amber-200 dark:bg-amber-900 text-amber-900 dark:text-amber-200">
+                          {repeatGuest.pastStaysCount} Past {repeatGuest.pastStaysCount === 1 ? "Stay" : "Stays"}
+                        </span>
+                        {repeatGuest.vipStatus && (
+                          <span className="rounded px-2 py-0.5 text-[10px] font-bold uppercase bg-purple-100 dark:bg-purple-900/60 text-purple-800 dark:text-purple-300">
+                            VIP Guest
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-amber-800/90 dark:text-amber-300/80 font-medium mt-0.5">
+                        Profile, address & ID details auto-populated from stay history
+                        {repeatGuest.city ? ` (${repeatGuest.city}, ${repeatGuest.state})` : ""}
+                        {repeatGuest.companyName ? ` • Company: ${repeatGuest.companyName}` : ""}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 self-end sm:self-auto">
+                    <button
+                      type="button"
+                      onClick={() => setRepeatGuest(null)}
+                      className="text-[11px] text-amber-800 dark:text-amber-400 hover:underline font-semibold"
+                    >
+                      Dismiss
+                    </button>
+                  </div>
+                </div>
+              )}
+
               <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                <div className="space-y-1">
+                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">Mobile Phone *</label>
+                  <div className="relative flex items-center">
+                    <input
+                      type="tel"
+                      required
+                      placeholder="e.g. 9864341211"
+                      value={formData.mobilePhone}
+                      onChange={(e) => handlePhoneChange(e.target.value)}
+                      className="w-full h-10 px-3 pr-8 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white font-mono text-xs font-bold focus:border-blue-500 focus:outline-none"
+                    />
+                    {repeatGuest && (
+                      <span className="absolute right-2.5 text-emerald-500 text-xs" title="Repeat Customer Auto-Filled">
+                        ✓
+                      </span>
+                    )}
+                  </div>
+                </div>
+
                 <div className="space-y-1">
                   <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">Title</label>
                   <select
@@ -783,7 +907,7 @@ export function GrcIntakeModal({
                   />
                 </div>
 
-                <div className="space-y-1">
+                <div className="space-y-1 sm:col-span-2">
                   <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">Father / Spouse Name</label>
                   <input
                     type="text"
@@ -794,19 +918,7 @@ export function GrcIntakeModal({
                   />
                 </div>
 
-                <div className="space-y-1">
-                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">Mobile Phone *</label>
-                  <input
-                    type="tel"
-                    required
-                    placeholder="9864341211"
-                    value={formData.mobilePhone}
-                    onChange={(e) => setFormData({ ...formData, mobilePhone: e.target.value })}
-                    className="w-full h-10 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white font-mono text-xs focus:border-blue-500 focus:outline-none"
-                  />
-                </div>
-
-                <div className="space-y-1">
+                <div className="space-y-1 sm:col-span-2">
                   <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">Alternate Phone</label>
                   <input
                     type="tel"
@@ -1409,24 +1521,35 @@ export function GrcIntakeModal({
                     <option value="UPI">UPI / QR Code</option>
                     <option value="CASH">Cash Drawer</option>
                     <option value="CARD">Credit / Debit Card</option>
+                    <option value="DIRECT_BILL">🏢 Bill to Company (Company Ledger / BTC)</option>
                     <option value="BANK_TRANSFER">Bank Transfer / NEFT</option>
-                    <option value="DIRECT_BILL">Company Bill</option>
                   </select>
                 </div>
 
                 <div className="space-y-1">
                   <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">
-                    Transaction / UTR Ref
+                    Transaction / UTR / PO Ref
                   </label>
                   <input
                     type="text"
-                    placeholder="e.g. UTR/98127391"
+                    placeholder="e.g. UTR/98127391 or PO-2026"
                     value={formData.transactionRef}
                     onChange={(e) => setFormData({ ...formData, transactionRef: e.target.value.toUpperCase() })}
                     className="w-full h-10 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white font-mono text-xs focus:border-blue-500 focus:outline-none"
                   />
                 </div>
               </div>
+
+              {formData.paymentMethod === "DIRECT_BILL" && (
+                <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-700/60 text-xs text-amber-900 dark:text-amber-200 flex items-center gap-2">
+                  <Building2 className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                  <span>
+                    Billing will be posted to Company Ledger:{" "}
+                    <strong>{formData.companyName || "Corporate Account (Please enter Company Name in Section 4)"}</strong>
+                    {formData.guestGstin ? ` • GSTIN: ${formData.guestGstin}` : ""}
+                  </span>
+                </div>
+              )}
             </div>
 
             {/* Bottom Actions */}

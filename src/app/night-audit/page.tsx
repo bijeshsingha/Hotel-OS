@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import Link from "next/link";
 import { useHotel } from "@/lib/context/hotel-context";
 import { formatINR } from "@/lib/gst/calculator";
 import {
@@ -12,6 +13,9 @@ import {
   Calendar,
   ArrowRight,
   ShieldCheck,
+  Clock,
+  BarChart3,
+  FileText,
 } from "lucide-react";
 
 export default function NightAuditPage() {
@@ -22,6 +26,31 @@ export default function NightAuditPage() {
   const [actionLoading, setActionLoading] = useState(false);
   const [postingResults, setPostingResults] = useState<any[]>([]);
   const [closeResult, setCloseResult] = useState<any | null>(null);
+  const [timeUntilMidnight, setTimeUntilMidnight] = useState("");
+
+  // Update Countdown to 12:00 AM Midnight
+  useEffect(() => {
+    const updateCountdown = () => {
+      const now = new Date();
+      const midnight = new Date();
+      midnight.setHours(24, 0, 0, 0); // Next 12:00 AM midnight
+      const diffMs = midnight.getTime() - now.getTime();
+      if (diffMs > 0) {
+        const hours = Math.floor(diffMs / (1000 * 60 * 60));
+        const mins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+        const secs = Math.floor((diffMs % (1000 * 60)) / 1000);
+        setTimeUntilMidnight(
+          `${hours.toString().padStart(2, "0")}h ${mins.toString().padStart(2, "0")}m ${secs.toString().padStart(2, "0")}s`
+        );
+      } else {
+        setTimeUntilMidnight("00h 00m 00s");
+      }
+    };
+
+    updateCountdown();
+    const interval = setInterval(updateCountdown, 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   const loadChecklist = async () => {
     if (!activeProperty) return;
@@ -90,23 +119,30 @@ export default function NightAuditPage() {
       {/* Top Banner */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 rounded-xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs">
         <div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <h1 className="text-base font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
-              <Moon className="h-4 w-4 text-zinc-500 dark:text-zinc-400" />
+              <Moon className="h-4 w-4 text-indigo-500 dark:text-indigo-400" />
               Night Audit & Day Close
             </h1>
-            <span className="rounded px-2 py-0.5 text-[10px] font-mono text-zinc-600 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 font-semibold">
-              N01–N04
+            <span className="rounded px-2 py-0.5 text-[10px] font-mono font-bold text-indigo-700 dark:text-indigo-400 bg-indigo-100 dark:bg-indigo-950/50 border border-indigo-200 dark:border-indigo-800/60">
+              12 AM – 12 AM DAY CYCLE
             </span>
           </div>
           <p className="text-xs text-zinc-500 font-medium mt-0.5">
-            Pre-close checklist, room charge posting & date rollover
+            Midnight-to-midnight pre-close verification, room tariff posting & business date rollover
           </p>
         </div>
 
-        <div className="rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-3.5 py-2 text-xs text-zinc-700 dark:text-zinc-300 font-mono flex items-center gap-2 shadow-xs">
-          <Calendar className="h-3.5 w-3.5 text-zinc-500 dark:text-zinc-400" />
-          <span>Operational Date: <strong className="text-zinc-900 dark:text-zinc-100 font-bold">{activeProperty?.businessDate}</strong></span>
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-3.5 py-2 text-xs text-zinc-700 dark:text-zinc-300 font-mono flex items-center gap-2 shadow-xs">
+            <Calendar className="h-3.5 w-3.5 text-zinc-500 dark:text-zinc-400" />
+            <span>Operational Date: <strong className="text-zinc-900 dark:text-zinc-100 font-bold">{activeProperty?.businessDate}</strong></span>
+          </div>
+
+          <div className="rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-3.5 py-2 text-xs text-zinc-700 dark:text-zinc-300 font-mono flex items-center gap-1.5 shadow-xs">
+            <Clock className="h-3.5 w-3.5 text-amber-500" />
+            <span>Next Midnight in: <strong className="text-emerald-600 dark:text-emerald-400">{timeUntilMidnight}</strong></span>
+          </div>
         </div>
       </div>
 
@@ -170,8 +206,8 @@ export default function NightAuditPage() {
         <div className="p-5 rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 space-y-4 shadow-xs">
           <div className="flex items-center justify-between pb-3 border-b border-zinc-200 dark:border-zinc-800 text-xs">
             <div>
-              <h2 className="font-bold text-zinc-900 dark:text-zinc-200 text-sm">Operational Verification</h2>
-              <p className="text-zinc-500 text-xs mt-0.5">System state before closing operational day</p>
+              <h2 className="font-bold text-zinc-900 dark:text-zinc-200 text-sm">Operational Verification (12 AM – 12 AM Cycle)</h2>
+              <p className="text-zinc-500 text-xs mt-0.5">System state before closing operational day {activeProperty?.businessDate}</p>
             </div>
             <button
               onClick={loadChecklist}
@@ -200,8 +236,8 @@ export default function NightAuditPage() {
 
             <div className="rounded-xl bg-zinc-50 dark:bg-zinc-900 p-3.5 border border-zinc-200 dark:border-zinc-800 flex items-start justify-between shadow-xs">
               <div className="space-y-0.5">
-                <div className="font-bold text-zinc-900 dark:text-zinc-200">Due-out Departures</div>
-                <div className="text-[11px] text-zinc-500">Stays scheduled for departure</div>
+                <div className="font-bold text-zinc-900 dark:text-zinc-200">Pending Departures</div>
+                <div className="text-[11px] text-zinc-500">Guests due-out today</div>
               </div>
               <span
                 className={`rounded px-2 py-0.5 text-[10px] font-bold ${
@@ -210,14 +246,14 @@ export default function NightAuditPage() {
                     : "bg-amber-100 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-500/20"
                 }`}
               >
-                {checklist?.openDeparturesCount || 0} Open
+                {checklist?.openDeparturesCount || 0} Pending
               </span>
             </div>
 
             <div className="rounded-xl bg-zinc-50 dark:bg-zinc-900 p-3.5 border border-zinc-200 dark:border-zinc-800 flex items-start justify-between shadow-xs">
               <div className="space-y-0.5">
-                <div className="font-bold text-zinc-900 dark:text-zinc-200">Open Kitchen KOTs</div>
-                <div className="text-[11px] text-zinc-500">Unsettled restaurant orders</div>
+                <div className="font-bold text-zinc-900 dark:text-zinc-200">Open POS Orders / KOTs</div>
+                <div className="text-[11px] text-zinc-500">Unsettled restaurant tickets</div>
               </div>
               <span
                 className={`rounded px-2 py-0.5 text-[10px] font-bold ${
@@ -232,21 +268,28 @@ export default function NightAuditPage() {
 
             <div className="rounded-xl bg-zinc-50 dark:bg-zinc-900 p-3.5 border border-zinc-200 dark:border-zinc-800 flex items-start justify-between shadow-xs">
               <div className="space-y-0.5">
-                <div className="font-bold text-zinc-900 dark:text-zinc-200">Eligible Stays for Tariff</div>
-                <div className="text-[11px] text-zinc-500">In-house stays to bill nightly rate</div>
+                <div className="font-bold text-zinc-900 dark:text-zinc-200">Unposted Room Tariffs</div>
+                <div className="text-[11px] text-zinc-500">In-house stays needing daily post</div>
               </div>
-              <span className="rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 px-2 py-0.5 text-[10px] font-bold">
+              <span
+                className={`rounded px-2 py-0.5 text-[10px] font-bold ${
+                  checklist?.unpostedStaysCount === 0
+                    ? "bg-emerald-100 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20"
+                    : "bg-blue-100 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-500/20"
+                }`}
+              >
                 {checklist?.unpostedStaysCount || 0} Stays
               </span>
             </div>
           </div>
 
           {checklist?.warnings?.length > 0 && (
-            <div className="rounded-xl bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 p-3 text-xs text-amber-900 dark:text-amber-300 space-y-1">
-              <div className="font-bold flex items-center gap-1.5">
-                <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" /> Warnings:
+            <div className="p-3.5 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/60 space-y-1">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-amber-900 dark:text-amber-200">
+                <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                Attention Required:
               </div>
-              <ul className="list-disc list-inside space-y-0.5 text-[11px] text-amber-800 dark:text-amber-200">
+              <ul className="text-xs text-amber-800 dark:text-amber-300 list-disc list-inside space-y-0.5">
                 {checklist.warnings.map((w: string, i: number) => (
                   <li key={i}>{w}</li>
                 ))}
@@ -254,7 +297,7 @@ export default function NightAuditPage() {
             </div>
           )}
 
-          <div className="pt-3 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-end">
+          <div className="flex justify-end pt-2">
             <button
               onClick={() => setStep(2)}
               className="flex items-center gap-1.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-100 dark:hover:bg-white text-white dark:text-zinc-950 px-5 py-2 text-xs font-bold transition shadow-xs cursor-pointer"
@@ -265,38 +308,33 @@ export default function NightAuditPage() {
         </div>
       )}
 
-      {/* STEP 2: POST ROOM CHARGES */}
+      {/* STEP 2 & 3: CHARGES & CLOSE */}
       {(step === 2 || step === 3) && (
         <div className="p-5 rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 space-y-4 shadow-xs">
-          <div className="pb-3 border-b border-zinc-200 dark:border-zinc-800">
-            <h2 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">Post Nightly Room Charges (SAC 996311)</h2>
-            <p className="text-xs text-zinc-500 mt-0.5">
-              Calculates GST and posts nightly room tariff to active guest folios
+          <div>
+            <h2 className="font-bold text-zinc-900 dark:text-zinc-200 text-sm">
+              {step === 2 ? "Nightly Room Charges" : "Close Operational Day"}
+            </h2>
+            <p className="text-zinc-500 text-xs mt-0.5">
+              {step === 2
+                ? `Post room charges with GST Rule 46 calculation for ${activeProperty?.businessDate}`
+                : `Finalize all accounts, snapshot 12 AM reports and roll forward business date`}
             </p>
           </div>
 
-          <div className="rounded-xl bg-zinc-50 dark:bg-zinc-900 p-3.5 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-600 dark:text-zinc-400 space-y-1 font-mono shadow-xs">
-            <div>• Target Service Date: <span className="text-zinc-900 dark:text-zinc-200 font-bold">{activeProperty?.businessDate}</span></div>
-            <div>• Idempotency: Unique key per stay and date to prevent duplicates.</div>
-          </div>
-
-          {postingResults.length > 0 && (
-            <div className="rounded-xl bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 p-3.5 space-y-2 text-xs text-emerald-900 dark:text-emerald-300 font-mono">
+          {step === 3 && (
+            <div className="p-3.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/60 text-xs text-emerald-800 dark:text-emerald-300 space-y-1">
               <div className="font-bold flex items-center gap-1.5">
-                <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" /> Charges Posted
+                <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                Room charges posted successfully!
               </div>
-              <div className="space-y-1 text-xs">
-                {postingResults.map((r, idx) => (
-                  <div key={idx} className="flex justify-between">
-                    <span>Room {r.roomNumber || "Stay"}</span>
-                    <span className="tabular-nums font-bold">{r.status === "ALREADY_POSTED" ? "Already Posted" : formatINR(r.totalPosted)}</span>
-                  </div>
-                ))}
-              </div>
+              <p className="text-[11px] text-emerald-700 dark:text-emerald-400 font-mono">
+                {postingResults.length} rooms billed. Ready to close operational day {activeProperty?.businessDate}.
+              </p>
             </div>
           )}
 
-          <div className="pt-3 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
+          <div className="flex justify-between items-center pt-2">
             <button
               onClick={() => setStep(1)}
               className="rounded-xl px-4 py-2 text-xs font-semibold text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 cursor-pointer"
@@ -360,15 +398,24 @@ export default function NightAuditPage() {
             </div>
           </div>
 
-          <button
-            onClick={() => {
-              setStep(1);
-              setCloseResult(null);
-            }}
-            className="rounded-xl bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-100 dark:hover:bg-white text-white dark:text-zinc-950 px-6 py-2 text-xs font-bold transition shadow-xs cursor-pointer"
-          >
-            Done
-          </button>
+          <div className="flex items-center justify-center gap-3 pt-2">
+            <Link
+              href="/reports"
+              className="flex items-center gap-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white px-5 py-2 text-xs font-bold transition shadow-xs"
+            >
+              <BarChart3 className="h-4 w-4" /> View 12 AM Daily Manager Report
+            </Link>
+
+            <button
+              onClick={() => {
+                setStep(1);
+                setCloseResult(null);
+              }}
+              className="rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 px-5 py-2 text-xs font-bold transition shadow-xs cursor-pointer"
+            >
+              Done
+            </button>
+          </div>
         </div>
       )}
     </div>

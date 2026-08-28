@@ -23,7 +23,6 @@ function SidebarNav() {
     { label: "Dashboard", href: "/", icon: LayoutDashboard, badge: "D01" },
     { label: "PMS & Front Desk", href: "/pms", icon: BedDouble, badge: "P01" },
     { label: "Housekeeping", href: "/housekeeping", icon: Sparkles, badge: "H01" },
-    { label: "Restaurant POS", href: "/pos", icon: UtensilsCrossed, badge: "F01" },
     { label: "Folio & Invoicing", href: "/billing", icon: Receipt, badge: "B01" },
     { label: "Night Audit", href: "/night-audit", icon: Moon, badge: "N01" },
     { label: "Maintenance", href: "/maintenance", icon: Wrench, badge: "M01" },

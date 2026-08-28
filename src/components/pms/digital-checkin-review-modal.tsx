@@ -798,6 +798,7 @@ export function DigitalCheckInReviewModal({
                         <option value="UPI">UPI / QR Payment</option>
                         <option value="CASH">Cash</option>
                         <option value="CARD">Debit / Credit Card</option>
+                        <option value="DIRECT_BILL">🏢 Bill to Company (Company Ledger / BTC)</option>
                         <option value="BANK_TRANSFER">Bank Transfer / NEFT</option>
                       </select>
                     </div>

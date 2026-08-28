@@ -85,6 +85,7 @@ export async function recordPayment({
   method,
   reference,
   payerName,
+  payerSnapshot,
   actorId,
 }: {
   folioId: string;
@@ -93,6 +94,7 @@ export async function recordPayment({
   method: string;
   reference?: string;
   payerName?: string;
+  payerSnapshot?: string;
   actorId?: string;
 }) {
   const folio = await prisma.folio.findUniqueOrThrow({
@@ -114,7 +116,7 @@ export async function recordPayment({
       amount,
       method,
       reference,
-      payerSnapshot: JSON.stringify({ name: payerName || "Guest" }),
+      payerSnapshot: payerSnapshot || JSON.stringify({ name: payerName || "Guest" }),
       status: "SUCCEEDED",
       createdById: actorId,
     },

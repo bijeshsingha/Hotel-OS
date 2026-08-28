@@ -1,21 +1,52 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
+import { getMidnightDayBoundaries } from "@/lib/domain/daily-report-service";
 
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const propertyId = searchParams.get("propertyId");
     const reportType = searchParams.get("type") || "CASHIER_COLLECTIONS_EXPENSES";
+    const date = searchParams.get("date") || undefined;
+    const startDate = searchParams.get("startDate") || undefined;
+    const endDate = searchParams.get("endDate") || undefined;
 
     if (!propertyId) {
       return NextResponse.json({ error: "propertyId is required" }, { status: 400 });
     }
 
+    // Compute 12 AM to 12 AM Midnight Date Range Boundaries
+    let dateFilter: { gte: Date; lte: Date } | undefined = undefined;
+    if (date) {
+      const bounds = getMidnightDayBoundaries(date);
+      dateFilter = {
+        gte: bounds.localStart < bounds.startUtc ? bounds.localStart : bounds.startUtc,
+        lte: bounds.localEnd > bounds.endUtc ? bounds.localEnd : bounds.endUtc,
+      };
+    } else if (startDate && endDate) {
+      const s = getMidnightDayBoundaries(startDate);
+      const e = getMidnightDayBoundaries(endDate);
+      dateFilter = {
+        gte: s.localStart < s.startUtc ? s.localStart : s.startUtc,
+        lte: e.localEnd > e.endUtc ? e.localEnd : e.endUtc,
+      };
+    }
+
     // 1. DAILY COLLECTIONS & EXPENSES COMPREHENSIVE CASHIER AUDIT
     if (reportType === "CASHIER_COLLECTIONS_EXPENSES" || reportType === "COLLECTIONS" || reportType === "EXPENSES") {
+      const paymentWhere: any = { propertyId, status: "SUCCEEDED" };
+      if (dateFilter) {
+        paymentWhere.receivedAt = dateFilter;
+      }
+
+      const expenseWhere: any = { propertyId, status: "PAID" };
+      if (dateFilter) {
+        expenseWhere.paidAt = dateFilter;
+      }
+
       const [payments, expenses, property] = await Promise.all([
         prisma.payment.findMany({
-          where: { propertyId, status: "SUCCEEDED" },
+          where: paymentWhere,
           include: {
             folio: {
               include: {
@@ -31,7 +62,7 @@ export async function GET(request: Request) {
           orderBy: { receivedAt: "desc" },
         }),
         prisma.expense.findMany({
-          where: { propertyId, status: "PAID" },
+          where: expenseWhere,
           orderBy: { paidAt: "desc" },
         }),
         prisma.property.findUnique({
@@ -207,6 +238,8 @@ export async function GET(request: Request) {
 
       return NextResponse.json({
         reportType,
+        dayCycle: "12:00 AM – 12:00 AM Midnight",
+        filterDate: date || (startDate && endDate ? `${startDate} to ${endDate}` : "All Time"),
         generatedAt: new Date().toISOString(),
         property,
         summary: {
@@ -227,7 +260,6 @@ export async function GET(request: Request) {
         },
         collections: formattedCollections,
         expenses: formattedExpenses,
-        // Combined chronological audit feed
         allTransactions: [
           ...formattedCollections.map((c) => ({
             ...c,
@@ -251,8 +283,14 @@ export async function GET(request: Request) {
 
     // 2. FRONT OFFICE GUEST LEDGER
     if (reportType === "FRONT_OFFICE") {
+      const stayWhere: any = { propertyId };
+      if (date) {
+        stayWhere.arrivalAt = { lte: dateFilter?.lte };
+        stayWhere.expectedDepartureAt = { gte: dateFilter?.gte };
+      }
+
       const stays = await prisma.stay.findMany({
-        where: { propertyId },
+        where: stayWhere,
         include: {
           primaryGuest: true,
           roomAssignments: { include: { room: { include: { roomType: true } } } },
@@ -263,6 +301,7 @@ export async function GET(request: Request) {
 
       return NextResponse.json({
         reportType,
+        dayCycle: "12:00 AM – 12:00 AM Midnight",
         generatedAt: new Date().toISOString(),
         rows: stays.map((s) => ({
           stayId: s.id,
@@ -280,14 +319,25 @@ export async function GET(request: Request) {
 
     // 3. REVENUE & GST JOURNAL
     if (reportType === "REVENUE") {
+      const entryWhere: any = { propertyId, status: "POSTED" };
+      if (date) {
+        entryWhere.OR = [
+          { serviceDate: date },
+          { postedAt: dateFilter },
+        ];
+      } else if (dateFilter) {
+        entryWhere.postedAt = dateFilter;
+      }
+
       const entries = await prisma.folioEntry.findMany({
-        where: { propertyId, status: "POSTED" },
+        where: entryWhere,
         include: { folio: { include: { stay: { include: { primaryGuest: true } } } } },
         orderBy: { postedAt: "desc" },
       });
 
       return NextResponse.json({
         reportType,
+        dayCycle: "12:00 AM – 12:00 AM Midnight",
         generatedAt: new Date().toISOString(),
         rows: entries.map((e) => ({
           id: e.id,
@@ -304,8 +354,13 @@ export async function GET(request: Request) {
 
     // 4. F&B SALES REPORT
     if (reportType === "FNB") {
+      const orderWhere: any = { propertyId };
+      if (dateFilter) {
+        orderWhere.createdAt = dateFilter;
+      }
+
       const orders = await prisma.order.findMany({
-        where: { propertyId },
+        where: orderWhere,
         include: {
           outlet: true,
           table: true,
@@ -316,6 +371,7 @@ export async function GET(request: Request) {
 
       return NextResponse.json({
         reportType,
+        dayCycle: "12:00 AM – 12:00 AM Midnight",
         generatedAt: new Date().toISOString(),
         rows: orders.map((o) => ({
           orderNo: o.orderNo,
