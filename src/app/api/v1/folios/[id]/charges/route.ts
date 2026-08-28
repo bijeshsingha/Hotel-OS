@@ -8,17 +8,18 @@ export async function POST(
   try {
     const { id: folioId } = await params;
     const body = await request.json();
-    const { folioWindowId, chargeCode, description, amount, qty, isInclusive, sacHsn, actorId } = body;
+    const { folioWindowId, chargeCode, description, amount, qty, isInclusive, sacHsn, customTaxRate, actorId } = body;
 
     const entry = await postManualFolioCharge({
       folioId,
       folioWindowId,
-      chargeCode: chargeCode || "MISC",
+      chargeCode: chargeCode || "RESTAURANT_FOOD",
       description,
       amount: Number(amount),
       qty: Number(qty) || 1,
-      isInclusive: Boolean(isInclusive),
-      sacHsn,
+      isInclusive: isInclusive !== undefined ? Boolean(isInclusive) : true,
+      sacHsn: sacHsn || "996331",
+      customTaxRate: customTaxRate !== undefined ? Number(customTaxRate) : 5,
       actorId,
     });
 

@@ -250,7 +250,7 @@ function BillingContent() {
   const totalPayments = payments.reduce((acc: number, p: any) => acc + (p.amount || 0), 0);
   const currentBalance = folioData ? (folioData.balance ?? (totalCharges - totalPayments)) : 0;
 
-  // Post Manual / Restaurant Charge
+  // Post Manual / Restaurant Charge (5% GST Inclusive)
   const handlePostCharge = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!folioData) return;
@@ -268,12 +268,13 @@ function BillingContent() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           folioWindowId: folioData.windows[0].id,
-          chargeCode: chargeForm.chargeCode || (chargeForm.sacHsn === "996331" ? "RESTAURANT_FOOD" : "MANUAL"),
-          description: chargeForm.description,
+          chargeCode: chargeForm.chargeCode || "RESTAURANT_FOOD",
+          description: chargeForm.description || "Dinner Service Bill",
           qty: 1,
           amount: numAmt,
-          isInclusive: false,
-          sacHsn: chargeForm.sacHsn,
+          isInclusive: true,
+          sacHsn: chargeForm.sacHsn || "996331",
+          customTaxRate: 5,
         }),
       });
 
@@ -1000,9 +1001,9 @@ function BillingContent() {
                       className="h-9 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700/80 px-3 text-xs text-zinc-900 dark:text-zinc-200 focus:outline-none focus:border-blue-500 font-mono font-semibold"
                     >
                       <option value="ALL">All Categories</option>
-                      <option value="ROOM_TARIFF">🛏️ Room Tariffs (12%)</option>
+                      <option value="ROOM_TARIFF">🛏️ Room Tariffs (5%)</option>
                       <option value="RESTAURANT_FOOD">🍽️ Restaurant F&B (5%)</option>
-                      <option value="MANUAL">🧺 Laundry & Services</option>
+                      <option value="MANUAL">🧺 Laundry & Services (5%)</option>
                     </select>
                   </div>
                 </div>
@@ -1045,7 +1046,7 @@ function BillingContent() {
                                       : "bg-purple-100 dark:bg-purple-950/60 text-purple-800 dark:text-purple-300 border border-purple-300 dark:border-purple-700"
                                   }`}
                                 >
-                                  {isDiscount ? "Discount" : isFood ? "🍽️ F&B 5%" : isRoom ? "🛏️ Room 12%" : "🧺 Service"}
+                                  {isDiscount ? "Discount" : isFood ? "🍽️ F&B 5%" : isRoom ? "🛏️ Room 5%" : "🧺 Service 5%"}
                                 </span>
                               </div>
                             </td>
@@ -1219,11 +1220,11 @@ function BillingContent() {
       </div>
 
       {/* ========================================================================= */}
-      {/* 🍲 POST CHARGE MODAL (ENHANCED FOR RESTAURANT F&B & ROOM CHARGES)        */}
+      {/* 🍲 POST CHARGE MODAL (CLEAN DROPDOWN & 5% GST INCLUSIVE)                   */}
       {/* ========================================================================= */}
       {showManualChargeModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in">
-          <div className="w-full max-w-lg rounded-3xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-[#121215] p-6 shadow-2xl space-y-5 text-zinc-900 dark:text-white">
+          <div className="w-full max-w-md rounded-3xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-[#121215] p-5 sm:p-6 shadow-2xl space-y-4 text-zinc-900 dark:text-white">
             <div className="flex items-center justify-between pb-3 border-b border-zinc-200 dark:border-zinc-800">
               <div>
                 <h2 className="text-base font-bold text-zinc-900 dark:text-white flex items-center gap-2">
@@ -1234,142 +1235,77 @@ function BillingContent() {
                   Guest: {activeStay?.primaryGuest?.name || "In-House Guest"}
                 </p>
               </div>
-              <button onClick={() => setShowManualChargeModal(false)} className="text-zinc-400 hover:text-zinc-700 dark:hover:text-white">
+              <button
+                onClick={() => setShowManualChargeModal(false)}
+                className="text-zinc-400 hover:text-zinc-700 dark:hover:text-white cursor-pointer"
+              >
                 <X className="h-5 w-5" />
               </button>
             </div>
 
-            {/* Quick Category Selector */}
-            <div className="space-y-2">
-              <label className="text-xs uppercase font-bold font-mono text-zinc-500 tracking-wider">
-                Charge Category
-              </label>
-              <div className="grid grid-cols-3 gap-2.5">
-                <button
-                  type="button"
-                  onClick={() =>
-                    setChargeForm({
-                      chargeCode: "RESTAURANT_FOOD",
-                      description: "Dinner Service Bill",
-                      amount: chargeForm.amount || "650",
-                      sacHsn: "996331",
-                    })
-                  }
-                  className={`p-3 rounded-2xl border-2 text-left font-bold transition flex items-center gap-2.5 ${
-                    chargeForm.sacHsn === "996331"
-                      ? "bg-amber-50 dark:bg-amber-950/50 border-amber-500 text-amber-900 dark:text-amber-200 shadow-sm"
-                      : "bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300"
-                  }`}
-                >
-                  <span className="text-xl">🍽️</span>
-                  <div>
-                    <span className="block text-xs font-black">F&B Dining</span>
-                    <span className="text-[11px] font-mono text-amber-600 dark:text-amber-400 font-bold">5% GST</span>
-                  </div>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() =>
-                    setChargeForm({
-                      chargeCode: "ROOM_TARIFF",
-                      description: "Extra Bed & Stay Extension",
-                      amount: chargeForm.amount || "1000",
-                      sacHsn: "996311",
-                    })
-                  }
-                  className={`p-3 rounded-2xl border-2 text-left font-bold transition flex items-center gap-2.5 ${
-                    chargeForm.sacHsn === "996311"
-                      ? "bg-blue-50 dark:bg-blue-950/50 border-blue-500 text-blue-900 dark:text-blue-200 shadow-sm"
-                      : "bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300"
-                  }`}
-                >
-                  <span className="text-xl">🛏️</span>
-                  <div>
-                    <span className="block text-xs font-black">Room Tariff</span>
-                    <span className="text-[11px] font-mono text-blue-600 dark:text-blue-400 font-bold">12% GST</span>
-                  </div>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() =>
-                    setChargeForm({
-                      chargeCode: "LAUNDRY",
-                      description: "Laundry & Pressing Service",
-                      amount: chargeForm.amount || "300",
-                      sacHsn: "9997",
-                    })
-                  }
-                  className={`p-3 rounded-2xl border-2 text-left font-bold transition flex items-center gap-2.5 ${
-                    chargeForm.sacHsn === "9997"
-                      ? "bg-purple-50 dark:bg-purple-950/50 border-purple-500 text-purple-900 dark:text-purple-200 shadow-sm"
-                      : "bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300"
-                  }`}
-                >
-                  <span className="text-xl">🧺</span>
-                  <div>
-                    <span className="block text-xs font-black">Laundry</span>
-                    <span className="text-[11px] font-mono text-purple-600 dark:text-purple-400 font-bold">18% GST</span>
-                  </div>
-                </button>
-              </div>
-            </div>
-
-            {/* Quick F&B Items Presets when in F&B mode */}
-            {chargeForm.sacHsn === "996331" && (
-              <div className="space-y-2 p-3 rounded-2xl bg-amber-500/10 border border-amber-300/70 dark:border-amber-700/50 text-xs">
-                <span className="text-[11px] font-mono font-black text-amber-900 dark:text-amber-300 uppercase tracking-wider block">
-                  Quick Food & Dining Items (Click to Select)
-                </span>
-                <div className="flex flex-wrap gap-2">
-                  {[
-                    { text: "Dinner Service Bill", amt: "650" },
-                    { text: "Breakfast Spread & Coffee", amt: "350" },
-                    { text: "Lunch Service Bill", amt: "550" },
-                    { text: "In-Room Tea & Snacks", amt: "180" },
-                    { text: "Mineral Water & Beverages", amt: "120" },
-                    { text: "Buffet Dinner", amt: "850" },
-                  ].map((preset) => (
-                    <button
-                      key={preset.text}
-                      type="button"
-                      onClick={() =>
-                        setChargeForm((prev) => ({
-                          ...prev,
-                          description: preset.text,
-                          amount: preset.amt,
-                        }))
-                      }
-                      className="px-3 py-1.5 rounded-xl bg-white dark:bg-zinc-900 border border-amber-300 dark:border-amber-700 text-zinc-900 dark:text-zinc-100 text-xs font-bold hover:bg-amber-100 dark:hover:bg-amber-950/80 transition shadow-xs"
-                    >
-                      {preset.text} (₹{preset.amt})
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
             <form onSubmit={handlePostCharge} className="space-y-4 text-xs sm:text-sm">
+              {/* 1. Single Clean Dropdown for Charge Category */}
               <div>
-                <label className="text-zinc-700 dark:text-zinc-300 font-bold block mb-1.5">
-                  Item / Service Description *
+                <label className="text-xs uppercase font-bold font-mono text-zinc-500 tracking-wider block mb-1.5">
+                  Select Service / Category *
+                </label>
+                <select
+                  value={chargeForm.chargeCode}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    const presets: Record<string, { desc: string; sac: string; defaultAmt: string }> = {
+                      RESTAURANT_FOOD: { desc: "Dinner Service Bill", sac: "996331", defaultAmt: "650" },
+                      ROOM_TARIFF: { desc: "Extra Bed / Stay Extension", sac: "996311", defaultAmt: "1000" },
+                      LAUNDRY: { desc: "Laundry & Pressing Service", sac: "9997", defaultAmt: "300" },
+                      TRANSPORT: { desc: "Cab / Airport Pick & Drop", sac: "9964", defaultAmt: "800" },
+                      MISC: { desc: "Miscellaneous Guest Service", sac: "9999", defaultAmt: "250" },
+                    };
+                    const selected = presets[val] || { desc: "Guest Service Charge", sac: "996331", defaultAmt: "500" };
+                    setChargeForm({
+                      ...chargeForm,
+                      chargeCode: val,
+                      sacHsn: selected.sac,
+                      description: selected.desc,
+                      amount: chargeForm.amount || selected.defaultAmt,
+                    });
+                  }}
+                  className="w-full h-11 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 px-3.5 text-xs sm:text-sm text-zinc-900 dark:text-white font-semibold focus:outline-none focus:border-blue-500 transition cursor-pointer"
+                >
+                  <option value="RESTAURANT_FOOD">🍽️ Restaurant & In-Room Dining (5% GST)</option>
+                  <option value="ROOM_TARIFF">🛏️ Room Tariff / Extension (5% GST)</option>
+                  <option value="LAUNDRY">🧺 Laundry & Valet Service (5% GST)</option>
+                  <option value="TRANSPORT">🚗 Travel / Cab / Transfer (5% GST)</option>
+                  <option value="MISC">📦 Miscellaneous Guest Service (5% GST)</option>
+                </select>
+              </div>
+
+              {/* 2. Editable Description */}
+              <div>
+                <label className="text-xs uppercase font-bold font-mono text-zinc-500 tracking-wider block mb-1.5">
+                  Description / Item Details *
                 </label>
                 <input
                   type="text"
                   required
-                  placeholder="e.g. Restaurant Dinner Bill #1042 / KOT #55"
+                  placeholder="e.g. Dinner Service Bill #1042 / KOT #55"
                   value={chargeForm.description}
                   onChange={(e) => setChargeForm({ ...chargeForm, description: e.target.value })}
-                  className="w-full h-11 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 px-3.5 text-sm text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:border-blue-500 font-medium"
+                  className="w-full h-11 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 px-3.5 text-xs sm:text-sm text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:border-blue-500 font-medium transition"
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-zinc-700 dark:text-zinc-300 font-bold block mb-1.5">
-                    Taxable Base Amount (₹) *
+              {/* 3. Total Amount (Inclusive of 5% GST) */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-xs uppercase font-bold font-mono text-zinc-500 tracking-wider">
+                    Total Amount (₹) *
                   </label>
+                  <span className="text-[10.5px] font-mono font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-300 dark:border-emerald-800">
+                    ✓ 5% GST Inclusive
+                  </span>
+                </div>
+                <div className="relative">
+                  <span className="absolute left-3.5 top-2.5 font-bold text-zinc-400 font-mono text-base">₹</span>
                   <input
                     type="number"
                     required
@@ -1378,73 +1314,68 @@ function BillingContent() {
                     placeholder="0.00"
                     value={chargeForm.amount}
                     onChange={(e) => setChargeForm({ ...chargeForm, amount: e.target.value })}
-                    className="w-full h-11 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 px-3.5 text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-blue-500 font-mono font-black"
+                    className="w-full h-11 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 pl-8 pr-3.5 text-base text-zinc-900 dark:text-white focus:outline-none focus:border-blue-500 font-mono font-black transition"
                   />
-                </div>
-                <div>
-                  <label className="text-zinc-700 dark:text-zinc-300 font-bold block mb-1.5">
-                    SAC Code & GST Rate *
-                  </label>
-                  <select
-                    value={chargeForm.sacHsn}
-                    onChange={(e) => setChargeForm({ ...chargeForm, sacHsn: e.target.value })}
-                    className="w-full h-11 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 px-3 text-xs sm:text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-blue-500 font-mono font-bold"
-                  >
-                    <option value="996331">SAC 996331 — Restaurant F&B (5% GST)</option>
-                    <option value="996311">SAC 996311 — Accommodation (12% GST)</option>
-                    <option value="9997">SAC 9997 — Laundry & Services (18% GST)</option>
-                    <option value="9964">SAC 9964 — Passenger Transport (5% GST)</option>
-                    <option value="9999">SAC 9999 — Miscellaneous (18% GST)</option>
-                  </select>
                 </div>
               </div>
 
-              {/* Live GST Math Preview */}
+              {/* 4. Live 5% GST Inclusive Math Breakdown */}
               {(() => {
-                const base = Number(chargeForm.amount) || 0;
-                let taxRate = 0.05;
-                if (chargeForm.sacHsn === "996311") taxRate = 0.12;
-                else if (chargeForm.sacHsn === "9997" || chargeForm.sacHsn === "9999") taxRate = 0.18;
-                else if (chargeForm.sacHsn === "9964") taxRate = 0.05;
-
-                const tax = Math.round(base * taxRate * 100) / 100;
-                const total = Math.round((base + tax) * 100) / 100;
+                const gross = Number(chargeForm.amount) || 0;
+                const baseTaxable = Math.round((gross / 1.05) * 100) / 100;
+                const totalGst = Math.round((gross - baseTaxable) * 100) / 100;
+                const cgst = Math.round((totalGst / 2) * 100) / 100;
+                const sgst = Math.round((totalGst - cgst) * 100) / 100;
 
                 return (
-                  <div className="p-4 rounded-2xl bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
-                    <div>
-                      <span className="text-xs text-zinc-500 block font-mono font-medium">
-                        Base: ₹{base.toFixed(2)} + GST ({(taxRate * 100).toFixed(0)}%): ₹{tax.toFixed(2)}
-                      </span>
-                      <span className="text-[11px] text-zinc-400 font-mono">
-                        (CGST {((taxRate / 2) * 100).toFixed(1)}% + SGST {((taxRate / 2) * 100).toFixed(1)}%)
+                  <div className="p-3.5 rounded-2xl bg-zinc-50 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 space-y-2.5">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-mono text-zinc-500 font-medium">Tax Calculation (5% Inclusive):</span>
+                      <span className="font-mono text-[11px] text-zinc-600 dark:text-zinc-400">
+                        CGST 2.5% + SGST 2.5%
                       </span>
                     </div>
-                    <div className="text-right font-mono">
-                      <span className="text-[10px] text-zinc-500 block uppercase font-bold">Total Post Amount</span>
-                      <span className="text-lg font-black text-emerald-600 dark:text-emerald-400">
-                        {formatINR(total)}
+
+                    <div className="grid grid-cols-3 gap-2 text-center text-xs font-mono">
+                      <div className="bg-white dark:bg-zinc-800/80 p-2 rounded-xl border border-zinc-200 dark:border-zinc-700/60 shadow-xs">
+                        <span className="text-[10px] text-zinc-400 block uppercase">Base Taxable</span>
+                        <span className="font-bold text-zinc-900 dark:text-white">{formatINR(baseTaxable)}</span>
+                      </div>
+                      <div className="bg-white dark:bg-zinc-800/80 p-2 rounded-xl border border-zinc-200 dark:border-zinc-700/60 shadow-xs">
+                        <span className="text-[10px] text-zinc-400 block uppercase">CGST (2.5%)</span>
+                        <span className="font-bold text-zinc-900 dark:text-white">{formatINR(cgst)}</span>
+                      </div>
+                      <div className="bg-white dark:bg-zinc-800/80 p-2 rounded-xl border border-zinc-200 dark:border-zinc-700/60 shadow-xs">
+                        <span className="text-[10px] text-zinc-400 block uppercase">SGST (2.5%)</span>
+                        <span className="font-bold text-zinc-900 dark:text-white">{formatINR(sgst)}</span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-2 border-t border-zinc-200 dark:border-zinc-800">
+                      <span className="text-xs font-bold text-zinc-700 dark:text-zinc-300">Total Posted to Room:</span>
+                      <span className="text-base sm:text-lg font-black font-mono text-emerald-600 dark:text-emerald-400">
+                        {formatINR(gross)}
                       </span>
                     </div>
                   </div>
                 );
               })()}
 
-              <div className="pt-3 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-end gap-3">
+              <div className="pt-2 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-end gap-2.5">
                 <button
                   type="button"
                   onClick={() => setShowManualChargeModal(false)}
-                  className="h-11 px-5 rounded-xl text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white font-bold"
+                  className="h-10 px-4 rounded-xl text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white font-bold cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={actionLoading}
-                  className="h-11 px-6 rounded-xl bg-zinc-900 text-white hover:bg-zinc-800 dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-200 font-black transition disabled:opacity-50 shadow-md flex items-center gap-2"
+                  className="h-10 px-5 rounded-xl bg-zinc-900 text-white hover:bg-zinc-800 dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-200 font-black transition disabled:opacity-50 shadow-md flex items-center gap-1.5 cursor-pointer"
                 >
                   <Plus className="h-4 w-4" />
-                  {actionLoading ? "Posting..." : "Confirm & Post to Folio"}
+                  <span>{actionLoading ? "Posting..." : "Post Charge (5% GST)"}</span>
                 </button>
               </div>
             </form>

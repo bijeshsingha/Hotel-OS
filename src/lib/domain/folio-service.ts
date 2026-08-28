@@ -9,8 +9,9 @@ export async function postManualFolioCharge({
   description,
   amount,
   qty = 1,
-  isInclusive = false,
-  sacHsn = "996311",
+  isInclusive = true,
+  sacHsn = "996331",
+  customTaxRate = 5,
   actorId,
 }: {
   folioId: string;
@@ -21,6 +22,7 @@ export async function postManualFolioCharge({
   qty?: number;
   isInclusive?: boolean;
   sacHsn?: string;
+  customTaxRate?: number;
   actorId?: string;
 }) {
   const folio = await prisma.folio.findUniqueOrThrow({
@@ -45,6 +47,7 @@ export async function postManualFolioCharge({
     grossOrBaseAmount: totalBase,
     isInclusive,
     sacHsn,
+    customTaxRate: customTaxRate !== undefined ? customTaxRate : 5,
     supplierStateCode: folio.property.stateCode || "18",
   });
 
