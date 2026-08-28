@@ -154,17 +154,102 @@ label {
 }
 
 td, th {
-  padding-top: 0.5rem;
-  padding-bottom: 0.5rem;
+  padding-top: 0.4rem;
+  padding-bottom: 0.4rem;
 }
 
 .backdrop-blur-sm {
   backdrop-filter: blur(6px);
 }
 
+/* ================================================================
+   HIGH-PRECISION PRINT CSS (RULE 46 STATUTORY TAX INVOICE)
+   ================================================================ */
+
+@page {
+  size: A4 portrait;
+  margin: 8mm 10mm 8mm 10mm;
+}
+
 @media print {
-  html { font-size: 12px; }
-  button, [role="button"] { min-height: auto; }
-  input, select, textarea { min-height: auto; font-size: inherit; }
-  td, th { padding: 2px 4px; }
+  *, *::before, *::after {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+
+  html, body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    width: 100% !important;
+    height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    font-size: 11px !important;
+    line-height: 1.3 !important;
+  }
+
+  /* Hide app shell, sidebar, and non-printable elements */
+  aside, nav, header, [role="navigation"], .no-print, .print\:hidden {
+    display: none !important;
+  }
+
+  /* Reset print container to fit A4 exactly */
+  .print-modal-overlay {
+    position: static !important;
+    inset: auto !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: transparent !important;
+    backdrop-filter: none !important;
+    overflow: visible !important;
+  }
+
+  .print-invoice-sheet {
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    page-break-after: avoid !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  .print-invoice-sheet * {
+    color: #000000 !important;
+    border-color: #18181b !important;
+  }
+
+  .print-invoice-sheet .bg-zinc-100,
+  .print-invoice-sheet .bg-zinc-50 {
+    background-color: #f4f4f5 !important;
+  }
+
+  .page-break-avoid {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  td, th {
+    padding: 2px 4px !important;
+  }
+
+  button, [role="button"] {
+    min-height: auto;
+  }
+
+  input, select, textarea {
+    min-height: auto;
+    font-size: inherit;
+  }
 }

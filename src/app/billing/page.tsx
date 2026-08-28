@@ -1916,19 +1916,19 @@ function BillingContent() {
       )}
 
       {/* ========================================================================= */}
-      {/* 📄 HIGH-FIDELITY PRINTABLE TAX INVOICE MODAL                               */}
+      {/* 📄 HIGH-FIDELITY PRINTABLE TAX INVOICE MODAL (1-PAGE A4 GUARANTEE)         */}
       {/* ========================================================================= */}
       {showInvoiceModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-2 sm:p-4 overflow-y-auto print:p-0 print:bg-white">
-          <div className="w-full max-w-4xl rounded-3xl border border-zinc-700 bg-white text-zinc-900 p-6 sm:p-8 shadow-2xl space-y-5 print:p-0 print:border-none print:shadow-none print:w-full print:max-w-none">
+        <div className="print-modal-overlay fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-2 sm:p-4 overflow-y-auto print:p-0 print:bg-white print:static print:overflow-visible">
+          <div className="print-invoice-sheet w-full max-w-3xl xl:max-w-4xl rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white text-zinc-900 p-4 sm:p-6 shadow-2xl space-y-3.5 print:p-0 print:border-none print:shadow-none print:w-full print:max-w-none print:space-y-2.5 max-h-[94vh] overflow-y-auto print:max-h-none print:overflow-visible">
             
             {/* Top Toolbar (Hidden when printing) */}
-            <div className="flex items-center justify-between pb-3 border-b border-zinc-200 print:hidden">
-              <div className="flex items-center gap-2.5">
+            <div className="flex items-center justify-between pb-2.5 border-b border-zinc-200 print:hidden no-print">
+              <div className="flex items-center gap-2">
                 <span className="text-xs font-black uppercase font-mono tracking-wider text-zinc-700">
                   {isLiveTaxBillView ? "Live Folio Tax Invoice (Rule 46)" : "Official Tax Invoice"}
                 </span>
-                <span className="rounded-md bg-emerald-100 text-emerald-800 border border-emerald-300 px-2 py-0.5 text-xs font-mono font-bold">
+                <span className="rounded-md bg-emerald-100 text-emerald-800 border border-emerald-300 px-2 py-0.5 text-[11px] font-mono font-bold">
                   Verified GST Tax Invoice
                 </span>
               </div>
@@ -1936,27 +1936,27 @@ function BillingContent() {
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => window.print()}
-                  className="h-10 px-5 rounded-xl bg-zinc-950 hover:bg-zinc-800 text-white text-xs font-extrabold transition shadow flex items-center gap-2"
+                  className="h-9 px-4 rounded-xl bg-zinc-950 hover:bg-zinc-800 text-white text-xs font-extrabold transition shadow flex items-center gap-1.5 cursor-pointer"
                 >
-                  <Printer className="h-4 w-4" /> Print Tax Invoice
+                  <Printer className="h-3.5 w-3.5" /> Print Tax Invoice
                 </button>
-                <button onClick={() => setShowInvoiceModal(false)} className="text-zinc-500 hover:text-zinc-900 p-2">
+                <button onClick={() => setShowInvoiceModal(false)} className="text-zinc-500 hover:text-zinc-900 p-1.5 cursor-pointer">
                   <X className="h-5 w-5" />
                 </button>
               </div>
             </div>
 
             {/* PRINTABLE TAX INVOICE DOCUMENT */}
-            <div className="space-y-4 text-xs text-zinc-900 font-sans print:text-black">
+            <div className="space-y-2.5 text-xs text-zinc-900 font-sans print:text-black leading-snug">
               {/* Header: Hotel Identity & GST */}
-              <div className="text-center pb-2 border-b border-zinc-900">
-                <h1 className="text-xl sm:text-2xl font-black tracking-wide uppercase">
+              <div className="text-center pb-1.5 border-b border-zinc-900">
+                <h1 className="text-lg sm:text-xl font-black tracking-wide uppercase">
                   Tax Invoice
                 </h1>
-                <div className="text-sm font-bold text-zinc-800 uppercase mt-0.5">
+                <div className="text-xs font-bold text-zinc-800 uppercase mt-0.5">
                   {activeProperty?.legalName || activeProperty?.displayName || "Hotel Ambarish Grand Residency"}
                 </div>
-                <div className="text-[11px] text-zinc-600 font-mono mt-0.5">
+                <div className="text-[10.5px] text-zinc-600 font-mono mt-0.5">
                   {activeProperty?.address || "MD Shah Road, Paltan Bazar, Guwahati, Assam - 781008"} | GSTIN: {activeProperty?.gstin || "18AACCB2447F1ZX"} | State Code: {activeProperty?.stateCode || "18"}
                 </div>
               </div>
@@ -1973,62 +1973,64 @@ function BillingContent() {
 
                 const companyName = activeStay?.primaryGuest?.companyName || btcSnapshot?.companyName || "—";
                 const companyGstin = activeStay?.primaryGuest?.gstin || btcSnapshot?.gstin || "—";
-                const billNo = selectedInvoice?.invoiceNo || (activeStay?.folio?.invoices?.[0]?.invoiceNo) || `INV-2627-${activeStay?.id?.slice(-4) || "0102"}`;
+                const roomNo = activeStay?.roomAssignments?.[0]?.room?.number || "206";
+                const billNo = selectedInvoice?.invoiceNo || (activeStay?.folio?.invoices?.[0]?.invoiceNo) || `INV-2627-0${roomNo}`;
+                const grcNo = `GRC-2627-0${roomNo}`;
 
                 return (
-                  <div className="border border-zinc-900 p-3.5 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5 font-mono text-xs leading-relaxed">
+                  <div className="border border-zinc-900 p-2.5 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 font-mono text-[11px] leading-tight">
                     {/* Left Column */}
-                    <div className="space-y-1">
+                    <div className="space-y-0.5">
                       <div className="flex">
-                        <span className="w-32 font-bold text-zinc-800 shrink-0">Bill / Inv No.</span>
+                        <span className="w-28 font-bold text-zinc-800 shrink-0">Bill / Inv No.</span>
                         <span className="font-bold text-zinc-950">: {billNo}</span>
                       </div>
                       <div className="flex">
-                        <span className="w-32 font-bold text-zinc-800 shrink-0">Guest Name</span>
+                        <span className="w-28 font-bold text-zinc-800 shrink-0">Guest Name</span>
                         <span className="font-bold uppercase text-zinc-950">: {activeStay?.primaryGuest?.name || "JAMUNA SINGHA"}</span>
                       </div>
                       <div className="flex">
-                        <span className="w-32 font-bold text-zinc-800 shrink-0">Address</span>
+                        <span className="w-28 font-bold text-zinc-800 shrink-0">Address</span>
                         <span>: {activeStay?.primaryGuest?.city ? `${activeStay.primaryGuest.city}, ${activeStay.primaryGuest.state || "ASSAM"}` : "ASSAM / INDIA"}</span>
                       </div>
                       <div className="flex">
-                        <span className="w-32 font-bold text-zinc-800 shrink-0">Contact No.</span>
+                        <span className="w-28 font-bold text-zinc-800 shrink-0">Contact No.</span>
                         <span>: {activeStay?.primaryGuest?.phone || "—"}</span>
                       </div>
                       <div className="flex">
-                        <span className="w-32 font-bold text-zinc-800 shrink-0">Company</span>
+                        <span className="w-28 font-bold text-zinc-800 shrink-0">Company</span>
                         <span className="font-bold">: {companyName}</span>
                       </div>
                       <div className="flex">
-                        <span className="w-32 font-bold text-zinc-800 shrink-0">Company GSTIN</span>
+                        <span className="w-28 font-bold text-zinc-800 shrink-0">Company GST</span>
                         <span className="font-mono">: {companyGstin}</span>
                       </div>
                     </div>
 
                     {/* Right Column */}
-                    <div className="space-y-1">
+                    <div className="space-y-0.5">
                       <div className="flex">
-                        <span className="w-36 font-bold text-zinc-800 shrink-0">Date & Time</span>
+                        <span className="w-32 font-bold text-zinc-800 shrink-0">Date & Time</span>
                         <span>: {new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })} {new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}</span>
                       </div>
                       <div className="flex">
-                        <span className="w-36 font-bold text-zinc-800 shrink-0">Room No.</span>
-                        <span className="font-bold text-sm">: {activeStay?.roomAssignments?.[0]?.room?.number || "206"}</span>
+                        <span className="w-32 font-bold text-zinc-800 shrink-0">Room No.</span>
+                        <span className="font-bold text-xs">: {roomNo}</span>
                       </div>
                       <div className="flex">
-                        <span className="w-36 font-bold text-zinc-800 shrink-0">GRC / Regn. No.</span>
-                        <span>: GRC-2627-{activeStay?.id?.slice(-4) || "0102"}</span>
+                        <span className="w-32 font-bold text-zinc-800 shrink-0">GRC / Regn. No.</span>
+                        <span>: {grcNo}</span>
                       </div>
                       <div className="flex">
-                        <span className="w-36 font-bold text-zinc-800 shrink-0">Arrival Date</span>
+                        <span className="w-32 font-bold text-zinc-800 shrink-0">Arrival Date</span>
                         <span>: {activeStay?.arrivalAt ? new Date(activeStay.arrivalAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : "—"}</span>
                       </div>
                       <div className="flex">
-                        <span className="w-36 font-bold text-zinc-800 shrink-0">Departure Date</span>
+                        <span className="w-32 font-bold text-zinc-800 shrink-0">Departure Date</span>
                         <span>: {new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}</span>
                       </div>
                       <div className="flex">
-                        <span className="w-36 font-bold text-zinc-800 shrink-0">Pax / Occupancy</span>
+                        <span className="w-32 font-bold text-zinc-800 shrink-0">Pax / Occupancy</span>
                         <span>: {activeStay?.adults || 1} Adult{activeStay?.adults > 1 ? "s" : ""}</span>
                       </div>
                     </div>
@@ -2038,44 +2040,45 @@ function BillingContent() {
 
               {/* 2. DATE-WISE CHARGES BREAKDOWN TABLE */}
               <div className="border border-zinc-900 overflow-hidden">
-                <table className="w-full text-left font-mono text-xs border-collapse">
+                <table className="w-full text-left font-mono text-[11px] border-collapse">
                   <thead className="border-b border-zinc-900 bg-zinc-100 font-bold">
                     <tr>
-                      <th className="p-2 border-r border-zinc-400 w-24">Date</th>
-                      <th className="p-2 border-r border-zinc-400">Description / Service</th>
-                      <th className="p-2 border-r border-zinc-400 w-20 text-center">SAC/HSN</th>
-                      <th className="p-2 border-r border-zinc-400 text-right w-24">Taxable (₹)</th>
-                      <th className="p-2 border-r border-zinc-400 text-right w-20">CGST (₹)</th>
-                      <th className="p-2 border-r border-zinc-400 text-right w-20">SGST (₹)</th>
-                      <th className="p-2 text-right w-28">Total (₹)</th>
+                      <th className="p-1.5 border-r border-zinc-400 w-28 whitespace-nowrap">Date</th>
+                      <th className="p-1.5 border-r border-zinc-400">Description / Service</th>
+                      <th className="p-1.5 border-r border-zinc-400 w-20 text-center">SAC/HSN</th>
+                      <th className="p-1.5 border-r border-zinc-400 text-right w-24">Taxable (₹)</th>
+                      <th className="p-1.5 border-r border-zinc-400 text-right w-18">CGST (₹)</th>
+                      <th className="p-1.5 border-r border-zinc-400 text-right w-18">SGST (₹)</th>
+                      <th className="p-1.5 text-right w-24">Total (₹)</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-zinc-300">
                     {rawEntries.map((e: any) => {
                       const taxHalf = ((e.totalAmount || 0) - (e.taxableAmount || 0)) / 2;
                       const isFood = e.chargeCode?.includes("FOOD") || e.chargeCode?.includes("RESTAURANT");
+                      const dStr = e.serviceDate ? new Date(e.serviceDate).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : (e.createdAt?.slice(0, 10) || "—");
 
                       return (
                         <tr key={e.id} className="hover:bg-zinc-50">
-                          <td className="p-2 border-r border-zinc-300 font-mono text-[11px]">
-                            {e.serviceDate || e.createdAt?.slice(0, 10)}
+                          <td className="p-1.5 border-r border-zinc-300 font-mono whitespace-nowrap text-[10.5px]">
+                            {dStr}
                           </td>
-                          <td className="p-2 border-r border-zinc-300 font-semibold text-zinc-900">
+                          <td className="p-1.5 border-r border-zinc-300 font-medium text-zinc-900 text-xs">
                             {e.description}
                           </td>
-                          <td className="p-2 border-r border-zinc-300 text-center text-[11px]">
+                          <td className="p-1.5 border-r border-zinc-300 text-center text-[10.5px]">
                             {e.sacHsn || (isFood ? "996331" : "996311")}
                           </td>
-                          <td className="p-2 border-r border-zinc-300 text-right tabular-nums">
+                          <td className="p-1.5 border-r border-zinc-300 text-right tabular-nums">
                             {(e.taxableAmount || 0).toFixed(2)}
                           </td>
-                          <td className="p-2 border-r border-zinc-300 text-right tabular-nums">
+                          <td className="p-1.5 border-r border-zinc-300 text-right tabular-nums">
                             {taxHalf.toFixed(2)}
                           </td>
-                          <td className="p-2 border-r border-zinc-300 text-right tabular-nums">
+                          <td className="p-1.5 border-r border-zinc-300 text-right tabular-nums">
                             {taxHalf.toFixed(2)}
                           </td>
-                          <td className="p-2 text-right font-bold tabular-nums">
+                          <td className="p-1.5 text-right font-bold tabular-nums">
                             {(e.totalAmount || 0).toFixed(2)}
                           </td>
                         </tr>
@@ -2084,27 +2087,27 @@ function BillingContent() {
 
                     {rawEntries.length === 0 && (
                       <tr>
-                        <td colSpan={7} className="p-4 text-center text-zinc-500 italic">
+                        <td colSpan={7} className="p-3 text-center text-zinc-500 italic">
                           No charges posted to folio yet.
                         </td>
                       </tr>
                     )}
 
                     {/* Summary Row */}
-                    <tr className="bg-zinc-100 border-t-2 border-zinc-900 font-bold text-xs">
-                      <td className="p-2 border-r border-zinc-400" colSpan={3}>
+                    <tr className="bg-zinc-100 border-t border-zinc-900 font-bold text-[11px]">
+                      <td className="p-1.5 border-r border-zinc-400" colSpan={3}>
                         STAY SUMMARY: {stayCalculations.nights} NIGHT{stayCalculations.nights > 1 ? "S" : ""} DURATION
                       </td>
-                      <td className="p-2 border-r border-zinc-400 text-right tabular-nums">
+                      <td className="p-1.5 border-r border-zinc-400 text-right tabular-nums">
                         {totalTaxable.toFixed(2)}
                       </td>
-                      <td className="p-2 border-r border-zinc-400 text-right tabular-nums">
+                      <td className="p-1.5 border-r border-zinc-400 text-right tabular-nums">
                         {(totalTaxes / 2).toFixed(2)}
                       </td>
-                      <td className="p-2 border-r border-zinc-400 text-right tabular-nums">
+                      <td className="p-1.5 border-r border-zinc-400 text-right tabular-nums">
                         {(totalTaxes / 2).toFixed(2)}
                       </td>
-                      <td className="p-2 text-right font-black tabular-nums">
+                      <td className="p-1.5 text-right font-black tabular-nums">
                         {totalCharges.toFixed(2)}
                       </td>
                     </tr>
@@ -2113,36 +2116,36 @@ function BillingContent() {
               </div>
 
               {/* 3. GST BREAKDOWN & PAYMENTS GRID (LEFT) + TOTALS SUMMARY BOX (RIGHT) */}
-              <div className="grid grid-cols-1 sm:grid-cols-12 gap-4 pt-1 items-start">
+              <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 pt-0.5 items-start page-break-avoid">
                 
                 {/* Left Block: GST Slab Breakdown & Payment Receipts List */}
-                <div className="sm:col-span-7 space-y-3.5">
+                <div className="sm:col-span-7 space-y-2.5">
                   
                   {/* GST Table */}
                   <div className="border border-zinc-900 overflow-hidden">
-                    <table className="w-full text-left font-mono text-xs border-collapse">
+                    <table className="w-full text-left font-mono text-[10.5px] border-collapse">
                       <thead className="bg-zinc-100 border-b border-zinc-900 font-bold">
                         <tr>
-                          <th className="p-1.5 border-r border-zinc-400">GST Slab</th>
-                          <th className="p-1.5 border-r border-zinc-400 text-right">Taxable Amt</th>
-                          <th className="p-1.5 border-r border-zinc-400 text-right">CGST</th>
-                          <th className="p-1.5 border-r border-zinc-400 text-right">SGST</th>
-                          <th className="p-1.5 text-right font-black">Total Amt</th>
+                          <th className="p-1 border-r border-zinc-400">GST Slab</th>
+                          <th className="p-1 border-r border-zinc-400 text-right">Taxable Amt</th>
+                          <th className="p-1 border-r border-zinc-400 text-right">CGST</th>
+                          <th className="p-1 border-r border-zinc-400 text-right">SGST</th>
+                          <th className="p-1 text-right font-black">Total Amt</th>
                         </tr>
                       </thead>
                       <tbody>
                         <tr>
-                          <td className="p-1.5 border-r border-zinc-300 font-bold">GST 5.00%</td>
-                          <td className="p-1.5 border-r border-zinc-300 text-right tabular-nums">
+                          <td className="p-1 border-r border-zinc-300 font-bold">GST 5.00%</td>
+                          <td className="p-1 border-r border-zinc-300 text-right tabular-nums">
                             {totalTaxable.toFixed(2)}
                           </td>
-                          <td className="p-1.5 border-r border-zinc-300 text-right tabular-nums">
+                          <td className="p-1 border-r border-zinc-300 text-right tabular-nums">
                             {(totalTaxes / 2).toFixed(2)}
                           </td>
-                          <td className="p-1.5 border-r border-zinc-300 text-right tabular-nums">
+                          <td className="p-1 border-r border-zinc-300 text-right tabular-nums">
                             {(totalTaxes / 2).toFixed(2)}
                           </td>
-                          <td className="p-1.5 text-right font-bold tabular-nums">
+                          <td className="p-1 text-right font-bold tabular-nums">
                             {totalCharges.toFixed(2)}
                           </td>
                         </tr>
@@ -2152,34 +2155,35 @@ function BillingContent() {
 
                   {/* Payment Receipts Breakdown Table */}
                   <div className="border border-zinc-900 overflow-hidden">
-                    <table className="w-full text-left font-mono text-[11px] border-collapse">
+                    <table className="w-full text-left font-mono text-[10.5px] border-collapse">
                       <thead className="bg-zinc-100 border-b border-zinc-900 font-bold">
                         <tr>
-                          <th className="p-1.5 border-r border-zinc-400 w-20">Date</th>
-                          <th className="p-1.5 border-r border-zinc-400 w-28">Receipt #</th>
-                          <th className="p-1.5 border-r border-zinc-400">Mode / Channel</th>
-                          <th className="p-1.5 border-r border-zinc-400">Ledger / Ref</th>
-                          <th className="p-1.5 text-right w-24">Amount (₹)</th>
+                          <th className="p-1 border-r border-zinc-400 w-24">Date</th>
+                          <th className="p-1 border-r border-zinc-400 w-28">Receipt #</th>
+                          <th className="p-1 border-r border-zinc-400">Mode / Channel</th>
+                          <th className="p-1 border-r border-zinc-400">Ledger / Ref</th>
+                          <th className="p-1 text-right w-24">Amount (₹)</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-zinc-300">
                         {payments.map((p: any) => {
                           const isBTC = p.method === "DIRECT_BILL";
+                          const pDate = p.receivedAt ? new Date(p.receivedAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : "—";
                           return (
                             <tr key={p.id}>
-                              <td className="p-1.5 border-r border-zinc-300">
-                                {p.receivedAt?.slice(0, 10)}
+                              <td className="p-1 border-r border-zinc-300 whitespace-nowrap">
+                                {pDate}
                               </td>
-                              <td className="p-1.5 border-r border-zinc-300 font-bold text-zinc-900">
+                              <td className="p-1 border-r border-zinc-300 font-bold text-zinc-900">
                                 {p.receiptNo}
                               </td>
-                              <td className="p-1.5 border-r border-zinc-300 font-bold">
+                              <td className="p-1 border-r border-zinc-300 font-bold">
                                 {isBTC ? "BTC / DIRECT BILL" : p.method}
                               </td>
-                              <td className="p-1.5 border-r border-zinc-300 text-zinc-700 truncate max-w-[140px]">
+                              <td className="p-1 border-r border-zinc-300 text-zinc-700 truncate max-w-[130px]">
                                 {isBTC ? "Company Ledger" : p.reference || "Bank / Cash"}
                               </td>
-                              <td className="p-1.5 text-right font-bold text-emerald-700 tabular-nums">
+                              <td className="p-1 text-right font-bold text-emerald-700 tabular-nums">
                                 {(p.amount || 0).toFixed(2)}
                               </td>
                             </tr>
@@ -2187,7 +2191,7 @@ function BillingContent() {
                         })}
                         {payments.length === 0 && (
                           <tr>
-                            <td colSpan={5} className="p-2.5 text-center text-zinc-500 italic">
+                            <td colSpan={5} className="p-2 text-center text-zinc-500 italic">
                               No payments or advances recorded yet
                             </td>
                           </tr>
@@ -2198,11 +2202,11 @@ function BillingContent() {
                 </div>
 
                 {/* Right Block: Totals Calculation Summary Box */}
-                <div className="sm:col-span-5 flex flex-col justify-between font-mono text-xs border-2 border-zinc-900 p-4 bg-zinc-50 space-y-3">
-                  <div className="space-y-2">
-                    <div className="flex justify-between font-bold text-zinc-900 text-sm">
+                <div className="sm:col-span-5 flex flex-col justify-between font-mono text-[11px] border border-zinc-900 p-2.5 bg-zinc-50 space-y-2">
+                  <div className="space-y-1">
+                    <div className="flex justify-between font-bold text-zinc-900 text-xs">
                       <span>Gross Bill Amount</span>
-                      <span className="font-black text-base">{totalCharges.toFixed(2)}</span>
+                      <span className="font-black text-sm">{totalCharges.toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between text-zinc-700">
                       <span>Less Advance / Settled</span>
@@ -2218,15 +2222,15 @@ function BillingContent() {
                     </div>
                   </div>
 
-                  <div className="border-t-2 border-zinc-900 pt-2.5">
-                    <div className="flex justify-between font-black text-lg text-zinc-950 items-baseline">
+                  <div className="border-t border-zinc-900 pt-1.5">
+                    <div className="flex justify-between font-black text-base text-zinc-950 items-baseline">
                       <span>Net Balance Due</span>
                       <span className={currentBalance > 0.5 ? "text-rose-600" : "text-emerald-700"}>
                         ₹ {Math.max(0, currentBalance).toFixed(2)}
                       </span>
                     </div>
                     {currentBalance <= 0.5 && (
-                      <div className="text-[10px] text-emerald-700 font-bold text-right uppercase tracking-wider mt-0.5">
+                      <div className="text-[9.5px] text-emerald-700 font-bold text-right uppercase tracking-wider">
                         ✓ Folio Cleared & Settled
                       </div>
                     )}
@@ -2235,7 +2239,7 @@ function BillingContent() {
               </div>
 
               {/* 4. AMOUNT IN WORDS */}
-              <div className="font-mono text-xs font-bold uppercase pt-1 border-t border-zinc-300">
+              <div className="font-mono text-[11px] font-bold uppercase pt-1 border-t border-zinc-300 page-break-avoid">
                 Amount In Words:{" "}
                 <span className="text-zinc-900 font-extrabold">
                   {numberToWordsINR(Math.max(0, Math.round(totalCharges > 0 ? totalCharges : totalPayments)))}
@@ -2243,18 +2247,18 @@ function BillingContent() {
               </div>
 
               {/* 5. HOTEL POLICIES & STATUTORY SIGNATURE BLOCK */}
-              <div className="pt-3 border-t border-zinc-400 space-y-6 text-xs font-mono">
-                <div className="space-y-0.5 text-zinc-600 text-[11px]">
+              <div className="pt-2 border-t border-zinc-400 space-y-4 text-[10.5px] font-mono page-break-avoid">
+                <div className="space-y-0.5 text-zinc-600 text-[10px]">
                   <div>* Check out time is 12:00 Noon.</div>
                   <div>* Please handover your room key at the reception when checking out.</div>
                   <div>* Thank you for staying with us. We hope you enjoyed your stay!</div>
                 </div>
 
-                <div className="flex justify-between items-end pt-6 font-bold text-xs">
-                  <div className="border-t border-zinc-800 pt-1.5 w-48 text-center">
+                <div className="flex justify-between items-end pt-4 font-bold text-xs">
+                  <div className="border-t border-zinc-800 pt-1 w-44 text-center">
                     Guest's Signature
                   </div>
-                  <div className="border-t border-zinc-800 pt-1.5 w-64 text-center">
+                  <div className="border-t border-zinc-800 pt-1 w-56 text-center">
                     For {activeProperty?.displayName?.toUpperCase() || "HOTEL AMBARISH GRAND RESIDENCY"}
                   </div>
                 </div>
