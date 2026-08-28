@@ -578,7 +578,7 @@ function BillingContent() {
                   className="h-10 sm:h-11 px-4 rounded-xl bg-amber-50 dark:bg-amber-500/10 hover:bg-amber-100 dark:hover:bg-amber-500/20 border border-amber-300 dark:border-amber-500/30 text-amber-900 dark:text-amber-300 font-bold text-xs sm:text-sm flex items-center gap-2 transition shadow-xs"
                 >
                   <Plus className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-                  <span>+ Post Charge</span>
+                  <span>Post Charge</span>
                 </button>
 
                 <button
