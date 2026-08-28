@@ -9,7 +9,9 @@
     "start": "next start -p 3000",
     "db:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts",
-    "db:generate": "prisma generate"
+    "db:generate": "prisma generate",
+    "db:backup": "tsx scripts/db-backup.ts",
+    "db:restore": "tsx scripts/db-restore.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
