@@ -202,10 +202,11 @@ function BillingContent() {
     const diffDays = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
 
     let rate = 2500;
-    if (folioData?.windows?.[0]?.lineItems) {
-      const roomCharge = folioData.windows[0].lineItems.find((i: any) => i.chargeCode?.includes("ROOM_TARIFF"));
-      if (roomCharge && roomCharge.taxableAmount) {
-        rate = roomCharge.taxableAmount;
+    if (folioData?.windows?.[0]) {
+      const items = folioData.windows[0].entries || folioData.windows[0].lineItems || [];
+      const roomCharge = items.find((i: any) => i.chargeCode?.includes("ROOM_TARIFF"));
+      if (roomCharge && (roomCharge.taxableAmount || roomCharge.unitAmount)) {
+        rate = roomCharge.taxableAmount || roomCharge.unitAmount;
       }
     }
 
@@ -216,11 +217,11 @@ function BillingContent() {
     };
   }, [activeStay, folioData]);
 
-  // Aggregate raw ledger line items
+  // Aggregate raw ledger line items from Prisma folio windows (entries)
   const rawEntries = useMemo(() => {
     if (!folioData?.windows) return [];
-    const allItems = folioData.windows.flatMap((w: any) => w.lineItems || []);
-    return allItems.sort((a: any, b: any) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    const allItems = folioData.windows.flatMap((w: any) => w.entries || w.lineItems || []);
+    return allItems.sort((a: any, b: any) => new Date(a.createdAt || a.postedAt).getTime() - new Date(b.createdAt || b.postedAt).getTime());
   }, [folioData]);
 
   // Filtered charges ledger items
@@ -1919,16 +1920,16 @@ function BillingContent() {
       {/* ========================================================================= */}
       {showInvoiceModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-2 sm:p-4 overflow-y-auto print:p-0 print:bg-white">
-          <div className="w-full max-w-3xl rounded-3xl border border-zinc-700 bg-white text-zinc-900 p-6 sm:p-8 shadow-2xl space-y-4 print:p-0 print:border-none print:shadow-none print:w-full print:max-w-none">
+          <div className="w-full max-w-4xl rounded-3xl border border-zinc-700 bg-white text-zinc-900 p-6 sm:p-8 shadow-2xl space-y-5 print:p-0 print:border-none print:shadow-none print:w-full print:max-w-none">
             
             {/* Top Toolbar (Hidden when printing) */}
             <div className="flex items-center justify-between pb-3 border-b border-zinc-200 print:hidden">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2.5">
                 <span className="text-xs font-black uppercase font-mono tracking-wider text-zinc-700">
                   {isLiveTaxBillView ? "Live Folio Tax Invoice (Rule 46)" : "Official Tax Invoice"}
                 </span>
                 <span className="rounded-md bg-emerald-100 text-emerald-800 border border-emerald-300 px-2 py-0.5 text-xs font-mono font-bold">
-                  Verified GST
+                  Verified GST Tax Invoice
                 </span>
               </div>
 
@@ -1947,235 +1948,247 @@ function BillingContent() {
 
             {/* PRINTABLE TAX INVOICE DOCUMENT */}
             <div className="space-y-4 text-xs text-zinc-900 font-sans print:text-black">
-              {/* Center Title */}
-              <div className="text-center pb-1">
-                <h1 className="text-xl font-black tracking-wide uppercase border-b-2 border-zinc-900 inline-block pb-0.5">
+              {/* Header: Hotel Identity & GST */}
+              <div className="text-center pb-2 border-b border-zinc-900">
+                <h1 className="text-xl sm:text-2xl font-black tracking-wide uppercase">
                   Tax Invoice
                 </h1>
-                <div className="text-xs font-bold text-zinc-700 uppercase mt-0.5">
-                  {activeProperty?.legalName || activeProperty?.displayName}
+                <div className="text-sm font-bold text-zinc-800 uppercase mt-0.5">
+                  {activeProperty?.legalName || activeProperty?.displayName || "Hotel Ambarish Grand Residency"}
                 </div>
-                <div className="text-[11px] text-zinc-600 font-mono">
-                  {activeProperty?.address} | GSTIN: {activeProperty?.gstin || "18AAAAA1234A1Z5"} | State Code: {activeProperty?.stateCode || "18"}
+                <div className="text-[11px] text-zinc-600 font-mono mt-0.5">
+                  {activeProperty?.address || "MD Shah Road, Paltan Bazar, Guwahati, Assam - 781008"} | GSTIN: {activeProperty?.gstin || "18AACCB2447F1ZX"} | State Code: {activeProperty?.stateCode || "18"}
                 </div>
               </div>
 
-              {/* 1. TOP HEADER KEY-VALUE BOX */}
-              <div className="border border-zinc-900 p-3 rounded-none grid grid-cols-2 gap-x-4 gap-y-1 font-mono text-xs leading-tight">
-                {/* Left Column */}
-                <div className="space-y-1">
-                  <div className="flex">
-                    <span className="w-28 font-bold text-zinc-800">Bill No.</span>
-                    <span>: {selectedInvoice?.invoiceNo || `F${activeStay?.roomAssignments?.[0]?.room?.number || "00"}${new Date().getDate()}`}</span>
-                  </div>
-                  <div className="flex">
-                    <span className="w-28 font-bold text-zinc-800">Guest Name</span>
-                    <span className="font-bold uppercase">: {activeStay?.primaryGuest?.name || "ANSHU KUMAR GUPTA"}</span>
-                  </div>
-                  <div className="flex">
-                    <span className="w-28 font-bold text-zinc-800">Address</span>
-                    <span>: {activeStay?.primaryGuest?.city || "ASSAM / INDIA"}</span>
-                  </div>
-                  <div className="flex">
-                    <span className="w-28 font-bold text-zinc-800">Contact No.</span>
-                    <span>: {activeStay?.primaryGuest?.phone || "9525053699"}</span>
-                  </div>
-                  <div className="flex">
-                    <span className="w-28 font-bold text-zinc-800">City</span>
-                    <span>: {activeStay?.primaryGuest?.city || "Guwahati"}</span>
-                  </div>
-                  <div className="flex">
-                    <span className="w-28 font-bold text-zinc-800">Country</span>
-                    <span>: {activeStay?.primaryGuest?.nationality || "India"}</span>
-                  </div>
-                  <div className="flex">
-                    <span className="w-28 font-bold text-zinc-800">Company</span>
-                    <span>: {activeStay?.primaryGuest?.companyName || "—"}</span>
-                  </div>
-                  <div className="flex">
-                    <span className="w-28 font-bold text-zinc-800">Company Address</span>
-                    <span>: —</span>
-                  </div>
-                </div>
+              {/* 1. TOP HEADER KEY-VALUE METADATA BOX */}
+              {(() => {
+                const btcPayment = payments.find((p: any) => p.method === "DIRECT_BILL");
+                let btcSnapshot: any = null;
+                if (btcPayment?.payerSnapshot) {
+                  try {
+                    btcSnapshot = JSON.parse(btcPayment.payerSnapshot);
+                  } catch (e) {}
+                }
 
-                {/* Right Column */}
-                <div className="space-y-1">
-                  <div className="flex">
-                    <span className="w-32 font-bold text-zinc-800">Date & Time</span>
-                    <span>: {new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })} {new Date().toLocaleTimeString("en-US")}</span>
+                const companyName = activeStay?.primaryGuest?.companyName || btcSnapshot?.companyName || "—";
+                const companyGstin = activeStay?.primaryGuest?.gstin || btcSnapshot?.gstin || "—";
+                const billNo = selectedInvoice?.invoiceNo || (activeStay?.folio?.invoices?.[0]?.invoiceNo) || `INV-2627-${activeStay?.id?.slice(-4) || "0102"}`;
+
+                return (
+                  <div className="border border-zinc-900 p-3.5 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5 font-mono text-xs leading-relaxed">
+                    {/* Left Column */}
+                    <div className="space-y-1">
+                      <div className="flex">
+                        <span className="w-32 font-bold text-zinc-800 shrink-0">Bill / Inv No.</span>
+                        <span className="font-bold text-zinc-950">: {billNo}</span>
+                      </div>
+                      <div className="flex">
+                        <span className="w-32 font-bold text-zinc-800 shrink-0">Guest Name</span>
+                        <span className="font-bold uppercase text-zinc-950">: {activeStay?.primaryGuest?.name || "JAMUNA SINGHA"}</span>
+                      </div>
+                      <div className="flex">
+                        <span className="w-32 font-bold text-zinc-800 shrink-0">Address</span>
+                        <span>: {activeStay?.primaryGuest?.city ? `${activeStay.primaryGuest.city}, ${activeStay.primaryGuest.state || "ASSAM"}` : "ASSAM / INDIA"}</span>
+                      </div>
+                      <div className="flex">
+                        <span className="w-32 font-bold text-zinc-800 shrink-0">Contact No.</span>
+                        <span>: {activeStay?.primaryGuest?.phone || "—"}</span>
+                      </div>
+                      <div className="flex">
+                        <span className="w-32 font-bold text-zinc-800 shrink-0">Company</span>
+                        <span className="font-bold">: {companyName}</span>
+                      </div>
+                      <div className="flex">
+                        <span className="w-32 font-bold text-zinc-800 shrink-0">Company GSTIN</span>
+                        <span className="font-mono">: {companyGstin}</span>
+                      </div>
+                    </div>
+
+                    {/* Right Column */}
+                    <div className="space-y-1">
+                      <div className="flex">
+                        <span className="w-36 font-bold text-zinc-800 shrink-0">Date & Time</span>
+                        <span>: {new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })} {new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}</span>
+                      </div>
+                      <div className="flex">
+                        <span className="w-36 font-bold text-zinc-800 shrink-0">Room No.</span>
+                        <span className="font-bold text-sm">: {activeStay?.roomAssignments?.[0]?.room?.number || "206"}</span>
+                      </div>
+                      <div className="flex">
+                        <span className="w-36 font-bold text-zinc-800 shrink-0">GRC / Regn. No.</span>
+                        <span>: GRC-2627-{activeStay?.id?.slice(-4) || "0102"}</span>
+                      </div>
+                      <div className="flex">
+                        <span className="w-36 font-bold text-zinc-800 shrink-0">Arrival Date</span>
+                        <span>: {activeStay?.arrivalAt ? new Date(activeStay.arrivalAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : "—"}</span>
+                      </div>
+                      <div className="flex">
+                        <span className="w-36 font-bold text-zinc-800 shrink-0">Departure Date</span>
+                        <span>: {new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}</span>
+                      </div>
+                      <div className="flex">
+                        <span className="w-36 font-bold text-zinc-800 shrink-0">Pax / Occupancy</span>
+                        <span>: {activeStay?.adults || 1} Adult{activeStay?.adults > 1 ? "s" : ""}</span>
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex">
-                    <span className="w-32 font-bold text-zinc-800">Pax</span>
-                    <span>: {activeStay?.adults || 1} Adult{activeStay?.adults > 1 ? "s" : ""}</span>
-                  </div>
-                  <div className="flex">
-                    <span className="w-32 font-bold text-zinc-800">Regn. No.</span>
-                    <span>: R/000000{activeStay?.id?.slice(-4) || "4435"}</span>
-                  </div>
-                  <div className="flex">
-                    <span className="w-32 font-bold text-zinc-800">Regn Date & Time</span>
-                    <span>: {activeStay?.arrivalAt ? new Date(activeStay.arrivalAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : "—"}</span>
-                  </div>
-                  <div className="flex">
-                    <span className="w-32 font-bold text-zinc-800">Arrival Date</span>
-                    <span>: {activeStay?.arrivalAt ? new Date(activeStay.arrivalAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : "—"}</span>
-                  </div>
-                  <div className="flex">
-                    <span className="w-32 font-bold text-zinc-800">Departure Date</span>
-                    <span>: {new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })} {new Date().toLocaleTimeString("en-US")}</span>
-                  </div>
-                  <div className="flex">
-                    <span className="w-32 font-bold text-zinc-800">Room No.</span>
-                    <span className="font-bold">: {activeStay?.roomAssignments?.[0]?.room?.number || "229"}</span>
-                  </div>
-                  <div className="flex">
-                    <span className="w-32 font-bold text-zinc-800">Company GST No</span>
-                    <span>: {activeStay?.primaryGuest?.gstin || "—"}</span>
-                  </div>
-                </div>
-              </div>
+                );
+              })()}
 
               {/* 2. DATE-WISE CHARGES BREAKDOWN TABLE */}
               <div className="border border-zinc-900 overflow-hidden">
-                <table className="w-full text-left font-mono text-[11px] border-collapse">
+                <table className="w-full text-left font-mono text-xs border-collapse">
                   <thead className="border-b border-zinc-900 bg-zinc-100 font-bold">
                     <tr>
-                      <th className="p-1.5 border-r border-zinc-400">Date</th>
-                      <th className="p-1.5 border-r border-zinc-400 text-right">O.Room Rent</th>
-                      <th className="p-1.5 border-r border-zinc-400 text-right">Disc</th>
-                      <th className="p-1.5 border-r border-zinc-400 text-right">Room Rent</th>
-                      <th className="p-1.5 border-r border-zinc-400 text-right">E.Bed Ch.</th>
-                      <th className="p-1.5 border-r border-zinc-400 text-right">SGST</th>
-                      <th className="p-1.5 border-r border-zinc-400 text-right">CGST</th>
-                      <th className="p-1.5 border-r border-zinc-400 text-right">Room Credit</th>
-                      <th className="p-1.5 border-r border-zinc-400 text-right">Oth. Charge</th>
-                      <th className="p-1.5 border-r border-zinc-400 text-right">Advance</th>
-                      <th className="p-1.5 text-right">Bill Amt</th>
+                      <th className="p-2 border-r border-zinc-400 w-24">Date</th>
+                      <th className="p-2 border-r border-zinc-400">Description / Service</th>
+                      <th className="p-2 border-r border-zinc-400 w-20 text-center">SAC/HSN</th>
+                      <th className="p-2 border-r border-zinc-400 text-right w-24">Taxable (₹)</th>
+                      <th className="p-2 border-r border-zinc-400 text-right w-20">CGST (₹)</th>
+                      <th className="p-2 border-r border-zinc-400 text-right w-20">SGST (₹)</th>
+                      <th className="p-2 text-right w-28">Total (₹)</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-zinc-300">
                     {rawEntries.map((e: any) => {
-                      const isFood = e.chargeCode?.includes("FOOD") || e.chargeCode?.includes("RESTAURANT");
-                      const isExtraBed = e.chargeCode?.includes("EXTRA_BED");
-                      const isRoomTariff = e.chargeCode?.includes("ROOM_TARIFF");
                       const taxHalf = ((e.totalAmount || 0) - (e.taxableAmount || 0)) / 2;
+                      const isFood = e.chargeCode?.includes("FOOD") || e.chargeCode?.includes("RESTAURANT");
+
                       return (
-                        <tr key={e.id}>
-                          <td className="p-1.5 border-r border-zinc-300">{e.serviceDate || e.createdAt?.slice(0, 10)}</td>
-                          <td className="p-1.5 border-r border-zinc-300 text-right">{isRoomTariff ? (e.taxableAmount || 0).toFixed(2) : "0.00"}</td>
-                          <td className="p-1.5 border-r border-zinc-300 text-right">0.00</td>
-                          <td className="p-1.5 border-r border-zinc-300 text-right">{isRoomTariff ? (e.taxableAmount || 0).toFixed(2) : "0.00"}</td>
-                          <td className="p-1.5 border-r border-zinc-300 text-right">{isExtraBed ? (e.taxableAmount || 0).toFixed(2) : "0.00"}</td>
-                          <td className="p-1.5 border-r border-zinc-300 text-right">{taxHalf.toFixed(2)}</td>
-                          <td className="p-1.5 border-r border-zinc-300 text-right">{taxHalf.toFixed(2)}</td>
-                          <td className="p-1.5 border-r border-zinc-300 text-right">0.00</td>
-                          <td className="p-1.5 border-r border-zinc-300 text-right">{isFood ? (e.totalAmount || 0).toFixed(2) : "0.00"}</td>
-                          <td className="p-1.5 border-r border-zinc-300 text-right">0.00</td>
-                          <td className="p-1.5 text-right font-bold">{(e.totalAmount || 0).toFixed(2)}</td>
+                        <tr key={e.id} className="hover:bg-zinc-50">
+                          <td className="p-2 border-r border-zinc-300 font-mono text-[11px]">
+                            {e.serviceDate || e.createdAt?.slice(0, 10)}
+                          </td>
+                          <td className="p-2 border-r border-zinc-300 font-semibold text-zinc-900">
+                            {e.description}
+                          </td>
+                          <td className="p-2 border-r border-zinc-300 text-center text-[11px]">
+                            {e.sacHsn || (isFood ? "996331" : "996311")}
+                          </td>
+                          <td className="p-2 border-r border-zinc-300 text-right tabular-nums">
+                            {(e.taxableAmount || 0).toFixed(2)}
+                          </td>
+                          <td className="p-2 border-r border-zinc-300 text-right tabular-nums">
+                            {taxHalf.toFixed(2)}
+                          </td>
+                          <td className="p-2 border-r border-zinc-300 text-right tabular-nums">
+                            {taxHalf.toFixed(2)}
+                          </td>
+                          <td className="p-2 text-right font-bold tabular-nums">
+                            {(e.totalAmount || 0).toFixed(2)}
+                          </td>
                         </tr>
                       );
                     })}
 
-                    {/* Summary row showing Nights calculation */}
-                    <tr className="bg-zinc-50 border-t border-zinc-900 font-bold">
-                      <td className="p-1.5 border-r border-zinc-400" colSpan={3}>
-                        STAY DURATION: {stayCalculations.nights} NIGHT{stayCalculations.nights > 1 ? "S" : ""}
+                    {rawEntries.length === 0 && (
+                      <tr>
+                        <td colSpan={7} className="p-4 text-center text-zinc-500 italic">
+                          No charges posted to folio yet.
+                        </td>
+                      </tr>
+                    )}
+
+                    {/* Summary Row */}
+                    <tr className="bg-zinc-100 border-t-2 border-zinc-900 font-bold text-xs">
+                      <td className="p-2 border-r border-zinc-400" colSpan={3}>
+                        STAY SUMMARY: {stayCalculations.nights} NIGHT{stayCalculations.nights > 1 ? "S" : ""} DURATION
                       </td>
-                      <td className="p-1.5 border-r border-zinc-400 text-right">
-                        {rawEntries
-                          .filter((e: any) => e.chargeCode?.includes("ROOM_TARIFF"))
-                          .reduce((acc: number, e: any) => acc + (e.taxableAmount || 0), 0)
-                          .toFixed(2)}
+                      <td className="p-2 border-r border-zinc-400 text-right tabular-nums">
+                        {totalTaxable.toFixed(2)}
                       </td>
-                      <td className="p-1.5 border-r border-zinc-400 text-right">
-                        {rawEntries
-                          .filter((e: any) => e.chargeCode?.includes("EXTRA_BED"))
-                          .reduce((acc: number, e: any) => acc + (e.taxableAmount || 0), 0)
-                          .toFixed(2)}
-                      </td>
-                      <td className="p-1.5 border-r border-zinc-400 text-right">
+                      <td className="p-2 border-r border-zinc-400 text-right tabular-nums">
                         {(totalTaxes / 2).toFixed(2)}
                       </td>
-                      <td className="p-1.5 border-r border-zinc-400 text-right">
+                      <td className="p-2 border-r border-zinc-400 text-right tabular-nums">
                         {(totalTaxes / 2).toFixed(2)}
                       </td>
-                      <td className="p-1.5 border-r border-zinc-400 text-right">0.00</td>
-                      <td className="p-1.5 border-r border-zinc-400 text-right">0.00</td>
-                      <td className="p-1.5 border-r border-zinc-400 text-right">{totalPayments.toFixed(2)}</td>
-                      <td className="p-1.5 text-right">{totalCharges.toFixed(2)}</td>
+                      <td className="p-2 text-right font-black tabular-nums">
+                        {totalCharges.toFixed(2)}
+                      </td>
                     </tr>
                   </tbody>
                 </table>
               </div>
 
-              {/* 3. GST TABLE & PAYMENTS TABLE (LEFT) + TOTALS SUMMARY (RIGHT) */}
-              <div className="grid grid-cols-1 sm:grid-cols-12 gap-4 pt-1">
-                {/* Left Block: GST Breakdown & Receipt Breakdown */}
-                <div className="sm:col-span-7 space-y-3">
+              {/* 3. GST BREAKDOWN & PAYMENTS GRID (LEFT) + TOTALS SUMMARY BOX (RIGHT) */}
+              <div className="grid grid-cols-1 sm:grid-cols-12 gap-4 pt-1 items-start">
+                
+                {/* Left Block: GST Slab Breakdown & Payment Receipts List */}
+                <div className="sm:col-span-7 space-y-3.5">
+                  
                   {/* GST Table */}
-                  <div className="border border-zinc-900 overflow-hidden w-full max-w-sm">
+                  <div className="border border-zinc-900 overflow-hidden">
                     <table className="w-full text-left font-mono text-xs border-collapse">
                       <thead className="bg-zinc-100 border-b border-zinc-900 font-bold">
                         <tr>
-                          <th className="p-1.5 border-r border-zinc-400">GST(%)</th>
-                          <th className="p-1.5 border-r border-zinc-400 text-right">Amount</th>
+                          <th className="p-1.5 border-r border-zinc-400">GST Slab</th>
+                          <th className="p-1.5 border-r border-zinc-400 text-right">Taxable Amt</th>
                           <th className="p-1.5 border-r border-zinc-400 text-right">CGST</th>
                           <th className="p-1.5 border-r border-zinc-400 text-right">SGST</th>
-                          <th className="p-1.5 text-right">To.Amt.</th>
+                          <th className="p-1.5 text-right font-black">Total Amt</th>
                         </tr>
                       </thead>
                       <tbody>
                         <tr>
-                          <td className="p-1.5 border-r border-zinc-300 font-bold">5.00</td>
-                          <td className="p-1.5 border-r border-zinc-300 text-right">
+                          <td className="p-1.5 border-r border-zinc-300 font-bold">GST 5.00%</td>
+                          <td className="p-1.5 border-r border-zinc-300 text-right tabular-nums">
                             {totalTaxable.toFixed(2)}
                           </td>
-                          <td className="p-1.5 border-r border-zinc-300 text-right">
+                          <td className="p-1.5 border-r border-zinc-300 text-right tabular-nums">
                             {(totalTaxes / 2).toFixed(2)}
                           </td>
-                          <td className="p-1.5 border-r border-zinc-300 text-right">
+                          <td className="p-1.5 border-r border-zinc-300 text-right tabular-nums">
                             {(totalTaxes / 2).toFixed(2)}
                           </td>
-                          <td className="p-1.5 text-right font-bold">{totalCharges.toFixed(2)}</td>
+                          <td className="p-1.5 text-right font-bold tabular-nums">
+                            {totalCharges.toFixed(2)}
+                          </td>
                         </tr>
                       </tbody>
                     </table>
                   </div>
 
-                  {/* Payment Receipts Grid */}
+                  {/* Payment Receipts Breakdown Table */}
                   <div className="border border-zinc-900 overflow-hidden">
-                    <table className="w-full text-left font-mono text-[10px] border-collapse">
+                    <table className="w-full text-left font-mono text-[11px] border-collapse">
                       <thead className="bg-zinc-100 border-b border-zinc-900 font-bold">
                         <tr>
-                          <th className="p-1.5 border-r border-zinc-400">R.Date</th>
-                          <th className="p-1.5 border-r border-zinc-400">Receipt No.</th>
-                          <th className="p-1.5 border-r border-zinc-400">Pay Mode</th>
-                          <th className="p-1.5 border-r border-zinc-400 text-right">Pay Amount</th>
-                          <th className="p-1.5 border-r border-zinc-400">Bank / Account</th>
-                          <th className="p-1.5 border-r border-zinc-400">Trans No.</th>
-                          <th className="p-1.5">Room</th>
+                          <th className="p-1.5 border-r border-zinc-400 w-20">Date</th>
+                          <th className="p-1.5 border-r border-zinc-400 w-28">Receipt #</th>
+                          <th className="p-1.5 border-r border-zinc-400">Mode / Channel</th>
+                          <th className="p-1.5 border-r border-zinc-400">Ledger / Ref</th>
+                          <th className="p-1.5 text-right w-24">Amount (₹)</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-zinc-300">
-                        {payments.map((p: any) => (
-                          <tr key={p.id}>
-                            <td className="p-1.5 border-r border-zinc-300">{p.receivedAt?.slice(0, 10)}</td>
-                            <td className="p-1.5 border-r border-zinc-300 font-bold">{p.receiptNo}</td>
-                            <td className="p-1.5 border-r border-zinc-300 font-bold">
-                              {p.method === "DIRECT_BILL" ? "BTC / DIRECT BILL" : p.method}
-                            </td>
-                            <td className="p-1.5 border-r border-zinc-300 text-right font-bold">{(p.amount || 0).toFixed(2)}</td>
-                            <td className="p-1.5 border-r border-zinc-300">
-                              {p.method === "DIRECT_BILL" ? "Company Ledger" : p.method === "CASH" ? "Cash Account" : "Bank Account"}
-                            </td>
-                            <td className="p-1.5 border-r border-zinc-300">{p.reference || "—"}</td>
-                            <td className="p-1.5">{activeStay?.roomAssignments?.[0]?.room?.number || "229"}</td>
-                          </tr>
-                        ))}
+                        {payments.map((p: any) => {
+                          const isBTC = p.method === "DIRECT_BILL";
+                          return (
+                            <tr key={p.id}>
+                              <td className="p-1.5 border-r border-zinc-300">
+                                {p.receivedAt?.slice(0, 10)}
+                              </td>
+                              <td className="p-1.5 border-r border-zinc-300 font-bold text-zinc-900">
+                                {p.receiptNo}
+                              </td>
+                              <td className="p-1.5 border-r border-zinc-300 font-bold">
+                                {isBTC ? "BTC / DIRECT BILL" : p.method}
+                              </td>
+                              <td className="p-1.5 border-r border-zinc-300 text-zinc-700 truncate max-w-[140px]">
+                                {isBTC ? "Company Ledger" : p.reference || "Bank / Cash"}
+                              </td>
+                              <td className="p-1.5 text-right font-bold text-emerald-700 tabular-nums">
+                                {(p.amount || 0).toFixed(2)}
+                              </td>
+                            </tr>
+                          );
+                        })}
                         {payments.length === 0 && (
                           <tr>
-                            <td colSpan={7} className="p-2 text-center text-zinc-500 italic">
-                              No payments recorded yet
+                            <td colSpan={5} className="p-2.5 text-center text-zinc-500 italic">
+                              No payments or advances recorded yet
                             </td>
                           </tr>
                         )}
@@ -2184,16 +2197,16 @@ function BillingContent() {
                   </div>
                 </div>
 
-                {/* Right Block: Totals Calculation */}
-                <div className="sm:col-span-5 flex flex-col justify-between font-mono text-xs border border-zinc-900 p-3 bg-zinc-50">
-                  <div className="space-y-1.5">
-                    <div className="flex justify-between font-bold text-zinc-900">
-                      <span>Total Amount</span>
-                      <span className="text-base font-black">{totalCharges.toFixed(2)}</span>
+                {/* Right Block: Totals Calculation Summary Box */}
+                <div className="sm:col-span-5 flex flex-col justify-between font-mono text-xs border-2 border-zinc-900 p-4 bg-zinc-50 space-y-3">
+                  <div className="space-y-2">
+                    <div className="flex justify-between font-bold text-zinc-900 text-sm">
+                      <span>Gross Bill Amount</span>
+                      <span className="font-black text-base">{totalCharges.toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between text-zinc-700">
-                      <span>Less Adv. Amount</span>
-                      <span>- {totalPayments.toFixed(2)}</span>
+                      <span>Less Advance / Settled</span>
+                      <span className="text-emerald-700 font-bold">- {totalPayments.toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between text-zinc-700">
                       <span>Less Bill Discount</span>
@@ -2205,31 +2218,44 @@ function BillingContent() {
                     </div>
                   </div>
 
-                  <div className="flex justify-between font-black text-lg text-zinc-950 pt-2 border-t-2 border-zinc-900 mt-3">
-                    <span>Net Amount</span>
-                    <span>₹ {Math.max(0, currentBalance).toFixed(2)}</span>
+                  <div className="border-t-2 border-zinc-900 pt-2.5">
+                    <div className="flex justify-between font-black text-lg text-zinc-950 items-baseline">
+                      <span>Net Balance Due</span>
+                      <span className={currentBalance > 0.5 ? "text-rose-600" : "text-emerald-700"}>
+                        ₹ {Math.max(0, currentBalance).toFixed(2)}
+                      </span>
+                    </div>
+                    {currentBalance <= 0.5 && (
+                      <div className="text-[10px] text-emerald-700 font-bold text-right uppercase tracking-wider mt-0.5">
+                        ✓ Folio Cleared & Settled
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
 
               {/* 4. AMOUNT IN WORDS */}
-              <div className="font-mono text-xs font-bold uppercase pt-1">
-                Amount : {numberToWordsINR(Math.max(0, Math.round(totalCharges - totalPayments)))}
+              <div className="font-mono text-xs font-bold uppercase pt-1 border-t border-zinc-300">
+                Amount In Words:{" "}
+                <span className="text-zinc-900 font-extrabold">
+                  {numberToWordsINR(Math.max(0, Math.round(totalCharges > 0 ? totalCharges : totalPayments)))}
+                </span>
               </div>
 
-              {/* 5. HOTEL POLICIES & SIGNATURE BLOCK */}
-              <div className="pt-3 border-t border-zinc-400 space-y-6 text-[11px] font-mono">
-                <div className="space-y-0.5 text-zinc-600">
-                  <div>* CHECK OUT TIME 12 NOON.</div>
-                  <div>* PLEASE HANDOVER YOUR ROOM KEY WHEN YOU CHECK OUT FROM THE HOTEL.</div>
+              {/* 5. HOTEL POLICIES & STATUTORY SIGNATURE BLOCK */}
+              <div className="pt-3 border-t border-zinc-400 space-y-6 text-xs font-mono">
+                <div className="space-y-0.5 text-zinc-600 text-[11px]">
+                  <div>* Check out time is 12:00 Noon.</div>
+                  <div>* Please handover your room key at the reception when checking out.</div>
+                  <div>* Thank you for staying with us. We hope you enjoyed your stay!</div>
                 </div>
 
                 <div className="flex justify-between items-end pt-6 font-bold text-xs">
                   <div className="border-t border-zinc-800 pt-1.5 w-48 text-center">
                     Guest's Signature
                   </div>
-                  <div className="border-t border-zinc-800 pt-1.5 w-56 text-center">
-                    For {activeProperty?.displayName?.toUpperCase() || "HOTEL DIVINE VIEW"}
+                  <div className="border-t border-zinc-800 pt-1.5 w-64 text-center">
+                    For {activeProperty?.displayName?.toUpperCase() || "HOTEL AMBARISH GRAND RESIDENCY"}
                   </div>
                 </div>
               </div>
