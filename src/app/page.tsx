@@ -84,6 +84,75 @@ export default function DashboardPage() {
         </div>
       </div>
 
+      {/* Front Desk & Operations Launchpad */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <a
+          href="/pms"
+          className="group p-4 rounded-xl bg-gradient-to-br from-emerald-950/40 via-zinc-900 to-zinc-950 border border-emerald-500/30 hover:border-emerald-500/60 transition shadow-lg space-y-2"
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="p-2 rounded-lg bg-emerald-500/20 text-emerald-400">
+                <BedDouble className="h-5 w-5" />
+              </span>
+              <div>
+                <h3 className="text-sm font-bold text-white group-hover:text-emerald-400 transition">PMS Room Rack</h3>
+                <p className="text-[11px] text-zinc-400 font-mono">35 Rooms Ready • 100% Vacant</p>
+              </div>
+            </div>
+            <ArrowUpRight className="h-4 w-4 text-emerald-400 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition" />
+          </div>
+          <div className="pt-2 border-t border-white/5 flex items-center justify-between text-xs font-mono">
+            <span className="text-zinc-400">Front Desk Check-In</span>
+            <span className="font-bold text-emerald-400">Open Grid →</span>
+          </div>
+        </a>
+
+        <a
+          href="/pms?tab=reservations"
+          className="group p-4 rounded-xl bg-gradient-to-br from-blue-950/40 via-zinc-900 to-zinc-950 border border-blue-500/30 hover:border-blue-500/60 transition shadow-lg space-y-2"
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="p-2 rounded-lg bg-blue-500/20 text-blue-400">
+                <Calendar className="h-5 w-5" />
+              </span>
+              <div>
+                <h3 className="text-sm font-bold text-white group-hover:text-blue-400 transition">Future Bookings</h3>
+                <p className="text-[11px] text-zinc-400 font-mono">Advance Room Reservations</p>
+              </div>
+            </div>
+            <ArrowUpRight className="h-4 w-4 text-blue-400 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition" />
+          </div>
+          <div className="pt-2 border-t border-white/5 flex items-center justify-between text-xs font-mono">
+            <span className="text-zinc-400">Create & Manage Bookings</span>
+            <span className="font-bold text-blue-400">+ New Booking →</span>
+          </div>
+        </a>
+
+        <a
+          href="/order"
+          className="group p-4 rounded-xl bg-gradient-to-br from-amber-950/40 via-zinc-900 to-zinc-950 border border-amber-500/30 hover:border-amber-500/60 transition shadow-lg space-y-2"
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="p-2 rounded-lg bg-amber-500/20 text-amber-400">
+                <UtensilsCrossed className="h-5 w-5" />
+              </span>
+              <div>
+                <h3 className="text-sm font-bold text-white group-hover:text-amber-400 transition">In-Room Dining POS</h3>
+                <p className="text-[11px] text-zinc-400 font-mono">93 Menu Items Active</p>
+              </div>
+            </div>
+            <ArrowUpRight className="h-4 w-4 text-amber-400 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition" />
+          </div>
+          <div className="pt-2 border-t border-white/5 flex items-center justify-between text-xs font-mono">
+            <span className="text-zinc-400">Restaurant & Room Service</span>
+            <span className="font-bold text-amber-400">Open Menu →</span>
+          </div>
+        </a>
+      </div>
+
       {/* KPI Stats Grid */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {/* Occupancy % */}

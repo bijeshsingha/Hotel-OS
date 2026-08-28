@@ -35,6 +35,7 @@ interface GrcIntakeModalProps {
   rooms: any[];
   activeProperty: any;
   initialRoomId?: string;
+  initialReservation?: any;
 }
 
 export function GrcIntakeModal({
@@ -44,6 +45,7 @@ export function GrcIntakeModal({
   rooms,
   activeProperty,
   initialRoomId,
+  initialReservation,
 }: GrcIntakeModalProps) {
   // Method Switcher: "PHYSICAL_ENTRY" vs "QR_DIGITAL"
   const [activeMethod, setActiveMethod] = useState<"PHYSICAL_ENTRY" | "QR_DIGITAL">("PHYSICAL_ENTRY");
@@ -145,18 +147,45 @@ export function GrcIntakeModal({
       const currentDateTime = `${year}-${month}-${day} ${hours}:${minutes}`;
       const defaultDepDate = new Date(Date.now() + 86400000 * 2).toISOString().split("T")[0];
 
-      setFormData((prev) => ({
-        ...prev,
-        roomId: initialRoomId || prev.roomId,
-        additionalRoomIds: [],
-        roomRates: {},
-        groupBilling: true,
-        arrivalDateTime: currentDateTime,
-        departureDate: prev.departureDate || defaultDepDate,
-      }));
+      if (initialReservation) {
+        const guest = initialReservation.primaryGuest || {};
+        const firstRoom = initialReservation.rooms?.[0] || {};
+        const firstDeposit = initialReservation.deposits?.[0]?.payment?.amount || 0;
+        const assigned = firstRoom.assignedRoomId || initialRoomId;
+
+        setFormData((prev) => ({
+          ...prev,
+          fullName: guest.name || "",
+          mobilePhone: guest.phone || "",
+          email: guest.email || "",
+          city: guest.city || "",
+          state: guest.state || "",
+          guestGstin: guest.gstin || "",
+          arrivalDateTime: currentDateTime,
+          departureDate: initialReservation.departureDate || defaultDepDate,
+          adults: String(firstRoom.adults || 2),
+          children: String(firstRoom.children || 0),
+          referralChannel: initialReservation.source || "DIRECT",
+          depositAmount: String(firstDeposit),
+          roomId: assigned || prev.roomId || (rooms.find((r) => r.roomState?.occupancyStatus === "VACANT" && (!firstRoom.roomTypeId || r.roomTypeId === firstRoom.roomTypeId))?.id || ""),
+          additionalRoomIds: [],
+          roomRates: {},
+          groupBilling: true,
+        }));
+      } else {
+        setFormData((prev) => ({
+          ...prev,
+          roomId: initialRoomId || prev.roomId,
+          additionalRoomIds: [],
+          roomRates: {},
+          groupBilling: true,
+          arrivalDateTime: currentDateTime,
+          departureDate: prev.departureDate || defaultDepDate,
+        }));
+      }
       setRepeatGuest(null);
     }
-  }, [isOpen, initialRoomId]);
+  }, [isOpen, initialRoomId, initialReservation, rooms]);
 
   if (!isOpen) return null;
 
@@ -294,6 +323,7 @@ export function GrcIntakeModal({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           propertyId: activeProperty?.id,
+          reservationId: initialReservation?.id,
           roomIds: [formData.roomId, ...formData.additionalRoomIds],
           groupBilling: formData.groupBilling,
           roomRates: formData.roomRates,

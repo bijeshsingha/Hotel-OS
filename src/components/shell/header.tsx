@@ -23,10 +23,12 @@ import {
   Plus,
   Sun,
   Moon,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from "lucide-react";
 
 export function AppHeader() {
-  const { user, activeProperty, availableProperties, allUsers, switchProperty, switchUser, logout } = useHotel();
+  const { user, activeProperty, availableProperties, allUsers, switchProperty, switchUser, logout, sidebarCollapsed, toggleSidebar } = useHotel();
   const { theme, toggleTheme } = useTheme();
   const router = useRouter();
   const [showPropMenu, setShowPropMenu] = useState(false);
@@ -120,7 +122,20 @@ export function AppHeader() {
       <header className="sticky top-0 z-40 w-full bg-white/95 dark:bg-[#09090b]/95 backdrop-blur-md border-b border-zinc-200 dark:border-[#27272a] px-3.5 sm:px-6 py-2.5 text-zinc-900 dark:text-zinc-100 shadow-sm transition-colors duration-150">
         <div className="flex items-center justify-between gap-4">
           {/* Left: Clean Brand & Property Switcher */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
+            {/* Sidebar Collapse/Expand Toggle Button */}
+            <button
+              onClick={toggleSidebar}
+              className="p-1.5 rounded-lg text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition border border-transparent hover:border-zinc-200 dark:hover:border-zinc-700"
+              title={sidebarCollapsed ? "Expand Sidebar (Ctrl+B)" : "Collapse Sidebar (Ctrl+B)"}
+            >
+              {sidebarCollapsed ? (
+                <PanelLeftOpen className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+              ) : (
+                <PanelLeftClose className="h-4 w-4" />
+              )}
+            </button>
+
             <div className="flex items-center gap-2">
               <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-600 dark:bg-white text-white dark:text-zinc-950 font-black text-xs tracking-tight shadow-sm">
                 H
@@ -129,7 +144,7 @@ export function AppHeader() {
                 <span className="text-sm font-black tracking-tight text-zinc-900 dark:text-white">
                   Hotel OS
                 </span>
-                <span className="rounded px-1.5 py-0.5 text-[10px] font-mono font-semibold text-zinc-600 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800">
+                <span className="rounded px-1.5 py-0.5 text-[10px] font-mono font-semibold text-zinc-600 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 hidden sm:inline-block">
                   v1.0
                 </span>
               </div>

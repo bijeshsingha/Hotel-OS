@@ -39,6 +39,9 @@ interface HotelContextType {
   }>;
   isLoading: boolean;
   activeRole: string;
+  sidebarCollapsed: boolean;
+  toggleSidebar: () => void;
+  setSidebarCollapsed: (collapsed: boolean) => void;
   switchProperty: (propertyId: string) => void;
   switchUser: (identifier: string) => void;
   logout: () => void;
@@ -46,15 +49,63 @@ interface HotelContextType {
   refreshKey: number;
 }
 
+const INITIAL_PROPERTY: PropertyInfo = {
+  id: "prop_ambarish",
+  code: "GUW-01",
+  displayName: "Hotel Ambarish Grand Residency",
+  legalName: "AMBARISH RESIDENCY",
+  gstin: "18AACCB2447F1ZX",
+  stateCode: "18",
+  businessDate: "2026-08-24",
+  currency: "INR",
+};
+
+const INITIAL_USER: UserInfo = {
+  id: "usr_bijesh",
+  name: "Bijesh Singha",
+  username: "bijesh_singha",
+  email: "bijesh.singha@hotelos.in",
+  activeRole: "ORG_OWNER",
+  roleName: "Organization Owner & Super Admin",
+};
+
 const HotelContext = createContext<HotelContextType | undefined>(undefined);
 
 export function HotelProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<UserInfo | null>(null);
-  const [activeProperty, setActiveProperty] = useState<PropertyInfo | null>(null);
-  const [availableProperties, setAvailableProperties] = useState<PropertyInfo[]>([]);
+  const [user, setUser] = useState<UserInfo | null>(INITIAL_USER);
+  const [activeProperty, setActiveProperty] = useState<PropertyInfo | null>(INITIAL_PROPERTY);
+  const [availableProperties, setAvailableProperties] = useState<PropertyInfo[]>([INITIAL_PROPERTY]);
   const [allUsers, setAllUsers] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [sidebarCollapsed, setSidebarCollapsedState] = useState(false);
+
+  // Initialize sidebar collapsed state from localStorage
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("hotel_sidebar_collapsed");
+      if (saved === "true") {
+        setSidebarCollapsedState(true);
+      }
+    }
+  }, []);
+
+  const toggleSidebar = useCallback(() => {
+    setSidebarCollapsedState((prev) => {
+      const next = !prev;
+      if (typeof window !== "undefined") {
+        localStorage.setItem("hotel_sidebar_collapsed", String(next));
+      }
+      return next;
+    });
+  }, []);
+
+  const setSidebarCollapsed = useCallback((collapsed: boolean) => {
+    setSidebarCollapsedState(collapsed);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("hotel_sidebar_collapsed", String(collapsed));
+    }
+  }, []);
 
   // Ensure root dark mode is fixed
   useEffect(() => {
@@ -81,7 +132,12 @@ export function HotelProvider({ children }: { children: React.ReactNode }) {
             localStorage.setItem("hotel_os_user", data.user.username);
           }
         }
-        if (data?.activeProperty) setActiveProperty(data.activeProperty);
+        if (data?.activeProperty) {
+          setActiveProperty(data.activeProperty);
+          if (typeof window !== "undefined") {
+            localStorage.setItem("hotel_os_property", data.activeProperty.id);
+          }
+        }
         if (Array.isArray(data?.availableProperties)) setAvailableProperties(data.availableProperties);
         if (Array.isArray(data?.allUsers)) setAllUsers(data.allUsers);
       }
@@ -93,11 +149,15 @@ export function HotelProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    const saved = typeof window !== "undefined" ? localStorage.getItem("hotel_os_user") : null;
-    fetchSession(saved || undefined);
+    const savedUser = typeof window !== "undefined" ? localStorage.getItem("hotel_os_user") : null;
+    const savedProp = typeof window !== "undefined" ? localStorage.getItem("hotel_os_property") : null;
+    fetchSession(savedUser || undefined, savedProp || undefined);
   }, [fetchSession]);
 
   const switchProperty = (propertyId: string) => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("hotel_os_property", propertyId);
+    }
     fetchSession(user?.username || user?.email, propertyId);
     setRefreshKey((k) => k + 1);
   };
@@ -106,7 +166,8 @@ export function HotelProvider({ children }: { children: React.ReactNode }) {
     if (typeof window !== "undefined") {
       localStorage.setItem("hotel_os_user", identifier);
     }
-    fetchSession(identifier);
+    const savedProp = typeof window !== "undefined" ? localStorage.getItem("hotel_os_property") : null;
+    fetchSession(identifier, savedProp || undefined);
     setRefreshKey((k) => k + 1);
   };
 
@@ -134,6 +195,9 @@ export function HotelProvider({ children }: { children: React.ReactNode }) {
         allUsers,
         isLoading,
         activeRole: user?.activeRole || "ORG_OWNER",
+        sidebarCollapsed,
+        toggleSidebar,
+        setSidebarCollapsed,
         switchProperty,
         switchUser,
         logout,

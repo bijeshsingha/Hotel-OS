@@ -1,17 +1,54 @@
 /**
- * India GST Calculation Engine (Hotel OS V1 - Section 11)
+ * India GST Calculation Engine (Hotel OS V1)
  *
- * Rules:
- * - SAC 996311: Room Accommodation
- *   - Up to ₹7,500/night/room: 12% (6% CGST + 6% SGST, or 12% IGST)
- *   - Above ₹7,500/night/room: 18% (9% CGST + 9% SGST, or 18% IGST)
- * - SAC 996331: Restaurant Service
- *   - Standalone / without ITC: 5% (2.5% CGST + 2.5% SGST, or 5% IGST)
- *   - At specified premises / with ITC: 18% (9% CGST + 9% SGST, or 18% IGST)
- * - State code comparison:
- *   - Same state (supplierState === recipientState or Intra-state): CGST + SGST
- *   - Different state (Inter-state): IGST
+ * Centralized Tax Rate Configuration:
+ * - All rates are configured via constants & dynamic variables.
+ * - Defaults are set uniformly to 5% as per hotel configuration.
  */
+
+export interface TaxRatesConfig {
+  DEFAULT_TAX_RATE: number; // 5%
+  ROOM_ACCOMMODATION_RATE: number; // 5%
+  ROOM_ACCOMMODATION_LUXURY_RATE: number; // 5%
+  RESTAURANT_FOOD_RATE: number; // 5%
+  SERVICES_LAUNDRY_RATE: number; // 5%
+  BANQUET_EVENT_RATE: number; // 5%
+  TRANSPORT_RATE: number; // 5%
+  MISC_SERVICES_RATE: number; // 5%
+}
+
+export const DEFAULT_TAX_RATES: TaxRatesConfig = {
+  DEFAULT_TAX_RATE: 5,
+  ROOM_ACCOMMODATION_RATE: 5,
+  ROOM_ACCOMMODATION_LUXURY_RATE: 5,
+  RESTAURANT_FOOD_RATE: 5,
+  SERVICES_LAUNDRY_RATE: 5,
+  BANQUET_EVENT_RATE: 5,
+  TRANSPORT_RATE: 5,
+  MISC_SERVICES_RATE: 5,
+};
+
+// Active mutable tax rate settings that can be dynamically queried or adjusted
+export let ACTIVE_TAX_RATES: TaxRatesConfig = { ...DEFAULT_TAX_RATES };
+
+export function setTaxRates(newRates: Partial<TaxRatesConfig>) {
+  ACTIVE_TAX_RATES = { ...ACTIVE_TAX_RATES, ...newRates };
+}
+
+export function getTaxRateForSac(sacHsn?: string, grossOrBaseAmount = 0): number {
+  if (!sacHsn) return ACTIVE_TAX_RATES.DEFAULT_TAX_RATE;
+  if (sacHsn === "996311") {
+    return grossOrBaseAmount > 7500
+      ? ACTIVE_TAX_RATES.ROOM_ACCOMMODATION_LUXURY_RATE
+      : ACTIVE_TAX_RATES.ROOM_ACCOMMODATION_RATE;
+  }
+  if (sacHsn === "996331") return ACTIVE_TAX_RATES.RESTAURANT_FOOD_RATE;
+  if (sacHsn === "996332") return ACTIVE_TAX_RATES.BANQUET_EVENT_RATE;
+  if (sacHsn === "9997") return ACTIVE_TAX_RATES.SERVICES_LAUNDRY_RATE;
+  if (sacHsn === "9964") return ACTIVE_TAX_RATES.TRANSPORT_RATE;
+  if (sacHsn === "9999") return ACTIVE_TAX_RATES.MISC_SERVICES_RATE;
+  return ACTIVE_TAX_RATES.DEFAULT_TAX_RATE;
+}
 
 export interface TaxComponentBreakdown {
   cgstRate: number;
@@ -59,29 +96,13 @@ export function calculateGST({
     recipientStateCode !== supplierStateCode &&
     recipientStateCode !== "99"; // 99 indicates unregistered / unassigned
 
-  // Determine total applicable GST rate
-  let totalRate = 12; // default accommodation 12%
+  // Determine total applicable GST rate from centralized constant / dynamic variables
+  let totalRate = ACTIVE_TAX_RATES.DEFAULT_TAX_RATE;
 
   if (customTaxRate !== undefined) {
     totalRate = customTaxRate;
-  } else if (sacHsn === "996311") {
-    // Accommodation rule: ₹7,500 threshold
-    // If inclusive, check approx base: gross / 1.12 or gross / 1.18
-    const baseValueEst = isInclusive ? grossOrBaseAmount / 1.12 : grossOrBaseAmount;
-    if (baseValueEst > 7500) {
-      totalRate = 18;
-    } else {
-      totalRate = 12;
-    }
-  } else if (sacHsn === "996331") {
-    // Restaurant rule
-    if (premisesTreatment === "specified_premises_opt_in") {
-      totalRate = 18;
-    } else {
-      totalRate = 5;
-    }
-  } else if (sacHsn === "996332") {
-    totalRate = 18; // Banquet / Event
+  } else {
+    totalRate = getTaxRateForSac(sacHsn, grossOrBaseAmount);
   }
 
   let taxableAmount: number;

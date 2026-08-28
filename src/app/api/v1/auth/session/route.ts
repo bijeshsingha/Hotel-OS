@@ -140,7 +140,7 @@ export async function GET(request: Request) {
         const uGrants = u.memberships[0]?.propertyGrants || [];
         let propertyScope = "All Properties";
         if (uGrants.length === 1) {
-          propertyScope = uGrants[0].property.displayName;
+          propertyScope = uGrants[0]?.property?.displayName || "Hotel Ambarish Grand Residency";
         } else if (uGrants.length > 1) {
           propertyScope = `Multi-Property (${uGrants.length})`;
         }

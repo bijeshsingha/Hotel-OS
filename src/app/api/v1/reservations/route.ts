@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { getNextDocumentNumber } from "@/lib/sequence/generator";
 import { quoteStay } from "@/lib/domain/pms-service";
+import { calculateGST } from "@/lib/gst/calculator";
 
 export async function GET(request: Request) {
   try {
@@ -25,11 +26,30 @@ export async function GET(request: Request) {
             nights: true,
           },
         },
+        deposits: true,
+        notesHistory: true,
       },
       orderBy: { createdAt: "desc" },
     });
 
-    return NextResponse.json(reservations);
+    // Also enrich with room types for quick client rendering
+    const roomTypes = await prisma.roomType.findMany({
+      where: { propertyId },
+    });
+    const rtMap = new Map(roomTypes.map((rt) => [rt.id, rt]));
+
+    const enriched = reservations.map((res) => {
+      const firstRoom = res.rooms[0];
+      const rt = firstRoom ? rtMap.get(firstRoom.roomTypeId) : null;
+      return {
+        ...res,
+        roomType: rt,
+        roomTypeName: rt?.name || "Standard Room",
+        roomTypeCode: rt?.code || "STD",
+      };
+    });
+
+    return NextResponse.json(enriched);
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
@@ -44,15 +64,29 @@ export async function POST(request: Request) {
       guestPhone,
       guestEmail,
       guestGstin,
+      guestCity,
+      guestState,
       guestNationality = "Indian",
       roomTypeId,
+      assignedRoomId,
       arrivalDate,
       departureDate,
       adults = 2,
       children = 0,
       source = "DIRECT",
+      channelRef,
+      ratePerNight,
       depositAmount = 0,
+      depositMethod = "UPI",
+      notes,
     } = body;
+
+    if (!propertyId || !guestName || !roomTypeId || !arrivalDate || !departureDate) {
+      return NextResponse.json(
+        { error: "Property, Guest Name, Room Category, Check-In Date, and Check-Out Date are required." },
+        { status: 400 }
+      );
+    }
 
     const property = await prisma.property.findUniqueOrThrow({
       where: { id: propertyId },
@@ -74,23 +108,53 @@ export async function POST(request: Request) {
         data: {
           organizationId: property.organizationId,
           name: guestName,
-          email: guestEmail,
-          phone: guestPhone,
-          gstin: guestGstin,
+          email: guestEmail || null,
+          phone: guestPhone || null,
+          gstin: guestGstin || null,
           nationality: guestNationality,
+          addressJson: JSON.stringify({
+            city: guestCity || "",
+            state: guestState || "",
+            country: "India",
+          }),
         },
       });
     }
 
-    // 2. Quote stay to calculate snapshot
-    const quote = await quoteStay({
-      propertyId,
-      roomTypeId,
-      arrivalDate,
-      departureDate,
-      adults,
-      children,
-    });
+    // Calculate nights count
+    const start = new Date(arrivalDate);
+    const end = new Date(departureDate);
+    const diffTime = Math.abs(end.getTime() - start.getTime());
+    const nightsCount = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
+
+    // Calculate per-night rates & total
+    const effectiveBaseRate = Number(ratePerNight) > 0 ? Number(ratePerNight) : 3500;
+    const nightsData = [];
+    let calculatedTotal = 0;
+
+    for (let i = 0; i < nightsCount; i++) {
+      const current = new Date(start);
+      current.setDate(current.getDate() + i);
+      const serviceDate = current.toISOString().split("T")[0];
+
+      const gst = calculateGST({
+        grossOrBaseAmount: effectiveBaseRate,
+        isInclusive: false,
+        sacHsn: "996311",
+        supplierStateCode: property.stateCode || "18",
+      });
+
+      calculatedTotal += gst.totalAmount;
+
+      nightsData.push({
+        serviceDate,
+        baseAmount: effectiveBaseRate,
+        discountAmount: 0,
+        taxableAmount: gst.taxableAmount,
+        taxAmount: gst.taxAmount,
+        totalAmount: gst.totalAmount,
+      });
+    }
 
     // 3. Document sequence for confirmation number
     const seq = await getNextDocumentNumber(propertyId, "RESERVATION");
@@ -106,7 +170,9 @@ export async function POST(request: Request) {
         departureDate,
         status: "CONFIRMED",
         source,
-        totalSnapshot: quote.totalAmount,
+        channelRef: channelRef || null,
+        notes: notes || null,
+        totalSnapshot: calculatedTotal,
       },
     });
 
@@ -114,13 +180,14 @@ export async function POST(request: Request) {
       data: {
         reservationId: reservation.id,
         roomTypeId,
-        adults,
-        children,
+        assignedRoomId: assignedRoomId || null,
+        adults: Number(adults) || 2,
+        children: Number(children) || 0,
         status: "CONFIRMED",
       },
     });
 
-    for (const night of quote.nights) {
+    for (const night of nightsData) {
       await prisma.reservationNight.create({
         data: {
           reservationRoomId: resRoom.id,
@@ -133,8 +200,20 @@ export async function POST(request: Request) {
       });
     }
 
+    // Add note history if provided
+    if (notes) {
+      await prisma.reservationNote.create({
+        data: {
+          reservationId: reservation.id,
+          category: "SPECIAL_REQUEST",
+          text: notes,
+          visibility: "INTERNAL",
+        },
+      });
+    }
+
     // Record Deposit if provided
-    if (depositAmount > 0) {
+    if (Number(depositAmount) > 0) {
       const recSeq = await getNextDocumentNumber(propertyId, "RECEIPT");
       const payment = await prisma.payment.create({
         data: {
@@ -142,8 +221,8 @@ export async function POST(request: Request) {
           propertyId,
           receiptNo: recSeq.formattedNumber,
           reservationId: reservation.id,
-          amount: depositAmount,
-          method: "UPI",
+          amount: Number(depositAmount),
+          method: depositMethod || "UPI",
           status: "SUCCEEDED",
         },
       });
@@ -154,8 +233,8 @@ export async function POST(request: Request) {
           propertyId,
           reservationId: reservation.id,
           paymentId: payment.id,
-          originalAmount: depositAmount,
-          availableAmount: depositAmount,
+          originalAmount: Number(depositAmount),
+          availableAmount: Number(depositAmount),
           status: "AVAILABLE",
         },
       });
@@ -165,8 +244,51 @@ export async function POST(request: Request) {
       success: true,
       reservation,
       confirmationNo: reservation.confirmationNo,
-      quote,
+      totalAmount: calculatedTotal,
     });
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}
+
+export async function PATCH(request: Request) {
+  try {
+    const body = await request.json();
+    const { id, status, reason, assignedRoomId } = body;
+
+    if (!id) {
+      return NextResponse.json({ error: "Reservation ID is required." }, { status: 400 });
+    }
+
+    const updated = await prisma.reservation.update({
+      where: { id },
+      data: {
+        ...(status ? { status } : {}),
+      },
+    });
+
+    if (status) {
+      await prisma.reservationRoom.updateMany({
+        where: { reservationId: id },
+        data: {
+          status,
+          ...(assignedRoomId ? { assignedRoomId } : {}),
+        },
+      });
+    }
+
+    if (reason) {
+      await prisma.reservationNote.create({
+        data: {
+          reservationId: id,
+          category: "FRONT_DESK",
+          text: `Status updated to ${status}. Reason: ${reason}`,
+          visibility: "INTERNAL",
+        },
+      });
+    }
+
+    return NextResponse.json({ success: true, reservation: updated });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

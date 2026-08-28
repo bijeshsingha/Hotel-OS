@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useMemo, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useHotel } from "@/lib/context/hotel-context";
-import { formatINR } from "@/lib/gst/calculator";
+import { formatINR, ACTIVE_TAX_RATES, getTaxRateForSac } from "@/lib/gst/calculator";
 import { numberToWordsINR } from "@/lib/gst/number-to-words";
 import {
   Receipt,
@@ -1001,9 +1001,15 @@ function BillingContent() {
                       className="h-9 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700/80 px-3 text-xs text-zinc-900 dark:text-zinc-200 focus:outline-none focus:border-blue-500 font-mono font-semibold"
                     >
                       <option value="ALL">All Categories</option>
+<<<<<<< HEAD
                       <option value="ROOM_TARIFF">🛏️ Room Tariffs (5%)</option>
                       <option value="RESTAURANT_FOOD">🍽️ Restaurant F&B (5%)</option>
                       <option value="MANUAL">🧺 Laundry & Services (5%)</option>
+=======
+                      <option value="ROOM_TARIFF">🛏️ Room Tariffs ({ACTIVE_TAX_RATES.ROOM_ACCOMMODATION_RATE}%)</option>
+                      <option value="RESTAURANT_FOOD">🍽️ Restaurant F&B ({ACTIVE_TAX_RATES.RESTAURANT_FOOD_RATE}%)</option>
+                      <option value="MANUAL">🧺 Laundry & Services ({ACTIVE_TAX_RATES.SERVICES_LAUNDRY_RATE}%)</option>
+>>>>>>> 1c24e1f (feat(pms): Add collapsible sidebar, future reservations suite, 5% centralized tax config, and LAN network support)
                     </select>
                   </div>
                 </div>
@@ -1046,7 +1052,11 @@ function BillingContent() {
                                       : "bg-purple-100 dark:bg-purple-950/60 text-purple-800 dark:text-purple-300 border border-purple-300 dark:border-purple-700"
                                   }`}
                                 >
+<<<<<<< HEAD
                                   {isDiscount ? "Discount" : isFood ? "🍽️ F&B 5%" : isRoom ? "🛏️ Room 5%" : "🧺 Service 5%"}
+=======
+                                  {isDiscount ? "Discount" : isFood ? `🍽️ F&B ${ACTIVE_TAX_RATES.RESTAURANT_FOOD_RATE}%` : isRoom ? `🛏️ Room ${ACTIVE_TAX_RATES.ROOM_ACCOMMODATION_RATE}%` : `🧺 Service ${ACTIVE_TAX_RATES.SERVICES_LAUNDRY_RATE}%`}
+>>>>>>> 1c24e1f (feat(pms): Add collapsible sidebar, future reservations suite, 5% centralized tax config, and LAN network support)
                                 </span>
                               </div>
                             </td>
@@ -1243,6 +1253,120 @@ function BillingContent() {
               </button>
             </div>
 
+<<<<<<< HEAD
+=======
+            {/* Quick Category Selector */}
+            <div className="space-y-2">
+              <label className="text-xs uppercase font-bold font-mono text-zinc-500 tracking-wider">
+                Charge Category
+              </label>
+              <div className="grid grid-cols-3 gap-2.5">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setChargeForm({
+                      chargeCode: "RESTAURANT_FOOD",
+                      description: "Dinner Service Bill",
+                      amount: chargeForm.amount || "650",
+                      sacHsn: "996331",
+                    })
+                  }
+                  className={`p-3 rounded-2xl border-2 text-left font-bold transition flex items-center gap-2.5 ${
+                    chargeForm.sacHsn === "996331"
+                      ? "bg-amber-50 dark:bg-amber-950/50 border-amber-500 text-amber-900 dark:text-amber-200 shadow-sm"
+                      : "bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300"
+                  }`}
+                >
+                  <span className="text-xl">🍽️</span>
+                  <div>
+                    <span className="block text-xs font-black">F&B Dining</span>
+                    <span className="text-[11px] font-mono text-amber-600 dark:text-amber-400 font-bold">5% GST</span>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    setChargeForm({
+                      chargeCode: "ROOM_TARIFF",
+                      description: "Extra Bed & Stay Extension",
+                      amount: chargeForm.amount || "1000",
+                      sacHsn: "996311",
+                    })
+                  }
+                  className={`p-3 rounded-2xl border-2 text-left font-bold transition flex items-center gap-2.5 ${
+                    chargeForm.sacHsn === "996311"
+                      ? "bg-blue-50 dark:bg-blue-950/50 border-blue-500 text-blue-900 dark:text-blue-200 shadow-sm"
+                      : "bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300"
+                  }`}
+                >
+                  <span className="text-xl">🛏️</span>
+                  <div>
+                    <span className="block text-xs font-black">Room Tariff</span>
+                    <span className="text-[11px] font-mono text-blue-600 dark:text-blue-400 font-bold">{ACTIVE_TAX_RATES.ROOM_ACCOMMODATION_RATE}% GST</span>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    setChargeForm({
+                      chargeCode: "LAUNDRY",
+                      description: "Laundry & Pressing Service",
+                      amount: chargeForm.amount || "300",
+                      sacHsn: "9997",
+                    })
+                  }
+                  className={`p-3 rounded-2xl border-2 text-left font-bold transition flex items-center gap-2.5 ${
+                    chargeForm.sacHsn === "9997"
+                      ? "bg-purple-50 dark:bg-purple-950/50 border-purple-500 text-purple-900 dark:text-purple-200 shadow-sm"
+                      : "bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300"
+                  }`}
+                >
+                  <span className="text-xl">🧺</span>
+                  <div>
+                    <span className="block text-xs font-black">Laundry</span>
+                    <span className="text-[11px] font-mono text-purple-600 dark:text-purple-400 font-bold">{ACTIVE_TAX_RATES.SERVICES_LAUNDRY_RATE}% GST</span>
+                  </div>
+                </button>
+              </div>
+            </div>
+
+            {/* Quick F&B Items Presets when in F&B mode */}
+            {chargeForm.sacHsn === "996331" && (
+              <div className="space-y-2 p-3 rounded-2xl bg-amber-500/10 border border-amber-300/70 dark:border-amber-700/50 text-xs">
+                <span className="text-[11px] font-mono font-black text-amber-900 dark:text-amber-300 uppercase tracking-wider block">
+                  Quick Food & Dining Items (Click to Select)
+                </span>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    { text: "Dinner Service Bill", amt: "650" },
+                    { text: "Breakfast Spread & Coffee", amt: "350" },
+                    { text: "Lunch Service Bill", amt: "550" },
+                    { text: "In-Room Tea & Snacks", amt: "180" },
+                    { text: "Mineral Water & Beverages", amt: "120" },
+                    { text: "Buffet Dinner", amt: "850" },
+                  ].map((preset) => (
+                    <button
+                      key={preset.text}
+                      type="button"
+                      onClick={() =>
+                        setChargeForm((prev) => ({
+                          ...prev,
+                          description: preset.text,
+                          amount: preset.amt,
+                        }))
+                      }
+                      className="px-3 py-1.5 rounded-xl bg-white dark:bg-zinc-900 border border-amber-300 dark:border-amber-700 text-zinc-900 dark:text-zinc-100 text-xs font-bold hover:bg-amber-100 dark:hover:bg-amber-950/80 transition shadow-xs"
+                    >
+                      {preset.text} (₹{preset.amt})
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+>>>>>>> 1c24e1f (feat(pms): Add collapsible sidebar, future reservations suite, 5% centralized tax config, and LAN network support)
             <form onSubmit={handlePostCharge} className="space-y-4 text-xs sm:text-sm">
               {/* 1. Single Clean Dropdown for Charge Category */}
               <div>
@@ -1322,17 +1446,19 @@ function BillingContent() {
               {/* 4. Live 5% GST Inclusive Math Breakdown */}
               {(() => {
                 const gross = Number(chargeForm.amount) || 0;
-                const baseTaxable = Math.round((gross / 1.05) * 100) / 100;
+                const taxRatePercent = getTaxRateForSac(chargeForm.sacHsn, gross);
+                const baseTaxable = Math.round((gross / (1 + taxRatePercent / 100)) * 100) / 100;
                 const totalGst = Math.round((gross - baseTaxable) * 100) / 100;
+                const halfRate = (taxRatePercent / 2).toFixed(1);
                 const cgst = Math.round((totalGst / 2) * 100) / 100;
                 const sgst = Math.round((totalGst - cgst) * 100) / 100;
 
                 return (
                   <div className="p-3.5 rounded-2xl bg-zinc-50 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 space-y-2.5">
                     <div className="flex items-center justify-between text-xs">
-                      <span className="font-mono text-zinc-500 font-medium">Tax Calculation (5% Inclusive):</span>
+                      <span className="font-mono text-zinc-500 font-medium">Tax Calculation ({taxRatePercent}% Inclusive):</span>
                       <span className="font-mono text-[11px] text-zinc-600 dark:text-zinc-400">
-                        CGST 2.5% + SGST 2.5%
+                        CGST {halfRate}% + SGST {halfRate}%
                       </span>
                     </div>
 
@@ -1342,11 +1468,11 @@ function BillingContent() {
                         <span className="font-bold text-zinc-900 dark:text-white">{formatINR(baseTaxable)}</span>
                       </div>
                       <div className="bg-white dark:bg-zinc-800/80 p-2 rounded-xl border border-zinc-200 dark:border-zinc-700/60 shadow-xs">
-                        <span className="text-[10px] text-zinc-400 block uppercase">CGST (2.5%)</span>
+                        <span className="text-[10px] text-zinc-400 block uppercase">CGST ({halfRate}%)</span>
                         <span className="font-bold text-zinc-900 dark:text-white">{formatINR(cgst)}</span>
                       </div>
                       <div className="bg-white dark:bg-zinc-800/80 p-2 rounded-xl border border-zinc-200 dark:border-zinc-700/60 shadow-xs">
-                        <span className="text-[10px] text-zinc-400 block uppercase">SGST (2.5%)</span>
+                        <span className="text-[10px] text-zinc-400 block uppercase">SGST ({halfRate}%)</span>
                         <span className="font-bold text-zinc-900 dark:text-white">{formatINR(sgst)}</span>
                       </div>
                     </div>
@@ -1358,6 +1484,8 @@ function BillingContent() {
                       </span>
                     </div>
                   </div>
+                );
+              })()}
                 );
               })()}
 

@@ -34,6 +34,13 @@ export async function getNextDocumentNumber(
   else if (documentType === "ORDER") defaultPrefix = `ORD-`;
   else if (documentType === "MAINTENANCE") defaultPrefix = `MNT-`;
 
+  // Fetch organizationId from property
+  const prop = await prisma.property.findUnique({
+    where: { id: propertyId },
+    select: { organizationId: true },
+  });
+  const orgId = prop?.organizationId || "org_ambarish";
+
   // Upsert document sequence record atomically
   const sequence = await prisma.documentSequence.upsert({
     where: {
@@ -45,7 +52,7 @@ export async function getNextDocumentNumber(
       },
     },
     create: {
-      organizationId: "", // will be linked or retrieved
+      organizationId: orgId,
       propertyId,
       documentType,
       scopeKey,
