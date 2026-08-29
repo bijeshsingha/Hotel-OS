@@ -50,7 +50,68 @@ export async function GET(request: Request) {
       take: limit,
     });
 
-    return NextResponse.json(records);
+    // Enrich records with live Stay agreed tariffs and Folio deposit payment methods
+    const enrichedRecords = await Promise.all(
+      records.map(async (rec) => {
+        let agreedRoomTariff = 3200;
+        let depositAmount = rec.depositAmount || 0;
+        let advancePaymentMethod = "";
+
+        // Check internal notes JSON first
+        try {
+          if (rec.internalNotes) {
+            const parsed = JSON.parse(rec.internalNotes);
+            if (parsed.agreedTariff !== undefined) agreedRoomTariff = Number(parsed.agreedTariff);
+            if (parsed.advancePaymentMethod) advancePaymentMethod = parsed.advancePaymentMethod;
+            if (parsed.depositAmount !== undefined) depositAmount = Number(parsed.depositAmount);
+          }
+        } catch {}
+
+        // Query linked Stay for real-time operational rate and payments
+        try {
+          const stay = await prisma.stay.findFirst({
+            where: {
+              propertyId: rec.propertyId,
+              OR: [
+                ...(rec.stayId ? [{ id: rec.stayId }] : []),
+                { primaryGuest: { phone: rec.mobilePhone } },
+                { primaryGuest: { name: rec.fullName } },
+                ...(rec.preAssignedRoom ? [{ roomAssignments: { some: { room: { number: rec.preAssignedRoom } } } }] : []),
+              ],
+            },
+            include: {
+              roomAssignments: { include: { room: true } },
+              folio: { include: { payments: true } },
+            },
+          });
+
+          if (stay) {
+            const firstAssignment = stay.roomAssignments[0];
+            if (firstAssignment?.moveReason?.startsWith("AGREED_RATE:")) {
+              const parsedRate = Number(firstAssignment.moveReason.replace("AGREED_RATE:", ""));
+              if (!isNaN(parsedRate)) agreedRoomTariff = parsedRate;
+            } else if (firstAssignment?.rateHandling === "COMPLIMENTARY") {
+              agreedRoomTariff = 0;
+            }
+
+            if (stay.folio?.payments && stay.folio.payments.length > 0) {
+              const firstPayment = stay.folio.payments[0];
+              depositAmount = firstPayment.amount;
+              advancePaymentMethod = firstPayment.method;
+            }
+          }
+        } catch {}
+
+        return {
+          ...rec,
+          agreedRoomTariff,
+          depositAmount,
+          advancePaymentMethod,
+        };
+      })
+    );
+
+    return NextResponse.json(enrichedRecords);
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
@@ -86,11 +147,28 @@ export async function PATCH(request: Request) {
       expectedDepartureDate,
       preAssignedRoom,
       status,
+      agreedRoomTariff,
+      depositAmount,
+      advancePaymentMethod,
     } = body;
 
     if (!id) {
       return NextResponse.json({ error: "GRC ID is required." }, { status: 400 });
     }
+
+    const currentReg = await prisma.guestRegistration.findUnique({ where: { id } });
+    let notesObj: any = {};
+    try {
+      if (currentReg?.internalNotes) {
+        notesObj = JSON.parse(currentReg.internalNotes);
+      }
+    } catch {
+      notesObj = { note: currentReg?.internalNotes || "" };
+    }
+
+    if (agreedRoomTariff !== undefined) notesObj.agreedTariff = Number(agreedRoomTariff);
+    if (depositAmount !== undefined) notesObj.depositAmount = Number(depositAmount);
+    if (advancePaymentMethod !== undefined) notesObj.advancePaymentMethod = advancePaymentMethod;
 
     const updated = await prisma.guestRegistration.update({
       where: { id },
@@ -119,12 +197,19 @@ export async function PATCH(request: Request) {
         arrivalDateTime: arrivalDateTime || undefined,
         expectedDepartureDate: expectedDepartureDate !== undefined ? expectedDepartureDate : undefined,
         preAssignedRoom: preAssignedRoom !== undefined ? preAssignedRoom : undefined,
+        depositAmount: depositAmount !== undefined ? Number(depositAmount) || 0 : undefined,
+        internalNotes: JSON.stringify(notesObj),
         status: status || undefined,
       },
     });
 
     // Synchronize edits across Guest CRM, Stays, and Folios, and backup snapshot
-    await syncGrcEditsEverywhere(updated);
+    await syncGrcEditsEverywhere({
+      ...updated,
+      agreedRoomTariff: agreedRoomTariff !== undefined ? Number(agreedRoomTariff) : undefined,
+      depositAmount: depositAmount !== undefined ? Number(depositAmount) : undefined,
+      advancePaymentMethod: advancePaymentMethod !== undefined ? advancePaymentMethod : undefined,
+    });
 
     // Audit log
     await prisma.auditLog.create({

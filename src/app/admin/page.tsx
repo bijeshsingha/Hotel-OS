@@ -912,10 +912,11 @@ export default function AdminPortalPage() {
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse text-xs">
                 <thead>
-                  <tr className="border-b border-zinc-200 dark:border-zinc-800 text-[10.5px] font-mono uppercase tracking-wider text-zinc-500 dark:text-zinc-400 bg-slate-50 dark:bg-zinc-900/80">
-                    <th className="py-3 px-4 font-bold">GRC Number</th>
-                    <th className="py-3 px-3 font-bold">Guest Full Name</th>
-                    <th className="py-3 px-3 font-bold">Room & Schedule</th>
+                  <tr className="bg-zinc-50 dark:bg-zinc-900/60 text-zinc-500 uppercase font-mono text-[10px] border-b border-zinc-200 dark:border-zinc-800">
+                    <th className="py-3 px-4 font-bold">GRC No.</th>
+                    <th className="py-3 px-3 font-bold">Primary Guest</th>
+                    <th className="py-3 px-3 font-bold">Room & Dates</th>
+                    <th className="py-3 px-3 font-bold">Agreed Rent & Deposit</th>
                     <th className="py-3 px-3 font-bold">Contact & ID</th>
                     <th className="py-3 px-3 font-bold">City / Address</th>
                     <th className="py-3 px-3 font-bold">{grcViewMode === "ARCHIVED" ? "Backup Action" : "Status"}</th>
@@ -925,13 +926,13 @@ export default function AdminPortalPage() {
                 <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/60">
                   {grcLoading ? (
                     <tr>
-                      <td colSpan={7} className="py-12 text-center text-zinc-400 font-mono">
+                      <td colSpan={8} className="py-12 text-center text-zinc-400 font-mono">
                         Loading {grcViewMode === "ARCHIVED" ? "archive backup records" : "GRC records"}...
                       </td>
                     </tr>
                   ) : grcList.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="py-12 text-center text-zinc-400 font-mono">
+                      <td colSpan={8} className="py-12 text-center text-zinc-400 font-mono">
                         No {grcViewMode === "ARCHIVED" ? "archived backup" : "GRC"} records found.
                       </td>
                     </tr>
@@ -959,6 +960,24 @@ export default function AdminPortalPage() {
                             </div>
                             <div className="text-[10px] text-zinc-400">
                               In: {data.arrivalDateTime?.slice(0, 16) || "—"} | Out: {data.expectedDepartureDate || "—"}
+                            </div>
+                          </td>
+                          <td className="py-3 px-3 font-mono text-[11px]">
+                            <div className="font-bold text-zinc-900 dark:text-white">
+                              {data.agreedRoomTariff === 0 ? (
+                                <span className="text-emerald-600 font-bold">🎁 Complimentary (₹0)</span>
+                              ) : (
+                                `₹${(data.agreedRoomTariff ?? 3200).toLocaleString()}/nt`
+                              )}
+                            </div>
+                            <div className="text-[10px]">
+                              {Number(data.depositAmount || 0) > 0 ? (
+                                <span className="text-emerald-700 dark:text-emerald-400 font-bold">
+                                  Adv: ₹{Number(data.depositAmount).toLocaleString()} ({data.advancePaymentMethod || "UPI"})
+                                </span>
+                              ) : (
+                                <span className="text-zinc-400">No Advance Paid</span>
+                              )}
                             </div>
                           </td>
                           <td className="py-3 px-3 font-mono text-[11px]">
@@ -1222,11 +1241,137 @@ export default function AdminPortalPage() {
                     </div>
                   </div>
 
-                  {/* Section 02: Residential Address */}
+                  {/* Section 02: Financial & Agreed Billing Terms */}
+                  <div className="rounded-2xl bg-white dark:bg-[#121215] border border-zinc-200/90 dark:border-zinc-800 p-5 space-y-4 shadow-2xs">
+                    <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800/80 pb-3">
+                      <div className="flex items-center gap-2.5">
+                        <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-bold text-xs font-mono">
+                          02
+                        </span>
+                        <span className="text-sm font-extrabold text-zinc-900 dark:text-zinc-100">
+                          Agreed Room Rent & Advance Payment Terms
+                        </span>
+                      </div>
+                      <span className="text-[11px] font-mono text-zinc-400">
+                        GST 5% Inclusive Calculation
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      {/* 1. Agreed Room Tariff */}
+                      <div className="space-y-1">
+                        <label className="block text-[11px] font-bold text-zinc-700 dark:text-zinc-300 uppercase">
+                          Agreed Room Rent (₹ / Night) *
+                        </label>
+                        <div className="relative flex items-center">
+                          <span className="absolute left-3 font-mono font-bold text-zinc-400 text-xs">₹</span>
+                          <input
+                            type="number"
+                            required
+                            min={0}
+                            step={1}
+                            value={editingGrc.agreedRoomTariff !== undefined ? editingGrc.agreedRoomTariff : 3200}
+                            onChange={(e) => setEditingGrc({ ...editingGrc, agreedRoomTariff: Number(e.target.value) })}
+                            className="w-full h-10 pl-7 pr-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs font-mono font-bold focus:border-indigo-600 focus:outline-none"
+                            placeholder="3200"
+                          />
+                        </div>
+                        <p className="text-[10px] text-zinc-400 mt-0.5">
+                          {editingGrc.agreedRoomTariff === 0 ? "Complimentary stay (₹0)" : "Daily room charge for 24h cycle"}
+                        </p>
+                      </div>
+
+                      {/* 2. Advance / Deposit Paid */}
+                      <div className="space-y-1">
+                        <label className="block text-[11px] font-bold text-zinc-700 dark:text-zinc-300 uppercase">
+                          Advance Paid (₹)
+                        </label>
+                        <div className="relative flex items-center">
+                          <span className="absolute left-3 font-mono font-bold text-zinc-400 text-xs">₹</span>
+                          <input
+                            type="number"
+                            min={0}
+                            step={1}
+                            value={editingGrc.depositAmount !== undefined ? editingGrc.depositAmount : 0}
+                            onChange={(e) => {
+                              const val = Number(e.target.value) || 0;
+                              setEditingGrc({
+                                ...editingGrc,
+                                depositAmount: val,
+                                advancePaymentMethod: val > 0 ? (editingGrc.advancePaymentMethod || "UPI") : "",
+                              });
+                            }}
+                            className="w-full h-10 pl-7 pr-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs font-mono font-bold focus:border-indigo-600 focus:outline-none"
+                            placeholder="0"
+                          />
+                        </div>
+                        <p className="text-[10px] text-zinc-400 mt-0.5">
+                          {Number(editingGrc.depositAmount || 0) > 0 ? (
+                            <span className="text-emerald-600 dark:text-emerald-400 font-semibold">Advance paid: ₹{editingGrc.depositAmount}</span>
+                          ) : (
+                            "Set 0 if no advance deposit was collected"
+                          )}
+                        </p>
+                      </div>
+
+                      {/* 3. Mode of Payment (Conditional) */}
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between">
+                          <label className="block text-[11px] font-bold text-zinc-700 dark:text-zinc-300 uppercase">
+                            Mode of Payment {Number(editingGrc.depositAmount || 0) > 0 ? <span className="text-rose-500">*</span> : ""}
+                          </label>
+                          {Number(editingGrc.depositAmount || 0) > 0 ? (
+                            <span className="text-[9.5px] px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 font-bold uppercase">
+                              Required
+                            </span>
+                          ) : (
+                            <span className="text-[9.5px] px-1.5 py-0.2 rounded bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400 font-mono font-semibold">
+                              Disabled
+                            </span>
+                          )}
+                        </div>
+
+                        <select
+                          disabled={Number(editingGrc.depositAmount || 0) <= 0}
+                          required={Number(editingGrc.depositAmount || 0) > 0}
+                          value={Number(editingGrc.depositAmount || 0) > 0 ? (editingGrc.advancePaymentMethod || "UPI") : ""}
+                          onChange={(e) => setEditingGrc({ ...editingGrc, advancePaymentMethod: e.target.value })}
+                          className={`w-full h-10 px-3.5 rounded-xl border text-xs font-bold transition focus:outline-none ${
+                            Number(editingGrc.depositAmount || 0) <= 0
+                              ? "bg-zinc-100 dark:bg-zinc-900/60 border-zinc-200 dark:border-zinc-800 text-zinc-400 dark:text-zinc-600 cursor-not-allowed select-none"
+                              : "bg-zinc-50 dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white focus:border-indigo-600 cursor-pointer shadow-xs"
+                          }`}
+                        >
+                          {Number(editingGrc.depositAmount || 0) <= 0 ? (
+                            <option value="">No Advance (Payment Mode Disabled)</option>
+                          ) : (
+                            <>
+                              <option value="UPI">UPI / QR (GPay / PhonePe / Paytm)</option>
+                              <option value="CASH">Cash at Reception Desk</option>
+                              <option value="CARD">Debit / Credit Card POS Machine</option>
+                              <option value="DIRECT_BILL">Bill to Company (BTC Direct Bill)</option>
+                              <option value="BANK_TRANSFER">Bank Transfer (NEFT / RTGS / IMPS)</option>
+                              <option value="ONLINE">Online Portal / Pre-paid OTA</option>
+                            </>
+                          )}
+                        </select>
+
+                        <p className="text-[10px] text-zinc-400 mt-0.5">
+                          {Number(editingGrc.depositAmount || 0) <= 0 ? (
+                            "🔒 Disabled when Advance Paid is ₹0"
+                          ) : (
+                            "Mandatory for recording receipt on folio"
+                          )}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Section 03: Residential Address */}
                   <div className="rounded-2xl bg-white dark:bg-[#121215] border border-zinc-200/90 dark:border-zinc-800 p-5 space-y-4 shadow-2xs">
                     <div className="flex items-center gap-2.5 border-b border-zinc-100 dark:border-zinc-800/80 pb-3">
                       <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 text-blue-600 dark:text-blue-400 font-bold text-xs font-mono">
-                        02
+                        03
                       </span>
                       <span className="text-sm font-extrabold text-zinc-900 dark:text-zinc-100">
                         Residential Address & Jurisdiction
@@ -1292,11 +1437,11 @@ export default function AdminPortalPage() {
                     </div>
                   </div>
 
-                  {/* Section 03: Travel & Purpose Details */}
+                  {/* Section 04: Travel & Purpose Details */}
                   <div className="rounded-2xl bg-white dark:bg-[#121215] border border-zinc-200/90 dark:border-zinc-800 p-5 space-y-4 shadow-2xs">
                     <div className="flex items-center gap-2.5 border-b border-zinc-100 dark:border-zinc-800/80 pb-3">
                       <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 text-blue-600 dark:text-blue-400 font-bold text-xs font-mono">
-                        03
+                        04
                       </span>
                       <span className="text-sm font-extrabold text-zinc-900 dark:text-zinc-100">
                         Travel & Purpose of Visit
@@ -1357,11 +1502,11 @@ export default function AdminPortalPage() {
                     </div>
                   </div>
 
-                  {/* Section 04: Contact & Vehicle Details */}
+                  {/* Section 05: Contact & Vehicle Details */}
                   <div className="rounded-2xl bg-white dark:bg-[#121215] border border-zinc-200/90 dark:border-zinc-800 p-5 space-y-4 shadow-2xs">
                     <div className="flex items-center gap-2.5 border-b border-zinc-100 dark:border-zinc-800/80 pb-3">
                       <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 text-blue-600 dark:text-blue-400 font-bold text-xs font-mono">
-                        04
+                        05
                       </span>
                       <span className="text-sm font-extrabold text-zinc-900 dark:text-zinc-100">
                         Contact & Vehicle Information
@@ -1415,11 +1560,11 @@ export default function AdminPortalPage() {
                     </div>
                   </div>
 
-                  {/* Section 05: Government ID Document */}
+                  {/* Section 06: Government ID Document */}
                   <div className="rounded-2xl bg-white dark:bg-[#121215] border border-zinc-200/90 dark:border-zinc-800 p-5 space-y-4 shadow-2xs">
                     <div className="flex items-center gap-2.5 border-b border-zinc-100 dark:border-zinc-800/80 pb-3">
                       <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 text-blue-600 dark:text-blue-400 font-bold text-xs font-mono">
-                        05
+                        06
                       </span>
                       <span className="text-sm font-extrabold text-zinc-900 dark:text-zinc-100">
                         Government Photo ID & Verification
@@ -1459,11 +1604,11 @@ export default function AdminPortalPage() {
                     </div>
                   </div>
 
-                  {/* Section 06: Digital Signature & GRC Status */}
+                  {/* Section 07: Digital Signature & GRC Status */}
                   <div className="rounded-2xl bg-white dark:bg-[#121215] border border-zinc-200/90 dark:border-zinc-800 p-5 space-y-4 shadow-2xs">
                     <div className="flex items-center gap-2.5 border-b border-zinc-100 dark:border-zinc-800/80 pb-3">
                       <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 text-blue-600 dark:text-blue-400 font-bold text-xs font-mono">
-                        06
+                        07
                       </span>
                       <span className="text-sm font-extrabold text-zinc-900 dark:text-zinc-100">
                         Digital Signature & Operational Status
