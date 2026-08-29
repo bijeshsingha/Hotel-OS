@@ -125,6 +125,7 @@ function BillingContent() {
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<any | null>(null);
   const [isLiveTaxBillView, setIsLiveTaxBillView] = useState(false);
+  const [gracePeriodMinutes, setGracePeriodMinutes] = useState<string>("60");
   const [actionLoading, setActionLoading] = useState(false);
 
   // Form states for modals
@@ -1143,38 +1144,69 @@ function BillingContent() {
                   </div>
                 </div>
 
-                {/* GROUP BILLING TOGGLE / DROPDOWN */}
-                <div className="flex items-center justify-between gap-2.5 pt-2.5 border-t border-zinc-100 dark:border-zinc-800/80 flex-wrap">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-xs font-bold text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
-                      <Layers className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
-                      Group Billing:
-                    </span>
-                    <select
-                      value={groupBillingMode}
-                      onChange={(e) => setGroupBillingMode(e.target.value as "NO" | "YES")}
-                      className="h-8.5 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 px-3 text-xs font-bold text-zinc-900 dark:text-white focus:outline-none focus:border-blue-500 cursor-pointer shadow-2xs"
-                    >
-                      <option value="NO">No — Separate Billing (Room {activeRoomNumber} Only)</option>
-                      {isMultiRoomGroup && (
-                        <option value="YES">Yes — Combined Group Billing (Rooms {allGroupRooms.join(", ")})</option>
-                      )}
-                    </select>
+                {/* BILLING CONTROLS: GRACE PERIOD & GROUP BILLING TOGGLE */}
+                <div className="flex items-center justify-between gap-3 pt-2.5 border-t border-zinc-100 dark:border-zinc-800/80 flex-wrap">
+                  <div className="flex items-center gap-3 flex-wrap">
+                    
+                    {/* Grace Period Selector */}
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
+                        <Clock className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+                        Grace Period:
+                      </span>
+                      <select
+                        value={gracePeriodMinutes}
+                        onChange={(e) => setGracePeriodMinutes(e.target.value)}
+                        className="h-8.5 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 px-3 text-xs font-bold text-zinc-900 dark:text-white focus:outline-none focus:border-amber-500 cursor-pointer shadow-2xs"
+                      >
+                        <option value="0">0 Hours (Strict 24h)</option>
+                        <option value="60">1 Hour Grace (Default)</option>
+                        <option value="120">2 Hours Grace</option>
+                        <option value="180">3 Hours Grace</option>
+                        <option value="240">4 Hours Grace</option>
+                      </select>
+                    </div>
+
+                    {/* Group Billing Selector */}
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
+                        <Layers className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
+                        Group Billing:
+                      </span>
+                      <select
+                        value={groupBillingMode}
+                        onChange={(e) => setGroupBillingMode(e.target.value as "NO" | "YES")}
+                        className="h-8.5 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 px-3 text-xs font-bold text-zinc-900 dark:text-white focus:outline-none focus:border-blue-500 cursor-pointer shadow-2xs"
+                      >
+                        <option value="NO">No — Separate Billing (Room {activeRoomNumber} Only)</option>
+                        {isMultiRoomGroup && (
+                          <option value="YES">Yes — Combined Group Billing (Rooms {allGroupRooms.join(", ")})</option>
+                        )}
+                      </select>
+                    </div>
+
                   </div>
 
-                  {isMultiRoomGroup && (
-                    <div className="text-[11px] font-medium">
-                      {groupBillingMode === "NO" ? (
-                        <span className="text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800/60 px-2 py-0.5 rounded-lg flex items-center gap-1">
-                          <span>Separate Room Mode (Room {activeRoomNumber} of {allGroupRooms.join(", ")})</span>
+                  {/* Status Badges */}
+                  <div className="flex items-center gap-2 text-[11px] font-medium flex-wrap">
+                    {Number(gracePeriodMinutes) > 0 && (
+                      <span className="text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 px-2 py-0.5 rounded-lg font-bold">
+                        ⏱️ +{Number(gracePeriodMinutes) / 60}h Billing Grace Active
+                      </span>
+                    )}
+
+                    {isMultiRoomGroup && (
+                      groupBillingMode === "NO" ? (
+                        <span className="text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800/60 px-2 py-0.5 rounded-lg">
+                          Separate Room Mode (Room {activeRoomNumber} of {allGroupRooms.join(", ")})
                         </span>
                       ) : (
                         <span className="text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 px-2 py-0.5 rounded-lg font-bold">
                           ✓ All {allGroupRooms.length} Rooms Automatically Combined
                         </span>
-                      )}
-                    </div>
-                  )}
+                      )
+                    )}
+                  </div>
                 </div>
               </div>
 

@@ -541,7 +541,7 @@ export function GrcIntakeModal({
                   />
                 </div>
 
-                {/* Checkout Billing Model & Grace Period */}
+                {/* Checkout Billing Model */}
                 <div className="space-y-1 sm:col-span-2">
                   <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">
                     Checkout Billing Cycle *
@@ -553,23 +553,6 @@ export function GrcIntakeModal({
                   >
                     <option value="24_HOURS">⏱️ 24-Hour Cycle from Check-In (Default)</option>
                     <option value="FIXED_TIME">☀️ Standard 11:00 AM / 12:00 PM Fixed Time</option>
-                  </select>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">
-                    Grace Period
-                  </label>
-                  <select
-                    value={formData.gracePeriodMinutes}
-                    onChange={(e) => setFormData({ ...formData, gracePeriodMinutes: e.target.value })}
-                    className="w-full h-10 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white text-xs font-semibold focus:border-blue-500 focus:outline-none cursor-pointer"
-                  >
-                    <option value="60">1 Hour Grace (Default)</option>
-                    <option value="0">0 Hours (Strict 24h)</option>
-                    <option value="120">2 Hours Grace</option>
-                    <option value="180">3 Hours Grace</option>
-                    <option value="240">4 Hours Grace</option>
                   </select>
                 </div>
 
