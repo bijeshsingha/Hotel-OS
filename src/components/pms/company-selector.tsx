@@ -12,6 +12,7 @@ import {
   MapPin,
   Phone,
   FileText,
+  X,
 } from "lucide-react";
 import { AddCompanyModal } from "./company-modal";
 
@@ -37,7 +38,7 @@ export interface CompanyItem {
 interface CompanySelectorProps {
   value?: string;
   selectedCompany?: CompanyItem | null;
-  onSelect: (company: CompanyItem) => void;
+  onSelect: (company: CompanyItem | null) => void;
   filterType?: "ALL" | "COMPANY" | "TRAVEL_AGENT";
   activeProperty?: any;
   placeholder?: string;
@@ -152,28 +153,55 @@ export function CompanySelector({
   return (
     <div className={`relative ${className}`} ref={dropdownRef}>
       {/* Selector Trigger Button */}
-      <button
-        type="button"
-        onClick={() => setIsOpen(!isOpen)}
-        className="w-full h-9 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs text-zinc-900 dark:text-white flex items-center justify-between gap-2 focus:border-indigo-500 focus:outline-none transition shadow-xs cursor-pointer text-left"
-      >
-        <div className="flex items-center gap-2 truncate">
-          {selectedCompany?.accountType === "TRAVEL_AGENT" ? (
-            <Building2 className="h-3.5 w-3.5 text-blue-500 shrink-0" />
-          ) : (
-            <Briefcase className="h-3.5 w-3.5 text-indigo-500 shrink-0" />
-          )}
-          <span className={`truncate font-semibold ${currentSelectionName ? "text-zinc-900 dark:text-white" : "text-zinc-400"}`}>
-            {currentSelectionName || placeholder}
-          </span>
-          {selectedCompany?.gstin && (
-            <span className="hidden sm:inline-block text-[10px] font-mono font-bold bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 px-1.5 py-0.5 rounded border border-zinc-200 dark:border-zinc-700 shrink-0">
-              GST: {selectedCompany.gstin}
+      <div className="relative flex items-center">
+        <button
+          type="button"
+          onClick={() => setIsOpen(!isOpen)}
+          className="w-full h-10 px-3 pr-16 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs text-zinc-900 dark:text-white flex items-center justify-between gap-2 focus:border-indigo-500 focus:outline-none transition shadow-xs cursor-pointer text-left"
+        >
+          <div className="flex items-center gap-2 truncate">
+            {selectedCompany?.accountType === "TRAVEL_AGENT" ? (
+              <Building2 className="h-4 w-4 text-blue-500 shrink-0" />
+            ) : (
+              <Briefcase className="h-4 w-4 text-indigo-500 shrink-0" />
+            )}
+            <span className={`truncate font-semibold ${currentSelectionName ? "text-zinc-900 dark:text-white" : "text-zinc-400"}`}>
+              {currentSelectionName || placeholder}
             </span>
-          )}
+            {selectedCompany?.gstin && (
+              <span className="hidden sm:inline-block text-[10px] font-mono font-bold bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 px-1.5 py-0.5 rounded border border-zinc-200 dark:border-zinc-700 shrink-0">
+                GST: {selectedCompany.gstin}
+              </span>
+            )}
+          </div>
+        </button>
+
+        {/* Action Controls in Input: Clear X + Dropdown Arrow */}
+        <div className="absolute right-2 flex items-center gap-1">
+          {currentSelectionName ? (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onSelect(null);
+                setIsOpen(false);
+              }}
+              title="Unselect / Clear Company"
+              className="p-1 rounded-lg text-zinc-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition cursor-pointer"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          ) : null}
+
+          <button
+            type="button"
+            onClick={() => setIsOpen(!isOpen)}
+            className="p-1 text-zinc-400 hover:text-zinc-700 dark:hover:text-white transition cursor-pointer"
+          >
+            <ChevronDown className={`h-4 w-4 transition-transform ${isOpen ? "rotate-180" : ""}`} />
+          </button>
         </div>
-        <ChevronDown className={`h-4 w-4 text-zinc-400 transition-transform ${isOpen ? "rotate-180" : ""}`} />
-      </button>
+      </div>
 
       {/* Dropdown Menu */}
       {isOpen && (
@@ -203,6 +231,22 @@ export function CompanySelector({
 
           {/* Company Items List */}
           <div className="overflow-y-auto p-1.5 space-y-1 flex-1">
+            
+            {/* Clear / None Option */}
+            {currentSelectionName && (
+              <button
+                type="button"
+                onClick={() => {
+                  onSelect(null);
+                  setIsOpen(false);
+                }}
+                className="w-full p-2 rounded-xl text-left transition flex items-center gap-2 bg-rose-50/60 hover:bg-rose-100/80 dark:bg-rose-950/20 dark:hover:bg-rose-950/40 text-rose-600 dark:text-rose-400 font-bold text-xs cursor-pointer border border-dashed border-rose-200 dark:border-rose-900/40"
+              >
+                <X className="h-3.5 w-3.5 shrink-0" />
+                <span>✕ None / Clear Company (Individual / Direct Guest)</span>
+              </button>
+            )}
+
             {companies.length === 0 ? (
               <div className="p-4 text-center text-xs text-zinc-500">
                 {loading ? "Searching master list..." : `No matching companies found for "${search}"`}
@@ -225,7 +269,7 @@ export function CompanySelector({
                     }`}
                   >
                     <div className="space-y-0.5 min-w-0">
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-1.5 flex-wrap">
                         <span className="font-bold text-xs truncate">{c.accountName}</span>
                         {c.shortName && (
                           <span className="text-[10px] font-mono bg-zinc-200 dark:bg-zinc-800 px-1 rounded text-zinc-700 dark:text-zinc-300 font-semibold">
@@ -242,7 +286,11 @@ export function CompanySelector({
                       </div>
 
                       <div className="flex items-center gap-3 text-[10px] text-zinc-500 dark:text-zinc-400 font-mono">
-                        {c.gstin && <span>GST: <strong>{c.gstin}</strong></span>}
+                        {c.gstin ? (
+                          <span>GST: <strong>{c.gstin}</strong></span>
+                        ) : (
+                          <span className="text-zinc-400 italic">No GST</span>
+                        )}
                         {c.mobile && <span>Ph: {c.mobile}</span>}
                         {c.city && <span>📍 {c.city}</span>}
                       </div>

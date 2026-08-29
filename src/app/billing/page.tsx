@@ -1424,7 +1424,13 @@ function BillingContent() {
                                 className={`rounded-md border px-2 py-0.5 text-xs font-semibold inline-flex items-center gap-1.5 ${
                                   isBTC
                                     ? "bg-amber-50 dark:bg-amber-950/60 text-amber-900 dark:text-amber-200 border-amber-200 dark:border-amber-700 shadow-xs"
-                                    : "bg-zinc-100 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 border-zinc-200 dark:border-zinc-700"
+                                    : p.method === "UPI"
+                                    ? "bg-blue-50 dark:bg-blue-950/60 text-blue-800 dark:text-blue-200 border-blue-200 dark:border-blue-700"
+                                    : p.method === "CARD"
+                                    ? "bg-purple-50 dark:bg-purple-950/60 text-purple-800 dark:text-purple-200 border-purple-200 dark:border-purple-700"
+                                    : p.method === "BANK_TRANSFER"
+                                    ? "bg-cyan-50 dark:bg-cyan-950/60 text-cyan-800 dark:text-cyan-200 border-cyan-200 dark:border-cyan-700"
+                                    : "bg-emerald-50 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-200 border-emerald-200 dark:border-emerald-700"
                                 }`}
                               >
                                 {isBTC ? (
@@ -1432,8 +1438,14 @@ function BillingContent() {
                                     <Building2 className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
                                     <span>Bill to Company (BTC)</span>
                                   </>
+                                ) : p.method === "UPI" ? (
+                                  <span>📱 UPI / QR</span>
+                                ) : p.method === "CARD" ? (
+                                  <span>💳 Card</span>
+                                ) : p.method === "BANK_TRANSFER" ? (
+                                  <span>🏦 Bank Transfer</span>
                                 ) : (
-                                  p.method
+                                  <span>💵 {p.method || "Cash"}</span>
                                 )}
                               </span>
                             </td>

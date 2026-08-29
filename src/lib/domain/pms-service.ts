@@ -215,6 +215,8 @@ export async function checkInGuest({
   paxC,
   ratePlanId,
   depositAmount = 0,
+  depositMethod = "CASH",
+  depositRef,
   agreedTariff,
   isComplimentary = false,
   checkoutType = "24_HOURS",
@@ -267,6 +269,8 @@ export async function checkInGuest({
   paxC?: number;
   ratePlanId?: string;
   depositAmount?: number;
+  depositMethod?: string;
+  depositRef?: string;
   agreedTariff?: number;
   isComplimentary?: boolean;
   checkoutType?: "24_HOURS" | "FIXED_TIME";
@@ -652,6 +656,7 @@ export async function checkInGuest({
   // 8. Handle advance deposit if provided
   if (depositAmount > 0) {
     const recSeq = await getNextDocumentNumber(propertyId, "RECEIPT");
+    const isBTC = depositMethod === "DIRECT_BILL";
     const payment = await prisma.payment.create({
       data: {
         organizationId: property.organizationId,
@@ -659,7 +664,15 @@ export async function checkInGuest({
         receiptNo: recSeq.formattedNumber,
         folioId: masterFolioId!,
         amount: depositAmount,
-        method: "CASH",
+        method: depositMethod || "CASH",
+        reference: depositRef || (isBTC ? `BTC-${guestData.companyName || "CORP"}` : undefined),
+        payerSnapshot: JSON.stringify({
+          name: guestData.name,
+          phone: guestData.phone,
+          companyName: guestData.companyName || "",
+          gstin: guestData.gstin || "",
+          billToCompany: isBTC,
+        }),
         status: "SUCCEEDED",
         createdById: actorId,
       },

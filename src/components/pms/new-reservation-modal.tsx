@@ -308,10 +308,18 @@ export function NewReservationModal({
                       activeProperty={activeProperty}
                       placeholder="Search agency, agent name, GSTIN..."
                       onSelect={(comp) => {
+                        if (!comp) {
+                          setForm((prev) => ({
+                            ...prev,
+                            agencyName: "",
+                            agencyPhone: "",
+                          }));
+                          return;
+                        }
                         setForm((prev) => ({
                           ...prev,
                           agencyName: comp.accountName,
-                          agencyPhone: comp.mobile || comp.phone || prev.agencyPhone,
+                          agencyPhone: comp.mobile || comp.phone || "",
                           guestCity: comp.city || prev.guestCity,
                           notes: comp.remarks ? `Agency terms: ${comp.remarks}` : prev.notes,
                         }));
@@ -361,11 +369,19 @@ export function NewReservationModal({
                       activeProperty={activeProperty}
                       placeholder="Search company (e.g. ABB, Asian Paints, Patanjali...)"
                       onSelect={(comp) => {
+                        if (!comp) {
+                          setForm((prev) => ({
+                            ...prev,
+                            companyName: "",
+                            guestGstin: "",
+                          }));
+                          return;
+                        }
                         setForm((prev) => ({
                           ...prev,
                           companyName: comp.accountName,
-                          guestGstin: comp.gstin || prev.guestGstin,
-                          guestPhone: prev.guestPhone || comp.mobile || comp.phone || "",
+                          guestGstin: comp.gstin || "",
+                          guestPhone: comp.mobile || comp.phone || prev.guestPhone || "",
                           guestCity: comp.city || prev.guestCity,
                           notes: comp.remarks ? `Company terms: ${comp.remarks}` : prev.notes,
                         }));

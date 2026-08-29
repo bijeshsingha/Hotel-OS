@@ -384,6 +384,8 @@ export function GrcIntakeModal({
           checkoutType: formData.checkoutType,
           gracePeriodMinutes: Number(formData.gracePeriodMinutes) || 60,
           depositAmount: Number(formData.depositAmount) || 0,
+          depositMethod: formData.paymentMethod || "CASH",
+          depositRef: formData.transactionRef?.trim() || undefined,
           extraBeds: (Number(formData.extraPaxCount) || 0) + formData.additionalRoomIds.reduce((acc, id) => acc + (Number(formData.roomExtraPax?.[id]) || 0), 0),
           extraBedRate: Number(formData.extraBedRate) || 500,
           coGuests: formData.coGuests.filter((cg) => cg.name.trim() !== ""),
@@ -1479,14 +1481,22 @@ export function GrcIntakeModal({
                     activeProperty={activeProperty}
                     placeholder="Search corporate company (e.g. ABB, Asian Paints, MMT...)"
                     onSelect={(comp) => {
+                      if (!comp) {
+                        setFormData((prev) => ({
+                          ...prev,
+                          companyName: "",
+                          guestGstin: "",
+                        }));
+                        return;
+                      }
                       setFormData((prev) => ({
                         ...prev,
                         companyName: comp.accountName,
-                        guestGstin: comp.gstin || prev.guestGstin,
+                        guestGstin: comp.gstin || "",
                         city: comp.city ? comp.city.toUpperCase() : prev.city,
                         streetAddress: comp.address ? comp.address.toUpperCase() : prev.streetAddress,
-                        email: prev.email || comp.email || "",
-                        alternatePhone: prev.alternatePhone || comp.phone || "",
+                        email: comp.email || prev.email || "",
+                        alternatePhone: comp.phone || comp.mobile || prev.alternatePhone || "",
                         referralChannel: comp.accountType === "TRAVEL_AGENT" ? (comp.shortName || comp.accountName) : prev.referralChannel,
                       }));
                     }}
