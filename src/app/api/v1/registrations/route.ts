@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { normalizeGuestName } from "@/lib/domain/name-utils";
+import { archiveGrcSnapshot } from "@/lib/domain/grc-archive-service";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -169,6 +170,9 @@ export async function POST(request: Request) {
         afterJson: JSON.stringify({ regNo: registration.registrationNo, name: registration.fullName }),
       },
     });
+
+    // Permanently Archive Snapshot to /prisma/backups/grc_archives
+    archiveGrcSnapshot(registration, "CREATED", "guest_self_service");
 
     return NextResponse.json(
       {

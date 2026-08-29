@@ -125,7 +125,6 @@ function BillingContent() {
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<any | null>(null);
   const [isLiveTaxBillView, setIsLiveTaxBillView] = useState(false);
-  const [gracePeriodMinutes, setGracePeriodMinutes] = useState<string>("60");
   const [actionLoading, setActionLoading] = useState(false);
 
   // Form states for modals
@@ -153,6 +152,9 @@ function BillingContent() {
     billingRemarks: "",
   });
 
+  // Grace Period control state (in minutes)
+  const [gracePeriodMinutes, setGracePeriodMinutes] = useState<number>(60);
+
   // Load in-house and past stays for current property
   const loadStays = async () => {
     if (!activeProperty?.id) return;
@@ -177,14 +179,22 @@ function BillingContent() {
     }
   };
 
-  // Load specific folio for selected stay
-  const loadFolio = async (folioId: string) => {
+  // Load specific folio for selected stay with dynamic 24h synchronization
+  const loadFolio = async (folioId: string, grace?: number) => {
     try {
-      const res = await fetch(`/api/v1/folios/${folioId}`);
+      const g = grace !== undefined ? grace : gracePeriodMinutes;
+      const res = await fetch(`/api/v1/folios/${folioId}?graceMinutes=${g}`);
       const data = await res.json();
       setFolioData(data);
     } catch (e) {
       console.error("Error loading folio:", e);
+    }
+  };
+
+  const handleGracePeriodChange = async (newGrace: number) => {
+    setGracePeriodMinutes(newGrace);
+    if (folioData?.id) {
+      await loadFolio(folioData.id, newGrace);
     }
   };
 
@@ -365,7 +375,20 @@ function BillingContent() {
 
   // Stay Calculations for Active Selected Room
   const stayCalculations = useMemo(() => {
-    if (!activeStay) return { nights: 1, roomRatePerNight: 0, isMultiNight: false };
+    if (!activeStay) {
+      return {
+        nights: 1,
+        scheduledNights: 1,
+        roomRatePerNight: 0,
+        isMultiNight: false,
+        isComplimentary: false,
+        elapsedHours: "0.0",
+        completedCycles: 0,
+        remainingMinutes: 0,
+        isWithinGrace: false,
+        checkoutCycleText: "24-Hr Cycle Billing",
+      };
+    }
     const arr = activeStay.arrivalAt ? new Date(activeStay.arrivalAt) : new Date();
     const exp = activeStay.expectedDepartureAt ? new Date(activeStay.expectedDepartureAt) : new Date();
     
@@ -390,14 +413,39 @@ function BillingContent() {
       }
     }
 
+    // Real-time 24-hr cycle metrics
+    const now = new Date();
+    const elapsedMs = Math.max(0, now.getTime() - arr.getTime());
+    const elapsedHours = elapsedMs / (1000 * 60 * 60);
+    const completedCycles = Math.floor(elapsedHours / 24);
+    const remainingMinutes = Math.round((elapsedHours % 24) * 60);
+
+    const items = folioData?.windows?.[0]?.entries || folioData?.windows?.[0]?.lineItems || [];
+    const allRoomEntries = items.filter((i: any) => i.chargeCode?.includes("ROOM_TARIFF"));
+    const chargedRoomEntries = allRoomEntries.filter((i: any) => {
+      if (groupBillingMode === "YES") return true;
+      if (allRoomEntries.length <= 1) return true;
+      return i.description?.includes(activeRoomNumber);
+    });
+    const chargedNights = chargedRoomEntries.length > 0
+      ? chargedRoomEntries.reduce((sum: number, i: any) => sum + (i.qty || 1), 0)
+      : 1;
+
+    const isWithinGrace = completedCycles >= 1 && remainingMinutes <= gracePeriodMinutes;
+
     return {
-      nights: diffDays,
+      nights: chargedNights,
+      scheduledNights: diffDays,
       roomRatePerNight: rate,
-      isMultiNight: diffDays > 1,
+      isMultiNight: chargedNights > 1,
       isComplimentary: isComp,
-      checkoutCycleText: assignment?.rateHandling?.includes("24_HOURS") ? "24-Hr Cycle" : "Standard 11 AM Checkout",
+      elapsedHours: elapsedHours.toFixed(1),
+      completedCycles,
+      remainingMinutes,
+      isWithinGrace,
+      checkoutCycleText: "24-Hr Cycle Billing",
     };
-  }, [activeStay, activeRoomNumber, folioData]);
+  }, [activeStay, activeRoomNumber, folioData, gracePeriodMinutes]);
 
   // Aggregate raw ledger line items from Prisma folio windows (entries)
   const rawEntries = useMemo(() => {
@@ -831,8 +879,8 @@ function BillingContent() {
       {/* 2. MAIN 2-COLUMN OPERATIONAL GRID */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 xl:gap-4 items-start">
         
-        {/* LEFT COLUMN: ROOMS DIRECTORY & GROUP SELECTOR (4 COLS) */}
-        <div className="lg:col-span-4 rounded-2xl bg-white dark:bg-[#121215] border border-zinc-200/80 dark:border-zinc-800/80 p-3.5 shadow-xs space-y-3 flex flex-col">
+        {/* LEFT COLUMN: ROOMS DIRECTORY & GROUP SELECTOR (3 COLS) */}
+        <div className="lg:col-span-3 xl:col-span-3 rounded-2xl bg-white dark:bg-[#121215] border border-zinc-200/80 dark:border-zinc-800/80 p-3 shadow-xs space-y-2.5 flex flex-col">
           
           <div className="flex items-center justify-between pb-2 border-b border-zinc-200/80 dark:border-zinc-800">
             <span className="font-bold text-xs text-zinc-900 dark:text-white flex items-center gap-2 uppercase tracking-wider">
@@ -1030,8 +1078,8 @@ function BillingContent() {
           </div>
         </div>
 
-        {/* RIGHT COLUMN: FOLIO HERO, KPI CARDS & LEDGER (8 COLS) */}
-        <div className="lg:col-span-8 space-y-3.5 xl:space-y-4">
+        {/* RIGHT COLUMN: FOLIO HERO, KPI CARDS & LEDGER (9 COLS) */}
+        <div className="lg:col-span-9 xl:col-span-9 space-y-3.5 xl:space-y-4">
           {folioData ? (
             <>
               {/* 1. ACTIVE STAY HERO OVERVIEW CARD */}
@@ -1072,23 +1120,25 @@ function BillingContent() {
                         <div className="inline-flex items-center gap-1.5 mt-1 px-2 py-0.5 rounded-md bg-amber-50/80 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-700/50 text-[11px] font-semibold text-amber-900 dark:text-amber-200">
                           <Building2 className="h-3 w-3 text-amber-600 dark:text-amber-400" />
                           <span>Bill to Company: {activeStay.primaryGuest.companyName}</span>
-                          {activeStay.primaryGuest.gstin && <span className="font-mono">• GSTIN: {activeStay.primaryGuest.gstin}</span>}
+                          {activeStay?.primaryGuest?.gstin && <span className="font-mono">• GSTIN: {activeStay.primaryGuest.gstin}</span>}
                         </div>
                       )}
                     </div>
                   </div>
 
-                  {/* Duration & Primary Settle Button */}
-                  <div className="flex items-center gap-2.5 flex-wrap">
-                    <div className="text-xs text-zinc-700 dark:text-zinc-300 bg-zinc-50 dark:bg-zinc-900 px-3 py-2 rounded-xl border border-zinc-200/80 dark:border-zinc-800 flex items-center gap-2.5 shadow-xs">
+                  {/* 24-Hr Cycle Metric & Primary Action Button */}
+                  <div className="flex items-center gap-3 shrink-0">
+                    
+                    {/* 24-Hour Cycle Metric Indicator */}
+                    <div className="text-xs text-zinc-700 dark:text-zinc-300 bg-zinc-50 dark:bg-zinc-900 px-3.5 py-2 rounded-xl border border-zinc-200/80 dark:border-zinc-800 flex items-center gap-2.5 shadow-2xs">
                       <Clock className="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
                       <div>
                         <div className="flex items-center gap-1.5">
                           <span className="font-bold text-xs sm:text-sm text-zinc-900 dark:text-white block">
-                            {stayCalculations.nights} Night{stayCalculations.nights > 1 ? "s" : ""}
+                            {stayCalculations.nights} Night{stayCalculations.nights > 1 ? "s" : ""} Billed
                           </span>
-                          <span className="text-[9.5px] px-1.5 py-0.2 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 font-mono font-medium">
-                            {stayCalculations.checkoutCycleText}
+                          <span className="text-[9.5px] px-1.5 py-0.2 rounded bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 font-mono font-bold">
+                            Cycle {stayCalculations.completedCycles + 1} ({stayCalculations.elapsedHours}h Elapsed)
                           </span>
                         </div>
                         <span className="text-[10.5px] text-zinc-500 block font-mono">
@@ -1106,7 +1156,7 @@ function BillingContent() {
                         <button
                           onClick={handleExecuteCheckout}
                           disabled={actionLoading}
-                          className="h-10 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition shadow-xs flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
+                          className="h-10 px-5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition shadow-xs flex items-center gap-1.5 disabled:opacity-50 cursor-pointer whitespace-nowrap"
                         >
                           <CheckCircle2 className="h-4 w-4" />
                           <span>{actionLoading ? "Checking Out..." : groupBillingMode === "YES" && isMultiRoomGroup ? "Check Out Group & Invoice" : `Check Out Room ${activeRoomNumber}`}</span>
@@ -1126,7 +1176,7 @@ function BillingContent() {
                             });
                             setShowPaymentModal(true);
                           }}
-                          className="h-10 px-4 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold transition shadow-xs flex items-center gap-1.5 cursor-pointer"
+                          className="h-10 px-5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold transition shadow-xs flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
                         >
                           <CreditCard className="h-4 w-4" />
                           <span>Settle {formatINR(currentBalance)} & Check Out</span>
@@ -1135,18 +1185,18 @@ function BillingContent() {
                     ) : (
                       <button
                         onClick={handleOpenLiveTaxBill}
-                        className="h-10 px-4 rounded-xl bg-zinc-900 text-white hover:bg-zinc-800 dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-200 font-bold text-xs transition shadow-xs flex items-center gap-1.5 cursor-pointer"
+                        className="h-10 px-5 rounded-xl bg-zinc-900 text-white hover:bg-zinc-800 dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-200 font-bold text-xs transition shadow-xs flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
                       >
                         <Printer className="h-4 w-4" />
-                        <span>Print Tax Invoice</span>
+                        <span>Print Final Invoice</span>
                       </button>
                     )}
                   </div>
                 </div>
 
                 {/* BILLING CONTROLS: GRACE PERIOD & GROUP BILLING TOGGLE */}
-                <div className="flex items-center justify-between gap-3 pt-2.5 border-t border-zinc-100 dark:border-zinc-800/80 flex-wrap">
-                  <div className="flex items-center gap-3 flex-wrap">
+                <div className="flex items-center justify-between gap-3 pt-3 border-t border-zinc-100 dark:border-zinc-800/80 flex-wrap">
+                  <div className="flex items-center gap-4 flex-wrap">
                     
                     {/* Grace Period Selector */}
                     <div className="flex items-center gap-2">
@@ -1156,57 +1206,52 @@ function BillingContent() {
                       </span>
                       <select
                         value={gracePeriodMinutes}
-                        onChange={(e) => setGracePeriodMinutes(e.target.value)}
+                        onChange={(e) => handleGracePeriodChange(Number(e.target.value))}
                         className="h-8.5 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 px-3 text-xs font-bold text-zinc-900 dark:text-white focus:outline-none focus:border-amber-500 cursor-pointer shadow-2xs"
                       >
-                        <option value="0">0 Hours (Strict 24h)</option>
-                        <option value="60">1 Hour Grace (Default)</option>
-                        <option value="120">2 Hours Grace</option>
-                        <option value="180">3 Hours Grace</option>
-                        <option value="240">4 Hours Grace</option>
+                        <option value={0}>0 Hours (Strict 24h)</option>
+                        <option value={60}>1 Hour Grace (Default)</option>
+                        <option value={120}>2 Hours Grace</option>
+                        <option value={180}>3 Hours Grace</option>
+                        <option value={240}>4 Hours Grace</option>
+                        <option value={1440}>Waive Next Night</option>
                       </select>
                     </div>
 
-                    {/* Group Billing Selector */}
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-bold text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
-                        <Layers className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
-                        Group Billing:
-                      </span>
-                      <select
-                        value={groupBillingMode}
-                        onChange={(e) => setGroupBillingMode(e.target.value as "NO" | "YES")}
-                        className="h-8.5 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 px-3 text-xs font-bold text-zinc-900 dark:text-white focus:outline-none focus:border-blue-500 cursor-pointer shadow-2xs"
-                      >
-                        <option value="NO">No — Separate Billing (Room {activeRoomNumber} Only)</option>
-                        {isMultiRoomGroup && (
-                          <option value="YES">Yes — Combined Group Billing (Rooms {allGroupRooms.join(", ")})</option>
-                        )}
-                      </select>
-                    </div>
+                    {/* Group Billing Selector (Only visible for multi-room groups) */}
+                    {isMultiRoomGroup && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
+                          <Layers className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
+                          Group Billing:
+                        </span>
+                        <select
+                          value={groupBillingMode}
+                          onChange={(e) => setGroupBillingMode(e.target.value as "NO" | "YES")}
+                          className="h-8.5 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 px-3 text-xs font-bold text-zinc-900 dark:text-white focus:outline-none focus:border-blue-500 cursor-pointer shadow-2xs"
+                        >
+                          <option value="NO">No — Separate Billing (Room {activeRoomNumber} Only)</option>
+                          <option value="YES">Yes — Combined Group Billing ({allGroupRooms.length} Rooms)</option>
+                        </select>
+                      </div>
+                    )}
 
                   </div>
 
-                  {/* Status Badges */}
-                  <div className="flex items-center gap-2 text-[11px] font-medium flex-wrap">
-                    {Number(gracePeriodMinutes) > 0 && (
-                      <span className="text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 px-2 py-0.5 rounded-lg font-bold">
-                        ⏱️ +{Number(gracePeriodMinutes) / 60}h Billing Grace Active
-                      </span>
-                    )}
-
-                    {isMultiRoomGroup && (
-                      groupBillingMode === "NO" ? (
-                        <span className="text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800/60 px-2 py-0.5 rounded-lg">
-                          Separate Room Mode (Room {activeRoomNumber} of {allGroupRooms.join(", ")})
+                  {/* Clean Status Badge for Multi-Room Group */}
+                  {isMultiRoomGroup && (
+                    <div className="flex items-center gap-2 text-[11px] font-medium">
+                      {groupBillingMode === "NO" ? (
+                        <span className="text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800/60 px-2.5 py-1 rounded-lg font-semibold">
+                          Separate Billing • Room {activeRoomNumber} of {allGroupRooms.length} Group Rooms
                         </span>
                       ) : (
-                        <span className="text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 px-2 py-0.5 rounded-lg font-bold">
-                          ✓ All {allGroupRooms.length} Rooms Automatically Combined
+                        <span className="text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 px-2.5 py-1 rounded-lg font-bold">
+                          ✓ Combined Group Folio ({allGroupRooms.length} Rooms)
                         </span>
-                      )
-                    )}
-                  </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
 

@@ -269,9 +269,9 @@ export async function POST(
           }
         }
 
-        const totalStayPrice = roomBasePrice * nights;
+        const initialNightPrice = roomBasePrice * 1;
         const roomGst = calculateGST({
-          grossOrBaseAmount: totalStayPrice,
+          grossOrBaseAmount: initialNightPrice,
           isInclusive: true,
           sacHsn: "996311",
           supplierStateCode: registration.property?.stateCode || "18",
@@ -287,8 +287,8 @@ export async function POST(
             serviceDate: serviceDateStr,
             type: "CHARGE",
             chargeCode: "ROOM_TARIFF",
-            description: `Room Tariff - Room ${rm.number} (${nights} Night${nights > 1 ? "s" : ""})`,
-            qty: nights,
+            description: `Room Tariff - Room ${rm.number} (Night 1)`,
+            qty: 1,
             unitAmount: roomBasePrice,
             taxableAmount: roomGst.taxableAmount,
             taxComponentsJson: JSON.stringify(roomGst.components),
@@ -420,9 +420,9 @@ export async function POST(
           }
         }
 
-        const totalStayPrice = roomBasePrice * nights;
+        const initialNightPrice = roomBasePrice * 1;
         const roomGst = calculateGST({
-          grossOrBaseAmount: totalStayPrice,
+          grossOrBaseAmount: initialNightPrice,
           isInclusive: true,
           sacHsn: "996311",
           supplierStateCode: registration.property?.stateCode || "18",
@@ -438,8 +438,8 @@ export async function POST(
             serviceDate: serviceDateStr,
             type: "CHARGE",
             chargeCode: "ROOM_TARIFF",
-            description: `Room Tariff - Room ${rm.number} (${nights} Night${nights > 1 ? "s" : ""})`,
-            qty: nights,
+            description: `Room Tariff - Room ${rm.number} (Night 1)`,
+            qty: 1,
             unitAmount: roomBasePrice,
             taxableAmount: roomGst.taxableAmount,
             taxComponentsJson: JSON.stringify(roomGst.components),

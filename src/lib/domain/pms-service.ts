@@ -493,11 +493,11 @@ export async function checkInGuest({
         update: { occupancyStatus: "OCCUPIED", lastChangedAt: new Date() },
       });
 
-      const totalStayPrice = roomBasePrice * nights;
+      const initialNightPrice = roomBasePrice * 1;
       const roomGst = isComp
         ? { taxableAmount: 0, taxAmount: 0, totalAmount: 0, components: [] }
         : calculateGST({
-            grossOrBaseAmount: totalStayPrice, isInclusive: true, sacHsn: "996311",
+            grossOrBaseAmount: initialNightPrice, isInclusive: true, sacHsn: "996311",
             supplierStateCode: property.stateCode || "18", customTaxRate: 5,
           });
 
@@ -506,9 +506,9 @@ export async function checkInGuest({
           organizationId: property.organizationId, propertyId, folioId: folio.id, folioWindowId: guestWindow.id,
           serviceDate: serviceDateStr, type: "CHARGE", chargeCode: "ROOM_TARIFF",
           description: isComp
-            ? `Room Tariff - Room ${room.number} (${nights} Night${nights > 1 ? "s" : ""} - COMPLIMENTARY)`
-            : `Room Tariff - Room ${room.number} (${nights} Night${nights > 1 ? "s" : ""})`,
-          qty: nights, unitAmount: roomBasePrice, taxableAmount: roomGst.taxableAmount,
+            ? `Room Tariff - Room ${room.number} (Night 1 - COMPLIMENTARY)`
+            : `Room Tariff - Room ${room.number} (Night 1)`,
+          qty: 1, unitAmount: roomBasePrice, taxableAmount: roomGst.taxableAmount,
           taxComponentsJson: JSON.stringify(roomGst.components), totalAmount: roomGst.totalAmount,
           sourceType: "PMS_NIGHTLY_CHARGE", status: "POSTED",
         },
@@ -517,11 +517,11 @@ export async function checkInGuest({
       totalBalanceAdded += roomGst.totalAmount;
     }
 
-    // Post Extra Bed Charges if requested (SAC 996311, 5% Flat GST Inclusive)
+    // Post Extra Bed Charges for Night 1 if requested (SAC 996311, 5% Flat GST Inclusive)
     if (extraBeds > 0) {
-      const totalExtraBedGross = extraBeds * extraBedRate * nights;
+      const initialExtraBedGross = extraBeds * extraBedRate * 1;
       const extraBedGst = calculateGST({
-        grossOrBaseAmount: totalExtraBedGross,
+        grossOrBaseAmount: initialExtraBedGross,
         isInclusive: true,
         sacHsn: "996311",
         supplierStateCode: property.stateCode || "18",
@@ -537,8 +537,8 @@ export async function checkInGuest({
           serviceDate: serviceDateStr,
           type: "CHARGE",
           chargeCode: "EXTRA_PAX",
-          description: `Extra Pax (${extraBeds} Pax x ₹${extraBedRate}/night x ${nights} Night${nights > 1 ? "s" : ""})`,
-          qty: extraBeds * nights,
+          description: `Extra Pax (${extraBeds} Pax x ₹${extraBedRate}/night - Night 1)`,
+          qty: extraBeds,
           unitAmount: extraBedRate,
           taxableAmount: extraBedGst.taxableAmount,
           taxComponentsJson: JSON.stringify(extraBedGst.components),
@@ -625,11 +625,11 @@ export async function checkInGuest({
 
       await prisma.stay.update({ where: { id: stay.id }, data: { folioId: folio.id } });
 
-      const totalStayPrice = roomBasePrice * nights;
+      const initialNightPrice = roomBasePrice * 1;
       const roomGst = isComp
         ? { taxableAmount: 0, taxAmount: 0, totalAmount: 0, components: [] }
         : calculateGST({
-            grossOrBaseAmount: totalStayPrice, isInclusive: true, sacHsn: "996311",
+            grossOrBaseAmount: initialNightPrice, isInclusive: true, sacHsn: "996311",
             supplierStateCode: property.stateCode || "18", customTaxRate: 5,
           });
 
@@ -638,9 +638,9 @@ export async function checkInGuest({
           organizationId: property.organizationId, propertyId, folioId: folio.id, folioWindowId: guestWindow.id,
           serviceDate: serviceDateStr, type: "CHARGE", chargeCode: "ROOM_TARIFF",
           description: isComp
-            ? `Room Tariff - Room ${room.number} (${nights} Night${nights > 1 ? "s" : ""} - COMPLIMENTARY)`
-            : `Room Tariff - Room ${room.number} (${nights} Night${nights > 1 ? "s" : ""})`,
-          qty: nights, unitAmount: roomBasePrice, taxableAmount: roomGst.taxableAmount,
+            ? `Room Tariff - Room ${room.number} (Night 1 - COMPLIMENTARY)`
+            : `Room Tariff - Room ${room.number} (Night 1)`,
+          qty: 1, unitAmount: roomBasePrice, taxableAmount: roomGst.taxableAmount,
           taxComponentsJson: JSON.stringify(roomGst.components), totalAmount: roomGst.totalAmount,
           sourceType: "PMS_NIGHTLY_CHARGE", status: "POSTED",
         },

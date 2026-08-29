@@ -105,36 +105,54 @@ export async function recordPayment({
     include: {
       property: true,
       windows: true,
+      stay: { include: { primaryGuest: true } },
     },
   });
 
-  const seq = await getNextDocumentNumber(folio.propertyId, "RECEIPT");
+  if (folio.status !== "OPEN") {
+    throw new Error(`Folio is ${folio.status}. Cannot record payments.`);
+  }
+
+  const windowId = folioWindowId || folio.windows[0]?.id;
+  if (!windowId) {
+    throw new Error("No folio window available.");
+  }
+
+  const docSeq = await getNextDocumentNumber(folio.propertyId, "RECEIPT");
+  const isBTC = method === "DIRECT_BILL";
+
+  const pSnapshot =
+    payerSnapshot ||
+    JSON.stringify({
+      name: payerName || folio.stay?.primaryGuest?.name || "Guest",
+      phone: folio.stay?.primaryGuest?.phone,
+      companyName: folio.stay?.primaryGuest?.companyName || "",
+      gstin: folio.stay?.primaryGuest?.gstin || "",
+      billToCompany: isBTC,
+    });
 
   const payment = await prisma.payment.create({
     data: {
       organizationId: folio.organizationId,
       propertyId: folio.propertyId,
-      receiptNo: seq.formattedNumber,
       folioId: folio.id,
+      receiptNo: docSeq.formattedNumber,
       amount,
       method,
-      reference,
-      payerSnapshot: payerSnapshot || JSON.stringify({ name: payerName || "Guest" }),
+      reference: reference || (isBTC ? `BTC-${folio.stay?.primaryGuest?.companyName || "CORP"}` : undefined),
+      payerSnapshot: pSnapshot,
       status: "SUCCEEDED",
       createdById: actorId,
     },
   });
 
-  const targetWindowId = folioWindowId || folio.windows[0]?.id;
-  if (targetWindowId) {
-    await prisma.paymentAllocation.create({
-      data: {
-        paymentId: payment.id,
-        folioWindowId: targetWindowId,
-        amount,
-      },
-    });
-  }
+  await prisma.paymentAllocation.create({
+    data: {
+      paymentId: payment.id,
+      folioWindowId: windowId,
+      amount,
+    },
+  });
 
   await prisma.folio.update({
     where: { id: folio.id },
@@ -201,7 +219,7 @@ export async function checkoutAndIssueInvoice({
   const supplierSnapshot = JSON.stringify({
     legalName: stay.property.legalName,
     displayName: stay.property.displayName,
-    gstin: stay.property.gstin || "18AAAAA0000A1Z5",
+    gstin: stay.property.gstin || "18AACCB2447F1ZX",
     stateCode: stay.property.stateCode || "18",
     address: stay.property.address || "Guwahati, Assam",
   });
@@ -321,4 +339,150 @@ export async function checkoutAndIssueInvoice({
   });
 
   return { success: true, invoice, balance };
+}
+
+/**
+ * Automatically evaluates 24-hour cycles and posts the next night's room charge
+ * once the stay crosses the 24-hour mark (unless protected by grace period).
+ */
+export async function sync24HourFolioCharges({
+  folioId,
+  overrideGraceMinutes,
+}: {
+  folioId: string;
+  overrideGraceMinutes?: number;
+}) {
+  const folio = await prisma.folio.findUnique({
+    where: { id: folioId },
+    include: {
+      property: true,
+      windows: {
+        include: {
+          entries: {
+            where: { chargeCode: "ROOM_TARIFF" },
+            orderBy: { createdAt: "asc" },
+          },
+        },
+      },
+      stay: {
+        include: {
+          roomAssignments: {
+            where: { endsAt: null },
+            include: { room: true },
+          },
+        },
+      },
+    },
+  });
+
+  if (!folio || folio.status !== "OPEN" || !folio.stay) {
+    return { billableNights: 1, completedCycles: 0, elapsedHours: "0.0" };
+  }
+
+  const stay = folio.stay;
+  const primaryWindow = folio.windows[0];
+  if (!primaryWindow) {
+    return { billableNights: 1, completedCycles: 0, elapsedHours: "0.0" };
+  }
+
+  const activeAssignment = stay.roomAssignments[0];
+  const room = activeAssignment?.room;
+
+  // Determine agreed rate
+  let roomBasePrice = 3200;
+  let isComp = false;
+  if (activeAssignment?.rateHandling === "COMPLIMENTARY" || activeAssignment?.moveReason === "AGREED_RATE:0") {
+    roomBasePrice = 0;
+    isComp = true;
+  } else if (activeAssignment?.moveReason?.startsWith("AGREED_RATE:")) {
+    roomBasePrice = Number(activeAssignment.moveReason.replace("AGREED_RATE:", "")) || 3200;
+  }
+
+  // Grace Period in minutes
+  let graceMinutes = 60; // default 1 hour grace
+  if (overrideGraceMinutes !== undefined) {
+    graceMinutes = overrideGraceMinutes;
+  } else if (activeAssignment?.rateHandling?.includes("24_HOURS:")) {
+    graceMinutes = Number(activeAssignment.rateHandling.split(":")[1]) || 60;
+  }
+
+  // Arrival timestamp
+  const arrivalTime = stay.arrivalAt ? new Date(stay.arrivalAt) : new Date(activeAssignment?.startsAt || Date.now());
+  const now = new Date();
+
+  // Elapsed duration
+  const elapsedMs = Math.max(0, now.getTime() - arrivalTime.getTime());
+  const elapsedHours = elapsedMs / (1000 * 60 * 60);
+
+  const completedCycles = Math.floor(elapsedHours / 24);
+  const remainingMinutes = Math.round((elapsedHours % 24) * 60);
+
+  // Billable nights calculation:
+  // - Cycle 1 (0 to 24 hrs): exactly 1 night
+  // - Cycle 2+ (after 24 hrs): if remaining time <= graceMinutes, remain on completedCycles; otherwise completedCycles + 1
+  let billableNights = 1;
+  if (completedCycles >= 1) {
+    if (remainingMinutes <= graceMinutes) {
+      billableNights = completedCycles;
+    } else {
+      billableNights = completedCycles + 1;
+    }
+  }
+
+  const existingEntries = primaryWindow.entries || [];
+  const currentChargedNights = existingEntries.length;
+
+  if (currentChargedNights < billableNights) {
+    // Post missing cycle room charges
+    for (let n = currentChargedNights + 1; n <= billableNights; n++) {
+      const cycleDate = new Date(arrivalTime.getTime() + (n - 1) * 24 * 60 * 60 * 1000)
+        .toISOString()
+        .split("T")[0];
+
+      const gst = isComp || roomBasePrice === 0
+        ? { taxableAmount: 0, taxAmount: 0, totalAmount: 0, components: [] }
+        : calculateGST({
+            grossOrBaseAmount: roomBasePrice,
+            isInclusive: true,
+            sacHsn: "996311",
+            supplierStateCode: folio.property.stateCode || "18",
+            customTaxRate: 5,
+          });
+
+      await prisma.folioEntry.create({
+        data: {
+          organizationId: folio.organizationId,
+          propertyId: folio.propertyId,
+          folioId: folio.id,
+          folioWindowId: primaryWindow.id,
+          serviceDate: cycleDate,
+          type: "CHARGE",
+          chargeCode: "ROOM_TARIFF",
+          description: isComp || roomBasePrice === 0
+            ? `Room Tariff - Room ${room?.number || "Stay"} (Night ${n} - 24hr Cycle - COMPLIMENTARY)`
+            : `Room Tariff - Room ${room?.number || "Stay"} (Night ${n} - 24hr Cycle Rollover)`,
+          qty: 1,
+          unitAmount: roomBasePrice,
+          taxableAmount: gst.taxableAmount,
+          taxComponentsJson: JSON.stringify(gst.components),
+          totalAmount: gst.totalAmount,
+          sourceType: "PMS_24HR_AUTO_CHARGE",
+          status: "POSTED",
+        },
+      });
+
+      await prisma.folio.update({
+        where: { id: folio.id },
+        data: { balance: { increment: gst.totalAmount } },
+      });
+    }
+  }
+
+  return {
+    billableNights,
+    completedCycles,
+    remainingMinutes,
+    graceMinutes,
+    elapsedHours: elapsedHours.toFixed(1),
+  };
 }

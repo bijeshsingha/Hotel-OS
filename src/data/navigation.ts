@@ -9,6 +9,7 @@ import {
   BarChart3,
   ScrollText,
   Building2,
+  SlidersHorizontal,
   LucideIcon,
 } from "lucide-react";
 
@@ -83,6 +84,13 @@ export const NAV_ITEMS: NavItem[] = [
     icon: ScrollText,
     badge: "A",
     description: "Immutable compliance log of system operations",
+  },
+  {
+    label: "Master Admin & Editor",
+    href: "/admin",
+    icon: SlidersHorizontal,
+    badge: "ADM",
+    description: "Password-protected database editor for Hotel, GRC, Rates & Rooms",
   },
   {
     label: "Onboard Hotel",

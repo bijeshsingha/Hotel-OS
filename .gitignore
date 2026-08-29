@@ -35,7 +35,7 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# prisma / sqlite database
+# prisma / sqlite database & local backups
 *.db
 *.db-journal
 *.sqlite
@@ -43,6 +43,7 @@ next-env.d.ts
 dev.db
 dev.db-journal
 prisma/*.db
+prisma/backups/
 # scratch & local tools
 scratch/
 *.Bak
