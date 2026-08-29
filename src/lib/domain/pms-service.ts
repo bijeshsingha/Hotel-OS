@@ -1,6 +1,7 @@
 import { prisma } from "../db/prisma";
 import { calculateGST } from "../gst/calculator";
 import { getNextDocumentNumber } from "../sequence/generator";
+import { normalizeGuestName } from "./name-utils";
 
 export interface QuoteRequest {
   propertyId: string;
@@ -33,6 +34,40 @@ export interface QuoteResult {
   totalTax: number;
   totalAmount: number;
   availableRoomsCount: number;
+}
+
+export function calculate24HrBillableDays(
+  arrivalAt: Date | string,
+  departureAt: Date | string,
+  checkoutType: "24_HOURS" | "FIXED_TIME" = "24_HOURS",
+  gracePeriodMinutes: number = 60
+): { billableDays: number; hoursElapsed: number; gracePeriodApplied: boolean } {
+  const start = new Date(arrivalAt).getTime();
+  const end = new Date(departureAt).getTime();
+  const elapsedMinutes = Math.max(0, Math.round((end - start) / (1000 * 60)));
+  const hoursElapsed = Math.round((elapsedMinutes / 60) * 10) / 10;
+
+  if (checkoutType === "FIXED_TIME") {
+    const startDate = new Date(arrivalAt).toISOString().split("T")[0];
+    const endDate = new Date(departureAt).toISOString().split("T")[0];
+    const diffDays = Math.round((new Date(endDate).getTime() - new Date(startDate).getTime()) / (1000 * 60 * 60 * 24));
+    return { billableDays: Math.max(1, diffDays), hoursElapsed, gracePeriodApplied: false };
+  }
+
+  // 24_HOURS cycle:
+  const completedBlocks = Math.floor(elapsedMinutes / (24 * 60));
+  const remainderMinutes = elapsedMinutes % (24 * 60);
+
+  if (completedBlocks === 0) {
+    return { billableDays: 1, hoursElapsed, gracePeriodApplied: false };
+  }
+
+  // Past 24 hours: check grace period
+  if (remainderMinutes <= gracePeriodMinutes) {
+    return { billableDays: completedBlocks, hoursElapsed, gracePeriodApplied: true };
+  } else {
+    return { billableDays: completedBlocks + 1, hoursElapsed, gracePeriodApplied: false };
+  }
 }
 
 export async function calculateAvailability(
@@ -181,6 +216,9 @@ export async function checkInGuest({
   ratePlanId,
   depositAmount = 0,
   agreedTariff,
+  isComplimentary = false,
+  checkoutType = "24_HOURS",
+  gracePeriodMinutes = 60,
   extraBeds = 0,
   extraBedRate = 500,
   actorId,
@@ -192,6 +230,7 @@ export async function checkInGuest({
   reservationId?: string;
   guestData: {
     name: string;
+    title?: string;
     phone?: string;
     email?: string;
     nationality?: string;
@@ -229,6 +268,9 @@ export async function checkInGuest({
   ratePlanId?: string;
   depositAmount?: number;
   agreedTariff?: number;
+  isComplimentary?: boolean;
+  checkoutType?: "24_HOURS" | "FIXED_TIME";
+  gracePeriodMinutes?: number;
   extraBeds?: number;
   extraBedRate?: number;
   actorId?: string;
@@ -283,11 +325,13 @@ export async function checkInGuest({
     country: guestData.country || "India",
   });
 
+  const { pureName: canonicalGuestName } = normalizeGuestName(guestData.name, guestData.title);
+
   if (!guest) {
     guest = await prisma.guest.create({
       data: {
         organizationId: property.organizationId,
-        name: guestData.name,
+        name: canonicalGuestName,
         phone: guestData.phone,
         email: guestData.email,
         nationality: guestData.nationality || "Indian",
@@ -300,7 +344,7 @@ export async function checkInGuest({
     await prisma.guest.update({
       where: { id: guest.id },
       data: {
-        name: guestData.name || guest.name,
+        name: canonicalGuestName || guest.name,
         addressJson: fullAddressJson,
         gstin: guestData.gstin || guest.gstin,
         companyName: guestData.companyName || guest.companyName,
@@ -404,24 +448,14 @@ export async function checkInGuest({
     });
 
     for (const room of rooms) {
-      await prisma.roomAssignment.create({
-        data: { stayId: stay.id, roomId: room.id, startsAt: new Date(), rateHandling: "RETAIN_RATE" },
-      });
-
-      await prisma.roomState.upsert({
-        where: { roomId: room.id },
-        create: {
-          organizationId: property.organizationId, propertyId, roomId: room.id, occupancyStatus: "OCCUPIED",
-          housekeepingStatus: room.roomState?.housekeepingStatus || "CLEAN", sellabilityStatus: "SELLABLE",
-        },
-        update: { occupancyStatus: "OCCUPIED", lastChangedAt: new Date() },
-      });
-
       let roomBasePrice = 3200;
-      if (roomRates && roomRates[room.id] !== undefined && roomRates[room.id] !== "") {
+      const isComp = Boolean(isComplimentary || agreedTariff === 0);
+      if (isComp) {
+        roomBasePrice = 0;
+      } else if (roomRates && roomRates[room.id] !== undefined && roomRates[room.id] !== "") {
         roomBasePrice = Number(roomRates[room.id]);
-      } else if (agreedTariff !== undefined && agreedTariff > 0) {
-        roomBasePrice = agreedTariff;
+      } else if (agreedTariff !== undefined && agreedTariff !== null) {
+        roomBasePrice = Number(agreedTariff);
       } else if (room.roomTypeId) {
         const rateVersion = await prisma.ratePlanVersion.findFirst({
           where: { roomTypeId: room.roomTypeId, active: true },
@@ -435,17 +469,40 @@ export async function checkInGuest({
         }
       }
 
-      const totalStayPrice = roomBasePrice * nights;
-      const roomGst = calculateGST({
-        grossOrBaseAmount: totalStayPrice, isInclusive: true, sacHsn: "996311",
-        supplierStateCode: property.stateCode || "18", customTaxRate: 5,
+      await prisma.roomAssignment.create({
+        data: {
+          stayId: stay.id,
+          roomId: room.id,
+          startsAt: new Date(),
+          moveReason: `AGREED_RATE:${roomBasePrice}`,
+          rateHandling: isComp ? "COMPLIMENTARY" : (checkoutType === "FIXED_TIME" ? "FIXED_TIME" : `24_HOURS:${gracePeriodMinutes}`),
+        },
       });
+
+      await prisma.roomState.upsert({
+        where: { roomId: room.id },
+        create: {
+          organizationId: property.organizationId, propertyId, roomId: room.id, occupancyStatus: "OCCUPIED",
+          housekeepingStatus: room.roomState?.housekeepingStatus || "CLEAN", sellabilityStatus: "SELLABLE",
+        },
+        update: { occupancyStatus: "OCCUPIED", lastChangedAt: new Date() },
+      });
+
+      const totalStayPrice = roomBasePrice * nights;
+      const roomGst = isComp
+        ? { taxableAmount: 0, taxAmount: 0, totalAmount: 0, components: [] }
+        : calculateGST({
+            grossOrBaseAmount: totalStayPrice, isInclusive: true, sacHsn: "996311",
+            supplierStateCode: property.stateCode || "18", customTaxRate: 5,
+          });
 
       await prisma.folioEntry.create({
         data: {
           organizationId: property.organizationId, propertyId, folioId: folio.id, folioWindowId: guestWindow.id,
           serviceDate: serviceDateStr, type: "CHARGE", chargeCode: "ROOM_TARIFF",
-          description: `Room Tariff - Room ${room.number} (${nights} Night${nights > 1 ? "s" : ""})`,
+          description: isComp
+            ? `Room Tariff - Room ${room.number} (${nights} Night${nights > 1 ? "s" : ""} - COMPLIMENTARY)`
+            : `Room Tariff - Room ${room.number} (${nights} Night${nights > 1 ? "s" : ""})`,
           qty: nights, unitAmount: roomBasePrice, taxableAmount: roomGst.taxableAmount,
           taxComponentsJson: JSON.stringify(roomGst.components), totalAmount: roomGst.totalAmount,
           sourceType: "PMS_NIGHTLY_CHARGE", status: "POSTED",
@@ -474,8 +531,8 @@ export async function checkInGuest({
           folioWindowId: guestWindow.id,
           serviceDate: serviceDateStr,
           type: "CHARGE",
-          chargeCode: "EXTRA_BED",
-          description: `Extra Bed / Mattress (${extraBeds} Bed${extraBeds > 1 ? "s" : ""} x ${nights} Night${nights > 1 ? "s" : ""})`,
+          chargeCode: "EXTRA_PAX",
+          description: `Extra Pax (${extraBeds} Pax x ₹${extraBedRate}/night x ${nights} Night${nights > 1 ? "s" : ""})`,
           qty: extraBeds * nights,
           unitAmount: extraBedRate,
           taxableAmount: extraBedGst.taxableAmount,
@@ -505,8 +562,34 @@ export async function checkInGuest({
       });
       stayIdsForDeposit.push(stay.id);
 
+      let roomBasePrice = 3200;
+      const isComp = Boolean(isComplimentary || agreedTariff === 0);
+      if (isComp) {
+        roomBasePrice = 0;
+      } else if (roomRates && roomRates[room.id] !== undefined && roomRates[room.id] !== "") {
+        roomBasePrice = Number(roomRates[room.id]);
+      } else if (agreedTariff !== undefined && agreedTariff !== null) {
+        roomBasePrice = Number(agreedTariff);
+      } else if (room.roomTypeId) {
+        const rateVersion = await prisma.ratePlanVersion.findFirst({
+          where: { roomTypeId: room.roomTypeId, active: true }, orderBy: { createdAt: "desc" },
+        });
+        if (rateVersion?.pricingJson) {
+          try {
+            const pricing = JSON.parse(rateVersion.pricingJson);
+            if (pricing.basePrice) roomBasePrice = Number(pricing.basePrice);
+          } catch {}
+        }
+      }
+
       await prisma.roomAssignment.create({
-        data: { stayId: stay.id, roomId: room.id, startsAt: new Date(), rateHandling: "RETAIN_RATE" },
+        data: {
+          stayId: stay.id,
+          roomId: room.id,
+          startsAt: new Date(),
+          moveReason: `AGREED_RATE:${roomBasePrice}`,
+          rateHandling: isComp ? "COMPLIMENTARY" : (checkoutType === "FIXED_TIME" ? "FIXED_TIME" : `24_HOURS:${gracePeriodMinutes}`),
+        },
       });
 
       await prisma.roomState.upsert({
@@ -537,34 +620,21 @@ export async function checkInGuest({
 
       await prisma.stay.update({ where: { id: stay.id }, data: { folioId: folio.id } });
 
-      let roomBasePrice = 3200;
-      if (roomRates && roomRates[room.id] !== undefined && roomRates[room.id] !== "") {
-        roomBasePrice = Number(roomRates[room.id]);
-      } else if (agreedTariff !== undefined && agreedTariff > 0) {
-        roomBasePrice = agreedTariff;
-      } else if (room.roomTypeId) {
-        const rateVersion = await prisma.ratePlanVersion.findFirst({
-          where: { roomTypeId: room.roomTypeId, active: true }, orderBy: { createdAt: "desc" },
-        });
-        if (rateVersion?.pricingJson) {
-          try {
-            const pricing = JSON.parse(rateVersion.pricingJson);
-            if (pricing.basePrice) roomBasePrice = Number(pricing.basePrice);
-          } catch {}
-        }
-      }
-
       const totalStayPrice = roomBasePrice * nights;
-      const roomGst = calculateGST({
-        grossOrBaseAmount: totalStayPrice, isInclusive: true, sacHsn: "996311",
-        supplierStateCode: property.stateCode || "18", customTaxRate: 5,
-      });
+      const roomGst = isComp
+        ? { taxableAmount: 0, taxAmount: 0, totalAmount: 0, components: [] }
+        : calculateGST({
+            grossOrBaseAmount: totalStayPrice, isInclusive: true, sacHsn: "996311",
+            supplierStateCode: property.stateCode || "18", customTaxRate: 5,
+          });
 
       await prisma.folioEntry.create({
         data: {
           organizationId: property.organizationId, propertyId, folioId: folio.id, folioWindowId: guestWindow.id,
           serviceDate: serviceDateStr, type: "CHARGE", chargeCode: "ROOM_TARIFF",
-          description: `Room Tariff - Room ${room.number} (${nights} Night${nights > 1 ? "s" : ""})`,
+          description: isComp
+            ? `Room Tariff - Room ${room.number} (${nights} Night${nights > 1 ? "s" : ""} - COMPLIMENTARY)`
+            : `Room Tariff - Room ${room.number} (${nights} Night${nights > 1 ? "s" : ""})`,
           qty: nights, unitAmount: roomBasePrice, taxableAmount: roomGst.taxableAmount,
           taxComponentsJson: JSON.stringify(roomGst.components), totalAmount: roomGst.totalAmount,
           sourceType: "PMS_NIGHTLY_CHARGE", status: "POSTED",

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
+import { normalizeGuestName } from "@/lib/domain/name-utils";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -116,13 +117,15 @@ export async function POST(request: Request) {
     const regCount = await prisma.guestRegistration.count({ where: { propertyId: prop.id } });
     const regNo = `GRC-${propCode}-2627-${String(regCount + 101).padStart(4, "0")}`;
 
+    const { pureName: canonicalFullName } = normalizeGuestName(fullName);
+
     const registration = await prisma.guestRegistration.create({
       data: {
         organizationId: prop.organizationId,
         propertyId: prop.id,
         registrationNo: regNo,
         status: "PENDING_REVIEW",
-        fullName: fullName.trim().toUpperCase(),
+        fullName: canonicalFullName.toUpperCase(),
         age: age ? Number(age) : null,
         gender: gender || "Male",
         nationality: nationality || "Indian",

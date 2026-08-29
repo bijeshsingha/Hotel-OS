@@ -32,79 +32,79 @@ export default function AuditLogPage() {
   );
 
   return (
-    <div className="space-y-4 max-w-6xl mx-auto">
+    <div className="space-y-4 max-w-[1500px] mx-auto w-full text-zinc-900 dark:text-zinc-100">
       {/* Top Banner */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3.5 rounded-xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 sm:p-5 rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200/80 dark:border-zinc-800/80 shadow-xs">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-base font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
-              <ScrollText className="h-4 w-4 text-zinc-500 dark:text-zinc-400" />
+            <h1 className="text-base sm:text-lg font-bold text-zinc-900 dark:text-white flex items-center gap-2">
+              <ScrollText className="h-4.5 w-4.5 text-zinc-500 dark:text-zinc-400" />
               Audit Log Trail
             </h1>
-            <span className="rounded px-1.5 py-0.5 text-[10px] font-mono font-bold text-zinc-600 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800">
+            <span className="rounded-md px-2 py-0.5 text-[10px] font-semibold text-zinc-600 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 uppercase">
               A16
             </span>
           </div>
-          <p className="text-xs text-zinc-500 font-mono mt-0.5 font-medium">
+          <p className="text-xs text-zinc-500 mt-0.5">
             Immutable log of operations, charges, check-ins & date rollovers
           </p>
         </div>
 
         <div className="relative">
-          <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-zinc-400" />
+          <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-zinc-400" />
           <input
             type="text"
             placeholder="Search action or ID..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 pl-8 pr-2.5 py-1.5 text-xs text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none focus:border-blue-500 w-56 font-mono shadow-xs"
+            className="rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 pl-8.5 pr-3 py-2 text-xs text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none focus:border-zinc-400 dark:focus:border-zinc-600 w-64 shadow-xs"
           />
         </div>
       </div>
 
       {/* Audit Log Table */}
-      <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#111114] overflow-hidden shadow-xs">
-        <div className="p-3 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
-          <h2 className="text-xs font-bold text-zinc-900 dark:text-zinc-200">Event History</h2>
-          <span className="text-xs text-zinc-500 font-mono font-bold">{filteredLogs.length} Events</span>
+      <div className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-[#111114] overflow-hidden shadow-xs">
+        <div className="p-4 sm:p-5 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
+          <h2 className="text-xs font-bold text-zinc-900 dark:text-white uppercase tracking-wider">Event History</h2>
+          <span className="text-xs text-zinc-500 font-medium">{filteredLogs.length} Events</span>
         </div>
 
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
-            <thead className="bg-zinc-100 dark:bg-zinc-900/60 text-zinc-700 dark:text-zinc-400 font-mono text-[10px] uppercase border-b border-zinc-200 dark:border-zinc-800 font-bold">
+            <thead className="bg-zinc-50 dark:bg-zinc-900/60 text-zinc-600 dark:text-zinc-400 text-xs uppercase font-semibold border-b border-zinc-200/80 dark:border-zinc-800">
               <tr>
-                <th className="p-2.5">Timestamp</th>
-                <th className="p-2.5">Actor</th>
-                <th className="p-2.5">Action</th>
-                <th className="p-2.5">Target</th>
-                <th className="p-2.5">Target ID</th>
-                <th className="p-2.5">Details</th>
+                <th className="p-3.5">Timestamp</th>
+                <th className="p-3.5">Actor</th>
+                <th className="p-3.5">Action</th>
+                <th className="p-3.5">Target</th>
+                <th className="p-3.5">Target ID</th>
+                <th className="p-3.5">Details</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800/60 text-zinc-800 dark:text-zinc-300">
+            <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/60 text-zinc-800 dark:text-zinc-300">
               {filteredLogs.map((log) => (
-                <tr key={log.id} className="hover:bg-zinc-50 dark:hover:bg-zinc-900/30 transition">
-                  <td className="p-2.5 font-mono text-zinc-500 whitespace-nowrap text-[11px]">
+                <tr key={log.id} className="hover:bg-zinc-50/60 dark:hover:bg-zinc-900/30 transition">
+                  <td className="p-3.5 font-mono text-zinc-500 whitespace-nowrap text-[11px]">
                     {new Date(log.occurredAt).toLocaleString("en-IN")}
                   </td>
-                  <td className="p-2.5 font-bold text-zinc-900 dark:text-zinc-200">
+                  <td className="p-3.5 font-semibold text-zinc-900 dark:text-white">
                     {log.actorName || log.actorId || "System"}
                   </td>
-                  <td className="p-2.5">
-                    <span className="rounded bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 text-[9px] font-mono font-bold text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700">
+                  <td className="p-3.5">
+                    <span className="rounded-md bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 text-[10px] font-semibold text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700">
                       {log.action}
                     </span>
                   </td>
-                  <td className="p-2.5 font-mono text-zinc-600 dark:text-zinc-400 text-[11px] font-medium">{log.targetType}</td>
-                  <td className="p-2.5 font-mono text-zinc-500 text-[11px] max-w-[100px] truncate">{log.targetId}</td>
-                  <td className="p-2.5 font-mono text-[11px] text-zinc-600 dark:text-zinc-400 max-w-sm truncate">
+                  <td className="p-3.5 text-zinc-600 dark:text-zinc-400 font-medium">{log.targetType}</td>
+                  <td className="p-3.5 font-mono text-zinc-500 text-[11px] max-w-[120px] truncate">{log.targetId}</td>
+                  <td className="p-3.5 font-mono text-[11px] text-zinc-600 dark:text-zinc-400 max-w-md truncate">
                     {log.afterJson || log.reason || "—"}
                   </td>
                 </tr>
               ))}
               {filteredLogs.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="p-6 text-center text-zinc-500 italic font-mono">
+                  <td colSpan={6} className="p-8 text-center text-zinc-400 dark:text-zinc-600 italic">
                     No audit logs found
                   </td>
                 </tr>

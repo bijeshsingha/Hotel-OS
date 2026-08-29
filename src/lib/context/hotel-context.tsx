@@ -56,7 +56,7 @@ const INITIAL_PROPERTY: PropertyInfo = {
   legalName: "AMBARISH RESIDENCY",
   gstin: "18AACCB2447F1ZX",
   stateCode: "18",
-  businessDate: "2026-08-24",
+  businessDate: typeof window !== "undefined" ? new Date().toLocaleDateString("en-CA") : new Date().toISOString().split("T")[0],
   currency: "INR",
 };
 

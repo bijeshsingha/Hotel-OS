@@ -1410,3 +1410,40 @@ model Expense {
 
   @@unique([propertyId, voucherNo])
 }
+
+// ----------------------------------------------------
+// Travel Agent & Corporate Company Master Directory
+// ----------------------------------------------------
+
+model CompanyMaster {
+  id                String   @id @default(cuid())
+  organizationId    String
+  propertyId        String?
+  accountType       String   @default("COMPANY") // COMPANY (Corporate B2B), TRAVEL_AGENT, OTA
+  accountName       String
+  shortName         String?
+  city              String?
+  address           String?
+  phone             String?
+  mobile            String?
+  email             String?
+  faxNo             String?
+  gstin             String?
+  panNo             String?
+  foodPlan          String?  @default("EP")
+  fbDiscountPercent Float    @default(0)
+  creditLimit       Float    @default(0)
+  openingBalance    Float    @default(0)
+  hsnCode           String?
+  orderType         String?  @default("None")
+  commissionPercent Float    @default(0)
+  gstTax            String?
+  tcs               String?
+  tds               String?
+  remarks           String?
+  status            String   @default("ACTIVE") // ACTIVE, INACTIVE
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@unique([organizationId, accountName])
+}

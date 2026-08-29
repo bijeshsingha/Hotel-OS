@@ -18,6 +18,7 @@ import {
   CheckCircle2,
   ShieldCheck,
   Plus,
+  Minus,
   Trash2,
   Globe,
   Share2,
@@ -27,6 +28,14 @@ import {
   Sparkles,
   Clock,
 } from "lucide-react";
+import {
+  ID_PROOF_TYPES,
+  PURPOSE_OF_VISIT_OPTIONS,
+  MEAL_PLANS,
+  COMMON_NATIONALITIES,
+} from "@/data";
+import { normalizeGuestName } from "@/lib/domain/name-utils";
+import { CompanySelector } from "./company-selector";
 
 interface GrcIntakeModalProps {
   isOpen: boolean;
@@ -64,8 +73,8 @@ export function GrcIntakeModal({
     arrivalDateTime: new Date().toISOString().replace("T", " ").slice(0, 16),
     departureDate: new Date(Date.now() + 86400000 * 2).toISOString().split("T")[0],
     mealPlan: "EP", // EP, CP, MAP, AP
-    extraBedRoomIds: [] as string[],
-    extraBeds: "0",
+    extraPaxCount: 0,
+    roomExtraPax: {} as Record<string, number>,
     extraBedRate: "500",
     adults: "",
     children: "",
@@ -109,6 +118,9 @@ export function GrcIntakeModal({
 
     // Billing & Advance
     agreedTariff: "",
+    isComplimentary: false,
+    checkoutType: "24_HOURS" as "24_HOURS" | "FIXED_TIME",
+    gracePeriodMinutes: "60",
     depositAmount: "0",
     paymentMethod: "UPI",
     transactionRef: "",
@@ -201,38 +213,42 @@ export function GrcIntakeModal({
         if (data.found && data.guest) {
           const g = data.guest;
           setRepeatGuest(g);
-          setFormData((prev) => ({
-            ...prev,
-            mobilePhone: val,
-            fullName: g.fullName || prev.fullName,
-            title: g.title || prev.title,
-            fatherSpouseName: g.fatherSpouseName || prev.fatherSpouseName,
-            age: g.age ? String(g.age) : prev.age,
-            gender: g.gender || prev.gender,
-            nationality: g.nationality || prev.nationality,
-            profession: g.profession || prev.profession,
-            alternatePhone: g.alternatePhone || prev.alternatePhone,
-            email: g.email || prev.email,
+          setFormData((prev) => {
+            const { title, pureName } = normalizeGuestName(g.fullName || g.name || prev.fullName, g.title || prev.title);
 
-            // Address
-            streetAddress: g.streetAddress || prev.streetAddress,
-            policeStation: g.policeStation || prev.policeStation,
-            city: g.city || prev.city,
-            state: g.state || prev.state,
-            pinZipCode: g.pinZipCode || prev.pinZipCode,
-            country: g.country || prev.country,
+            return {
+              ...prev,
+              mobilePhone: val,
+              fullName: pureName,
+              title,
+              fatherSpouseName: g.fatherSpouseName || prev.fatherSpouseName,
+              age: g.age ? String(g.age) : prev.age,
+              gender: g.gender || prev.gender,
+              nationality: g.nationality || prev.nationality,
+              profession: g.profession || prev.profession,
+              alternatePhone: g.alternatePhone || prev.alternatePhone,
+              email: g.email || prev.email,
 
-            // Travel & ID
-            arrivedFrom: g.arrivedFrom || prev.arrivedFrom,
-            goingTo: g.goingTo || prev.goingTo,
-            purposeOfVisit: g.purposeOfVisit || prev.purposeOfVisit,
-            vehicleNumber: g.vehicleNumber || prev.vehicleNumber,
-            driverName: g.driverName || prev.driverName,
-            idType: g.idType || prev.idType,
-            idLast4: g.idLast4 || prev.idLast4,
-            companyName: g.companyName || prev.companyName,
-            guestGstin: g.guestGstin || prev.guestGstin,
-          }));
+              // Address
+              streetAddress: g.streetAddress || prev.streetAddress,
+              policeStation: g.policeStation || prev.policeStation,
+              city: g.city || prev.city,
+              state: g.state || prev.state,
+              pinZipCode: g.pinZipCode || prev.pinZipCode,
+              country: g.country || prev.country,
+
+              // Travel & ID
+              arrivedFrom: g.arrivedFrom || prev.arrivedFrom,
+              goingTo: g.goingTo || prev.goingTo,
+              purposeOfVisit: g.purposeOfVisit || prev.purposeOfVisit,
+              vehicleNumber: g.vehicleNumber || prev.vehicleNumber,
+              driverName: g.driverName || prev.driverName,
+              idType: g.idType || prev.idType,
+              idLast4: g.idLast4 || prev.idLast4,
+              guestGstin: g.guestGstin || prev.guestGstin,
+              companyName: g.companyName || prev.companyName,
+            };
+          });
         } else {
           setRepeatGuest(null);
         }
@@ -318,6 +334,8 @@ export function GrcIntakeModal({
         ? "Indian"
         : (formData.foreignDetails.countryOfCitizenship || formData.country || "Foreign");
 
+      const { title: finalTitle, pureName: finalPureName } = normalizeGuestName(formData.fullName, formData.title);
+
       const res = await fetch("/api/v1/stays/check-in", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -328,7 +346,8 @@ export function GrcIntakeModal({
           groupBilling: formData.groupBilling,
           roomRates: formData.roomRates,
           guestData: {
-            name: `${formData.title} ${formData.fullName}`.trim(),
+            name: finalPureName,
+            title: finalTitle,
             phone: formData.mobilePhone,
             alternatePhone: formData.alternatePhone,
             email: formData.email,
@@ -360,8 +379,12 @@ export function GrcIntakeModal({
           paxM: Number(formData.paxM) || 0,
           paxF: Number(formData.paxF) || 0,
           paxC: Number(formData.paxC) || 0,
+          agreedTariff: formData.isComplimentary ? 0 : (formData.agreedTariff !== "" ? Number(formData.agreedTariff) : undefined),
+          isComplimentary: formData.isComplimentary,
+          checkoutType: formData.checkoutType,
+          gracePeriodMinutes: Number(formData.gracePeriodMinutes) || 60,
           depositAmount: Number(formData.depositAmount) || 0,
-          extraBeds: formData.extraBedRoomIds.filter(id => [formData.roomId, ...formData.additionalRoomIds].includes(id)).length,
+          extraBeds: (Number(formData.extraPaxCount) || 0) + formData.additionalRoomIds.reduce((acc, id) => acc + (Number(formData.roomExtraPax?.[id]) || 0), 0),
           extraBedRate: Number(formData.extraBedRate) || 500,
           coGuests: formData.coGuests.filter((cg) => cg.name.trim() !== ""),
           foreignDetails: formData.nationality !== "Indian" ? formData.foreignDetails : undefined,
@@ -518,30 +541,82 @@ export function GrcIntakeModal({
                   />
                 </div>
 
-                {/* Primary Room Extra Bed Toggle */}
-                <div className="space-y-1 sm:col-span-3">
-                  <div className="h-10 flex items-center justify-between px-3.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700">
-                    <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-zinc-800 dark:text-zinc-200">
-                      <input
-                        type="checkbox"
-                        checked={formData.extraBedRoomIds.includes(formData.roomId)}
-                        onChange={() => {
-                          const rid = formData.roomId;
-                          setFormData((prev) => ({
-                            ...prev,
-                            extraBedRoomIds: prev.extraBedRoomIds.includes(rid)
-                              ? prev.extraBedRoomIds.filter((id) => id !== rid)
-                              : [...prev.extraBedRoomIds, rid],
-                          }));
+                {/* Checkout Billing Model & Grace Period */}
+                <div className="space-y-1 sm:col-span-2">
+                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">
+                    Checkout Billing Cycle *
+                  </label>
+                  <select
+                    value={formData.checkoutType}
+                    onChange={(e: any) => setFormData({ ...formData, checkoutType: e.target.value })}
+                    className="w-full h-10 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white text-xs font-semibold focus:border-blue-500 focus:outline-none cursor-pointer"
+                  >
+                    <option value="24_HOURS">⏱️ 24-Hour Cycle from Check-In (Default)</option>
+                    <option value="FIXED_TIME">☀️ Standard 11:00 AM / 12:00 PM Fixed Time</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">
+                    Grace Period
+                  </label>
+                  <select
+                    value={formData.gracePeriodMinutes}
+                    onChange={(e) => setFormData({ ...formData, gracePeriodMinutes: e.target.value })}
+                    className="w-full h-10 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white text-xs font-semibold focus:border-blue-500 focus:outline-none cursor-pointer"
+                  >
+                    <option value="60">1 Hour Grace (Default)</option>
+                    <option value="0">0 Hours (Strict 24h)</option>
+                    <option value="120">2 Hours Grace</option>
+                    <option value="180">3 Hours Grace</option>
+                    <option value="240">4 Hours Grace</option>
+                  </select>
+                </div>
+
+                {/* Primary Room Extra Pax Stepper */}
+                <div className="space-y-1">
+                  <label className="block font-bold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">
+                    Extra Pax (₹500/Pax)
+                  </label>
+                  <div className="h-10 flex items-center justify-between px-2.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 shadow-xs">
+                    {/* Compact Segmented Control */}
+                    <div className="flex items-center bg-zinc-100 dark:bg-zinc-800 p-0.5 rounded-lg border border-zinc-200 dark:border-zinc-700">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const current = Number(formData.extraPaxCount) || 0;
+                          const next = Math.max(0, current - 1);
+                          setFormData((prev) => ({ ...prev, extraPaxCount: next }));
                         }}
-                        className="w-4 h-4 rounded bg-zinc-100 dark:bg-zinc-800 border-zinc-300 dark:border-zinc-600 text-blue-600 cursor-pointer"
-                      />
-                      <span>+ 1 Extra Bed for Primary Room</span>
-                    </label>
-                    {formData.extraBedRoomIds.includes(formData.roomId) && (
-                      <span className="text-[11px] font-mono font-bold text-amber-600 dark:text-amber-400">
-                        +₹{formData.extraBedRate || "500"}/nt
+                        className="h-6 w-6 rounded-md bg-white dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-700 active:scale-90 text-zinc-700 dark:text-zinc-200 flex items-center justify-center transition shadow-xs cursor-pointer"
+                        title="Decrease Extra Pax"
+                      >
+                        <Minus className="h-3 w-3 stroke-[2.5]" />
+                      </button>
+                      <span className="font-mono font-bold text-xs text-zinc-900 dark:text-white px-2 min-w-[24px] text-center select-none">
+                        {Number(formData.extraPaxCount) || 0}
                       </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const current = Number(formData.extraPaxCount) || 0;
+                          const next = current + 1;
+                          setFormData((prev) => ({ ...prev, extraPaxCount: next }));
+                        }}
+                        className="h-6 w-6 rounded-md bg-white dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-700 active:scale-90 text-zinc-700 dark:text-zinc-200 flex items-center justify-center transition shadow-xs cursor-pointer"
+                        title="Increase Extra Pax"
+                      >
+                        <Plus className="h-3 w-3 stroke-[2.5]" />
+                      </button>
+                    </div>
+
+                    {/* Price Badge */}
+                    {(Number(formData.extraPaxCount) || 0) > 0 ? (
+                      <span className="text-[11px] font-mono font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/60 px-2 py-0.5 rounded-md border border-amber-200 dark:border-amber-800/60">
+                        +₹{(Number(formData.extraPaxCount) || 0) * 500}/nt
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-mono text-zinc-400 dark:text-zinc-500 pr-1">₹0</span>
                     )}
                   </div>
                 </div>
@@ -558,7 +633,7 @@ export function GrcIntakeModal({
                   <div className="flex flex-col gap-2.5 mb-3">
                     {formData.additionalRoomIds.map((id) => {
                       const r = rooms.find((room) => room.id === id);
-                      const hasExtraBed = formData.extraBedRoomIds.includes(id);
+                      const roomPaxCount = formData.roomExtraPax?.[id] || 0;
                       return (
                         <div
                           key={id}
@@ -593,11 +668,15 @@ export function GrcIntakeModal({
                               <button
                                 type="button"
                                 onClick={() =>
-                                  setFormData((prev) => ({
-                                    ...prev,
-                                    additionalRoomIds: prev.additionalRoomIds.filter((rid) => rid !== id),
-                                    extraBedRoomIds: prev.extraBedRoomIds.filter((rid) => rid !== id),
-                                  }))
+                                  setFormData((prev) => {
+                                    const nextPax = { ...(prev.roomExtraPax || {}) };
+                                    delete nextPax[id];
+                                    return {
+                                      ...prev,
+                                      additionalRoomIds: prev.additionalRoomIds.filter((rid) => rid !== id),
+                                      roomExtraPax: nextPax,
+                                    };
+                                  })
                                 }
                                 className="p-1.5 text-zinc-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-colors"
                                 title="Remove Room"
@@ -607,29 +686,55 @@ export function GrcIntakeModal({
                             </div>
                           </div>
 
-                          {/* Per-Room Extra Bed Toggle */}
-                          <div className="flex items-center justify-between p-2 rounded-lg bg-white dark:bg-zinc-900/90 border border-zinc-200 dark:border-zinc-800 text-xs">
-                            <label className="flex items-center gap-2 cursor-pointer font-bold text-zinc-800 dark:text-zinc-300">
-                              <input
-                                type="checkbox"
-                                checked={hasExtraBed}
-                                onChange={() => {
-                                  setFormData((prev) => ({
-                                    ...prev,
-                                    extraBedRoomIds: prev.extraBedRoomIds.includes(id)
-                                      ? prev.extraBedRoomIds.filter((rid) => rid !== id)
-                                      : [...prev.extraBedRoomIds, id],
-                                  }));
-                                }}
-                                className="w-4 h-4 rounded bg-zinc-100 dark:bg-zinc-800 border-zinc-300 dark:border-zinc-600 text-blue-600 cursor-pointer"
-                              />
-                              <span>+ 1 Extra Bed for Room {r?.number}</span>
-                            </label>
-                            {hasExtraBed && (
-                              <span className="text-[11px] font-mono font-bold text-amber-600 dark:text-amber-400">
-                                +₹{formData.extraBedRate || "500"}/nt
-                              </span>
-                            )}
+                          {/* Per-Room Extra Pax Stepper */}
+                          <div className="flex items-center justify-between p-2.5 rounded-xl bg-white dark:bg-zinc-900/90 border border-zinc-200 dark:border-zinc-800 text-xs shadow-xs">
+                            <span className="font-bold text-zinc-800 dark:text-zinc-300">
+                              Extra Pax for Room {r?.number} (₹500/Pax)
+                            </span>
+                            <div className="flex items-center gap-2.5">
+                              <div className="flex items-center bg-zinc-100 dark:bg-zinc-800 p-0.5 rounded-lg border border-zinc-200 dark:border-zinc-700">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const cur = formData.roomExtraPax?.[id] || 0;
+                                    const next = Math.max(0, cur - 1);
+                                    setFormData((prev) => ({
+                                      ...prev,
+                                      roomExtraPax: { ...(prev.roomExtraPax || {}), [id]: next },
+                                    }));
+                                  }}
+                                  className="h-6 w-6 rounded-md bg-white dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-700 active:scale-90 text-zinc-700 dark:text-zinc-200 flex items-center justify-center transition shadow-xs cursor-pointer"
+                                  title="Decrease Extra Pax"
+                                >
+                                  <Minus className="h-3 w-3 stroke-[2.5]" />
+                                </button>
+                                <span className="font-mono font-bold text-xs text-zinc-900 dark:text-white px-2 min-w-[20px] text-center select-none">
+                                  {roomPaxCount}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const cur = formData.roomExtraPax?.[id] || 0;
+                                    const next = cur + 1;
+                                    setFormData((prev) => ({
+                                      ...prev,
+                                      roomExtraPax: { ...(prev.roomExtraPax || {}), [id]: next },
+                                    }));
+                                  }}
+                                  className="h-6 w-6 rounded-md bg-white dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-700 active:scale-90 text-zinc-700 dark:text-zinc-200 flex items-center justify-center transition shadow-xs cursor-pointer"
+                                  title="Increase Extra Pax"
+                                >
+                                  <Plus className="h-3 w-3 stroke-[2.5]" />
+                                </button>
+                              </div>
+                              {roomPaxCount > 0 ? (
+                                <span className="text-[11px] font-mono font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/60 px-2 py-0.5 rounded-md border border-amber-200 dark:border-amber-800/60">
+                                  +₹{roomPaxCount * 500}/nt
+                                </span>
+                              ) : (
+                                <span className="text-[10px] font-mono text-zinc-400 dark:text-zinc-500 pr-1">₹0</span>
+                              )}
+                            </div>
                           </div>
                         </div>
                       );
@@ -760,12 +865,9 @@ export function GrcIntakeModal({
                   0
                 ) || totalRoomsCount * 2;
                 
-                const activeExtraBeds = formData.extraBedRoomIds.filter((id) =>
-                  selectedRoomsList.some((r) => r.id === id)
-                );
-                const currentExtraBeds = activeExtraBeds.length;
-                const totalCapacity = baseStandardCapacity + currentExtraBeds;
-                const absoluteMaxRoomCapacity = baseStandardCapacity + totalRoomsCount;
+                const currentExtraPax = (Number(formData.extraPaxCount) || 0) + formData.additionalRoomIds.reduce((sum, id) => sum + (Number(formData.roomExtraPax?.[id]) || 0), 0);
+                const totalCapacity = baseStandardCapacity + currentExtraPax;
+                const absoluteMaxRoomCapacity = baseStandardCapacity + totalRoomsCount * 2;
                 
                 const totalAdultsCount =
                   Number(formData.adults) ||
@@ -795,7 +897,7 @@ export function GrcIntakeModal({
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                         <div className="flex items-center gap-2.5">
                           <span className="text-base">
-                            {isBeyondMaxPhysicalLimit ? "⛔" : isOverCapacity ? "⚠️" : hasGuestsEntered ? "✅" : "🛏️"}
+                            {isBeyondMaxPhysicalLimit ? "⛔" : isOverCapacity ? "⚠️" : hasGuestsEntered ? "✅" : "👥"}
                           </span>
                           <div className="text-xs">
                             <span className="font-bold">
@@ -809,12 +911,12 @@ export function GrcIntakeModal({
                             </span>
                             <p className="text-[11px] opacity-90 mt-0.5">
                               {isBeyondMaxPhysicalLimit
-                                ? `${totalGuests} Guests entered, but ${totalRoomsCount} selected room(s) can only hold max ${absoluteMaxRoomCapacity} Pax (1 extra bed/room max). You MUST add another room.`
+                                ? `${totalGuests} Guests entered, but ${totalRoomsCount} selected room(s) can only hold max ${absoluteMaxRoomCapacity} Pax. You MUST add another room.`
                                 : isOverCapacity
-                                ? `${totalGuests} Guests entered, but current setup fits ${totalCapacity} Pax. Check "+ 1 Extra Bed" on unselected room(s).`
+                                ? `${totalGuests} Guests entered, but standard capacity is ${totalCapacity} Pax. Increment Extra Pax (+₹500/Pax) or add an extra room.`
                                 : hasGuestsEntered
-                                ? `${totalGuests} Guests fit across ${totalRoomsCount} Room(s) (Base: ${baseStandardCapacity} + ${currentExtraBeds} Extra Bed = ${totalCapacity} Pax capacity).`
-                                : `Selected ${totalRoomsCount} Room(s) accommodate base ${baseStandardCapacity} Pax (Max ${absoluteMaxRoomCapacity} Pax with 1 extra bed per room).`}
+                                ? `${totalGuests} Guests fit across ${totalRoomsCount} Room(s) (Base: ${baseStandardCapacity} + ${currentExtraPax} Extra Pax = ${totalCapacity} Pax capacity).`
+                                : `Base capacity: ${baseStandardCapacity} Pax (${totalRoomsCount} Room${totalRoomsCount > 1 ? "s" : ""}). Increment Extra Pax if adding extra guests.`}
                             </p>
                           </div>
                         </div>
@@ -1337,15 +1439,13 @@ export function GrcIntakeModal({
                   <select
                     value={formData.purposeOfVisit}
                     onChange={(e) => setFormData({ ...formData, purposeOfVisit: e.target.value })}
-                    className="w-full h-10 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white text-xs focus:border-blue-500 focus:outline-none"
+                    className="w-full h-10 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white text-xs focus:border-blue-500 focus:outline-none cursor-pointer font-medium"
                   >
-                    <option value="Tourism / Holiday">Tourism / Holiday</option>
-                    <option value="Business / Official">Business / Official</option>
-                    <option value="Medical">Medical Treatment</option>
-                    <option value="Transit">Transit / Layover</option>
-                    <option value="Event / Wedding">Event / Wedding</option>
-                    <option value="Exam / Interview">Exam / Interview</option>
-                    <option value="Other">Other</option>
+                    {PURPOSE_OF_VISIT_OPTIONS.map((opt) => (
+                      <option key={opt.id} value={opt.label}>
+                        {opt.label}
+                      </option>
+                    ))}
                   </select>
                 </div>
 
@@ -1365,13 +1465,13 @@ export function GrcIntakeModal({
                   <select
                     value={formData.idType}
                     onChange={(e) => setFormData({ ...formData, idType: e.target.value })}
-                    className="w-full h-10 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white text-xs font-semibold focus:border-blue-500 focus:outline-none"
+                    className="w-full h-10 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white text-xs font-semibold focus:border-blue-500 focus:outline-none cursor-pointer"
                   >
-                    <option value="AADHAAR">Aadhaar Card</option>
-                    <option value="PASSPORT">Passport</option>
-                    <option value="DRIVING_LICENSE">Driving License</option>
-                    <option value="VOTER_ID">Voter ID</option>
-                    <option value="GOVT_ID">Govt Issued ID</option>
+                    {ID_PROOF_TYPES.map((id) => (
+                      <option key={id.id} value={id.id}>
+                        {id.label}
+                      </option>
+                    ))}
                   </select>
                 </div>
 
@@ -1386,25 +1486,38 @@ export function GrcIntakeModal({
                   />
                 </div>
 
-                <div className="space-y-1">
-                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">Company Name</label>
-                  <input
-                    type="text"
-                    placeholder="Corporate Billing (Optional)"
+                <div className="space-y-1 sm:col-span-2">
+                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap flex items-center justify-between">
+                    <span>Company / Travel Agent Master</span>
+                    <span className="text-[10px] text-blue-600 dark:text-blue-400 font-mono font-bold">24+ Directory</span>
+                  </label>
+                  <CompanySelector
                     value={formData.companyName}
-                    onChange={(e) => setFormData({ ...formData, companyName: e.target.value.toUpperCase() })}
-                    className="w-full h-10 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white text-xs focus:border-blue-500 focus:outline-none"
+                    activeProperty={activeProperty}
+                    placeholder="Search corporate company (e.g. ABB, Asian Paints, MMT...)"
+                    onSelect={(comp) => {
+                      setFormData((prev) => ({
+                        ...prev,
+                        companyName: comp.accountName,
+                        guestGstin: comp.gstin || prev.guestGstin,
+                        city: comp.city ? comp.city.toUpperCase() : prev.city,
+                        streetAddress: comp.address ? comp.address.toUpperCase() : prev.streetAddress,
+                        email: prev.email || comp.email || "",
+                        alternatePhone: prev.alternatePhone || comp.phone || "",
+                        referralChannel: comp.accountType === "TRAVEL_AGENT" ? (comp.shortName || comp.accountName) : prev.referralChannel,
+                      }));
+                    }}
                   />
                 </div>
 
                 <div className="space-y-1">
-                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">Guest GSTIN</label>
+                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">Company GSTIN</label>
                   <input
                     type="text"
                     placeholder="e.g. 18AAAAA0000A1Z5"
                     value={formData.guestGstin}
                     onChange={(e) => setFormData({ ...formData, guestGstin: e.target.value.toUpperCase() })}
-                    className="w-full h-10 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white font-mono text-xs focus:border-blue-500 focus:outline-none"
+                    className="w-full h-10 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white font-mono text-xs focus:border-blue-500 focus:outline-none font-semibold"
                   />
                 </div>
               </div>
@@ -1495,11 +1608,29 @@ export function GrcIntakeModal({
 
             {/* 6. ADVANCE PAYMENT & SETTLEMENT */}
             <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-[#09090b] p-4 space-y-3.5 shadow-xs">
-              <div className="border-b border-zinc-200 dark:border-zinc-800 pb-2">
+              <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 pb-2">
                 <span className="font-bold text-zinc-900 dark:text-white uppercase tracking-wider flex items-center gap-2 text-xs">
                   <CreditCard className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-                  6. Check-In Advance Payment & Receipt
+                  6. Room Tariff, Complimentary Option & Advance Deposit
                 </span>
+
+                {/* Complimentary Room Option */}
+                <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-emerald-800 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 px-2.5 py-1 rounded-lg border border-emerald-200 dark:border-emerald-800">
+                  <input
+                    type="checkbox"
+                    checked={formData.isComplimentary}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setFormData({
+                        ...formData,
+                        isComplimentary: checked,
+                        agreedTariff: checked ? "0" : formData.agreedTariff,
+                      });
+                    }}
+                    className="w-4 h-4 rounded text-emerald-600 cursor-pointer"
+                  />
+                  <span>🎁 Complimentary Room (₹0 Free Stay)</span>
+                </label>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
@@ -1511,12 +1642,11 @@ export function GrcIntakeModal({
                     <span className="absolute left-3 text-zinc-400 font-bold font-mono text-xs">₹</span>
                     <input
                       type="number"
-                      min="0"
-                      step="1"
-                      placeholder="e.g. 2000"
-                      value={formData.agreedTariff}
+                      placeholder={formData.isComplimentary ? "0 (Complimentary)" : "Enter custom rate"}
+                      disabled={formData.isComplimentary}
+                      value={formData.isComplimentary ? "0" : formData.agreedTariff}
                       onChange={(e) => setFormData({ ...formData, agreedTariff: e.target.value })}
-                      className="w-full h-10 pl-7 pr-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-blue-700 dark:text-blue-400 font-mono font-bold text-sm focus:border-blue-500 focus:outline-none"
+                      className="w-full h-10 pl-7 pr-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-blue-700 dark:text-blue-400 font-mono font-bold text-sm focus:border-blue-500 focus:outline-none disabled:opacity-60 disabled:bg-zinc-100 dark:disabled:bg-zinc-800"
                     />
                   </div>
                 </div>
@@ -1529,8 +1659,6 @@ export function GrcIntakeModal({
                     <span className="absolute left-3 text-emerald-500 font-bold font-mono text-xs">₹</span>
                     <input
                       type="number"
-                      min="0"
-                      step="100"
                       placeholder="0"
                       value={formData.depositAmount}
                       onChange={(e) => setFormData({ ...formData, depositAmount: e.target.value })}
@@ -1583,26 +1711,26 @@ export function GrcIntakeModal({
             </div>
 
             {/* Bottom Actions */}
-            <div className="pt-3 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
-              <span className="text-[11px] text-zinc-500 font-mono">
-                Complies with Form GRC Rule 46 • Instant Folio & Registration Creation
+            <div className="pt-3.5 pb-1 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-between gap-4">
+              <span className="text-[11px] text-zinc-500 font-mono hidden sm:inline truncate">
+                Rule 46 Compliant GRC • Instant Folio
               </span>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-3 ml-auto shrink-0">
                 <button
                   type="button"
                   onClick={onClose}
-                  className="px-4 py-2.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 text-xs font-semibold transition"
+                  className="px-4 py-2.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 text-xs font-bold transition cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={loading}
-                  className="px-6 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 font-extrabold text-white text-sm transition shadow-lg shadow-blue-600/30 flex items-center gap-2 disabled:opacity-50 whitespace-nowrap"
+                  className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 font-bold text-white text-xs sm:text-sm transition shadow-md shadow-blue-600/20 flex items-center gap-2 disabled:opacity-50 whitespace-nowrap cursor-pointer"
                 >
-                  <CheckCircle2 className="h-4 w-4" />
-                  <span>{loading ? "Checking In..." : "Complete Check-In & Issue GRC"}</span>
+                  <CheckCircle2 className="h-4 w-4 shrink-0" />
+                  <span>{loading ? "Checking In..." : "Complete Check-In"}</span>
                 </button>
               </div>
             </div>

@@ -9,6 +9,7 @@ import {
   Copy,
   Check,
 } from "lucide-react";
+import { formatGuestDisplayName } from "@/lib/domain/name-utils";
 
 export interface GrcData {
   id?: string;
@@ -166,7 +167,7 @@ export function PrintableGrcModal({
       <html lang="en">
         <head>
           <meta charset="utf-8" />
-          <title>GRC_${registrationNumber}_${(data.fullName || "Guest").replace(/\\s+/g, "_")}</title>
+          <title>GRC_${registrationNumber}_${(formatGuestDisplayName(data.fullName) || "Guest").replace(/\s+/g, "_")}</title>
           <style>
             @page {
               size: A4 portrait;
@@ -434,7 +435,7 @@ export function PrintableGrcModal({
                 <tr>
                   <td style="width: 38%;">
                     <span class="field-label">Full Name of Guest:</span>
-                    <span class="field-value-lg">${sanitize(data.fullName)}</span>
+                    <span class="field-value-lg">${sanitize(formatGuestDisplayName(data.fullName))}</span>
                   </td>
                   <td style="width: 32%;">
                     <span class="field-label">Age / Gender / Nationality:</span>
@@ -688,16 +689,26 @@ export function PrintableGrcModal({
           <div className="bg-white text-black p-4 sm:p-6 rounded-xl border border-zinc-300 shadow-lg space-y-2.5 max-w-3xl mx-auto">
             
             {/* 1. HOTEL LETTERHEAD & GRC HEADER */}
-            <div className="border-2 border-black p-3 rounded-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 bg-zinc-50">
-              <div className="space-y-0.5">
-                <h1 className="text-base sm:text-lg font-black tracking-tight text-black uppercase leading-tight font-serif">
-                  {property.displayName || "Hotel Ambarish Grand Residency"}
-                </h1>
-                <div className="text-[11px] font-bold text-zinc-800">
-                  {property.legalName || "AMBARISH RESIDENCY"} • <span className="font-mono">GSTIN: {property.gstin || "18AACCB2447F1ZX"}</span>
-                </div>
-                <div className="text-[10px] text-zinc-700 max-w-lg leading-snug">
-                  {property.address || "MD Shah Road, Paltan Bazar, Guwahati, Assam - 781008"} • Ph: {property.phone || "+91 9864341211"}
+            <div className="border-2 border-black p-3 rounded-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-zinc-50">
+              <div className="flex items-center gap-3">
+                <img
+                  src="/images/ambarish-logo.png"
+                  alt="Hotel Ambarish Grand Residency Logo"
+                  className="h-10 sm:h-12 w-auto object-contain shrink-0"
+                  onError={(e) => {
+                    e.currentTarget.style.display = "none";
+                  }}
+                />
+                <div className="space-y-0.5">
+                  <h1 className="text-base sm:text-lg font-black tracking-tight text-black uppercase leading-tight font-serif">
+                    {property.displayName || "Hotel Ambarish Grand Residency"}
+                  </h1>
+                  <div className="text-[11px] font-bold text-zinc-800">
+                    {property.legalName || "AMBARISH RESIDENCY"} • <span className="font-mono">GSTIN: {property.gstin || "18AACCB2447F1ZX"}</span>
+                  </div>
+                  <div className="text-[10px] text-zinc-700 max-w-lg leading-snug">
+                    {property.address || "MD Shah Road, Paltan Bazar, Guwahati, Assam - 781008"} • Ph: {property.phone || "+91 9864341211"}
+                  </div>
                 </div>
               </div>
 
@@ -749,7 +760,7 @@ export function PrintableGrcModal({
               <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-black border-b border-black text-xs">
                 <div className="p-2 space-y-0.5">
                   <span className="text-[9px] uppercase font-bold text-zinc-600 block">Full Name of Guest:</span>
-                  <span className="text-xs sm:text-sm font-black text-black uppercase block">{sanitize(data.fullName)}</span>
+                  <span className="text-xs sm:text-sm font-black text-black uppercase block">{sanitize(formatGuestDisplayName(data.fullName))}</span>
                 </div>
 
                 <div className="p-2 space-y-0.5">

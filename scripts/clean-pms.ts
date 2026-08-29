@@ -25,50 +25,54 @@ async function cleanPmsDatabase() {
   // 2. Delete all transactional records in strict child-to-parent dependency order
   console.log("🗑️  Clearing all transactional stays, folios, orders & registrations...");
 
+  const p = prisma as any;
   // Invoices, Credit Notes & Lines
-  if (prisma.creditNoteLine) await prisma.creditNoteLine.deleteMany({});
-  if (prisma.creditNote) await prisma.creditNote.deleteMany({});
-  if (prisma.invoiceLine) await prisma.invoiceLine.deleteMany({});
-  if (prisma.invoice) await prisma.invoice.deleteMany({});
+  if (p.creditNoteLine) await p.creditNoteLine.deleteMany({});
+  if (p.creditNote) await p.creditNote.deleteMany({});
+  if (p.invoiceLine) await p.invoiceLine.deleteMany({});
+  if (p.invoice) await p.invoice.deleteMany({});
 
   // Payments, Allocations & Refunds
-  if (prisma.refund) await prisma.refund.deleteMany({});
-  if (prisma.paymentAllocation) await prisma.paymentAllocation.deleteMany({});
-  if (prisma.deposit) await prisma.deposit.deleteMany({});
-  if (prisma.payment) await prisma.payment.deleteMany({});
+  if (p.refund) await p.refund.deleteMany({});
+  if (p.paymentAllocation) await p.paymentAllocation.deleteMany({});
+  if (p.deposit) await p.deposit.deleteMany({});
+  if (p.payment) await p.payment.deleteMany({});
 
   // Folio Entries & Windows & Folios
-  if (prisma.folioEntry) await prisma.folioEntry.deleteMany({});
-  if (prisma.folioWindow) await prisma.folioWindow.deleteMany({});
-  if (prisma.folio) await prisma.folio.deleteMany({});
+  if (p.folioEntry) await p.folioEntry.deleteMany({});
+  if (p.folioWindow) await p.folioWindow.deleteMany({});
+  if (p.folio) await p.folio.deleteMany({});
 
   // Orders, KOTs & POS Shifts
-  if (prisma.orderItemModifier) await prisma.orderItemModifier.deleteMany({});
-  if (prisma.orderItem) await prisma.orderItem.deleteMany({});
-  if (prisma.kotItem) await prisma.kotItem.deleteMany({});
-  if (prisma.kot) await prisma.kot.deleteMany({});
-  if (prisma.order) await prisma.order.deleteMany({});
-  if (prisma.pOSShift) await prisma.pOSShift.deleteMany({});
+  if (p.orderItemModifier) await p.orderItemModifier.deleteMany({});
+  if (p.orderItem) await p.orderItem.deleteMany({});
+  if (p.kotItem) await p.kotItem.deleteMany({});
+  if (p.kOTItem) await p.kOTItem.deleteMany({});
+  if (p.kot) await p.kot.deleteMany({});
+  if (p.kOT) await p.kOT.deleteMany({});
+  if (p.order) await p.order.deleteMany({});
+  if (p.pOSShift) await p.pOSShift.deleteMany({});
 
   // Digital Registrations & GRC queue
-  if (prisma.digitalRegistration) await prisma.digitalRegistration.deleteMany({});
+  if (p.digitalRegistration) await p.digitalRegistration.deleteMany({});
 
   // Stays & Room Assignments (must be deleted before ReservationRooms)
-  if (prisma.roomAssignment) await prisma.roomAssignment.deleteMany({});
-  if (prisma.stayGuest) await prisma.stayGuest.deleteMany({});
-  if (prisma.stay) await prisma.stay.deleteMany({});
+  if (p.roomAssignment) await p.roomAssignment.deleteMany({});
+  if (p.stayGuest) await p.stayGuest.deleteMany({});
+  if (p.stay) await p.stay.deleteMany({});
 
   // Reservations
-  if (prisma.reservationNight) await prisma.reservationNight.deleteMany({});
-  if (prisma.reservationNote) await prisma.reservationNote.deleteMany({});
-  if (prisma.reservationRoom) await prisma.reservationRoom.deleteMany({});
-  if (prisma.reservation) await prisma.reservation.deleteMany({});
+  if (p.reservationNight) await p.reservationNight.deleteMany({});
+  if (p.reservationNote) await p.reservationNote.deleteMany({});
+  if (p.reservationRoom) await p.reservationRoom.deleteMany({});
+  if (p.reservation) await p.reservation.deleteMany({});
 
   // Housekeeping & Maintenance tasks
-  if (prisma.hkTaskEvent) await prisma.hkTaskEvent.deleteMany({});
-  if (prisma.housekeepingTask) await prisma.housekeepingTask.deleteMany({});
-  if (prisma.maintenanceEvent) await prisma.maintenanceEvent.deleteMany({});
-  if (prisma.maintenanceIssue) await prisma.maintenanceIssue.deleteMany({});
+  if (p.hkTaskEvent) await p.hkTaskEvent.deleteMany({});
+  if (p.hKTaskEvent) await p.hKTaskEvent.deleteMany({});
+  if (p.housekeepingTask) await p.housekeepingTask.deleteMany({});
+  if (p.maintenanceEvent) await p.maintenanceEvent.deleteMany({});
+  if (p.maintenanceIssue) await p.maintenanceIssue.deleteMany({});
 
   // Room blocks & state history
   if (prisma.roomBlock) await prisma.roomBlock.deleteMany({});

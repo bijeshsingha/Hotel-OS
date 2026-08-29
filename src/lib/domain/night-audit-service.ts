@@ -127,14 +127,37 @@ export async function postNightlyRoomCharges(propertyId: string) {
       continue;
     }
 
-    const room = stay.roomAssignments[0]?.room;
-    const baseTariff = 4500; // Base rate
-    const gst = calculateGST({
-      grossOrBaseAmount: baseTariff,
-      isInclusive: false,
-      sacHsn: "996311",
-      supplierStateCode: property.stateCode || "18",
-    });
+    const activeAssignment = stay.roomAssignments[0];
+    const room = activeAssignment?.room;
+    
+    // Determine exact agreed rate for this stay/room
+    let baseTariff = 3200;
+    const isComp = activeAssignment?.rateHandling === "COMPLIMENTARY" || activeAssignment?.moveReason === "AGREED_RATE:0";
+    
+    if (isComp) {
+      baseTariff = 0;
+    } else if (activeAssignment?.moveReason?.startsWith("AGREED_RATE:")) {
+      baseTariff = Number(activeAssignment.moveReason.replace("AGREED_RATE:", "")) || 3200;
+    } else {
+      // Look up initial posted room charge on this folio to maintain exact tariff consistency
+      const prevEntry = await prisma.folioEntry.findFirst({
+        where: { folioId: stay.folio.id, chargeCode: "ROOM_TARIFF" },
+        orderBy: { createdAt: "asc" },
+      });
+      if (prevEntry && prevEntry.unitAmount !== undefined) {
+        baseTariff = prevEntry.unitAmount;
+      }
+    }
+
+    const gst = isComp || baseTariff === 0
+      ? { taxableAmount: 0, taxAmount: 0, totalAmount: 0, components: [] }
+      : calculateGST({
+          grossOrBaseAmount: baseTariff,
+          isInclusive: true,
+          sacHsn: "996311",
+          supplierStateCode: property.stateCode || "18",
+          customTaxRate: 5,
+        });
 
     const primaryWindow = stay.folio.windows[0];
 
@@ -147,7 +170,9 @@ export async function postNightlyRoomCharges(propertyId: string) {
         serviceDate: currentDate,
         type: "CHARGE",
         chargeCode: "ROOM_TARIFF",
-        description: `Room Tariff - Room ${room?.number || "Stay"} (${currentDate})`,
+        description: isComp || baseTariff === 0
+          ? `Room Tariff - Room ${room?.number || "Stay"} (${currentDate} - COMPLIMENTARY)`
+          : `Room Tariff - Room ${room?.number || "Stay"} (${currentDate})`,
         qty: 1,
         unitAmount: baseTariff,
         taxableAmount: gst.taxableAmount,

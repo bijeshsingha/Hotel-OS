@@ -115,17 +115,27 @@ export function ReservationVoucherModal({
         <div ref={printRef} className="p-6 sm:p-8 overflow-y-auto space-y-6 bg-white text-zinc-900 font-sans print:p-0">
           
           {/* Hotel Header Letterhead */}
-          <div className="flex items-start justify-between border-b-2 border-zinc-900 pb-4">
-            <div>
-              <h1 className="text-xl sm:text-2xl font-black tracking-tight text-zinc-950 uppercase">
-                {activeProperty?.displayName || "Hotel Ambarish Grand Residency"}
-              </h1>
-              <p className="text-[11px] text-zinc-600 font-medium">
-                {activeProperty?.address || "MD Shah Road, Paltan Bazar, Guwahati, Assam - 781008"}
-              </p>
-              <p className="text-[11px] text-zinc-600 font-mono">
-                Phone: {activeProperty?.phone || "+91 9864341211"} • GSTIN: <strong>{activeProperty?.gstin || "18AACCB2447F1ZX"}</strong>
-              </p>
+          <div className="flex items-start justify-between border-b-2 border-zinc-900 pb-4 gap-4">
+            <div className="flex items-center gap-3.5">
+              <img
+                src="/images/ambarish-logo.png"
+                alt="Hotel Ambarish Grand Residency Logo"
+                className="h-11 sm:h-13 w-auto object-contain shrink-0"
+                onError={(e) => {
+                  e.currentTarget.style.display = "none";
+                }}
+              />
+              <div>
+                <h1 className="text-xl sm:text-2xl font-black tracking-tight text-zinc-950 uppercase">
+                  {activeProperty?.displayName || "Hotel Ambarish Grand Residency"}
+                </h1>
+                <p className="text-[11px] text-zinc-600 font-medium">
+                  {activeProperty?.address || "MD Shah Road, Paltan Bazar, Guwahati, Assam - 781008"}
+                </p>
+                <p className="text-[11px] text-zinc-600 font-mono">
+                  Phone: {activeProperty?.phone || "+91 9864341211"} • GSTIN: <strong>{activeProperty?.gstin || "18AACCB2447F1ZX"}</strong>
+                </p>
+              </div>
             </div>
 
             <div className="text-right">

@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db/prisma";
 import { getNextDocumentNumber } from "@/lib/sequence/generator";
 import { quoteStay } from "@/lib/domain/pms-service";
 import { calculateGST } from "@/lib/gst/calculator";
+import { normalizeGuestName } from "@/lib/domain/name-utils";
 
 export async function GET(request: Request) {
   try {
@@ -68,12 +69,16 @@ export async function POST(request: Request) {
       guestState,
       guestNationality = "Indian",
       roomTypeId,
+      roomCount = 1,
       assignedRoomId,
       arrivalDate,
       departureDate,
       adults = 2,
       children = 0,
       source = "DIRECT",
+      agencyName,
+      agencyPhone,
+      companyName,
       channelRef,
       ratePerNight,
       depositAmount = 0,
@@ -103,14 +108,17 @@ export async function POST(request: Request) {
       },
     });
 
+    const { pureName: canonicalGuestName } = normalizeGuestName(guestName);
+
     if (!guest) {
       guest = await prisma.guest.create({
         data: {
           organizationId: property.organizationId,
-          name: guestName,
+          name: canonicalGuestName,
           email: guestEmail || null,
           phone: guestPhone || null,
           gstin: guestGstin || null,
+          companyName: companyName || agencyName || null,
           nationality: guestNationality,
           addressJson: JSON.stringify({
             city: guestCity || "",
@@ -121,30 +129,33 @@ export async function POST(request: Request) {
       });
     }
 
-    // Calculate nights count
+    // Calculate nights count and room count
     const start = new Date(arrivalDate);
     const end = new Date(departureDate);
     const diffTime = Math.abs(end.getTime() - start.getTime());
     const nightsCount = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
+    const numRooms = Math.max(1, Number(roomCount) || 1);
 
-    // Calculate per-night rates & total
-    const effectiveBaseRate = Number(ratePerNight) > 0 ? Number(ratePerNight) : 3500;
+    // Calculate per-night rates & total per room
+    const effectiveBaseRate = Number(ratePerNight) >= 0 ? Number(ratePerNight) : 3500;
     const nightsData = [];
-    let calculatedTotal = 0;
+    let singleRoomTotal = 0;
 
     for (let i = 0; i < nightsCount; i++) {
       const current = new Date(start);
       current.setDate(current.getDate() + i);
       const serviceDate = current.toISOString().split("T")[0];
 
-      const gst = calculateGST({
-        grossOrBaseAmount: effectiveBaseRate,
-        isInclusive: false,
-        sacHsn: "996311",
-        supplierStateCode: property.stateCode || "18",
-      });
+      const gst = effectiveBaseRate === 0
+        ? { taxableAmount: 0, taxAmount: 0, totalAmount: 0 }
+        : calculateGST({
+            grossOrBaseAmount: effectiveBaseRate,
+            isInclusive: false,
+            sacHsn: "996311",
+            supplierStateCode: property.stateCode || "18",
+          });
 
-      calculatedTotal += gst.totalAmount;
+      singleRoomTotal += gst.totalAmount;
 
       nightsData.push({
         serviceDate,
@@ -156,8 +167,17 @@ export async function POST(request: Request) {
       });
     }
 
+    const calculatedTotal = singleRoomTotal * numRooms;
+
     // 3. Document sequence for confirmation number
     const seq = await getNextDocumentNumber(propertyId, "RESERVATION");
+
+    // Format channel and agency reference text
+    const formattedChannelRef = agencyName
+      ? `${agencyName}${agencyPhone ? ` (${agencyPhone})` : ""}${channelRef ? ` - Ref: ${channelRef}` : ""}`
+      : companyName
+      ? `Corporate: ${companyName}${channelRef ? ` - Ref: ${channelRef}` : ""}`
+      : channelRef || null;
 
     // 4. Create Reservation & Allocation
     const reservation = await prisma.reservation.create({
@@ -170,43 +190,53 @@ export async function POST(request: Request) {
         departureDate,
         status: "CONFIRMED",
         source,
-        channelRef: channelRef || null,
+        channelRef: formattedChannelRef,
         notes: notes || null,
         totalSnapshot: calculatedTotal,
       },
     });
 
-    const resRoom = await prisma.reservationRoom.create({
-      data: {
-        reservationId: reservation.id,
-        roomTypeId,
-        assignedRoomId: assignedRoomId || null,
-        adults: Number(adults) || 2,
-        children: Number(children) || 0,
-        status: "CONFIRMED",
-      },
-    });
-
-    for (const night of nightsData) {
-      await prisma.reservationNight.create({
+    // Create ReservationRoom for each booked room in the reservation
+    for (let r = 0; r < numRooms; r++) {
+      const resRoom = await prisma.reservationRoom.create({
         data: {
-          reservationRoomId: resRoom.id,
-          serviceDate: night.serviceDate,
-          baseAmount: night.baseAmount,
-          taxableAmount: night.taxableAmount,
-          taxAmount: night.taxAmount,
-          totalAmount: night.totalAmount,
+          reservationId: reservation.id,
+          roomTypeId,
+          assignedRoomId: r === 0 ? (assignedRoomId || null) : null,
+          adults: Number(adults) || 2,
+          children: Number(children) || 0,
+          status: "CONFIRMED",
         },
       });
+
+      for (const night of nightsData) {
+        await prisma.reservationNight.create({
+          data: {
+            reservationRoomId: resRoom.id,
+            serviceDate: night.serviceDate,
+            baseAmount: night.baseAmount,
+            taxableAmount: night.taxableAmount,
+            taxAmount: night.taxAmount,
+            totalAmount: night.totalAmount,
+          },
+        });
+      }
     }
 
-    // Add note history if provided
-    if (notes) {
+    // Add note history if provided or if agency details exist
+    const fullNotes = [
+      agencyName ? `Tour Agency: ${agencyName} (${agencyPhone || "No direct phone"})` : "",
+      companyName ? `Corporate Client: ${companyName}` : "",
+      numRooms > 1 ? `Group Booking: ${numRooms} Rooms x ${nightsCount} Nights` : "",
+      notes ? `Special Requests: ${notes}` : "",
+    ].filter(Boolean).join(" | ");
+
+    if (fullNotes) {
       await prisma.reservationNote.create({
         data: {
           reservationId: reservation.id,
           category: "SPECIAL_REQUEST",
-          text: notes,
+          text: fullNotes,
           visibility: "INTERNAL",
         },
       });

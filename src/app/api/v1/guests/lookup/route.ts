@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
+import { normalizeGuestName } from "@/lib/domain/name-utils";
 
 export async function GET(request: Request) {
   try {
@@ -78,10 +79,12 @@ export async function GET(request: Request) {
       ? lastStay.arrivalAt.toISOString().split("T")[0]
       : reg?.arrivalDateTime?.split(" ")[0];
 
+    const { title, pureName } = normalizeGuestName(reg?.fullName || g?.name || "", reg?.title || g?.title);
+
     const guestProfile = {
       id: g?.id || reg?.guestId || reg?.id,
-      fullName: reg?.fullName || g?.name || "",
-      title: reg?.title || "Mr.",
+      fullName: pureName,
+      title,
       fatherSpouseName: reg?.fatherSpouseName || "",
       age: reg?.age ? String(reg.age) : "",
       gender: reg?.gender || "Male",

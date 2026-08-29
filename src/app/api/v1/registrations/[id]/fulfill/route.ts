@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { calculateGST } from "@/lib/gst/calculator";
+import { normalizeGuestName } from "@/lib/domain/name-utils";
 
 // POST /api/v1/registrations/[id]/fulfill
 export async function POST(
@@ -114,11 +115,13 @@ export async function POST(
       country: registration.country,
     });
 
+    const { pureName: canonicalGuestName } = normalizeGuestName(registration.fullName);
+
     if (!guest) {
       guest = await prisma.guest.create({
         data: {
           organizationId: registration.organizationId,
-          name: registration.fullName,
+          name: canonicalGuestName,
           phone: registration.mobilePhone,
           email: registration.email,
           nationality: registration.nationality,
@@ -130,7 +133,7 @@ export async function POST(
       guest = await prisma.guest.update({
         where: { id: guest.id },
         data: {
-          name: registration.fullName,
+          name: canonicalGuestName || guest.name,
           addressJson,
         },
       });

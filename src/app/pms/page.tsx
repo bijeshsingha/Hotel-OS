@@ -3,6 +3,7 @@
 import React, { useEffect, useState, useMemo, Suspense } from "react";
 import { useHotel } from "@/lib/context/hotel-context";
 import { formatINR } from "@/lib/gst/calculator";
+import { formatGuestDisplayName } from "@/lib/domain/name-utils";
 import {
   BedDouble,
   Calendar,
@@ -28,6 +29,7 @@ import {
   SlidersHorizontal,
   Building,
   Plus,
+  Minus,
   ArrowRight,
   Receipt,
   Sparkles,
@@ -36,6 +38,8 @@ import {
   Bed,
   Crown,
   Wrench,
+  Briefcase,
+  Building2,
 } from "lucide-react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { PrintableGrcModal, GrcData } from "@/components/pms/printable-grc";
@@ -43,6 +47,7 @@ import { GrcIntakeModal } from "@/components/pms/grc-intake-modal";
 import { DigitalCheckInReviewModal } from "@/components/pms/digital-checkin-review-modal";
 import { NewReservationModal } from "@/components/pms/new-reservation-modal";
 import { ReservationVoucherModal } from "@/components/pms/reservation-voucher-modal";
+import { CompanyDirectoryModal } from "@/components/pms/company-directory-modal";
 
 function PMSFrontDeskContent() {
   const searchParams = useSearchParams();
@@ -92,6 +97,7 @@ function PMSFrontDeskContent() {
   // Future Reservations Suite state
   const [showNewResModal, setShowNewResModal] = useState(false);
   const [showResVoucherModal, setShowResVoucherModal] = useState(false);
+  const [showCompanyDirectoryModal, setShowCompanyDirectoryModal] = useState(false);
   const [selectedResForVoucher, setSelectedResForVoucher] = useState<any | null>(null);
   const [resForCheckIn, setResForCheckIn] = useState<any | null>(null);
   const [resStatusFilter, setResStatusFilter] = useState<"ALL" | "CONFIRMED" | "CHECKED_IN" | "CANCELLED">("ALL");
@@ -107,6 +113,17 @@ function PMSFrontDeskContent() {
   const [moveForm, setMoveForm] = useState({
     targetRoomId: "",
     reason: "Guest requested room change",
+  });
+
+  // Add Room to In-House Guest Modal State
+  const [showAddRoomModal, setShowAddRoomModal] = useState<boolean>(false);
+  const [addRoomForm, setAddRoomForm] = useState({
+    stayId: "",
+    roomId: "",
+    agreedTariff: "",
+    isComplimentary: false,
+    extraBeds: 0,
+    extraBedRate: 500,
   });
 
   const [actionLoading, setActionLoading] = useState(false);
@@ -430,128 +447,128 @@ function PMSFrontDeskContent() {
       <div
         key={room.id}
         onClick={() => setSelectedRoomForInspect(room)}
-        className={`rounded-xl border-2 transition-all duration-150 cursor-pointer flex flex-col justify-between p-3 sm:p-3.5 shadow-xs hover:shadow-lg hover:-translate-y-0.5 relative group ${
+        className={`rounded-2xl border transition-all duration-150 cursor-pointer flex flex-col justify-between p-3.5 shadow-xs hover:shadow-md relative group ${
           isOutOfOrder
-            ? "bg-rose-50/90 dark:bg-[#181114] border-rose-300 dark:border-red-900/80 hover:border-rose-500 dark:hover:border-red-600"
+            ? "bg-rose-50/70 dark:bg-rose-950/20 border-rose-200 dark:border-rose-900/60 hover:border-rose-400"
             : isOccupied
-            ? "bg-blue-50/90 dark:bg-[#101928] border-blue-400 dark:border-blue-600/70 hover:border-blue-600 dark:hover:border-blue-400"
+            ? "bg-blue-50/70 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800/60 hover:border-blue-400"
             : hkStatus === "DIRTY"
-            ? "bg-amber-50/90 dark:bg-[#1e1910] border-amber-400 dark:border-amber-600/70 hover:border-amber-600 dark:hover:border-amber-400"
-            : "bg-emerald-50/90 dark:bg-[#0f1d18] border-emerald-400 dark:border-emerald-600/70 hover:border-emerald-600 dark:hover:border-emerald-400"
+            ? "bg-amber-50/70 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800/60 hover:border-amber-400"
+            : "bg-white dark:bg-[#121215] border-zinc-200/80 dark:border-zinc-800/80 hover:border-emerald-400 dark:hover:border-emerald-500/50"
         }`}
       >
         {/* Top Header Row: Room Number & Prominent Bed Badge */}
         <div>
-          <div className="flex items-start justify-between gap-1.5 pb-2 border-b border-black/10 dark:border-white/10">
+          <div className="flex items-start justify-between gap-1.5 pb-2.5 border-b border-zinc-100 dark:border-zinc-800/80">
             <div className="min-w-0">
               <div className="flex items-center gap-1.5 flex-wrap">
-                <span className="text-xl sm:text-2xl font-black font-mono tracking-tight text-zinc-900 dark:text-white leading-none">
+                <span className="text-xl sm:text-2xl font-bold font-mono tracking-tight text-zinc-900 dark:text-white leading-none">
                   {room.number}
                 </span>
 
                 {/* VISIBLE BED CONFIGURATION BADGE */}
                 {bedCat === "TWIN" ? (
-                  <span className="flex items-center gap-1 text-[9.5px] font-extrabold font-mono px-1.5 py-0.5 rounded bg-cyan-100 dark:bg-cyan-950/80 border border-cyan-300 dark:border-cyan-500/50 text-cyan-900 dark:text-cyan-300 uppercase shadow-xs whitespace-nowrap">
-                    <span>🛏️🛏️ TWIN</span>
+                  <span className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-md bg-cyan-50 dark:bg-cyan-950/50 border border-cyan-200 dark:border-cyan-800/60 text-cyan-800 dark:text-cyan-300 uppercase tracking-wide">
+                    <span>Twin Bed</span>
                   </span>
                 ) : bedCat === "SUITE" ? (
-                  <span className="flex items-center gap-1 text-[9.5px] font-extrabold font-mono px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-950/80 border border-amber-300 dark:border-amber-500/50 text-amber-900 dark:text-amber-300 uppercase shadow-xs whitespace-nowrap">
-                    <Crown className="h-2.5 w-2.5 text-amber-600 dark:text-amber-400" />
-                    <span>SUITE</span>
+                  <span className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-md bg-amber-50 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-800/60 text-amber-800 dark:text-amber-300 uppercase tracking-wide">
+                    <Crown className="h-3 w-3 text-amber-600 dark:text-amber-400" />
+                    <span>Suite</span>
                   </span>
                 ) : (
-                  <span className="flex items-center gap-1 text-[9.5px] font-extrabold font-mono px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-950/80 border border-blue-300 dark:border-blue-500/50 text-blue-900 dark:text-blue-300 uppercase shadow-xs whitespace-nowrap">
-                    <Bed className="h-2.5 w-2.5 text-blue-600 dark:text-blue-400" />
-                    <span>KING BED</span>
+                  <span className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-md bg-blue-50 dark:bg-blue-950/50 border border-blue-200 dark:border-blue-800/60 text-blue-800 dark:text-blue-300 uppercase tracking-wide">
+                    <Bed className="h-3 w-3 text-blue-600 dark:text-blue-400" />
+                    <span>King Bed</span>
                   </span>
                 )}
               </div>
 
-              <div className="text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 truncate max-w-[140px] mt-1">
+              <div className="text-xs text-zinc-500 dark:text-zinc-400 truncate max-w-[150px] mt-1">
                 {room.roomType?.name || (bedCat === "TWIN" ? "Deluxe Twin Room" : "Deluxe King Room")}
               </div>
             </div>
 
-            {/* Status Pill with Solid Visual Identity */}
+            {/* Status Pill */}
             {isOutOfOrder ? (
               <div className="flex flex-col items-end shrink-0">
-                <span className="rounded px-2 py-0.5 text-[10px] font-mono font-bold text-rose-800 dark:text-rose-300 bg-rose-100 dark:bg-rose-950 border border-rose-300 dark:border-rose-600 shadow-xs flex items-center gap-1 whitespace-nowrap">
-                  <Wrench className="h-2.5 w-2.5 text-rose-600 dark:text-rose-400" />
-                  <span>{activeIssue ? activeIssue.issueNo : "⛔ OOO"}</span>
+                <span className="rounded-md px-2 py-0.5 text-[10px] font-semibold text-rose-700 dark:text-rose-300 bg-rose-50 dark:bg-rose-950/80 border border-rose-200 dark:border-rose-800 shadow-xs flex items-center gap-1 whitespace-nowrap">
+                  <Wrench className="h-3 w-3 text-rose-600 dark:text-rose-400" />
+                  <span>{activeIssue ? activeIssue.issueNo : "OOO"}</span>
                 </span>
-                <span className="text-[9.5px] text-rose-700 dark:text-rose-400 font-mono mt-0.5 font-bold whitespace-nowrap">
+                <span className="text-[10px] text-rose-600 dark:text-rose-400 mt-0.5 font-medium whitespace-nowrap">
                   {activeIssue ? activeIssue.status : "Out of Order"}
                 </span>
               </div>
             ) : isOccupied ? (
               <div className="flex flex-col items-end shrink-0">
-                <span className="rounded px-2 py-0.5 text-[10px] font-mono font-black text-white bg-blue-600 border border-blue-400 shadow-xs animate-pulse whitespace-nowrap">
-                  🔴 OCCUPIED
+                <span className="rounded-md px-2 py-0.5 text-[10px] font-bold text-white bg-blue-600 shadow-xs whitespace-nowrap">
+                  Occupied
                 </span>
-                <span className="text-[9.5px] text-blue-700 dark:text-blue-300 font-mono mt-0.5 font-bold whitespace-nowrap">Floor {room.floor}</span>
+                <span className="text-[10px] text-blue-600 dark:text-blue-400 mt-0.5 font-medium whitespace-nowrap">Floor {room.floor}</span>
               </div>
             ) : hkStatus === "DIRTY" ? (
               <div className="flex flex-col items-end shrink-0">
-                <span className="rounded px-2 py-0.5 text-[10px] font-mono font-bold text-amber-900 dark:text-amber-200 bg-amber-100 dark:bg-amber-900 border border-amber-300 dark:border-amber-500 shadow-xs whitespace-nowrap">
-                  🧹 DIRTY
+                <span className="rounded-md px-2 py-0.5 text-[10px] font-semibold text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/80 border border-amber-200 dark:border-amber-800 shadow-xs whitespace-nowrap">
+                  Dirty
                 </span>
-                <span className="text-[9.5px] text-amber-700 dark:text-amber-400 font-mono mt-0.5 font-bold whitespace-nowrap">Turnover</span>
+                <span className="text-[10px] text-amber-600 dark:text-amber-400 mt-0.5 font-medium whitespace-nowrap">Turnover</span>
               </div>
             ) : (
               <div className="flex flex-col items-end shrink-0">
-                <span className="rounded px-2 py-0.5 text-[10px] font-mono font-bold text-emerald-900 dark:text-emerald-200 bg-emerald-100 dark:bg-emerald-900 border border-emerald-300 dark:border-emerald-500 shadow-xs whitespace-nowrap">
-                  🟢 VACANT
+                <span className="rounded-md px-2 py-0.5 text-[10px] font-semibold text-emerald-800 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/80 border border-emerald-200 dark:border-emerald-800 shadow-xs whitespace-nowrap">
+                  Vacant Ready
                 </span>
-                <span className="text-[9.5px] text-emerald-700 dark:text-emerald-400 font-mono mt-0.5 font-bold whitespace-nowrap">Ready</span>
+                <span className="text-[10px] text-emerald-600 dark:text-emerald-400 mt-0.5 font-medium whitespace-nowrap">Clean</span>
               </div>
             )}
           </div>
 
           {/* Body Content Area */}
-          <div className="mt-2 min-h-[48px]">
+          <div className="mt-2.5 min-h-[44px]">
             {isOccupied && inHouseGuest ? (
-              <div className="rounded-lg bg-white/80 dark:bg-black/40 border border-blue-200 dark:border-blue-500/30 p-2 space-y-1 shadow-xs">
-                <div className="font-extrabold text-xs text-zinc-900 dark:text-white truncate flex items-center gap-1.5">
+              <div className="rounded-xl bg-white/90 dark:bg-black/30 border border-blue-100 dark:border-blue-500/20 p-2 space-y-1 shadow-xs">
+                <div className="font-semibold text-xs text-zinc-900 dark:text-white truncate flex items-center gap-1.5">
                   <User className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400 shrink-0" />
                   <span className="truncate">{inHouseGuest.name}</span>
                 </div>
 
-                <div className="flex items-center justify-between text-[11px] text-zinc-600 dark:text-zinc-300 font-mono">
-                  <span className="flex items-center gap-1 text-[10px] truncate">
-                    <Users className="h-2.5 w-2.5 text-zinc-500 dark:text-zinc-400 shrink-0" />
-                    {activeStay.adults || 1} Pax • {bedCat === "TWIN" ? "Twin" : "Double"}
+                <div className="flex items-center justify-between text-xs text-zinc-500">
+                  <span className="flex items-center gap-1 text-[11px] truncate">
+                    <Users className="h-3 w-3 text-zinc-400 shrink-0" />
+                    {activeStay.adults || 1} Pax
                   </span>
-                  <span className="font-bold text-emerald-600 dark:text-emerald-400 text-xs shrink-0">
+                  <span className="font-semibold font-mono text-emerald-600 dark:text-emerald-400 text-xs shrink-0">
                     ₹{baseTariff}/nt
                   </span>
                 </div>
               </div>
             ) : isOutOfOrder ? (
-              <div className="rounded-lg bg-rose-100/90 dark:bg-rose-950/60 border border-rose-300 dark:border-rose-800/60 p-2 space-y-1 text-xs text-rose-900 dark:text-rose-200 shadow-xs">
-                <div className="flex items-center justify-between font-bold">
+              <div className="rounded-xl bg-rose-100/70 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/40 p-2 space-y-1 text-xs text-rose-900 dark:text-rose-200 shadow-xs">
+                <div className="flex items-center justify-between font-medium">
                   <span className="flex items-center gap-1 text-xs">
                     <Wrench className="h-3 w-3 text-rose-600 dark:text-rose-400 shrink-0" />
-                    <span className="font-mono text-[11px]">{activeIssue?.issueNo || "Defect Block"}</span>
+                    <span className="font-mono text-xs">{activeIssue?.issueNo || "Defect Block"}</span>
                   </span>
-                  <span className="font-mono text-[9px] px-1.5 py-0.5 rounded bg-rose-200 dark:bg-rose-900 text-rose-800 dark:text-rose-300 font-bold uppercase">
+                  <span className="text-[10px] px-1.5 py-0.2 rounded bg-rose-200 dark:bg-rose-900 text-rose-800 dark:text-rose-300 font-semibold uppercase">
                     {activeIssue?.priority || "OUT OF ORDER"}
                   </span>
                 </div>
-                <p className="text-[10.5px] text-rose-800 dark:text-rose-300 line-clamp-1 leading-tight">
+                <p className="text-xs text-rose-700 dark:text-rose-300 line-clamp-1">
                   {activeIssue ? `${activeIssue.assetText ? `${activeIssue.assetText} • ` : ""}${activeIssue.description}` : "Room Blocked for Maintenance"}
                 </p>
               </div>
             ) : (
-              <div className="rounded-lg bg-white/80 dark:bg-black/30 border border-zinc-200/80 dark:border-white/5 p-2 space-y-0.5 text-xs shadow-xs">
-                <div className="flex items-center justify-between text-zinc-700 dark:text-zinc-300 text-[11px]">
-                  <span className="font-medium text-zinc-500 dark:text-zinc-400">Tariff (EP):</span>
+              <div className="rounded-xl bg-zinc-50/70 dark:bg-black/20 border border-zinc-100 dark:border-white/5 p-2 space-y-0.5 text-xs shadow-xs">
+                <div className="flex items-center justify-between text-zinc-600 dark:text-zinc-400 text-xs">
+                  <span>Tariff (EP):</span>
                   <strong className="text-zinc-900 dark:text-white font-mono font-bold text-xs">₹{baseTariff}</strong>
                 </div>
-                <div className="flex items-center justify-between text-[10.5px] text-zinc-500 dark:text-zinc-400">
-                  <span className="text-zinc-500">Bed Setup:</span>
-                  <strong className="text-zinc-700 dark:text-zinc-200 text-[10.5px] truncate max-w-[130px]">
+                <div className="flex items-center justify-between text-xs text-zinc-500">
+                  <span>Bed Setup:</span>
+                  <span className="text-zinc-700 dark:text-zinc-300 font-medium truncate max-w-[130px]">
                     {bedCat === "TWIN" ? "2x Single (Twin)" : bedCat === "SUITE" ? "1x King + Lounge" : "1x King (Double)"}
-                  </strong>
+                  </span>
                 </div>
               </div>
             )}
@@ -559,7 +576,7 @@ function PMSFrontDeskContent() {
         </div>
 
         {/* Card Actions Footer: Big, Easy Click Targets */}
-        <div className="mt-2.5 pt-2 border-t border-black/10 dark:border-white/10 flex items-center justify-between gap-1.5">
+        <div className="mt-2.5 pt-2 border-t border-zinc-100 dark:border-zinc-800/80 flex items-center justify-between gap-1.5">
           {isOccupied && activeStay ? (
             <div className="flex items-center gap-1.5 w-full">
               <button
@@ -567,10 +584,10 @@ function PMSFrontDeskContent() {
                   e.stopPropagation();
                   router.push(`/billing?stayId=${activeStay.id}`);
                 }}
-                className="flex-1 h-8 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center justify-center gap-1 transition shadow-xs"
+                className="flex-1 h-8 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs flex items-center justify-center gap-1 transition shadow-xs"
                 title="Open Folio & GST Billing"
               >
-                <Receipt className="h-3 w-3" />
+                <Receipt className="h-3.5 w-3.5" />
                 <span>Folio</span>
               </button>
 
@@ -580,15 +597,15 @@ function PMSFrontDeskContent() {
                   setSelectedStayForMove(activeStay);
                   setShowMoveModal(true);
                 }}
-                className="h-8 px-2 rounded-lg bg-zinc-200 hover:bg-zinc-300 dark:bg-white/10 dark:hover:bg-white/20 text-zinc-800 dark:text-zinc-200 font-semibold text-xs flex items-center justify-center gap-1 transition"
+                className="h-8 px-2.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 font-medium text-xs flex items-center justify-center gap-1 transition"
                 title="Move Room"
               >
-                <ArrowRightLeft className="h-3 w-3" />
+                <ArrowRightLeft className="h-3.5 w-3.5" />
               </button>
 
               <button
                 onClick={(e) => handleDirectCheckout(activeStay.id, e)}
-                className="h-8 px-2 rounded-lg bg-rose-600/80 hover:bg-rose-600 text-white font-bold text-xs flex items-center justify-center gap-1 transition"
+                className="h-8 px-2.5 rounded-xl bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/50 dark:hover:bg-rose-900/50 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 font-semibold text-xs flex items-center justify-center gap-1 transition"
                 title="Checkout Guest"
               >
                 Out
@@ -602,22 +619,22 @@ function PMSFrontDeskContent() {
                   setCheckInRoomId(room.id);
                   setShowCheckInModal(true);
                 }}
-                className="flex-1 h-8 rounded-lg bg-emerald-600 hover:bg-emerald-500 font-bold text-xs text-white transition shadow-xs flex items-center justify-center gap-1.5"
+                className="flex-1 h-8 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs flex items-center justify-center gap-1 transition shadow-xs"
               >
-                <UserPlus className="h-3 w-3" />
-                <span>+ Check-In</span>
+                <UserPlus className="h-3.5 w-3.5" />
+                <span>Check-In</span>
               </button>
 
               <button
                 onClick={(e) => handleQuickHKToggle(room.id, hkStatus, e)}
-                className={`h-8 px-2 rounded-lg font-semibold text-xs flex items-center justify-center transition border ${
-                  hkStatus === "CLEAN"
-                    ? "bg-zinc-200 hover:bg-amber-100 dark:bg-white/10 dark:hover:bg-amber-500/20 text-zinc-700 hover:text-amber-800 dark:text-zinc-300 dark:hover:text-amber-300 border-zinc-300 dark:border-white/10"
-                    : "bg-emerald-600/30 hover:bg-emerald-600/50 text-emerald-800 dark:text-emerald-300 border-emerald-300 dark:border-emerald-500/40"
+                className={`h-8 px-2.5 rounded-xl text-xs font-semibold transition border ${
+                  hkStatus === "DIRTY"
+                    ? "bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300"
+                    : "bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/40 border-amber-300 dark:border-amber-800 text-amber-800 dark:text-amber-300"
                 }`}
-                title={hkStatus === "CLEAN" ? "Mark Room Dirty" : "Mark Room Clean"}
+                title="Toggle Clean/Dirty Status"
               >
-                {hkStatus === "CLEAN" ? "🧹" : "✨"}
+                {hkStatus === "DIRTY" ? "Make Clean" : "Dirty"}
               </button>
             </div>
           ) : (
@@ -627,10 +644,10 @@ function PMSFrontDeskContent() {
                   e.stopPropagation();
                   router.push("/maintenance");
                 }}
-                className="flex-1 h-8 rounded-lg bg-rose-600 hover:bg-rose-500 font-bold text-xs text-white transition shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
+                className="flex-1 h-8 rounded-xl bg-rose-600 hover:bg-rose-500 font-semibold text-xs text-white transition shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
                 title="View & Resolve Maintenance Issue"
               >
-                <Wrench className="h-3 w-3" />
+                <Wrench className="h-3.5 w-3.5" />
                 <span>Ticket ({activeIssue?.issueNo || "Defect"})</span>
               </button>
             </div>
@@ -641,51 +658,82 @@ function PMSFrontDeskContent() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-[#09090b] text-zinc-900 dark:text-zinc-100 p-3 sm:p-6 space-y-6 transition-colors duration-150">
+    <div className="space-y-4 max-w-[1500px] mx-auto w-full text-zinc-900 dark:text-zinc-100">
       
       {/* 1. TOP MASTER HEADER & ACTION BAR */}
-      <div className="rounded-2xl bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 p-4 sm:p-6 shadow-sm dark:shadow-xl space-y-4">
+      <div className="rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200/80 dark:border-zinc-800/80 p-4 sm:p-5 shadow-xs space-y-4">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <div className="flex items-center gap-2.5">
-              <div className="h-9 w-9 rounded-xl bg-blue-600 dark:bg-white text-white dark:text-zinc-950 font-black text-base flex items-center justify-center shadow-md">
+            <div className="flex items-center gap-3">
+              <div className="h-9 w-9 rounded-xl bg-blue-600 dark:bg-white text-white dark:text-zinc-950 font-bold text-base flex items-center justify-center shadow-xs">
                 P
               </div>
               <div>
-                <h1 className="text-xl sm:text-2xl font-black text-zinc-900 dark:text-white tracking-tight flex items-center gap-2">
+                <h1 className="text-lg sm:text-xl font-bold text-zinc-900 dark:text-white tracking-tight flex items-center gap-2">
                   Front Desk & Room Inventory Rack
                 </h1>
-                <div className="flex items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400 font-mono mt-0.5">
-                  <span className="text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1">
-                    <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                <div className="flex items-center gap-2 text-xs text-zinc-500 mt-0.5">
+                  <span className="text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1.5">
+                    <span className="h-2 w-2 rounded-full bg-emerald-500" />
                     {activeProperty?.displayName || "Hotel Ambarish Grand Residency"}
                   </span>
                   <span>•</span>
-                  <span>GSTIN: {activeProperty?.gstin || "18AACCB2447F1ZX"}</span>
+                  <span>GSTIN: <span className="font-mono">{activeProperty?.gstin || "18AACCB2447F1ZX"}</span></span>
                   <span>•</span>
-                  <span>Date: {activeProperty?.businessDate || "2026-08-24"}</span>
+                  <span>Date: <span className="font-mono">{activeProperty?.businessDate || new Date().toISOString().split("T")[0]}</span></span>
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-2.5 flex-wrap">
+          <div className="flex items-center gap-2 flex-wrap">
             {/* Dining QRs */}
             <button
               onClick={() => setShowDiningQrModal(true)}
-              className="h-10 px-4 rounded-xl bg-amber-50 dark:bg-amber-500/10 border border-amber-300 dark:border-amber-500/30 hover:bg-amber-100 dark:hover:bg-amber-500/20 text-xs font-bold text-amber-800 dark:text-amber-300 flex items-center gap-1.5 transition shadow-sm"
+              className="h-9 px-3.5 rounded-xl bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 hover:bg-amber-100 dark:hover:bg-amber-500/20 text-xs font-semibold text-amber-800 dark:text-amber-300 flex items-center gap-1.5 transition shadow-xs"
             >
-              <UtensilsCrossed className="h-4 w-4 text-amber-500 dark:text-amber-400" />
+              <UtensilsCrossed className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
               <span>Dining QRs</span>
             </button>
 
             {/* Self Check-In QR */}
             <button
               onClick={() => setShowQrModal(true)}
-              className="h-10 px-4 rounded-xl bg-zinc-100 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 hover:border-zinc-400 dark:hover:border-zinc-500 text-xs font-bold text-zinc-800 dark:text-zinc-200 flex items-center gap-1.5 transition shadow-sm"
+              className="h-9 px-3.5 rounded-xl bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-xs font-semibold text-zinc-800 dark:text-zinc-200 flex items-center gap-1.5 transition shadow-xs"
             >
-              <QrCode className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+              <QrCode className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
               <span>Kiosk QR</span>
+            </button>
+
+            {/* Add Room to In-House Guest */}
+            <button
+              onClick={() => {
+                const inHouse = stays.filter(s => s.status === "IN_HOUSE");
+                const firstStayId = inHouse[0]?.id || "";
+                const vacantRoom = rooms.find(r => r.roomState?.occupancyStatus === "VACANT" && r.roomState?.housekeepingStatus === "CLEAN");
+                setAddRoomForm({
+                  stayId: firstStayId,
+                  roomId: vacantRoom?.id || "",
+                  agreedTariff: "",
+                  isComplimentary: false,
+                  extraBeds: 0,
+                  extraBedRate: 500,
+                });
+                setShowAddRoomModal(true);
+              }}
+              className="h-9 px-3.5 rounded-xl bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800 hover:bg-purple-100 dark:hover:bg-purple-900/60 text-xs font-bold text-purple-700 dark:text-purple-300 flex items-center gap-1.5 transition shadow-xs cursor-pointer"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              <span>Add Room to Guest</span>
+            </button>
+
+            {/* Corporate Companies & Travel Agents Directory */}
+            <button
+              onClick={() => setShowCompanyDirectoryModal(true)}
+              className="h-9 px-3.5 rounded-xl bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-200 dark:border-indigo-500/30 hover:bg-indigo-100 dark:hover:bg-indigo-500/20 text-xs font-bold text-indigo-800 dark:text-indigo-300 flex items-center gap-1.5 transition shadow-xs cursor-pointer"
+            >
+              <Briefcase className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
+              <span>Companies & Agents (24+)</span>
             </button>
 
             {/* Walk-in Check-in Primary Action */}
@@ -695,92 +743,92 @@ function PMSFrontDeskContent() {
                 setCheckInRoomId(vacantRoom?.id || "");
                 setShowCheckInModal(true);
               }}
-              className="h-10 px-5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-xs flex items-center gap-2 transition shadow-lg shadow-blue-600/30"
+              className="h-9 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs flex items-center gap-2 transition shadow-sm cursor-pointer"
             >
-              <UserPlus className="h-4 w-4" />
+              <UserPlus className="h-3.5 w-3.5" />
               <span>+ Walk-In Check-In</span>
             </button>
           </div>
         </div>
 
         {/* 2. MASTER RECEPTIONIST OPERATIONAL KPI RACK */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 pt-2 border-t border-zinc-200 dark:border-zinc-800/80">
-          <div className="rounded-xl bg-zinc-50 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 p-2.5 sm:p-3 space-y-0.5 shadow-xs">
-            <div className="text-[10.5px] uppercase font-mono font-bold tracking-wider text-zinc-500 dark:text-zinc-400">Total Rooms</div>
-            <div className="text-xl sm:text-2xl font-black text-zinc-900 dark:text-white font-mono leading-none">{metrics.total}</div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 pt-3 border-t border-zinc-100 dark:border-zinc-800/80">
+          <div className="rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 p-2.5 space-y-0.5 shadow-xs">
+            <div className="text-[10px] uppercase font-semibold tracking-wider text-zinc-500">Total Rooms</div>
+            <div className="text-xl sm:text-2xl font-bold text-zinc-900 dark:text-white tabular-nums leading-none">{metrics.total}</div>
             <div className="text-[10px] text-zinc-500">Floors 1 to 5</div>
           </div>
 
           <div
             onClick={() => setStatusFilter(statusFilter === "OCCUPIED" ? "ALL" : "OCCUPIED")}
-            className={`rounded-xl border-2 p-2.5 sm:p-3 space-y-0.5 cursor-pointer transition ${
+            className={`rounded-xl border p-2.5 space-y-0.5 cursor-pointer transition ${
               statusFilter === "OCCUPIED"
-                ? "bg-blue-50 dark:bg-blue-950/60 border-blue-500 shadow-md"
-                : "bg-zinc-50 dark:bg-zinc-900/80 border-zinc-200 dark:border-zinc-800 hover:border-blue-500 dark:hover:border-blue-700"
+                ? "bg-blue-50 dark:bg-blue-950/40 border-blue-400 shadow-xs"
+                : "bg-zinc-50 dark:bg-zinc-900 border-zinc-200/80 dark:border-zinc-800 hover:border-blue-400 dark:hover:border-blue-600"
             }`}
           >
-            <div className="text-[10.5px] uppercase font-mono font-bold tracking-wider text-blue-700 dark:text-blue-400 flex items-center justify-between">
+            <div className="text-[10px] uppercase font-semibold tracking-wider text-blue-700 dark:text-blue-400 flex items-center justify-between">
               <span>Occupied</span>
-              <span className="h-2 w-2 rounded-full bg-blue-500 animate-pulse" />
+              <span className="h-1.5 w-1.5 rounded-full bg-blue-500 animate-pulse" />
             </div>
-            <div className="text-xl sm:text-2xl font-black text-blue-700 dark:text-blue-400 font-mono leading-none">{metrics.occupied}</div>
-            <div className="text-[10px] text-blue-800 dark:text-blue-300 font-medium truncate">{metrics.occPercent}% Occ ({metrics.totalPax} Pax)</div>
+            <div className="text-xl sm:text-2xl font-bold text-blue-700 dark:text-blue-400 tabular-nums leading-none">{metrics.occupied}</div>
+            <div className="text-[10px] text-blue-700 dark:text-blue-300 font-medium truncate">{metrics.occPercent}% Occ ({metrics.totalPax} Pax)</div>
           </div>
 
           <div
             onClick={() => setStatusFilter(statusFilter === "VACANT_CLEAN" ? "ALL" : "VACANT_CLEAN")}
-            className={`rounded-xl border-2 p-2.5 sm:p-3 space-y-0.5 cursor-pointer transition ${
+            className={`rounded-xl border p-2.5 space-y-0.5 cursor-pointer transition ${
               statusFilter === "VACANT_CLEAN"
-                ? "bg-emerald-50 dark:bg-emerald-950/60 border-emerald-500 shadow-md"
-                : "bg-zinc-50 dark:bg-zinc-900/80 border-zinc-200 dark:border-zinc-800 hover:border-emerald-500 dark:hover:border-emerald-700"
+                ? "bg-emerald-50 dark:bg-emerald-950/40 border-emerald-400 shadow-xs"
+                : "bg-zinc-50 dark:bg-zinc-900 border-zinc-200/80 dark:border-zinc-800 hover:border-emerald-400 dark:hover:border-emerald-600"
             }`}
           >
-            <div className="text-[10.5px] uppercase font-mono font-bold tracking-wider text-emerald-700 dark:text-emerald-400 flex items-center justify-between">
+            <div className="text-[10px] uppercase font-semibold tracking-wider text-emerald-700 dark:text-emerald-400 flex items-center justify-between">
               <span>Vacant Ready</span>
-              <span className="h-2 w-2 rounded-full bg-emerald-500" />
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
             </div>
-            <div className="text-xl sm:text-2xl font-black text-emerald-700 dark:text-emerald-400 font-mono leading-none">{metrics.vacantClean}</div>
-            <div className="text-[10px] text-emerald-800 dark:text-emerald-300 font-medium">Ready to Sell</div>
+            <div className="text-xl sm:text-2xl font-bold text-emerald-700 dark:text-emerald-400 tabular-nums leading-none">{metrics.vacantClean}</div>
+            <div className="text-[10px] text-emerald-700 dark:text-emerald-300 font-medium">Ready to Sell</div>
           </div>
 
           <div
             onClick={() => setStatusFilter(statusFilter === "VACANT_DIRTY" ? "ALL" : "VACANT_DIRTY")}
-            className={`rounded-xl border-2 p-2.5 sm:p-3 space-y-0.5 cursor-pointer transition ${
+            className={`rounded-xl border p-2.5 space-y-0.5 cursor-pointer transition ${
               statusFilter === "VACANT_DIRTY"
-                ? "bg-amber-50 dark:bg-amber-950/60 border-amber-500 shadow-md"
-                : "bg-zinc-50 dark:bg-zinc-900/80 border-zinc-200 dark:border-zinc-800 hover:border-amber-500 dark:hover:border-amber-700"
+                ? "bg-amber-50 dark:bg-amber-950/40 border-amber-400 shadow-xs"
+                : "bg-zinc-50 dark:bg-zinc-900 border-zinc-200/80 dark:border-zinc-800 hover:border-amber-400 dark:hover:border-amber-600"
             }`}
           >
-            <div className="text-[10.5px] uppercase font-mono font-bold tracking-wider text-amber-700 dark:text-amber-400 flex items-center justify-between">
+            <div className="text-[10px] uppercase font-semibold tracking-wider text-amber-700 dark:text-amber-400 flex items-center justify-between">
               <span>Housekeeping</span>
-              <span className="h-2 w-2 rounded-full bg-amber-500" />
+              <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
             </div>
-            <div className="text-xl sm:text-2xl font-black text-amber-700 dark:text-amber-400 font-mono leading-none">{metrics.vacantDirty}</div>
-            <div className="text-[10px] text-amber-800 dark:text-amber-300 font-medium">Dirty / Turnover</div>
+            <div className="text-xl sm:text-2xl font-bold text-amber-700 dark:text-amber-400 tabular-nums leading-none">{metrics.vacantDirty}</div>
+            <div className="text-[10px] text-amber-700 dark:text-amber-300 font-medium">Dirty / Turnover</div>
           </div>
 
           <div
             onClick={() => setStatusFilter(statusFilter === "OUT_OF_ORDER" ? "ALL" : "OUT_OF_ORDER")}
-            className={`rounded-xl border-2 p-2.5 sm:p-3 space-y-0.5 cursor-pointer transition ${
+            className={`rounded-xl border p-2.5 space-y-0.5 cursor-pointer transition ${
               statusFilter === "OUT_OF_ORDER"
-                ? "bg-rose-50 dark:bg-rose-950/60 border-rose-500 shadow-md"
-                : "bg-zinc-50 dark:bg-zinc-900/80 border-zinc-200 dark:border-zinc-800 hover:border-rose-500 dark:hover:border-rose-700"
+                ? "bg-rose-50 dark:bg-rose-950/40 border-rose-400 shadow-xs"
+                : "bg-zinc-50 dark:bg-zinc-900 border-zinc-200/80 dark:border-zinc-800 hover:border-rose-400 dark:hover:border-rose-600"
             }`}
           >
-            <div className="text-[10.5px] uppercase font-mono font-bold tracking-wider text-rose-700 dark:text-rose-400 flex items-center justify-between">
-              <span>Maintenance / OOO</span>
+            <div className="text-[10px] uppercase font-semibold tracking-wider text-rose-700 dark:text-rose-400 flex items-center justify-between">
+              <span>Maintenance</span>
               <Wrench className="h-3 w-3 text-rose-600 dark:text-rose-400" />
             </div>
-            <div className="text-xl sm:text-2xl font-black text-rose-700 dark:text-rose-400 font-mono leading-none">{metrics.outOfOrder}</div>
-            <div className="text-[10px] text-rose-800 dark:text-rose-300 font-medium">Blocked / Repairs</div>
+            <div className="text-xl sm:text-2xl font-bold text-rose-700 dark:text-rose-400 tabular-nums leading-none">{metrics.outOfOrder}</div>
+            <div className="text-[10px] text-rose-700 dark:text-rose-300 font-medium">Blocked / Repairs</div>
           </div>
 
-          <div className="rounded-xl bg-zinc-50 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 p-2.5 sm:p-3 space-y-0.5 shadow-xs">
-            <div className="text-[10.5px] uppercase font-mono font-bold tracking-wider text-cyan-700 dark:text-cyan-400 flex items-center justify-between">
-              <span>Expected Arrivals</span>
-              <ArrowRightLeft className="h-2.5 w-2.5 text-cyan-600 dark:text-cyan-400" />
+          <div className="rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 p-2.5 space-y-0.5 shadow-xs">
+            <div className="text-[10px] uppercase font-semibold tracking-wider text-cyan-700 dark:text-cyan-400 flex items-center justify-between">
+              <span>Due Arrivals</span>
+              <ArrowRightLeft className="h-3 w-3 text-cyan-600 dark:text-cyan-400" />
             </div>
-            <div className="text-xl sm:text-2xl font-black text-cyan-700 dark:text-cyan-300 font-mono leading-none">0</div>
+            <div className="text-xl sm:text-2xl font-bold text-cyan-700 dark:text-cyan-300 tabular-nums leading-none">0</div>
             <div className="text-[10px] text-zinc-500">Due In Today</div>
           </div>
         </div>
@@ -791,10 +839,10 @@ function PMSFrontDeskContent() {
         <div className="flex items-center gap-1.5 flex-wrap">
           <button
             onClick={() => handleTabChange("grid")}
-            className={`flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-bold transition ${
+            className={`flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-semibold transition ${
               activeTab === "grid"
-                ? "bg-blue-600 dark:bg-white text-white dark:text-zinc-950 shadow-sm font-black"
-                : "bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-950 dark:hover:text-white border border-zinc-200 dark:border-zinc-800 font-bold"
+                ? "bg-blue-600 dark:bg-white text-white dark:text-zinc-950 shadow-xs"
+                : "bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-950 dark:hover:text-white border border-zinc-200 dark:border-zinc-800"
             }`}
           >
             <Layers className="h-3.5 w-3.5" />
@@ -803,28 +851,28 @@ function PMSFrontDeskContent() {
 
           <button
             onClick={() => handleTabChange("inhouse")}
-            className={`flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-bold transition ${
+            className={`flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-semibold transition ${
               activeTab === "inhouse"
-                ? "bg-blue-600 dark:bg-white text-white dark:text-zinc-950 shadow-sm font-black"
-                : "bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-950 dark:hover:text-white border border-zinc-200 dark:border-zinc-800 font-bold"
+                ? "bg-blue-600 dark:bg-white text-white dark:text-zinc-950 shadow-xs"
+                : "bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-950 dark:hover:text-white border border-zinc-200 dark:border-zinc-800"
             }`}
           >
             <Users className="h-3.5 w-3.5" />
-            <span>In-House Guest Roster ({stays.filter(s => s.status === "IN_HOUSE").length})</span>
+            <span>In-House Guests ({stays.filter(s => s.status === "IN_HOUSE").length})</span>
           </button>
 
           <button
             onClick={() => handleTabChange("registrations")}
-            className={`flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-bold transition ${
+            className={`flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-semibold transition ${
               activeTab === "registrations"
-                ? "bg-blue-600 dark:bg-white text-white dark:text-zinc-950 shadow-sm font-black"
-                : "bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-950 dark:hover:text-white border border-zinc-200 dark:border-zinc-800 font-bold"
+                ? "bg-blue-600 dark:bg-white text-white dark:text-zinc-950 shadow-xs"
+                : "bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-950 dark:hover:text-white border border-zinc-200 dark:border-zinc-800"
             }`}
           >
             <FileText className="h-3.5 w-3.5 text-blue-500 dark:text-blue-400" />
-            <span>Digital GRC & Check-In Queue ({registrations.length})</span>
+            <span>Digital GRC Queue ({registrations.length})</span>
             {registrations.filter((r) => r.status === "PENDING_REVIEW").length > 0 && (
-              <span className="rounded-full bg-amber-500 text-zinc-950 px-1.5 py-0.5 text-[9.5px] font-black font-mono animate-pulse">
+              <span className="rounded-full bg-amber-500 text-zinc-950 px-1.5 py-0.5 text-[9.5px] font-bold font-mono animate-pulse">
                 {registrations.filter((r) => r.status === "PENDING_REVIEW").length} Pending
               </span>
             )}
@@ -832,14 +880,14 @@ function PMSFrontDeskContent() {
 
           <button
             onClick={() => handleTabChange("reservations")}
-            className={`flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-bold transition ${
+            className={`flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-semibold transition ${
               activeTab === "reservations"
-                ? "bg-blue-600 dark:bg-white text-white dark:text-zinc-950 shadow-sm font-black"
-                : "bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-950 dark:hover:text-white border border-zinc-200 dark:border-zinc-800 font-bold"
+                ? "bg-blue-600 dark:bg-white text-white dark:text-zinc-950 shadow-xs"
+                : "bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-950 dark:hover:text-white border border-zinc-200 dark:border-zinc-800"
             }`}
           >
             <Calendar className="h-3.5 w-3.5 text-indigo-500 dark:text-indigo-400" />
-            <span>Future Reservations ({reservations.length})</span>
+            <span>Future Bookings ({reservations.length})</span>
           </button>
         </div>
 
@@ -849,32 +897,32 @@ function PMSFrontDeskContent() {
             <div className="flex items-center gap-1 bg-white dark:bg-zinc-900 p-1 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-xs text-xs">
               <button
                 onClick={() => setGroupBy("FLOOR")}
-                className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition ${
-                  groupBy === "FLOOR" ? "bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-xs font-black" : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
+                className={`px-2.5 py-1 rounded-lg text-xs font-medium transition ${
+                  groupBy === "FLOOR" ? "bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white font-semibold" : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
                 }`}
               >
                 Floor Racks
               </button>
               <button
                 onClick={() => setGroupBy("STATUS")}
-                className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition ${
-                  groupBy === "STATUS" ? "bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-xs font-black" : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
+                className={`px-2.5 py-1 rounded-lg text-xs font-medium transition ${
+                  groupBy === "STATUS" ? "bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white font-semibold" : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
                 }`}
               >
                 By Status
               </button>
               <button
                 onClick={() => setGroupBy("ROOM_TYPE")}
-                className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition ${
-                  groupBy === "ROOM_TYPE" ? "bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-xs font-black" : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
+                className={`px-2.5 py-1 rounded-lg text-xs font-medium transition ${
+                  groupBy === "ROOM_TYPE" ? "bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white font-semibold" : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
                 }`}
               >
                 By Category
               </button>
               <button
                 onClick={() => setGroupBy("COMPACT")}
-                className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition ${
-                  groupBy === "COMPACT" ? "bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-xs font-black" : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
+                className={`px-2.5 py-1 rounded-lg text-xs font-medium transition ${
+                  groupBy === "COMPACT" ? "bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white font-semibold" : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
                 }`}
               >
                 Unified
@@ -888,8 +936,17 @@ function PMSFrontDeskContent() {
                 placeholder="Search Room #, Guest..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="h-9 pl-8 pr-2.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-white focus:outline-none focus:border-blue-500 font-mono w-44 shadow-xs"
+                className="h-8.5 pl-8 pr-2.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-white focus:outline-none focus:border-blue-500 w-44 shadow-xs"
               />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-2 top-2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
             </div>
           </div>
         )}
@@ -1059,7 +1116,7 @@ function PMSFrontDeskContent() {
                   const roomAssignment = stay.roomAssignments?.[0]?.room;
                   const roomNumber = roomAssignment?.number || "N/A";
                   const bedCat = roomAssignment ? getBedCategory(roomAssignment) : "KING";
-                  const guestName = stay.primaryGuest?.name || "Valued Guest";
+                  const guestName = formatGuestDisplayName(stay.primaryGuest?.name) || "Valued Guest";
                   const guestPhone = stay.primaryGuest?.phone || "N/A";
                   const arrival = stay.arrivalAt ? new Date(stay.arrivalAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "N/A";
                   const departure = stay.expectedDepartureAt ? new Date(stay.expectedDepartureAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "N/A";
@@ -1374,13 +1431,13 @@ function PMSFrontDeskContent() {
                 </button>
               </div>
 
-              {/* + New Reservation Action Button */}
+              {/* New Reservation Action Button */}
               <button
                 onClick={() => setShowNewResModal(true)}
                 className="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold text-xs flex items-center gap-1.5 transition shadow-sm active:scale-95 shrink-0"
               >
                 <Plus className="h-4 w-4" />
-                <span>+ New Reservation</span>
+                <span>New Reservation</span>
               </button>
             </div>
           </div>
@@ -1476,7 +1533,7 @@ function PMSFrontDeskContent() {
 
                         {/* Guest Information */}
                         <td className="px-3.5 py-2.5 text-zinc-900 dark:text-white whitespace-nowrap">
-                          <div className="font-bold">{res.primaryGuest?.name || res.guestName || "Valued Guest"}</div>
+                          <div className="font-bold">{formatGuestDisplayName(res.primaryGuest?.name || res.guestName) || "Valued Guest"}</div>
                           <div className="text-[11px] text-zinc-500 font-mono flex items-center gap-1.5">
                             <span>{res.primaryGuest?.phone || res.phone || "No Phone"}</span>
                             {res.primaryGuest?.city && <span>• {res.primaryGuest.city}</span>}
@@ -1660,7 +1717,7 @@ function PMSFrontDeskContent() {
 
                     return (
                       <div className="space-y-2 text-xs">
-                        <div className="flex justify-between"><span className="text-zinc-500 dark:text-zinc-400">Guest Name:</span><strong className="text-zinc-900 dark:text-white font-bold text-sm">{activeStay.primaryGuest?.name}</strong></div>
+                        <div className="flex justify-between"><span className="text-zinc-500 dark:text-zinc-400">Guest Name:</span><strong className="text-zinc-900 dark:text-white font-bold text-sm">{formatGuestDisplayName(activeStay.primaryGuest?.name)}</strong></div>
                         <div className="flex justify-between"><span className="text-zinc-500 dark:text-zinc-400">Mobile Phone:</span><strong className="text-zinc-900 dark:text-white font-mono">{activeStay.primaryGuest?.phone || "N/A"}</strong></div>
                         <div className="flex justify-between"><span className="text-zinc-500 dark:text-zinc-400">Occupants:</span><strong className="text-zinc-900 dark:text-white font-mono">{activeStay.adults} Adults</strong></div>
                         <div className="flex justify-between"><span className="text-zinc-500 dark:text-zinc-400">Folio Balance:</span><strong className="text-emerald-700 dark:text-emerald-400 font-mono font-bold text-sm">{formatINR(activeStay.folio?.balance || 0)}</strong></div>
@@ -2107,6 +2164,306 @@ function PMSFrontDeskContent() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* 14. ADD ROOM TO EXISTING IN-HOUSE GUEST MODAL */}
+      {showAddRoomModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-700 rounded-3xl p-6 max-w-xl w-full space-y-5 shadow-2xl overflow-hidden">
+            <div className="flex items-start justify-between border-b border-zinc-200 dark:border-zinc-800 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-xl bg-purple-50 dark:bg-purple-950/50 border border-purple-200 dark:border-purple-800 flex items-center justify-center text-purple-600 dark:text-purple-400">
+                  <Plus className="h-5 w-5" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-black text-zinc-900 dark:text-white tracking-tight">
+                    Add Room to Checked-In Guest
+                  </h2>
+                  <p className="text-xs text-zinc-500">
+                    Attach an additional room to an existing in-house guest's stay & folio.
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setShowAddRoomModal(false)}
+                className="h-8 w-8 rounded-full bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-600 dark:text-zinc-300 flex items-center justify-center transition cursor-pointer"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                if (!addRoomForm.stayId) {
+                  alert("Please select a checked-in guest.");
+                  return;
+                }
+                if (!addRoomForm.roomId) {
+                  alert("Please select a vacant room to add.");
+                  return;
+                }
+                setActionLoading(true);
+                try {
+                  const res = await fetch("/api/v1/stays/add-room", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      stayId: addRoomForm.stayId,
+                      roomId: addRoomForm.roomId,
+                      agreedTariff: addRoomForm.isComplimentary ? 0 : (addRoomForm.agreedTariff !== "" ? Number(addRoomForm.agreedTariff) : undefined),
+                      isComplimentary: addRoomForm.isComplimentary,
+                      extraBeds: Number(addRoomForm.extraBeds) || 0,
+                      extraBedRate: 500,
+                    }),
+                  });
+                  const data = await res.json();
+                  if (!res.ok) throw new Error(data.error || "Failed to add room to stay");
+                  alert(data.message || `Room ${data.roomNumber} added to guest stay successfully!`);
+                  setShowAddRoomModal(false);
+                  await loadData();
+                  await refreshData();
+                } catch (err: any) {
+                  alert(`Error: ${err.message}`);
+                } finally {
+                  setActionLoading(false);
+                }
+              }}
+              className="space-y-4 text-xs"
+            >
+              {/* 1. Select In-House Guest (GRC # and Name only) */}
+              <div className="space-y-2">
+                <label className="block font-bold text-zinc-700 dark:text-zinc-300 uppercase text-[11px]">
+                  Select Checked-In Guest (GRC # & Name) *
+                </label>
+                <select
+                  required
+                  value={addRoomForm.stayId}
+                  onChange={(e) => setAddRoomForm({ ...addRoomForm, stayId: e.target.value })}
+                  className="w-full h-11 px-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white font-semibold text-xs focus:border-purple-500 focus:outline-none cursor-pointer shadow-xs"
+                >
+                  <option value="">-- Choose In-House Guest --</option>
+                  {stays
+                    .filter((s) => s.status === "IN_HOUSE")
+                    .map((s) => {
+                      const reg = registrations.find(
+                        (r) => r.stayId === s.id || (s.primaryGuest?.phone && r.mobilePhone === s.primaryGuest.phone)
+                      );
+                      const grcNo = reg?.registrationNo || `GRC-${s.id.slice(-6).toUpperCase()}`;
+                      const displayName = formatGuestDisplayName(s.primaryGuest?.name) || "Guest";
+                      return (
+                        <option key={s.id} value={s.id}>
+                          {grcNo} — {displayName}
+                        </option>
+                      );
+                    })}
+                </select>
+
+                {/* Selected Guest Details Display Box */}
+                {(() => {
+                  const selectedStay = stays.find((s) => s.id === addRoomForm.stayId);
+                  if (!selectedStay) return null;
+                  const reg = registrations.find(
+                    (r) => r.stayId === selectedStay.id || (selectedStay.primaryGuest?.phone && r.mobilePhone === selectedStay.primaryGuest.phone)
+                  );
+                  const roomNos = selectedStay.roomAssignments?.map((a: any) => a.room?.number).filter(Boolean).join(", ") || "Unassigned";
+                  const phone = selectedStay.primaryGuest?.phone || reg?.mobilePhone || "N/A";
+                  const checkInTime = selectedStay.arrivalAt
+                    ? new Date(selectedStay.arrivalAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
+                    : "Today";
+
+                  return (
+                    <div className="p-3 rounded-xl bg-purple-50/70 dark:bg-purple-950/30 border border-purple-200/80 dark:border-purple-800/50 grid grid-cols-3 gap-2 text-xs shadow-xs animate-in fade-in duration-200">
+                      <div>
+                        <span className="text-[10px] uppercase font-bold text-purple-700 dark:text-purple-300 block">
+                          Current Room(s)
+                        </span>
+                        <span className="font-bold font-mono text-zinc-900 dark:text-white">
+                          Room {roomNos}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] uppercase font-bold text-purple-700 dark:text-purple-300 block">
+                          Phone Number
+                        </span>
+                        <span className="font-mono text-zinc-800 dark:text-zinc-200">
+                          {phone}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] uppercase font-bold text-purple-700 dark:text-purple-300 block">
+                          Check-in Date
+                        </span>
+                        <span className="text-zinc-800 dark:text-zinc-200">
+                          {checkInTime}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {stays.filter((s) => s.status === "IN_HOUSE").length === 0 && (
+                  <p className="text-amber-600 dark:text-amber-400 text-[11px] italic">
+                    No guests are currently checked in.
+                  </p>
+                )}
+              </div>
+
+              {/* 2. Select Vacant Room to Add */}
+              <div className="space-y-1.5">
+                <label className="block font-bold text-zinc-700 dark:text-zinc-300 uppercase text-[11px]">
+                  Select Vacant Room to Add *
+                </label>
+                <select
+                  required
+                  value={addRoomForm.roomId}
+                  onChange={(e) => {
+                    const rid = e.target.value;
+                    const r = rooms.find((rm) => rm.id === rid);
+                    let base = "";
+                    if (r?.roomType?.basePrice) base = String(r.roomType.basePrice);
+                    setAddRoomForm({
+                      ...addRoomForm,
+                      roomId: rid,
+                      agreedTariff: addRoomForm.agreedTariff || base,
+                    });
+                  }}
+                  className="w-full h-11 px-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white font-mono font-bold text-xs focus:border-purple-500 focus:outline-none cursor-pointer"
+                >
+                  <option value="">-- Choose Vacant Room --</option>
+                  {rooms
+                    .filter((r) => r.roomState?.occupancyStatus === "VACANT" && r.roomState?.sellabilityStatus !== "OUT_OF_ORDER")
+                    .map((r) => (
+                      <option key={r.id} value={r.id}>
+                        Room {r.number} — {r.roomType?.name} [{getBedCategory(r) === "TWIN" ? "Twin Beds" : "King Bed"}] (Floor {r.floor} • {r.roomState?.housekeepingStatus || "CLEAN"})
+                      </option>
+                    ))}
+                </select>
+              </div>
+
+              {/* 3. Tariff & Complimentary Options */}
+              <div className="p-3.5 rounded-2xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-zinc-800 dark:text-zinc-200 text-xs">
+                    Room Rate & Pricing
+                  </span>
+
+                  <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-emerald-800 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 px-2.5 py-1 rounded-lg border border-emerald-200 dark:border-emerald-800">
+                    <input
+                      type="checkbox"
+                      checked={addRoomForm.isComplimentary}
+                      onChange={(e) => {
+                        const checked = e.target.checked;
+                        setAddRoomForm({
+                          ...addRoomForm,
+                          isComplimentary: checked,
+                          agreedTariff: checked ? "0" : addRoomForm.agreedTariff,
+                        });
+                      }}
+                      className="w-4 h-4 rounded text-emerald-600 cursor-pointer"
+                    />
+                    <span>🎁 Complimentary Room (₹0 Free Stay)</span>
+                  </label>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 items-end">
+                  <div className="space-y-1">
+                    <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px]">
+                      Agreed Rate / Night (₹)
+                    </label>
+                    <div className="relative flex items-center">
+                      <span className="absolute left-3 text-zinc-400 font-bold font-mono text-xs">₹</span>
+                      <input
+                        type="number"
+                        placeholder={addRoomForm.isComplimentary ? "0 (Complimentary)" : "Enter rate"}
+                        disabled={addRoomForm.isComplimentary}
+                        value={addRoomForm.isComplimentary ? "0" : addRoomForm.agreedTariff}
+                        onChange={(e) => setAddRoomForm({ ...addRoomForm, agreedTariff: e.target.value })}
+                        className="w-full h-10 pl-7 pr-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white font-mono font-bold text-sm focus:border-purple-500 focus:outline-none disabled:opacity-60 disabled:bg-zinc-100 dark:disabled:bg-zinc-800"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="block font-bold text-zinc-700 dark:text-zinc-300 uppercase text-[11px]">
+                      Extra Pax (₹500/Pax)
+                    </label>
+                    <div className="h-10 flex items-center justify-between px-2.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 shadow-xs">
+                      <div className="flex items-center bg-zinc-100 dark:bg-zinc-800 p-0.5 rounded-lg border border-zinc-200 dark:border-zinc-700">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const cur = addRoomForm.extraBeds || 0;
+                            const next = Math.max(0, cur - 1);
+                            setAddRoomForm({ ...addRoomForm, extraBeds: next });
+                          }}
+                          className="h-6 w-6 rounded-md bg-white dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-700 active:scale-90 text-zinc-700 dark:text-zinc-200 flex items-center justify-center transition shadow-xs cursor-pointer"
+                          title="Decrease Extra Pax"
+                        >
+                          <Minus className="h-3 w-3 stroke-[2.5]" />
+                        </button>
+                        <span className="font-mono font-bold text-xs text-zinc-900 dark:text-white px-2 min-w-[20px] text-center select-none">
+                          {addRoomForm.extraBeds || 0}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const cur = addRoomForm.extraBeds || 0;
+                            const next = cur + 1;
+                            setAddRoomForm({ ...addRoomForm, extraBeds: next });
+                          }}
+                          className="h-6 w-6 rounded-md bg-white dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-700 active:scale-90 text-zinc-700 dark:text-zinc-200 flex items-center justify-center transition shadow-xs cursor-pointer"
+                          title="Increase Extra Pax"
+                        >
+                          <Plus className="h-3 w-3 stroke-[2.5]" />
+                        </button>
+                      </div>
+                      {(addRoomForm.extraBeds || 0) > 0 ? (
+                        <span className="text-[11px] font-mono font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/60 px-2 py-0.5 rounded-md border border-amber-200 dark:border-amber-800/60">
+                          +₹{(addRoomForm.extraBeds || 0) * 500}/nt
+                        </span>
+                      ) : (
+                        <span className="text-[10px] font-mono text-zinc-400 dark:text-zinc-500 pr-1">₹0</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="pt-3 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowAddRoomModal(false)}
+                  className="px-4 py-2.5 rounded-xl text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white font-bold"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={actionLoading}
+                  className="px-6 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-black transition disabled:opacity-50 shadow-md flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Plus className="h-4 w-4" />
+                  <span>{actionLoading ? "Assigning Room..." : "Assign Room to Stay"}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 10. CORPORATE COMPANIES & TRAVEL AGENTS MASTER DIRECTORY */}
+      {showCompanyDirectoryModal && (
+        <CompanyDirectoryModal
+          isOpen={showCompanyDirectoryModal}
+          activeProperty={activeProperty}
+          onClose={() => setShowCompanyDirectoryModal(false)}
+          onSelectForBooking={() => {
+            setShowNewResModal(true);
+          }}
+        />
       )}
 
     </div>

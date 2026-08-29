@@ -35,6 +35,15 @@ export default function RootLayout({
                   document.documentElement.style.colorScheme = 'light';
                 }
               } catch (e) {}
+
+              // Disable mousewheel scroll value changes on number inputs globally
+              if (typeof window !== 'undefined') {
+                window.addEventListener('wheel', function(e) {
+                  if (document.activeElement && document.activeElement.type === 'number') {
+                    document.activeElement.blur();
+                  }
+                }, { passive: true });
+              }
             `,
           }}
         />

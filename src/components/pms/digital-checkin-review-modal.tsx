@@ -24,9 +24,11 @@ import {
   ChevronRight,
   Printer,
   Plus,
+  Minus,
   Trash2,
 } from "lucide-react";
 import { formatINR } from "@/lib/gst/calculator";
+import { formatGuestDisplayName } from "@/lib/domain/name-utils";
 
 interface DigitalCheckInReviewModalProps {
   isOpen: boolean;
@@ -48,8 +50,8 @@ export function DigitalCheckInReviewModal({
   const [selectedRoomId, setSelectedRoomId] = useState<string>("");
   const [additionalRoomIds, setAdditionalRoomIds] = useState<string[]>([]);
   const [roomRates, setRoomRates] = useState<Record<string, string>>({});
-  const [extraBedRoomIds, setExtraBedRoomIds] = useState<string[]>([]);
-  const [roomExtraBedRates, setRoomExtraBedRates] = useState<Record<string, string>>({});
+  const [extraPaxCount, setExtraPaxCount] = useState<number>(0);
+  const [roomExtraPax, setRoomExtraPax] = useState<Record<string, number>>({});
   const [groupBilling, setGroupBilling] = useState<boolean>(true);
   const [departureDate, setDepartureDate] = useState<string>("");
   const [agreedTariff, setAgreedTariff] = useState<string>("");
@@ -71,8 +73,8 @@ export function DigitalCheckInReviewModal({
       setSuccessData(null);
       setAdditionalRoomIds([]);
       setRoomRates({});
-      setExtraBedRoomIds([]);
-      setRoomExtraBedRates({});
+      setExtraPaxCount(0);
+      setRoomExtraPax({});
       setGroupBilling(true);
       setDepositAmount(registration.depositAmount ? String(registration.depositAmount) : "0");
       setStaffNotes(registration.internalNotes || "");
@@ -116,12 +118,6 @@ export function DigitalCheckInReviewModal({
     }
   };
 
-  const toggleExtraBedForRoom = (roomId: string) => {
-    setExtraBedRoomIds((prev) =>
-      prev.includes(roomId) ? prev.filter((id) => id !== roomId) : [...prev, roomId]
-    );
-  };
-
   if (!isOpen || !registration) return null;
 
   const isAlreadyCheckedIn = registration.status === "CHECKED_IN";
@@ -150,13 +146,10 @@ export function DigitalCheckInReviewModal({
     0
   ) || totalRoomsCount * 2;
   
-  // Total extra beds enabled across all assigned rooms
-  const activeExtraBedRooms = extraBedRoomIds.filter((id) =>
-    allSelectedRooms.some((r) => r.id === id)
-  );
-  const totalExtraBedsCount = activeExtraBedRooms.length;
-  const totalCap = baseCap + totalExtraBedsCount;
-  const absoluteMax = baseCap + totalRoomsCount;
+  // Total extra pax enabled across all assigned rooms
+  const totalExtraPaxCount = (Number(extraPaxCount) || 0) + additionalRoomIds.reduce((sum, id) => sum + (Number(roomExtraPax?.[id]) || 0), 0);
+  const totalCap = baseCap + totalExtraPaxCount;
+  const absoluteMax = baseCap + totalRoomsCount * 2;
 
   // Calculate total guests from registration
   const totalPax = 1 + coGuests.length;
@@ -186,7 +179,7 @@ export function DigitalCheckInReviewModal({
           roomRates: finalRoomRates,
           groupBilling,
           agreedTariff: Number(agreedTariff) || undefined,
-          extraBeds: totalExtraBedsCount,
+          extraBeds: totalExtraPaxCount,
           extraBedRate: 500,
           departureDate,
           depositAmount: Number(depositAmount) || 0,
@@ -259,7 +252,7 @@ export function DigitalCheckInReviewModal({
                 <CheckCircle2 className="h-6 w-6 text-emerald-600 dark:text-emerald-400 shrink-0" />
                 <div>
                   <h4 className="font-bold text-zinc-900 dark:text-white text-sm">
-                    {registration.fullName} Successfully Checked In!
+                    {formatGuestDisplayName(registration.fullName)} Successfully Checked In!
                   </h4>
                   <p className="text-xs text-emerald-800 dark:text-emerald-300 font-mono mt-0.5">
                     Assigned Room(s): {registration.assignedRoomNumber || successData.room?.number || "Ready"} • Stay #{successData.stayId?.slice(-6) || "Active"}
@@ -316,7 +309,7 @@ export function DigitalCheckInReviewModal({
                 <div className="grid grid-cols-2 gap-4 text-xs">
                   <div>
                     <span className="text-zinc-500 text-[11px] block font-semibold">Full Name</span>
-                    <strong className="text-zinc-900 dark:text-white text-sm font-bold block mt-0.5">{registration.fullName}</strong>
+                    <strong className="text-zinc-900 dark:text-white text-sm font-bold block mt-0.5">{formatGuestDisplayName(registration.fullName)}</strong>
                   </div>
                   <div>
                     <span className="text-zinc-500 text-[11px] block font-semibold">Father / Spouse Name</span>
@@ -554,33 +547,48 @@ export function DigitalCheckInReviewModal({
                         </div>
                       </div>
 
-                      {/* Primary Room Extra Bed Toggle */}
+                      {/* Primary Room Extra Pax Stepper (+/-) */}
                       <div className="space-y-1">
                         <label className="text-zinc-600 dark:text-zinc-400 text-[11px] font-bold block">
-                          Extra Bed for Primary Room
+                          Extra Pax (₹500/Pax)
                         </label>
-                        <div className="h-10 flex items-center justify-between px-3 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700">
-                          <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-zinc-800 dark:text-zinc-200">
-                            <input
-                              type="checkbox"
+                        <div className="h-10 flex items-center justify-between px-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 shadow-xs">
+                          <div className="flex items-center bg-zinc-200/80 dark:bg-zinc-800 p-0.5 rounded-lg border border-zinc-300/80 dark:border-zinc-700">
+                            <button
+                              type="button"
                               disabled={isAlreadyCheckedIn || loading}
-                              checked={extraBedRoomIds.includes(selectedRoomId)}
-                              onChange={() => toggleExtraBedForRoom(selectedRoomId)}
-                              className="w-4 h-4 rounded bg-zinc-100 dark:bg-zinc-800 border-zinc-300 dark:border-zinc-600 text-blue-600 cursor-pointer"
-                            />
-                            <span>+ 1 Extra Bed</span>
-                          </label>
-                          {extraBedRoomIds.includes(selectedRoomId) && (
-                            <span className="text-[11px] font-mono font-bold text-amber-700 dark:text-amber-400">
-                              +₹500/nt
+                              onClick={() => setExtraPaxCount((prev) => Math.max(0, prev - 1))}
+                              className="h-6 w-6 rounded-md bg-white dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-700 active:scale-90 text-zinc-700 dark:text-zinc-200 flex items-center justify-center transition shadow-xs cursor-pointer disabled:opacity-50"
+                              title="Decrease Extra Pax"
+                            >
+                              <Minus className="h-3 w-3 stroke-[2.5]" />
+                            </button>
+                            <span className="font-mono font-bold text-xs text-zinc-900 dark:text-white px-2 min-w-[20px] text-center select-none">
+                              {extraPaxCount}
                             </span>
+                            <button
+                              type="button"
+                              disabled={isAlreadyCheckedIn || loading}
+                              onClick={() => setExtraPaxCount((prev) => prev + 1)}
+                              className="h-6 w-6 rounded-md bg-white dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-700 active:scale-90 text-zinc-700 dark:text-zinc-200 flex items-center justify-center transition shadow-xs cursor-pointer disabled:opacity-50"
+                              title="Increase Extra Pax"
+                            >
+                              <Plus className="h-3 w-3 stroke-[2.5]" />
+                            </button>
+                          </div>
+                          {extraPaxCount > 0 ? (
+                            <span className="text-[11px] font-mono font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/60 px-2 py-0.5 rounded-md border border-amber-200 dark:border-amber-800/60">
+                              +₹{extraPaxCount * 500}/nt
+                            </span>
+                          ) : (
+                            <span className="text-[10px] font-mono text-zinc-400 dark:text-zinc-500 pr-1">₹0</span>
                           )}
                         </div>
                       </div>
                     </div>
                   </div>
 
-                  {/* Group Booking - Additional Rooms with Per-Room Extra Bed */}
+                  {/* Group Booking - Additional Rooms with Per-Room Extra Pax */}
                   <div className="space-y-3 border-t border-blue-200 dark:border-blue-900/40 pt-3.5">
                     <label className={labelClass}>
                       Additional Rooms (Group Booking)
@@ -591,7 +599,7 @@ export function DigitalCheckInReviewModal({
                       <div className="flex flex-col gap-3 mb-2">
                         {additionalRoomIds.map((id) => {
                           const r = rooms.find((room) => room.id === id);
-                          const hasExtraBed = extraBedRoomIds.includes(id);
+                          const roomPax = roomExtraPax[id] || 0;
                           return (
                             <div
                               key={id}
@@ -603,7 +611,7 @@ export function DigitalCheckInReviewModal({
                                   <span className="px-2.5 py-1 rounded-lg bg-blue-100 dark:bg-blue-500/20 text-blue-800 dark:text-blue-300 font-bold font-mono text-xs border border-blue-200 dark:border-blue-500/30">
                                     Room {r?.number}
                                   </span>
-                                  <span className="text-xs text-zinc-800 dark:text-zinc-200 font-medium">
+                                  <span className="text-xs text-zinc-700 dark:text-zinc-300 font-medium">
                                     {r?.roomType?.name}
                                   </span>
                                 </div>
@@ -613,19 +621,25 @@ export function DigitalCheckInReviewModal({
                                     <span className="absolute left-2.5 text-xs text-zinc-400 font-bold font-mono">₹</span>
                                     <input
                                       type="number"
-                                      placeholder="Rate"
+                                      disabled={isAlreadyCheckedIn || loading}
+                                      placeholder="Agreed Tariff"
                                       value={roomRates[id] || ""}
                                       onChange={(e) =>
                                         setRoomRates((prev) => ({ ...prev, [id]: e.target.value }))
                                       }
-                                      className="w-24 h-9 pl-6 pr-2 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white font-mono text-xs font-bold focus:border-blue-500 focus:outline-none"
+                                      className="w-28 h-9 pl-6 pr-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white font-mono text-xs font-bold focus:border-blue-500 focus:outline-none"
                                     />
                                   </div>
                                   <button
                                     type="button"
+                                    disabled={isAlreadyCheckedIn || loading}
                                     onClick={() => {
                                       setAdditionalRoomIds((prev) => prev.filter((rid) => rid !== id));
-                                      setExtraBedRoomIds((prev) => prev.filter((rid) => rid !== id));
+                                      setRoomExtraPax((prev) => {
+                                        const n = { ...prev };
+                                        delete n[id];
+                                        return n;
+                                      });
                                     }}
                                     className="p-2 text-zinc-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-lg transition"
                                     title="Remove Room"
@@ -635,22 +649,53 @@ export function DigitalCheckInReviewModal({
                                 </div>
                               </div>
 
-                              {/* Bottom row: Extra bed for this specific room */}
-                              <div className="flex items-center justify-between p-2 rounded-lg bg-zinc-50 dark:bg-zinc-900/90 border border-zinc-200 dark:border-zinc-800 text-xs">
-                                <label className="flex items-center gap-2 cursor-pointer font-bold text-zinc-800 dark:text-zinc-300">
-                                  <input
-                                    type="checkbox"
-                                    checked={hasExtraBed}
-                                    onChange={() => toggleExtraBedForRoom(id)}
-                                    className="w-4 h-4 rounded bg-zinc-100 dark:bg-zinc-800 border-zinc-300 dark:border-zinc-600 text-blue-600 cursor-pointer"
-                                  />
-                                  <span>+ 1 Extra Bed for Room {r?.number}</span>
-                                </label>
-                                {hasExtraBed && (
-                                  <span className="text-[11px] font-mono font-bold text-amber-700 dark:text-amber-400">
-                                    +₹500/nt
-                                  </span>
-                                )}
+                              {/* Bottom row: Extra Pax Stepper */}
+                              <div className="flex items-center justify-between p-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-900/90 border border-zinc-200 dark:border-zinc-800 text-xs shadow-xs">
+                                <span className="font-bold text-zinc-800 dark:text-zinc-300">
+                                  Extra Pax for Room {r?.number} (₹500/Pax)
+                                </span>
+                                <div className="flex items-center gap-2.5">
+                                  <div className="flex items-center bg-zinc-200/80 dark:bg-zinc-800 p-0.5 rounded-lg border border-zinc-300/80 dark:border-zinc-700">
+                                    <button
+                                      type="button"
+                                      disabled={isAlreadyCheckedIn || loading}
+                                      onClick={() =>
+                                        setRoomExtraPax((prev) => ({
+                                          ...prev,
+                                          [id]: Math.max(0, (prev[id] || 0) - 1),
+                                        }))
+                                      }
+                                      className="h-6 w-6 rounded-md bg-white dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-700 active:scale-90 text-zinc-700 dark:text-zinc-200 flex items-center justify-center transition shadow-xs cursor-pointer disabled:opacity-50"
+                                      title="Decrease Extra Pax"
+                                    >
+                                      <Minus className="h-3 w-3 stroke-[2.5]" />
+                                    </button>
+                                    <span className="font-mono font-bold text-xs text-zinc-900 dark:text-white px-2 min-w-[20px] text-center select-none">
+                                      {roomPax}
+                                    </span>
+                                    <button
+                                      type="button"
+                                      disabled={isAlreadyCheckedIn || loading}
+                                      onClick={() =>
+                                        setRoomExtraPax((prev) => ({
+                                          ...prev,
+                                          [id]: (prev[id] || 0) + 1,
+                                        }))
+                                      }
+                                      className="h-6 w-6 rounded-md bg-white dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-700 active:scale-90 text-zinc-700 dark:text-zinc-200 flex items-center justify-center transition shadow-xs cursor-pointer disabled:opacity-50"
+                                      title="Increase Extra Pax"
+                                    >
+                                      <Plus className="h-3 w-3 stroke-[2.5]" />
+                                    </button>
+                                  </div>
+                                  {roomPax > 0 ? (
+                                    <span className="text-[11px] font-mono font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/60 px-2 py-0.5 rounded-md border border-amber-200 dark:border-amber-800/60">
+                                      +₹{roomPax * 500}/nt
+                                    </span>
+                                  ) : (
+                                    <span className="text-[10px] font-mono text-zinc-400 dark:text-zinc-500 pr-1">₹0</span>
+                                  )}
+                                </div>
                               </div>
                             </div>
                           );
@@ -742,10 +787,10 @@ export function DigitalCheckInReviewModal({
                           </span>
                           <p className="text-[11px] opacity-90 mt-0.5">
                             {isBeyondMax
-                              ? `${totalPax} Guests registered, but ${totalRoomsCount} room(s) can only fit max ${absoluteMax} Pax (1 extra bed/room max). Please add another room.`
+                              ? `${totalPax} Guests registered, but ${totalRoomsCount} room(s) can only fit max ${absoluteMax} Pax. Please add another room.`
                               : isOver
-                              ? `${totalPax} Guests registered, but current setup fits ${totalCap} Pax. Check the "+ 1 Extra Bed" box on room(s).`
-                              : `${totalPax} Guest(s) fit across ${totalRoomsCount} room(s) (Base: ${baseCap} + ${totalExtraBedsCount} Extra Bed = Capacity: ${totalCap} Pax).`}
+                              ? `${totalPax} Guests registered, but standard capacity is ${totalCap} Pax. Increment Extra Pax (+₹500/Pax) or add an extra room.`
+                              : `${totalPax} Guest(s) fit across ${totalRoomsCount} room(s) (Base: ${baseCap} + ${totalExtraPaxCount} Extra Pax = Capacity: ${totalCap} Pax).`}
                           </p>
                         </div>
                       </div>
@@ -848,10 +893,10 @@ export function DigitalCheckInReviewModal({
                     <button
                       type="submit"
                       disabled={loading || !selectedRoomId}
-                      className="px-7 py-3 rounded-xl bg-amber-500 hover:bg-amber-400 font-black text-zinc-950 text-xs transition shadow-lg shadow-amber-500/20 flex items-center gap-2 disabled:opacity-50 active:scale-95"
+                      className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 font-black text-zinc-950 text-xs transition shadow-md shadow-amber-500/20 flex items-center gap-2 disabled:opacity-50 active:scale-95 cursor-pointer"
                     >
-                      <CheckCircle2 className="h-4 w-4" />
-                      <span>{loading ? "Fulfilling Check-In..." : "Approve & Complete Check-In"}</span>
+                      <CheckCircle2 className="h-4 w-4 shrink-0" />
+                      <span>{loading ? "Checking In..." : "Complete Check-In"}</span>
                     </button>
                   </div>
                 )}

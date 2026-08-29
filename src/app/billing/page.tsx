@@ -4,6 +4,7 @@ import React, { useEffect, useState, useMemo, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useHotel } from "@/lib/context/hotel-context";
 import { formatINR, ACTIVE_TAX_RATES, getTaxRateForSac } from "@/lib/gst/calculator";
+import { formatGuestDisplayName } from "@/lib/domain/name-utils";
 import { numberToWordsINR } from "@/lib/gst/number-to-words";
 import {
   Receipt,
@@ -27,6 +28,61 @@ import {
   FileText,
   UserCheck,
 } from "lucide-react";
+import { DISCOUNT_REASONS, PAYMENT_METHODS } from "@/data";
+import { PrintableTaxInvoiceModal } from "@/components/billing/printable-tax-invoice";
+
+// Helper to match charges with specific rooms in separate billing mode
+function isEntryForRoom(entry: any, roomNumber: string, allOtherRoomNumbers: string[]): boolean {
+  if (!roomNumber || roomNumber === "Unassigned") return true;
+  const desc = entry.description || "";
+
+  // Check if description explicitly mentions another room in the group
+  const otherRooms = allOtherRoomNumbers.filter((r) => r !== roomNumber);
+  for (const other of otherRooms) {
+    const regex = new RegExp(`\\bRoom\\s*#?\\s*${other}\\b`, "i");
+    if (regex.test(desc)) {
+      return false; // Belongs to the other room
+    }
+  }
+
+  // If description mentions this room, it definitely belongs here
+  const thisRoomRegex = new RegExp(`\\bRoom\\s*#?\\s*${roomNumber}\\b`, "i");
+  if (thisRoomRegex.test(desc)) {
+    return true;
+  }
+
+  // If it's a general charge (doesn't mention any room), assign to primary room (first in list)
+  if (allOtherRoomNumbers.length > 0 && allOtherRoomNumbers[0] === roomNumber) {
+    return true;
+  }
+
+  return false;
+}
+
+export interface DirectoryRoomItem {
+  key: string;
+  stayId: string;
+  stay: any;
+  roomNumber: string;
+  roomId?: string;
+  roomType?: any;
+  rateHandling?: string;
+  moveReason?: string;
+  startsAt?: string;
+  endsAt?: string;
+  isMultiRoom: boolean;
+  allRoomNumbers: string[];
+  guestName: string;
+  companyName?: string;
+  phone?: string;
+  arrivalAt?: string;
+  expectedDepartureAt?: string;
+  status: string;
+  roomCharges: number;
+  roomPayments: number;
+  roomBalance: number;
+  isSettled: boolean;
+}
 
 function BillingContent() {
   const searchParams = useSearchParams();
@@ -37,6 +93,8 @@ function BillingContent() {
   const { activeProperty, refreshKey, refreshData } = useHotel();
   const [stays, setStays] = useState<any[]>([]);
   const [selectedStayId, setSelectedStayId] = useState<string>(initialStayId);
+  const [selectedRoomNumber, setSelectedRoomNumber] = useState<string>("");
+  const [groupBillingMode, setGroupBillingMode] = useState<"NO" | "YES">("NO");
   const [folioData, setFolioData] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -105,7 +163,10 @@ function BillingContent() {
         setStays(data);
         if (data.length > 0 && !selectedStayId) {
           const inHouse = data.find((s: any) => s.status === "IN_HOUSE");
-          setSelectedStayId(inHouse ? inHouse.id : data[0].id);
+          const targetStay = inHouse || data[0];
+          setSelectedStayId(targetStay.id);
+          const firstRoom = targetStay.roomAssignments?.[0]?.room?.number || "";
+          setSelectedRoomNumber(firstRoom);
         }
       }
     } catch (e) {
@@ -153,7 +214,7 @@ function BillingContent() {
             amount: String(Math.max(0, bal)),
             method: activeStay?.primaryGuest?.companyName ? "DIRECT_BILL" : "UPI",
             reference: "",
-            payerName: activeStay?.primaryGuest?.name || "Guest",
+            payerName: formatGuestDisplayName(activeStay?.primaryGuest?.name) || "Guest",
             companyName: activeStay?.primaryGuest?.companyName || "",
             gstin: activeStay?.primaryGuest?.gstin || "",
             creditPeriod: "30_DAYS",
@@ -164,26 +225,135 @@ function BillingContent() {
     }
   }, [initialAction, folioData?.id]);
 
-  // Filtered Stays based on Search Query and Status Tabs
-  const filteredStays = useMemo(() => {
-    return stays.filter((s) => {
+  // Expand Stays into individual Room Directory items so multi-room stays have separated cards
+  const directoryItems: DirectoryRoomItem[] = useMemo(() => {
+    const items: DirectoryRoomItem[] = [];
+
+    stays.forEach((s) => {
+      const assignments = s.roomAssignments || [];
+      const distinctRooms: any[] = [];
+      const seen = new Set<string>();
+
+      assignments.forEach((a: any) => {
+        const num = a.room?.number || "Unassigned";
+        if (!seen.has(num)) {
+          seen.add(num);
+          distinctRooms.push(a);
+        }
+      });
+
+      if (distinctRooms.length === 0) {
+        distinctRooms.push({
+          room: { number: "Unassigned", roomType: null },
+        });
+      }
+
+      const allRoomNumbers = distinctRooms.map((d) => d.room?.number || "Unassigned");
+      const isMultiRoom = allRoomNumbers.length > 1;
+
+      distinctRooms.forEach((assignment) => {
+        const roomNo = assignment.room?.number || "Unassigned";
+        const otherRooms = allRoomNumbers.filter((r) => r !== roomNo);
+        const rawEntriesList = s.folio?.windows?.flatMap((w: any) => w.entries || w.lineItems || []) || [];
+        const paymentsList = s.folio?.payments || [];
+
+        // Determine charges for this room
+        const roomEntries = isMultiRoom
+          ? rawEntriesList.filter((e: any) => isEntryForRoom(e, roomNo, otherRooms))
+          : rawEntriesList;
+        const roomCharges = roomEntries.reduce((sum: number, e: any) => sum + (e.totalAmount || 0), 0);
+        const totalGroupCharges = rawEntriesList.reduce((sum: number, e: any) => sum + (e.totalAmount || 0), 0);
+        const totalGroupPayments = paymentsList.reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
+
+        // Determine payments for this room
+        let allocatedPayment = 0;
+        paymentsList.forEach((p: any) => {
+          const text = `${p.reference || ""} ${p.payerSnapshot || ""} ${p.notes || ""}`;
+          const isThis = new RegExp(`\\bRoom\\s*#?\\s*${roomNo}\\b`, "i").test(text);
+          const isOther = otherRooms.some((o) => new RegExp(`\\bRoom\\s*#?\\s*${o}\\b`, "i").test(text));
+
+          if (isThis && !isOther) {
+            allocatedPayment += p.amount || 0;
+          }
+        });
+
+        const unallocatedPayments = paymentsList.filter((p: any) => {
+          const text = `${p.reference || ""} ${p.payerSnapshot || ""} ${p.notes || ""}`;
+          const isSpecific = allRoomNumbers.some((r) => new RegExp(`\\bRoom\\s*#?\\s*${r}\\b`, "i").test(text));
+          return !isSpecific;
+        }).reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
+
+        if (unallocatedPayments > 0 && totalGroupCharges > 0) {
+          if (Math.abs(unallocatedPayments - roomCharges) < 1) {
+            allocatedPayment += roomCharges;
+          } else {
+            allocatedPayment += unallocatedPayments * (roomCharges / totalGroupCharges);
+          }
+        }
+
+        if (!isMultiRoom) {
+          allocatedPayment = totalGroupPayments;
+        }
+
+        const roomBalance = Math.max(0, roomCharges - allocatedPayment);
+
+        items.push({
+          key: `${s.id}-${roomNo}`,
+          stayId: s.id,
+          stay: s,
+          roomNumber: roomNo,
+          roomId: assignment.room?.id,
+          roomType: assignment.room?.roomType,
+          rateHandling: assignment.rateHandling,
+          moveReason: assignment.moveReason,
+          startsAt: assignment.startsAt,
+          endsAt: assignment.endsAt,
+          isMultiRoom,
+          allRoomNumbers,
+          guestName: formatGuestDisplayName(s.primaryGuest?.name) || "Guest",
+          companyName: s.primaryGuest?.companyName,
+          phone: s.primaryGuest?.phone,
+          arrivalAt: s.arrivalAt,
+          expectedDepartureAt: s.expectedDepartureAt,
+          status: s.status,
+          roomCharges,
+          roomPayments: allocatedPayment,
+          roomBalance,
+          isSettled: roomBalance <= 0.5,
+        });
+      });
+    });
+
+    return items;
+  }, [stays]);
+
+  // Filtered Directory Items based on Search Query and Status Tabs
+  const filteredDirectoryItems = useMemo(() => {
+    return directoryItems.filter((item) => {
       // 1. Status Filter
-      if (stayStatusFilter === "IN_HOUSE" && s.status !== "IN_HOUSE") return false;
-      if (stayStatusFilter === "CHECKED_OUT" && s.status !== "CHECKED_OUT") return false;
-      if (stayStatusFilter === "WITH_BALANCE" && (!s.folio || (s.folio.balance ?? 0) <= 0)) return false;
+      if (stayStatusFilter === "IN_HOUSE" && item.status !== "IN_HOUSE") return false;
+      if (stayStatusFilter === "CHECKED_OUT" && item.status !== "CHECKED_OUT") return false;
+      if (stayStatusFilter === "WITH_BALANCE" && item.roomBalance <= 0) return false;
 
       // 2. Search Query Filter
       if (!staySearchQuery.trim()) return true;
       const q = staySearchQuery.toLowerCase();
-      const roomNum = s.roomAssignments?.[0]?.room?.number?.toLowerCase() || "";
-      const guestName = s.primaryGuest?.name?.toLowerCase() || "";
-      const phone = s.primaryGuest?.phone?.toLowerCase() || "";
-      const company = s.primaryGuest?.companyName?.toLowerCase() || "";
+      const roomNum = item.roomNumber.toLowerCase();
+      const guestName = item.guestName.toLowerCase();
+      const phone = (item.phone || "").toLowerCase();
+      const company = (item.companyName || "").toLowerCase();
       return roomNum.includes(q) || guestName.includes(q) || phone.includes(q) || company.includes(q);
     });
-  }, [stays, staySearchQuery, stayStatusFilter]);
+  }, [directoryItems, staySearchQuery, stayStatusFilter]);
 
   const activeStay = stays.find((s) => s.id === selectedStayId);
+  const activeDirectoryItem = directoryItems.find(
+    (d) => d.stayId === selectedStayId && (selectedRoomNumber ? d.roomNumber === selectedRoomNumber : true)
+  ) || directoryItems.find((d) => d.stayId === selectedStayId);
+
+  const activeRoomNumber = activeDirectoryItem?.roomNumber || activeStay?.roomAssignments?.[0]?.room?.number || "Unassigned";
+  const allGroupRooms = activeDirectoryItem?.allRoomNumbers || [activeRoomNumber];
+  const isMultiRoomGroup = allGroupRooms.length > 1;
 
   // Group Multi-Room Checkbox toggle
   const toggleGroupStaySelection = (stayId: string) => {
@@ -192,7 +362,7 @@ function BillingContent() {
     );
   };
 
-  // Stay Calculations
+  // Stay Calculations for Active Selected Room
   const stayCalculations = useMemo(() => {
     if (!activeStay) return { nights: 1, roomRatePerNight: 0, isMultiNight: false };
     const arr = activeStay.arrivalAt ? new Date(activeStay.arrivalAt) : new Date();
@@ -201,12 +371,21 @@ function BillingContent() {
     const diffTime = Math.abs(exp.getTime() - arr.getTime());
     const diffDays = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
 
-    let rate = 2500;
-    if (folioData?.windows?.[0]) {
+    let rate = 3200;
+    let isComp = false;
+
+    const assignment = activeStay.roomAssignments?.find((a: any) => a.room?.number === activeRoomNumber) || activeStay.roomAssignments?.[0];
+    if (assignment?.rateHandling === "COMPLIMENTARY" || assignment?.moveReason === "AGREED_RATE:0") {
+      rate = 0;
+      isComp = true;
+    } else if (assignment?.moveReason?.startsWith("AGREED_RATE:")) {
+      rate = Number(assignment.moveReason.replace("AGREED_RATE:", "")) || 3200;
+    } else if (folioData?.windows?.[0]) {
       const items = folioData.windows[0].entries || folioData.windows[0].lineItems || [];
-      const roomCharge = items.find((i: any) => i.chargeCode?.includes("ROOM_TARIFF"));
-      if (roomCharge && (roomCharge.taxableAmount || roomCharge.unitAmount)) {
-        rate = roomCharge.taxableAmount || roomCharge.unitAmount;
+      const roomCharge = items.find((i: any) => i.chargeCode?.includes("ROOM_TARIFF") && (i.description?.includes(activeRoomNumber) || true));
+      if (roomCharge && roomCharge.unitAmount !== undefined) {
+        rate = roomCharge.unitAmount;
+        if (rate === 0) isComp = true;
       }
     }
 
@@ -214,8 +393,10 @@ function BillingContent() {
       nights: diffDays,
       roomRatePerNight: rate,
       isMultiNight: diffDays > 1,
+      isComplimentary: isComp,
+      checkoutCycleText: assignment?.rateHandling?.includes("24_HOURS") ? "24-Hr Cycle" : "Standard 11 AM Checkout",
     };
-  }, [activeStay, folioData]);
+  }, [activeStay, activeRoomNumber, folioData]);
 
   // Aggregate raw ledger line items from Prisma folio windows (entries)
   const rawEntries = useMemo(() => {
@@ -224,9 +405,19 @@ function BillingContent() {
     return allItems.sort((a: any, b: any) => new Date(a.createdAt || a.postedAt).getTime() - new Date(b.createdAt || b.postedAt).getTime());
   }, [folioData]);
 
-  // Filtered charges ledger items
+  // Entries filtered by Group Billing Mode (Separate vs Combined Group)
+  const modeFilteredEntries = useMemo(() => {
+    if (groupBillingMode === "YES" || !isMultiRoomGroup) {
+      return rawEntries;
+    }
+    // "NO" mode: Separate billing for activeRoomNumber only
+    const otherRooms = allGroupRooms.filter((r) => r !== activeRoomNumber);
+    return rawEntries.filter((e: any) => isEntryForRoom(e, activeRoomNumber, otherRooms));
+  }, [rawEntries, groupBillingMode, isMultiRoomGroup, activeRoomNumber, allGroupRooms]);
+
+  // Filtered charges ledger items (search and category)
   const entries = useMemo(() => {
-    return rawEntries.filter((e: any) => {
+    return modeFilteredEntries.filter((e: any) => {
       // Type Filter
       if (ledgerTypeFilter === "ROOM_TARIFF" && !e.chargeCode?.includes("ROOM_TARIFF")) return false;
       if (ledgerTypeFilter === "RESTAURANT_FOOD" && !e.chargeCode?.includes("FOOD") && !e.chargeCode?.includes("RESTAURANT") && !e.chargeCode?.includes("FB")) return false;
@@ -239,16 +430,30 @@ function BillingContent() {
       const code = e.chargeCode?.toLowerCase() || "";
       return desc.includes(q) || code.includes(q);
     });
-  }, [rawEntries, ledgerTypeFilter, ledgerSearchQuery]);
+  }, [modeFilteredEntries, ledgerTypeFilter, ledgerSearchQuery]);
 
   const payments = folioData?.payments || [];
   const invoices = folioData?.invoices || [];
 
-  const totalCharges = rawEntries.reduce((acc: number, e: any) => acc + (e.totalAmount || 0), 0);
-  const totalTaxable = rawEntries.reduce((acc: number, e: any) => acc + (e.taxableAmount || 0), 0);
+  // Financial calculations for active mode
+  const totalCharges = modeFilteredEntries.reduce((acc: number, e: any) => acc + (e.totalAmount || 0), 0);
+  const totalTaxable = modeFilteredEntries.reduce((acc: number, e: any) => acc + (e.taxableAmount || 0), 0);
   const totalTaxes = totalCharges - totalTaxable;
-  const totalPayments = payments.reduce((acc: number, p: any) => acc + (p.amount || 0), 0);
-  const currentBalance = folioData ? (folioData.balance ?? (totalCharges - totalPayments)) : 0;
+
+  const totalGroupPayments = payments.reduce((acc: number, p: any) => acc + (p.amount || 0), 0);
+  const totalPayments = useMemo(() => {
+    if (groupBillingMode === "YES" || !isMultiRoomGroup) {
+      return totalGroupPayments;
+    }
+    return activeDirectoryItem?.roomPayments ?? totalGroupPayments;
+  }, [groupBillingMode, isMultiRoomGroup, totalGroupPayments, activeDirectoryItem]);
+
+  const currentBalance = useMemo(() => {
+    if (groupBillingMode === "YES" || !isMultiRoomGroup) {
+      return folioData ? (folioData.balance ?? (totalCharges - totalPayments)) : 0;
+    }
+    return Math.max(0, totalCharges - totalPayments);
+  }, [groupBillingMode, isMultiRoomGroup, folioData, totalCharges, totalPayments]);
 
   // Post Manual / Restaurant Charge (5% GST Inclusive)
   const handlePostCharge = async (e: React.FormEvent) => {
@@ -360,7 +565,7 @@ function BillingContent() {
 
     const firstGuest = selectedStays[0]?.primaryGuest;
     setGroupPaymentForm({
-      payerName: firstGuest?.name || "Corporate / Group Head",
+      payerName: formatGuestDisplayName(firstGuest?.name) || "Corporate / Group Head",
       method: firstGuest?.companyName ? "DIRECT_BILL" : "UPI",
       reference: firstGuest?.companyName ? `GRP-PO-${(firstGuest.companyName || "").slice(0, 8)}` : "",
       companyName: firstGuest?.companyName || "",
@@ -399,7 +604,7 @@ function BillingContent() {
           totalAmount,
           method: groupPaymentForm.method,
           reference: groupPaymentForm.reference || undefined,
-          payerName: groupPaymentForm.payerName,
+          payerName: groupPaymentForm.payerName || undefined,
           companyName: groupPaymentForm.companyName || undefined,
           gstin: groupPaymentForm.gstin || undefined,
           allocations,
@@ -466,7 +671,7 @@ function BillingContent() {
         amount: String(currentBalance),
         method: activeStay?.primaryGuest?.companyName ? "DIRECT_BILL" : "UPI",
         reference: "",
-        payerName: activeStay?.primaryGuest?.name || "Guest",
+        payerName: formatGuestDisplayName(activeStay?.primaryGuest?.name) || "Guest",
         companyName: activeStay?.primaryGuest?.companyName || "",
         gstin: activeStay?.primaryGuest?.gstin || "",
         creditPeriod: "30_DAYS",
@@ -501,45 +706,44 @@ function BillingContent() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-[#09090b] text-zinc-900 dark:text-zinc-100 p-3 sm:p-4 xl:p-5 space-y-4 xl:space-y-5 transition-colors duration-150">
-      
-      {/* 1. MASTER TOP HEADER & ACTIONS (RESPONSIVE FOR 1440x900 & HIGH-DPI) */}
-      <div className="rounded-2xl bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 p-3.5 sm:p-4 xl:p-5 shadow-xs dark:shadow-xl space-y-3">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 sm:gap-4">
-          <div>
-            <div className="flex items-center gap-2.5 sm:gap-3">
-              <div className="h-9 w-9 sm:h-10 sm:w-10 xl:h-11 xl:w-11 rounded-xl bg-blue-600 dark:bg-white text-white dark:text-zinc-950 font-black text-base sm:text-lg flex items-center justify-center shadow-sm">
-                B
+    <>
+      <div className="billing-dashboard-view no-print print:hidden min-h-[calc(100vh-60px)] bg-slate-50/60 dark:bg-[#09090b] text-zinc-900 dark:text-zinc-100 p-3 sm:p-4 xl:p-5 space-y-3.5 xl:space-y-4 transition-colors duration-150">
+        
+        {/* 1. MASTER TOP HEADER & ACTIONS (CLEAN 1440x900 BAR) */}
+      <div className="rounded-2xl bg-white dark:bg-[#121215] border border-zinc-200/80 dark:border-zinc-800/80 p-3.5 sm:p-4 shadow-xs">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-xl bg-blue-600 dark:bg-white text-white dark:text-zinc-950 font-bold text-base flex items-center justify-center shadow-xs shrink-0">
+              <Receipt className="h-5 w-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h1 className="text-lg sm:text-xl font-bold text-zinc-900 dark:text-white tracking-tight">
+                  Folio, Billing & Tax Invoices
+                </h1>
+                <span className="rounded-md px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800/40 uppercase tracking-wide">
+                  GST Rule 46
+                </span>
               </div>
-              <div>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <h1 className="text-lg sm:text-xl xl:text-2xl font-black text-zinc-900 dark:text-white tracking-tight flex items-center gap-2">
-                    Folio, Billing & Tax Invoices
-                  </h1>
-                  <span className="rounded-md px-2 py-0.5 text-[10.5px] font-mono font-bold text-emerald-800 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-800/50 uppercase">
-                    Rule 46 GST
-                  </span>
-                </div>
-                <div className="flex items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400 font-mono mt-0.5 flex-wrap">
-                  <span className="text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1">
-                    <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                    {activeProperty?.displayName || "Hotel Ambarish Grand Residency"}
-                  </span>
-                  <span>•</span>
-                  <span>GSTIN: {activeProperty?.gstin || "18AACCB2447F1ZX"}</span>
-                  <span>•</span>
-                  <span>Date: {activeProperty?.businessDate || "2026-08-24"}</span>
-                </div>
+              <div className="flex items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400 mt-0.5 flex-wrap">
+                <span className="text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
+                  <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                  {activeProperty?.displayName || "Hotel Ambarish Grand Residency"}
+                </span>
+                <span>•</span>
+                <span className="font-mono">GSTIN: {activeProperty?.gstin || "18AACCB2447F1ZX"}</span>
+                <span>•</span>
+                <span>Date: <strong className="font-mono text-zinc-700 dark:text-zinc-300">{activeProperty?.businessDate || new Date().toISOString().split("T")[0]}</strong></span>
               </div>
             </div>
           </div>
 
           {/* Action Toolbar */}
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
             {selectedGroupStayIds.length > 0 && (
               <button
                 onClick={handleOpenGroupPaymentModal}
-                className="h-9 sm:h-10 px-3.5 sm:px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs sm:text-sm flex items-center gap-1.5 transition shadow-sm cursor-pointer animate-in fade-in"
+                className="h-9 px-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1.5 transition shadow-xs cursor-pointer animate-in fade-in"
               >
                 <Users className="h-4 w-4" />
                 <span>Group Payment ({selectedGroupStayIds.length})</span>
@@ -549,7 +753,7 @@ function BillingContent() {
             {selectedGroupStayIds.length > 0 && (
               <button
                 onClick={handleExecuteGroupCheckout}
-                className="h-9 sm:h-10 px-3.5 sm:px-4 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-900 dark:text-white border border-zinc-300 dark:border-zinc-700 font-bold text-xs sm:text-sm flex items-center gap-1.5 transition shadow-xs cursor-pointer"
+                className="h-9 px-3.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-900 dark:text-white border border-zinc-200 dark:border-zinc-700 font-semibold text-xs flex items-center gap-1.5 transition shadow-xs cursor-pointer"
               >
                 <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
                 <span>Group Checkout</span>
@@ -560,9 +764,9 @@ function BillingContent() {
               <>
                 <button
                   onClick={handleOpenLiveTaxBill}
-                  className="h-9 sm:h-10 px-3.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 hover:border-zinc-400 dark:hover:border-zinc-500 font-bold text-xs sm:text-sm text-zinc-800 dark:text-zinc-200 flex items-center gap-1.5 transition shadow-xs cursor-pointer"
+                  className="h-9 px-3.5 rounded-xl bg-zinc-100/80 hover:bg-zinc-200/80 dark:bg-zinc-900 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 font-semibold text-xs text-zinc-800 dark:text-zinc-200 flex items-center gap-1.5 transition shadow-xs cursor-pointer"
                 >
-                  <Printer className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                  <Printer className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
                   <span>Print Tax Bill</span>
                 </button>
 
@@ -576,9 +780,9 @@ function BillingContent() {
                     });
                     setShowManualChargeModal(true);
                   }}
-                  className="h-9 sm:h-10 px-3.5 rounded-xl bg-amber-50 dark:bg-amber-500/10 hover:bg-amber-100 dark:hover:bg-amber-500/20 border border-amber-300 dark:border-amber-500/30 text-amber-900 dark:text-amber-300 font-bold text-xs sm:text-sm flex items-center gap-1.5 transition shadow-xs cursor-pointer"
+                  className="h-9 px-3.5 rounded-xl bg-amber-50/80 dark:bg-amber-500/10 hover:bg-amber-100/80 dark:hover:bg-amber-500/20 border border-amber-200 dark:border-amber-500/30 text-amber-900 dark:text-amber-300 font-semibold text-xs flex items-center gap-1.5 transition shadow-xs cursor-pointer"
                 >
-                  <Plus className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                  <Plus className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
                   <span>Post Charge</span>
                 </button>
 
@@ -591,9 +795,9 @@ function BillingContent() {
                     });
                     setShowDiscountModal(true);
                   }}
-                  className="h-9 sm:h-10 px-3.5 rounded-xl bg-rose-50 dark:bg-rose-500/10 hover:bg-rose-100 dark:hover:bg-rose-500/20 border border-rose-300 dark:border-rose-500/30 text-rose-900 dark:text-rose-300 font-bold text-xs sm:text-sm flex items-center gap-1.5 transition shadow-xs cursor-pointer"
+                  className="h-9 px-3.5 rounded-xl bg-rose-50/80 dark:bg-rose-500/10 hover:bg-rose-100/80 dark:hover:bg-rose-500/20 border border-rose-200 dark:border-rose-500/30 text-rose-900 dark:text-rose-300 font-semibold text-xs flex items-center gap-1.5 transition shadow-xs cursor-pointer"
                 >
-                  <Plus className="h-4 w-4 text-rose-600 dark:text-rose-400" />
+                  <Plus className="h-3.5 w-3.5 text-rose-600 dark:text-rose-400" />
                   <span>Add Discount</span>
                 </button>
 
@@ -604,7 +808,7 @@ function BillingContent() {
                       amount: String(Math.max(0, currentBalance)),
                       method: hasCompany ? "DIRECT_BILL" : "UPI",
                       reference: hasCompany ? `PO-${(activeStay.primaryGuest.companyName || "").slice(0, 10)}` : "",
-                      payerName: activeStay?.primaryGuest?.name || "Guest",
+                      payerName: formatGuestDisplayName(activeStay?.primaryGuest?.name) || "Guest",
                       companyName: activeStay?.primaryGuest?.companyName || "",
                       gstin: activeStay?.primaryGuest?.gstin || "",
                       creditPeriod: "30_DAYS",
@@ -612,9 +816,9 @@ function BillingContent() {
                     });
                     setShowPaymentModal(true);
                   }}
-                  className="h-9 sm:h-10 px-4 sm:px-5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-xs sm:text-sm flex items-center gap-1.5 transition shadow-md shadow-blue-600/30 cursor-pointer"
+                  className="h-9 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center gap-1.5 transition shadow-sm shadow-blue-600/30 cursor-pointer"
                 >
-                  <CreditCard className="h-4 w-4" />
+                  <CreditCard className="h-3.5 w-3.5" />
                   <span>Collect Payment</span>
                 </button>
               </>
@@ -624,92 +828,92 @@ function BillingContent() {
       </div>
 
       {/* 2. MAIN 2-COLUMN OPERATIONAL GRID */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 xl:gap-5 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 xl:gap-4 items-start">
         
         {/* LEFT COLUMN: ROOMS DIRECTORY & GROUP SELECTOR (4 COLS) */}
-        <div className="lg:col-span-4 rounded-2xl bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 p-3.5 sm:p-4 shadow-xs dark:shadow-xl space-y-3 flex flex-col">
+        <div className="lg:col-span-4 rounded-2xl bg-white dark:bg-[#121215] border border-zinc-200/80 dark:border-zinc-800/80 p-3.5 shadow-xs space-y-3 flex flex-col">
           
-          <div className="flex items-center justify-between pb-2.5 border-b border-zinc-200 dark:border-zinc-800">
-            <span className="font-extrabold text-xs sm:text-sm text-zinc-900 dark:text-white flex items-center gap-2 uppercase tracking-wider font-mono">
-              <Layers className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+          <div className="flex items-center justify-between pb-2 border-b border-zinc-200/80 dark:border-zinc-800">
+            <span className="font-bold text-xs text-zinc-900 dark:text-white flex items-center gap-2 uppercase tracking-wider">
+              <Layers className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
               Rooms Directory
             </span>
-            <div className="flex items-center gap-2.5">
+            <div className="flex items-center gap-2">
               <button
                 onClick={() => {
-                  if (selectedGroupStayIds.length === filteredStays.length) {
+                  if (selectedGroupStayIds.length === stays.length) {
                     setSelectedGroupStayIds([]);
                   } else {
-                    setSelectedGroupStayIds(filteredStays.map((s) => s.id));
+                    setSelectedGroupStayIds(stays.map((s) => s.id));
                   }
                 }}
-                className="text-xs text-blue-600 dark:text-blue-400 hover:underline font-mono font-bold cursor-pointer"
+                className="text-xs text-blue-600 dark:text-blue-400 hover:underline font-semibold cursor-pointer"
               >
                 {selectedGroupStayIds.length > 0 ? "Clear" : "Select All"}
               </button>
-              <span className="text-[11px] text-zinc-500 dark:text-zinc-400 font-mono font-bold bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 rounded-md">
-                {filteredStays.length} / {stays.length}
+              <span className="text-[10.5px] text-zinc-500 dark:text-zinc-400 font-semibold bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 rounded-md">
+                {filteredDirectoryItems.length} / {directoryItems.length}
               </span>
             </div>
           </div>
 
           {/* Search Bar */}
           <div className="relative">
-            <Search className="absolute left-3 top-2.5 h-4 w-4 text-zinc-400 dark:text-zinc-500" />
+            <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-zinc-400 dark:text-zinc-500" />
             <input
               type="text"
               placeholder="Search room #, guest name, company..."
               value={staySearchQuery}
               onChange={(e) => setStaySearchQuery(e.target.value)}
-              className="w-full h-10 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700/80 pl-9 pr-8 text-xs sm:text-sm text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none focus:border-blue-500 font-medium transition"
+              className="w-full h-9 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 pl-8.5 pr-8 text-xs text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none focus:border-blue-500 font-medium transition"
             />
             {staySearchQuery && (
               <button
                 onClick={() => setStaySearchQuery("")}
-                className="absolute right-2.5 top-2.5 text-zinc-400 hover:text-zinc-700 dark:hover:text-white cursor-pointer"
+                className="absolute right-2.5 top-2 text-zinc-400 hover:text-zinc-700 dark:hover:text-white cursor-pointer"
               >
-                <X className="h-4 w-4" />
+                <X className="h-3.5 w-3.5" />
               </button>
             )}
           </div>
 
           {/* Quick Filter Tabs */}
-          <div className="grid grid-cols-4 gap-1 p-1 rounded-xl bg-zinc-100 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 text-[11px] font-semibold text-center">
+          <div className="grid grid-cols-4 gap-1 p-1 rounded-xl bg-zinc-100/80 dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 text-[11px] font-semibold text-center">
             <button
               onClick={() => setStayStatusFilter("ALL")}
               className={`rounded-lg py-1.5 transition cursor-pointer ${
                 stayStatusFilter === "ALL"
-                  ? "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-xs font-black"
+                  ? "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-xs font-bold"
                   : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200"
               }`}
             >
-              All ({stays.length})
+              All ({directoryItems.length})
             </button>
             <button
               onClick={() => setStayStatusFilter("IN_HOUSE")}
               className={`rounded-lg py-1.5 transition cursor-pointer ${
                 stayStatusFilter === "IN_HOUSE"
-                  ? "bg-emerald-600 text-white shadow-xs font-black"
+                  ? "bg-emerald-600 text-white shadow-xs font-bold"
                   : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200"
               }`}
             >
-              In-House ({stays.filter((s) => s.status === "IN_HOUSE").length})
+              In-House ({directoryItems.filter((d) => d.status === "IN_HOUSE").length})
             </button>
             <button
               onClick={() => setStayStatusFilter("WITH_BALANCE")}
               className={`rounded-lg py-1.5 transition cursor-pointer ${
                 stayStatusFilter === "WITH_BALANCE"
-                  ? "bg-rose-600 text-white shadow-xs font-black"
+                  ? "bg-rose-600 text-white shadow-xs font-bold"
                   : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200"
               }`}
             >
-              Due ({stays.filter((s) => (s.folio?.balance ?? 0) > 0).length})
+              Due ({directoryItems.filter((d) => d.roomBalance > 0).length})
             </button>
             <button
               onClick={() => setStayStatusFilter("CHECKED_OUT")}
               className={`rounded-lg py-1.5 transition cursor-pointer ${
                 stayStatusFilter === "CHECKED_OUT"
-                  ? "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-xs font-black"
+                  ? "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-xs font-bold"
                   : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200"
               }`}
             >
@@ -717,159 +921,181 @@ function BillingContent() {
             </button>
           </div>
 
-          {/* Stays List with High-Legibility Cards */}
-          <div className="space-y-2 max-h-[calc(100vh-270px)] overflow-y-auto pr-1 flex-1">
-            {filteredStays.map((s) => {
-              const isSelected = s.id === selectedStayId;
-              const isGroupChecked = selectedGroupStayIds.includes(s.id);
-              const room = s.roomAssignments?.[0]?.room;
-              const balance = s.folio?.balance ?? 0;
-              const hasCompany = Boolean(s.primaryGuest?.companyName);
+          {/* Stays / Rooms List with Separated Individual Cards */}
+          <div className="space-y-2 max-h-[calc(100vh-290px)] overflow-y-auto pr-0.5 flex-1">
+            {filteredDirectoryItems.map((item) => {
+              const isSelected = item.stayId === selectedStayId && (selectedRoomNumber ? item.roomNumber === selectedRoomNumber : true);
+              const isGroupChecked = selectedGroupStayIds.includes(item.stayId);
+              const hasCompany = Boolean(item.companyName);
 
               return (
                 <div
-                  key={s.id}
-                  onClick={() => setSelectedStayId(s.id)}
-                  className={`rounded-xl p-3 border-2 transition-all cursor-pointer flex items-start gap-2.5 shadow-xs hover:shadow-sm ${
+                  key={item.key}
+                  onClick={() => {
+                    setSelectedStayId(item.stayId);
+                    setSelectedRoomNumber(item.roomNumber);
+                    setGroupBillingMode("NO"); // Default to separate billing on click
+                  }}
+                  className={`rounded-xl p-3 border transition-all cursor-pointer flex items-start gap-2.5 shadow-xs ${
                     isSelected
-                      ? "bg-blue-50/90 dark:bg-[#101928] border-blue-500 shadow-sm text-zinc-900 dark:text-zinc-100"
-                      : "bg-zinc-50/70 dark:bg-zinc-900/60 border-zinc-200 dark:border-zinc-800/80 text-zinc-600 dark:text-zinc-400 hover:border-zinc-300 dark:hover:border-zinc-700"
+                      ? "bg-blue-50/80 dark:bg-blue-950/30 border-blue-400 dark:border-blue-700 text-zinc-900 dark:text-zinc-100"
+                      : "bg-zinc-50/50 dark:bg-zinc-900/50 border-zinc-200/80 dark:border-zinc-800/80 text-zinc-600 dark:text-zinc-400 hover:border-zinc-300 dark:hover:border-zinc-700"
                   }`}
                 >
                   <input
                     type="checkbox"
                     checked={isGroupChecked}
                     onClick={(e) => e.stopPropagation()}
-                    onChange={() => toggleGroupStaySelection(s.id)}
+                    onChange={() => toggleGroupStaySelection(item.stayId)}
                     className="mt-0.5 h-3.5 w-3.5 rounded bg-white dark:bg-zinc-800 border-zinc-300 dark:border-zinc-700 accent-emerald-500 cursor-pointer shrink-0"
                     title="Select for group settlement"
                   />
 
                   <div className="flex-1 min-w-0 space-y-1">
-                    {/* Top Row: Big Room Number & Due/Paid Badge */}
+                    {/* Top Row: Room Number & Settled/Due Badge */}
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-1.5">
-                        <span className="text-lg sm:text-xl font-black font-mono tracking-tight text-zinc-900 dark:text-white">
-                          {room?.number || "Unassigned"}
+                        <span className="text-base font-bold text-zinc-900 dark:text-white">
+                          {item.roomNumber}
                         </span>
-                        <span className="text-[11px] text-zinc-500 font-bold truncate">
-                          {room?.roomType?.name || "Deluxe Room"}
+                        <span className="text-[11px] text-zinc-500 font-medium truncate">
+                          {item.roomType?.name || "Deluxe Room"}
                         </span>
                       </div>
 
                       <div className="shrink-0">
-                        {balance > 0 ? (
-                          <span className="text-[11px] font-mono font-black text-rose-800 dark:text-rose-300 bg-rose-100 dark:bg-rose-950/70 border border-rose-300 dark:border-rose-800/60 px-2 py-0.5 rounded-md shadow-xs">
-                            Due: {formatINR(balance)}
+                        {item.roomBalance > 0 ? (
+                          <span className="text-[10.5px] font-bold text-rose-700 dark:text-rose-300 bg-rose-50 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-800/50 px-2 py-0.5 rounded-md">
+                            Due: {formatINR(item.roomBalance)}
                           </span>
                         ) : (
-                          <span className="text-[11px] font-mono font-black text-emerald-800 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-950/70 border border-emerald-300 dark:border-emerald-800/60 px-2 py-0.5 rounded-md shadow-xs">
+                          <span className="text-[10.5px] font-semibold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800/50 px-2 py-0.5 rounded-md">
                             ✓ Settled
                           </span>
                         )}
                       </div>
                     </div>
 
-                    {/* Middle Row: Guest Name & In-House Tag */}
+                    {/* Middle Row: Guest Name & Status Tag */}
                     <div className="flex items-center justify-between gap-1.5">
-                      <span className="text-xs sm:text-sm font-bold text-zinc-900 dark:text-zinc-100 truncate">
-                        {s.primaryGuest?.name || "Guest"}
+                      <span className="text-xs font-semibold text-zinc-800 dark:text-zinc-200 truncate">
+                        {item.guestName}
                       </span>
-                      <span
-                        className={`rounded-md px-1.5 py-0.5 text-[9.5px] font-mono font-bold uppercase shrink-0 ${
-                          s.status === "IN_HOUSE"
-                            ? "bg-emerald-100 dark:bg-emerald-500/10 text-emerald-800 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-500/20"
-                            : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700"
-                        }`}
-                      >
-                        {s.status}
-                      </span>
+                      <div className="flex items-center gap-1 shrink-0">
+                        {item.isMultiRoom && (
+                          <span className="rounded-md px-1.5 py-0.2 text-[9px] font-bold bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/60">
+                            Group ({item.allRoomNumbers.length} Rooms)
+                          </span>
+                        )}
+                        <span
+                          className={`rounded-md px-1.5 py-0.2 text-[9.5px] font-semibold uppercase ${
+                            item.status === "IN_HOUSE"
+                              ? "bg-emerald-100/70 dark:bg-emerald-500/10 text-emerald-800 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20"
+                              : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700"
+                          }`}
+                        >
+                          {item.status}
+                        </span>
+                      </div>
                     </div>
 
                     {/* Corporate Entity if present */}
                     {hasCompany && (
-                      <div className="flex items-center gap-1 text-[11px] text-amber-800 dark:text-amber-300 font-semibold truncate bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/50 px-1.5 py-0.5 rounded-md">
+                      <div className="flex items-center gap-1 text-[10.5px] text-amber-800 dark:text-amber-300 font-medium truncate bg-amber-50/80 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/40 px-1.5 py-0.5 rounded-md">
                         <Building2 className="h-3 w-3 shrink-0 text-amber-600 dark:text-amber-400" />
-                        <span className="truncate">{s.primaryGuest.companyName}</span>
+                        <span className="truncate">{item.companyName}</span>
                       </div>
                     )}
 
                     {/* Bottom Row: Dates & Phone */}
-                    <div className="flex items-center justify-between text-[10.5px] text-zinc-500 dark:text-zinc-400 font-mono">
+                    <div className="flex items-center justify-between text-[10.5px] text-zinc-400 dark:text-zinc-500">
                       <span>
-                        {s.arrivalAt?.slice(0, 10)} → {s.expectedDepartureAt?.slice(0, 10)}
+                        {item.arrivalAt?.slice(0, 10)} → {item.expectedDepartureAt?.slice(0, 10)}
                       </span>
-                      {s.primaryGuest?.phone && <span className="truncate font-semibold">{s.primaryGuest.phone}</span>}
+                      {item.phone && <span className="truncate font-mono">{item.phone}</span>}
                     </div>
                   </div>
                 </div>
               );
             })}
 
-            {filteredStays.length === 0 && (
+            {filteredDirectoryItems.length === 0 && (
               <div className="p-8 text-center text-xs text-zinc-500 space-y-2">
-                <AlertCircle className="h-7 w-7 text-zinc-400 dark:text-zinc-600 mx-auto" />
-                <p className="font-bold text-zinc-800 dark:text-zinc-300 text-xs sm:text-sm">No matching folios found</p>
-                <p className="text-zinc-500 text-[11px]">Try changing your search term or filter status.</p>
+                <AlertCircle className="h-6 w-6 text-zinc-400 dark:text-zinc-600 mx-auto" />
+                <p className="font-bold text-zinc-800 dark:text-zinc-300 text-xs">No matching folios found</p>
+                <p className="text-zinc-400 text-[11px]">Try changing your search term or filter status.</p>
               </div>
             )}
           </div>
         </div>
 
         {/* RIGHT COLUMN: FOLIO HERO, KPI CARDS & LEDGER (8 COLS) */}
-        <div className="lg:col-span-8 space-y-4 xl:space-y-5">
+        <div className="lg:col-span-8 space-y-3.5 xl:space-y-4">
           {folioData ? (
             <>
               {/* 1. ACTIVE STAY HERO OVERVIEW CARD */}
-              <div className="p-4 xl:p-5 rounded-2xl bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 shadow-xs dark:shadow-xl space-y-3">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4">
-                  <div className="flex items-start sm:items-center gap-3 sm:gap-4">
-                    <div className="h-12 w-12 rounded-xl bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-700/60 flex items-center justify-center text-blue-600 dark:text-blue-400 shrink-0">
-                      <BedDouble className="h-6 w-6" />
+              <div className="p-4 rounded-2xl bg-white dark:bg-[#121215] border border-zinc-200/80 dark:border-zinc-800/80 shadow-xs space-y-3">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="h-11 w-11 rounded-xl bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-700/60 flex items-center justify-center text-blue-600 dark:text-blue-400 shrink-0">
+                      <BedDouble className="h-5 w-5" />
                     </div>
                     <div>
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-xl sm:text-2xl font-black font-mono text-zinc-900 dark:text-white tracking-tight">
-                          Room {activeStay?.roomAssignments?.[0]?.room?.number || "Unassigned"}
+                        <span className="text-lg sm:text-xl font-bold text-zinc-900 dark:text-white tracking-tight">
+                          {groupBillingMode === "YES" && isMultiRoomGroup
+                            ? `Rooms ${allGroupRooms.join(" + ")}`
+                            : `Room ${activeRoomNumber}`}
                         </span>
-                        <span className="rounded-lg bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 px-2 py-0.5 text-[11px] font-mono font-bold text-zinc-700 dark:text-zinc-300">
-                          {activeStay?.roomAssignments?.[0]?.room?.roomType?.name || "Deluxe AC"}
+                        <span className="rounded-lg bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 px-2 py-0.5 text-[11px] font-semibold text-zinc-700 dark:text-zinc-300">
+                          {groupBillingMode === "YES" && isMultiRoomGroup
+                            ? "Combined Group Folio"
+                            : activeDirectoryItem?.roomType?.name || activeStay?.roomAssignments?.[0]?.room?.roomType?.name || "Deluxe AC"}
                         </span>
-                        <span className="rounded-lg bg-emerald-100 dark:bg-emerald-500/10 text-emerald-800 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-500/20 px-2 py-0.5 text-[11px] font-mono font-black">
+                        <span className="rounded-lg bg-emerald-50 dark:bg-emerald-500/10 text-emerald-800 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20 px-2 py-0.5 text-[11px] font-bold">
                           {activeStay?.status}
                         </span>
                       </div>
 
-                      <div className="text-xs sm:text-sm font-bold text-zinc-800 dark:text-zinc-200 mt-0.5 flex items-center gap-2 flex-wrap">
-                        <span>Guest: <strong className="text-zinc-950 dark:text-white text-sm sm:text-base">{activeStay?.primaryGuest?.name}</strong></span>
+                      <div className="text-xs font-medium text-zinc-600 dark:text-zinc-300 mt-0.5 flex items-center gap-2 flex-wrap">
+                        <span>Guest: <strong className="text-zinc-950 dark:text-white font-bold">{formatGuestDisplayName(activeStay?.primaryGuest?.name)}</strong></span>
                         {activeStay?.primaryGuest?.phone && (
-                          <span className="text-xs text-zinc-500 font-mono font-normal">({activeStay.primaryGuest.phone})</span>
+                          <span className="text-xs text-zinc-400 font-mono font-normal">({activeStay.primaryGuest.phone})</span>
                         )}
                         {activeStay?.primaryGuest?.email && (
-                          <span className="text-xs text-zinc-500 font-mono font-normal">• {activeStay.primaryGuest.email}</span>
+                          <span className="text-xs text-zinc-400 font-normal">• {activeStay.primaryGuest.email}</span>
                         )}
                       </div>
 
                       {activeStay?.primaryGuest?.companyName && (
-                        <div className="inline-flex items-center gap-1.5 mt-1 px-2 py-0.5 rounded-md bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-700/60 text-xs font-bold text-amber-900 dark:text-amber-200 font-mono">
+                        <div className="inline-flex items-center gap-1.5 mt-1 px-2 py-0.5 rounded-md bg-amber-50/80 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-700/50 text-[11px] font-semibold text-amber-900 dark:text-amber-200">
                           <Building2 className="h-3 w-3 text-amber-600 dark:text-amber-400" />
                           <span>Bill to Company: {activeStay.primaryGuest.companyName}</span>
-                          {activeStay.primaryGuest.gstin && <span>• GSTIN: {activeStay.primaryGuest.gstin}</span>}
+                          {activeStay.primaryGuest.gstin && <span className="font-mono">• GSTIN: {activeStay.primaryGuest.gstin}</span>}
                         </div>
                       )}
                     </div>
                   </div>
 
                   {/* Duration & Primary Settle Button */}
-                  <div className="flex flex-wrap items-center gap-2.5">
-                    <div className="text-xs text-zinc-700 dark:text-zinc-300 font-mono bg-zinc-50 dark:bg-zinc-900 px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-800 flex items-center gap-2.5 shadow-xs">
+                  <div className="flex items-center gap-2.5 flex-wrap">
+                    <div className="text-xs text-zinc-700 dark:text-zinc-300 bg-zinc-50 dark:bg-zinc-900 px-3 py-2 rounded-xl border border-zinc-200/80 dark:border-zinc-800 flex items-center gap-2.5 shadow-xs">
                       <Clock className="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
                       <div>
-                        <span className="font-bold text-xs sm:text-sm text-zinc-900 dark:text-white block">
-                          {stayCalculations.nights} Night{stayCalculations.nights > 1 ? "s" : ""}
-                        </span>
-                        <span className="text-[10.5px] text-zinc-500 block">
-                          {formatINR(stayCalculations.roomRatePerNight)}/night
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-bold text-xs sm:text-sm text-zinc-900 dark:text-white block">
+                            {stayCalculations.nights} Night{stayCalculations.nights > 1 ? "s" : ""}
+                          </span>
+                          <span className="text-[9.5px] px-1.5 py-0.2 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 font-mono font-medium">
+                            {stayCalculations.checkoutCycleText}
+                          </span>
+                        </div>
+                        <span className="text-[10.5px] text-zinc-500 block font-mono">
+                          {stayCalculations.isComplimentary ? (
+                            <strong className="text-emerald-600 dark:text-emerald-400 font-bold">🎁 Complimentary (₹0/nt)</strong>
+                          ) : (
+                            `${formatINR(stayCalculations.roomRatePerNight)}/night`
+                          )}
                         </span>
                       </div>
                     </div>
@@ -879,10 +1105,10 @@ function BillingContent() {
                         <button
                           onClick={handleExecuteCheckout}
                           disabled={actionLoading}
-                          className="h-10 sm:h-11 px-4 sm:px-5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs sm:text-sm font-black transition shadow-md shadow-emerald-600/30 flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
+                          className="h-10 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition shadow-xs flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
                         >
                           <CheckCircle2 className="h-4 w-4" />
-                          <span>{actionLoading ? "Checking Out..." : "Check Out & Invoice"}</span>
+                          <span>{actionLoading ? "Checking Out..." : groupBillingMode === "YES" && isMultiRoomGroup ? "Check Out Group & Invoice" : `Check Out Room ${activeRoomNumber}`}</span>
                         </button>
                       ) : (
                         <button
@@ -890,16 +1116,16 @@ function BillingContent() {
                             setPaymentForm({
                               amount: String(currentBalance),
                               method: activeStay?.primaryGuest?.companyName ? "DIRECT_BILL" : "UPI",
-                              reference: "",
-                              payerName: activeStay?.primaryGuest?.name || "Guest",
+                              reference: groupBillingMode === "YES" && isMultiRoomGroup ? `Group Settlement (Rooms ${allGroupRooms.join(", ")})` : `Room ${activeRoomNumber} Settlement`,
+                              payerName: formatGuestDisplayName(activeStay?.primaryGuest?.name) || "Guest",
                               companyName: activeStay?.primaryGuest?.companyName || "",
                               gstin: activeStay?.primaryGuest?.gstin || "",
                               creditPeriod: "30_DAYS",
-                              billingRemarks: "",
+                              billingRemarks: groupBillingMode === "YES" ? `Group billing settlement` : `Settlement for Room ${activeRoomNumber}`,
                             });
                             setShowPaymentModal(true);
                           }}
-                          className="h-10 sm:h-11 px-4 sm:px-5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs sm:text-sm font-black transition shadow-md shadow-rose-600/30 flex items-center gap-1.5 cursor-pointer"
+                          className="h-10 px-4 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold transition shadow-xs flex items-center gap-1.5 cursor-pointer"
                         >
                           <CreditCard className="h-4 w-4" />
                           <span>Settle {formatINR(currentBalance)} & Check Out</span>
@@ -908,7 +1134,7 @@ function BillingContent() {
                     ) : (
                       <button
                         onClick={handleOpenLiveTaxBill}
-                        className="h-10 sm:h-11 px-4 rounded-xl bg-zinc-900 text-white dark:bg-white dark:text-zinc-950 font-black text-xs sm:text-sm transition shadow-xs flex items-center gap-1.5 cursor-pointer"
+                        className="h-10 px-4 rounded-xl bg-zinc-900 text-white hover:bg-zinc-800 dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-200 font-bold text-xs transition shadow-xs flex items-center gap-1.5 cursor-pointer"
                       >
                         <Printer className="h-4 w-4" />
                         <span>Print Tax Invoice</span>
@@ -916,79 +1142,117 @@ function BillingContent() {
                     )}
                   </div>
                 </div>
+
+                {/* GROUP BILLING TOGGLE / DROPDOWN */}
+                <div className="flex items-center justify-between gap-2.5 pt-2.5 border-t border-zinc-100 dark:border-zinc-800/80 flex-wrap">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs font-bold text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
+                      <Layers className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
+                      Group Billing:
+                    </span>
+                    <select
+                      value={groupBillingMode}
+                      onChange={(e) => setGroupBillingMode(e.target.value as "NO" | "YES")}
+                      className="h-8.5 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 px-3 text-xs font-bold text-zinc-900 dark:text-white focus:outline-none focus:border-blue-500 cursor-pointer shadow-2xs"
+                    >
+                      <option value="NO">No — Separate Billing (Room {activeRoomNumber} Only)</option>
+                      {isMultiRoomGroup && (
+                        <option value="YES">Yes — Combined Group Billing (Rooms {allGroupRooms.join(", ")})</option>
+                      )}
+                    </select>
+                  </div>
+
+                  {isMultiRoomGroup && (
+                    <div className="text-[11px] font-medium">
+                      {groupBillingMode === "NO" ? (
+                        <span className="text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800/60 px-2 py-0.5 rounded-lg flex items-center gap-1">
+                          <span>Separate Room Mode (Room {activeRoomNumber} of {allGroupRooms.join(", ")})</span>
+                        </span>
+                      ) : (
+                        <span className="text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 px-2 py-0.5 rounded-lg font-bold">
+                          ✓ All {allGroupRooms.length} Rooms Automatically Combined
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* 2. THREE LARGE FINANCIAL KPI STAT TILES */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 xl:gap-4">
-                <div className="p-3.5 xl:p-4 rounded-2xl bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-0.5">
-                  <div className="text-[11px] text-zinc-500 dark:text-zinc-400 uppercase font-mono font-bold tracking-wider">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 xl:gap-3.5">
+                <div className="p-3.5 rounded-2xl bg-white dark:bg-[#121215] border border-zinc-200/80 dark:border-zinc-800/80 shadow-xs space-y-0.5">
+                  <div className="text-[11px] text-zinc-500 dark:text-zinc-400 uppercase font-semibold tracking-wider">
                     Total Charges Posted
                   </div>
-                  <div className="text-xl sm:text-2xl font-black text-zinc-900 dark:text-white font-mono tabular-nums">
+                  <div className="text-xl sm:text-2xl font-bold text-zinc-900 dark:text-white tabular-nums">
                     {formatINR(totalCharges)}
                   </div>
-                  <div className="text-[10.5px] text-zinc-400 font-mono">
-                    Taxable: {formatINR(totalTaxable)} + Tax: {formatINR(totalTaxes)}
+                  <div className="text-[10.5px] text-zinc-400">
+                    Taxable: <span className="font-mono">{formatINR(totalTaxable)}</span> + Tax: <span className="font-mono">{formatINR(totalTaxes)}</span>
                   </div>
                 </div>
 
-                <div className="p-3.5 xl:p-4 rounded-2xl bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-0.5">
-                  <div className="text-[11px] text-zinc-500 dark:text-zinc-400 uppercase font-mono font-bold tracking-wider">
+                <div className="p-3.5 rounded-2xl bg-white dark:bg-[#121215] border border-zinc-200/80 dark:border-zinc-800/80 shadow-xs space-y-0.5">
+                  <div className="text-[11px] text-zinc-500 dark:text-zinc-400 uppercase font-semibold tracking-wider">
                     Payments Received
                   </div>
-                  <div className="text-xl sm:text-2xl font-black text-emerald-600 dark:text-emerald-400 font-mono tabular-nums">
+                  <div className="text-xl sm:text-2xl font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">
                     {formatINR(totalPayments)}
                   </div>
-                  <div className="text-[10.5px] text-zinc-400 font-mono">
+                  <div className="text-[10.5px] text-zinc-400">
                     {payments.length} Transaction{payments.length === 1 ? "" : "s"}
                   </div>
                 </div>
 
-                <div className="p-3.5 xl:p-4 rounded-2xl bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-0.5">
-                  <div className="text-[11px] text-zinc-500 dark:text-zinc-400 uppercase font-mono font-bold tracking-wider">
+                <div className="p-3.5 rounded-2xl bg-white dark:bg-[#121215] border border-zinc-200/80 dark:border-zinc-800/80 shadow-xs space-y-0.5">
+                  <div className="text-[11px] text-zinc-500 dark:text-zinc-400 uppercase font-semibold tracking-wider">
                     Outstanding Balance Due
                   </div>
                   <div
-                    className={`text-2xl sm:text-3xl font-black font-mono tabular-nums ${
+                    className={`text-xl sm:text-2xl font-bold tabular-nums ${
                       currentBalance > 0 ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400"
                     }`}
                   >
                     {formatINR(currentBalance)}
                   </div>
-                  <div className="text-[11px] text-zinc-400 font-mono">
+                  <div className="text-[10.5px] text-zinc-400">
                     {currentBalance > 0 ? "Pending Guest / Corporate Settlement" : "Folio is Fully Cleared"}
                   </div>
                 </div>
               </div>
 
               {/* 3. FOLIO CHARGES LEDGER TABLE */}
-              <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121215] overflow-hidden shadow-sm dark:shadow-xl p-5 space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-zinc-200 dark:border-zinc-800">
+              <div className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-[#121215] overflow-hidden shadow-xs p-4 sm:p-5 space-y-3.5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-zinc-200/80 dark:border-zinc-800">
                   <div>
-                    <h2 className="text-sm font-extrabold text-zinc-900 dark:text-white uppercase tracking-wider font-mono flex items-center gap-2">
+                    <h2 className="text-xs sm:text-sm font-bold text-zinc-900 dark:text-white uppercase tracking-wider flex items-center gap-2">
                       <FileText className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                      Folio Itemized Charges Ledger
+                      {groupBillingMode === "YES" && isMultiRoomGroup
+                        ? `Group Folio Charges Ledger (Rooms ${allGroupRooms.join(", ")})`
+                        : `Room ${activeRoomNumber} Itemized Charges Ledger`}
                     </h2>
-                    <p className="text-xs text-zinc-500 font-mono mt-0.5">
-                      Stay Duration: {stayCalculations.nights} Night{stayCalculations.nights > 1 ? "s" : ""} x Room Tariff + Food & Services
+                    <p className="text-xs text-zinc-500 mt-0.5">
+                      {groupBillingMode === "YES" && isMultiRoomGroup
+                        ? `Combined billing for ${allGroupRooms.length} rooms + restaurant food & services`
+                        : `Separate individual billing for Room ${activeRoomNumber} (Default)`}
                     </p>
                   </div>
 
                   {/* Filter Controls */}
-                  <div className="flex items-center gap-2.5 flex-wrap">
-                    <div className="relative w-48 sm:w-60">
-                      <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-zinc-400" />
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <div className="relative w-44 sm:w-56">
+                      <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-zinc-400" />
                       <input
                         type="text"
                         placeholder="Filter charges..."
                         value={ledgerSearchQuery}
                         onChange={(e) => setLedgerSearchQuery(e.target.value)}
-                        className="w-full h-9 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700/80 pl-8 pr-7 text-xs text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:border-blue-500"
+                        className="w-full h-8.5 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 pl-8 pr-7 text-xs text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:border-blue-500"
                       />
                       {ledgerSearchQuery && (
                         <button
                           onClick={() => setLedgerSearchQuery("")}
-                          className="absolute right-2.5 top-2 text-zinc-400 hover:text-zinc-700"
+                          className="absolute right-2.5 top-2 text-zinc-400 hover:text-zinc-700 cursor-pointer"
                         >
                           <X className="h-3.5 w-3.5" />
                         </button>
@@ -998,7 +1262,7 @@ function BillingContent() {
                     <select
                       value={ledgerTypeFilter}
                       onChange={(e: any) => setLedgerTypeFilter(e.target.value)}
-                      className="h-9 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700/80 px-3 text-xs text-zinc-900 dark:text-zinc-200 focus:outline-none focus:border-blue-500 font-mono font-semibold"
+                      className="h-8.5 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-2.5 text-xs text-zinc-800 dark:text-zinc-200 focus:outline-none focus:border-blue-500 font-semibold cursor-pointer"
                     >
                       <option value="ALL">All Categories</option>
                       <option value="ROOM_TARIFF">🛏️ Room Tariffs ({ACTIVE_TAX_RATES.ROOM_ACCOMMODATION_RATE}%)</option>
@@ -1008,19 +1272,19 @@ function BillingContent() {
                   </div>
                 </div>
 
-                <div className="overflow-x-auto rounded-xl border border-zinc-200 dark:border-zinc-800">
-                  <table className="w-full text-left text-xs sm:text-sm">
-                    <thead className="bg-zinc-50 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 font-mono text-[11px] uppercase border-b border-zinc-200 dark:border-zinc-800">
+                <div className="overflow-x-auto rounded-xl border border-zinc-200/80 dark:border-zinc-800">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-zinc-50/80 dark:bg-zinc-900/80 text-zinc-500 dark:text-zinc-400 text-[11px] uppercase border-b border-zinc-200/80 dark:border-zinc-800 font-semibold">
                       <tr>
-                        <th className="py-2.5 px-3">Date</th>
-                        <th className="py-2.5 px-3">Description & Category</th>
-                        <th className="py-2.5 px-3">SAC</th>
-                        <th className="py-2.5 px-3 text-right">Taxable</th>
-                        <th className="py-2.5 px-3 text-right">GST</th>
-                        <th className="py-2.5 px-3 text-right">Total Amount</th>
+                        <th className="py-2 px-3">Date</th>
+                        <th className="py-2 px-3">Description & Category</th>
+                        <th className="py-2 px-3">SAC</th>
+                        <th className="py-2 px-3 text-right">Taxable</th>
+                        <th className="py-2 px-3 text-right">GST</th>
+                        <th className="py-2 px-3 text-right">Total Amount</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800/70">
+                    <tbody className="divide-y divide-zinc-200/60 dark:divide-zinc-800/60">
                       {entries.map((e: any) => {
                         const taxAmt = (e.totalAmount || 0) - (e.taxableAmount || 0);
                         const isFood = e.chargeCode?.includes("FOOD") || e.chargeCode?.includes("RESTAURANT") || e.chargeCode?.includes("FB");
@@ -1028,38 +1292,38 @@ function BillingContent() {
                         const isDiscount = (e.amount || 0) < 0 || (e.totalAmount || 0) < 0;
 
                         return (
-                          <tr key={e.id} className="hover:bg-zinc-50 dark:hover:bg-zinc-900/50 transition">
-                            <td className="py-2.5 px-3 font-mono text-zinc-600 dark:text-zinc-400 text-xs">
+                          <tr key={e.id} className="hover:bg-zinc-50/70 dark:hover:bg-zinc-900/50 transition">
+                            <td className="py-2 px-3 text-zinc-500 dark:text-zinc-400 font-mono text-xs">
                               {e.serviceDate || e.createdAt?.slice(0, 10)}
                             </td>
-                            <td className="py-2.5 px-3 font-semibold text-zinc-900 dark:text-zinc-100">
+                            <td className="py-2 px-3 font-medium text-zinc-900 dark:text-zinc-100">
                               <div className="flex items-center gap-1.5 flex-wrap">
                                 <span>{e.description}</span>
                                 <span
-                                  className={`text-[9.5px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${
+                                  className={`text-[9.5px] px-1.5 py-0.2 rounded font-semibold uppercase ${
                                     isDiscount
-                                      ? "bg-rose-100 dark:bg-rose-950/60 text-rose-800 dark:text-rose-300 border border-rose-300 dark:border-rose-700"
+                                      ? "bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-700"
                                       : isFood
-                                      ? "bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-700"
+                                      ? "bg-amber-50 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-700"
                                       : isRoom
-                                      ? "bg-blue-100 dark:bg-blue-950/60 text-blue-800 dark:text-blue-300 border border-blue-300 dark:border-blue-700"
-                                      : "bg-purple-100 dark:bg-purple-950/60 text-purple-800 dark:text-purple-300 border border-purple-300 dark:border-purple-700"
+                                      ? "bg-blue-50 dark:bg-blue-950/60 text-blue-800 dark:text-blue-300 border border-blue-200 dark:border-blue-700"
+                                      : "bg-purple-50 dark:bg-purple-950/60 text-purple-800 dark:text-purple-300 border border-purple-200 dark:border-purple-700"
                                   }`}
                                 >
                                   {isDiscount ? "Discount" : isFood ? `🍽️ F&B ${ACTIVE_TAX_RATES.RESTAURANT_FOOD_RATE}%` : isRoom ? `🛏️ Room ${ACTIVE_TAX_RATES.ROOM_ACCOMMODATION_RATE}%` : `🧺 Service ${ACTIVE_TAX_RATES.SERVICES_LAUNDRY_RATE}%`}
                                 </span>
                               </div>
                             </td>
-                            <td className="py-2.5 px-3 font-mono text-zinc-600 dark:text-zinc-400 text-xs">
+                            <td className="py-2 px-3 font-mono text-zinc-500 dark:text-zinc-400 text-xs">
                               {e.sacHsn || (isFood ? "996331" : "996311")}
                             </td>
-                            <td className="py-2.5 px-3 font-mono tabular-nums text-zinc-700 dark:text-zinc-300 text-right">
+                            <td className="py-2 px-3 font-mono tabular-nums text-zinc-600 dark:text-zinc-300 text-right">
                               {formatINR(e.taxableAmount || 0)}
                             </td>
-                            <td className="py-2.5 px-3 font-mono text-zinc-600 dark:text-zinc-400 tabular-nums text-right">
+                            <td className="py-2 px-3 font-mono text-zinc-500 dark:text-zinc-400 tabular-nums text-right">
                               {formatINR(taxAmt)}
                             </td>
-                            <td className="py-2.5 px-3 font-mono font-bold text-zinc-950 dark:text-white text-right tabular-nums">
+                            <td className="py-2 px-3 font-mono font-bold text-zinc-950 dark:text-white text-right tabular-nums">
                               {formatINR(e.totalAmount || 0)}
                             </td>
                           </tr>
@@ -1067,7 +1331,7 @@ function BillingContent() {
                       })}
                       {entries.length === 0 && (
                         <tr>
-                          <td colSpan={6} className="p-6 text-center text-zinc-500 italic font-mono text-xs">
+                          <td colSpan={6} className="p-5 text-center text-zinc-400 italic text-xs">
                             {rawEntries.length === 0 ? "No charges posted yet" : "No charges match your search filter"}
                           </td>
                         </tr>
@@ -1078,57 +1342,57 @@ function BillingContent() {
               </div>
 
               {/* 4. PAYMENT RECEIPTS TABLE */}
-              <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121215] overflow-hidden shadow-xs dark:shadow-xl p-4 xl:p-5 space-y-3">
-                <div className="flex items-center justify-between pb-2.5 border-b border-zinc-200 dark:border-zinc-800">
+              <div className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-[#121215] overflow-hidden shadow-xs p-4 sm:p-5 space-y-3">
+                <div className="flex items-center justify-between pb-2 border-b border-zinc-200/80 dark:border-zinc-800">
                   <div>
-                    <h2 className="text-xs sm:text-sm font-extrabold text-zinc-900 dark:text-white uppercase tracking-wider font-mono flex items-center gap-1.5">
+                    <h2 className="text-xs sm:text-sm font-bold text-zinc-900 dark:text-white uppercase tracking-wider flex items-center gap-1.5">
                       <CreditCard className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
                       Payment & Settlement Receipts
                     </h2>
-                    <p className="text-[11px] text-zinc-500 font-mono mt-0.5">
+                    <p className="text-[11px] text-zinc-500 mt-0.5">
                       {payments.length} Transaction{payments.length === 1 ? "" : "s"} Recorded for Folio
                     </p>
                   </div>
-                  <span className="text-[11px] font-mono font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-2.5 py-0.5 rounded-lg border border-emerald-300 dark:border-emerald-800">
+                  <span className="text-[11px] font-mono font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-2.5 py-0.5 rounded-lg border border-emerald-200 dark:border-emerald-800">
                     Total Settled: {formatINR(totalPayments)}
                   </span>
                 </div>
 
-                <div className="overflow-x-auto rounded-xl border border-zinc-200 dark:border-zinc-800">
-                  <table className="w-full text-left text-xs sm:text-sm">
-                    <thead className="bg-zinc-50 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 font-mono text-[11px] uppercase border-b border-zinc-200 dark:border-zinc-800">
+                <div className="overflow-x-auto rounded-xl border border-zinc-200/80 dark:border-zinc-800">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-zinc-50/80 dark:bg-zinc-900/80 text-zinc-500 dark:text-zinc-400 text-[11px] uppercase border-b border-zinc-200/80 dark:border-zinc-800 font-semibold">
                       <tr>
-                        <th className="py-2.5 px-3">Receipt #</th>
-                        <th className="py-2.5 px-3">Date & Time</th>
-                        <th className="py-2.5 px-3">Payment Method</th>
-                        <th className="py-2.5 px-3">Reference / Notes</th>
-                        <th className="py-2.5 px-3 text-right">Amount</th>
+                        <th className="py-2 px-3">Receipt #</th>
+                        <th className="py-2 px-3">Date & Time</th>
+                        <th className="py-2 px-3">Payment Method</th>
+                        <th className="py-2 px-3">Reference / Notes</th>
+                        <th className="py-2 px-3 text-right">Amount</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800/70">
+                    <tbody className="divide-y divide-zinc-200/60 dark:divide-zinc-800/60">
                       {payments.map((p: any) => {
                         const isGroup = p.reference?.includes("GRP") || p.receiptNo?.includes("GRP");
                         const isBTC = p.method === "DIRECT_BILL";
 
                         return (
-                          <tr key={p.id} className="hover:bg-zinc-50 dark:hover:bg-zinc-900/50 transition">
-                            <td className="py-2.5 px-3 font-mono text-blue-600 dark:text-blue-400 font-bold flex items-center gap-1.5">
+                          <tr key={p.id} className="hover:bg-zinc-50/70 dark:hover:bg-zinc-900/50 transition">
+                            <td className="py-2 px-3 font-mono text-blue-600 dark:text-blue-400 font-semibold flex items-center gap-1.5">
                               <span>{p.receiptNo}</span>
                               {isGroup && (
-                                <span className="text-[9.5px] bg-purple-100 dark:bg-purple-950/60 text-purple-800 dark:text-purple-300 border border-purple-300 dark:border-purple-800 px-1.5 py-0.5 rounded font-mono font-bold">
+                                <span className="text-[9.5px] bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 px-1.5 py-0.2 rounded font-bold">
                                   Group
                                 </span>
                               )}
                             </td>
-                            <td className="py-2.5 px-3 font-mono text-zinc-600 dark:text-zinc-400 text-xs">
+                            <td className="py-2 px-3 text-zinc-500 dark:text-zinc-400 text-xs">
                               {p.receivedAt ? new Date(p.receivedAt).toLocaleString("en-GB") : "—"}
                             </td>
-                            <td className="py-2.5 px-3 font-semibold text-zinc-800 dark:text-zinc-200">
+                            <td className="py-2 px-3 font-medium text-zinc-800 dark:text-zinc-200">
                               <span
-                                className={`rounded-md border px-2 py-0.5 font-mono text-xs font-bold inline-flex items-center gap-1.5 ${
+                                className={`rounded-md border px-2 py-0.5 text-xs font-semibold inline-flex items-center gap-1.5 ${
                                   isBTC
-                                    ? "bg-amber-100 dark:bg-amber-950/60 text-amber-900 dark:text-amber-200 border-amber-300 dark:border-amber-700 shadow-xs"
-                                    : "bg-zinc-100 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 border-zinc-300 dark:border-zinc-700"
+                                    ? "bg-amber-50 dark:bg-amber-950/60 text-amber-900 dark:text-amber-200 border-amber-200 dark:border-amber-700 shadow-xs"
+                                    : "bg-zinc-100 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 border-zinc-200 dark:border-zinc-700"
                                 }`}
                               >
                                 {isBTC ? (
@@ -1141,10 +1405,10 @@ function BillingContent() {
                                 )}
                               </span>
                             </td>
-                            <td className="py-2.5 px-3 font-mono text-zinc-700 dark:text-zinc-300 text-xs">
+                            <td className="py-2 px-3 font-mono text-zinc-600 dark:text-zinc-400 text-xs">
                               {p.reference && !p.reference.startsWith("GRC-DEPOSIT-") ? p.reference : "—"}
                             </td>
-                            <td className="py-2.5 px-3 font-mono font-black text-emerald-600 dark:text-emerald-400 text-right tabular-nums text-sm sm:text-base">
+                            <td className="py-2 px-3 font-mono font-bold text-emerald-600 dark:text-emerald-400 text-right tabular-nums text-sm">
                               {formatINR(p.amount || 0)}
                             </td>
                           </tr>
@@ -1152,7 +1416,7 @@ function BillingContent() {
                       })}
                       {payments.length === 0 && (
                         <tr>
-                          <td colSpan={5} className="p-6 text-center text-zinc-500 italic font-mono text-xs">
+                          <td colSpan={5} className="p-5 text-center text-zinc-400 italic text-xs">
                             No payments recorded yet for this stay.
                           </td>
                         </tr>
@@ -1164,18 +1428,18 @@ function BillingContent() {
 
               {/* 5. GENERATED TAX INVOICES CARD */}
               {invoices.length > 0 && (
-                <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121215] p-5 space-y-3.5 shadow-sm dark:shadow-xl">
-                  <h2 className="text-sm font-extrabold text-zinc-900 dark:text-white uppercase tracking-wider font-mono">
+                <div className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-[#121215] p-4 sm:p-5 space-y-3 shadow-xs">
+                  <h2 className="text-xs sm:text-sm font-bold text-zinc-900 dark:text-white uppercase tracking-wider">
                     Generated Tax Invoices
                   </h2>
-                  <div className="space-y-2.5">
+                  <div className="space-y-2">
                     {invoices.map((inv: any) => (
                       <div
                         key={inv.id}
-                        className="flex items-center justify-between p-4 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs sm:text-sm"
+                        className="flex items-center justify-between p-3.5 rounded-xl bg-zinc-50/80 dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 text-xs sm:text-sm"
                       >
                         <div>
-                          <div className="font-mono font-bold text-blue-600 dark:text-blue-400 text-base">
+                          <div className="font-mono font-bold text-blue-600 dark:text-blue-400 text-sm">
                             {inv.invoiceNo}
                           </div>
                           <div className="text-xs text-zinc-500 dark:text-zinc-400 font-mono mt-0.5">
@@ -1183,8 +1447,8 @@ function BillingContent() {
                           </div>
                         </div>
 
-                        <div className="flex items-center gap-4">
-                          <span className="font-mono font-black text-emerald-600 dark:text-emerald-400 tabular-nums text-base">
+                        <div className="flex items-center gap-3">
+                          <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400 tabular-nums text-sm">
                             {formatINR(inv.totalAmount || 0)}
                           </span>
                           <button
@@ -1193,9 +1457,9 @@ function BillingContent() {
                               setIsLiveTaxBillView(false);
                               setShowInvoiceModal(true);
                             }}
-                            className="h-10 px-4 rounded-xl bg-zinc-900 text-white hover:bg-zinc-800 dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-200 text-xs font-black transition shadow-xs flex items-center gap-2"
+                            className="h-8.5 px-3.5 rounded-xl bg-zinc-900 text-white hover:bg-zinc-800 dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-200 text-xs font-bold transition shadow-xs flex items-center gap-1.5 cursor-pointer"
                           >
-                            <Printer className="h-4 w-4" />
+                            <Printer className="h-3.5 w-3.5" />
                             <span>Print Tax Invoice</span>
                           </button>
                         </div>
@@ -1206,12 +1470,12 @@ function BillingContent() {
               )}
             </>
           ) : (
-            <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121215] p-20 text-center text-zinc-500 dark:text-zinc-400 font-mono space-y-3 shadow-sm">
-              <Receipt className="h-12 w-12 text-zinc-400 dark:text-zinc-600 mx-auto" />
-              <p className="font-extrabold text-base text-zinc-800 dark:text-zinc-200">
+            <div className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-[#121215] p-16 text-center text-zinc-500 dark:text-zinc-400 space-y-3 shadow-xs">
+              <Receipt className="h-10 w-10 text-zinc-400 dark:text-zinc-600 mx-auto" />
+              <p className="font-bold text-sm text-zinc-800 dark:text-zinc-200">
                 Select a room from the directory to manage billing
               </p>
-              <p className="text-xs text-zinc-500 max-w-sm mx-auto">
+              <p className="text-xs text-zinc-400 max-w-sm mx-auto">
                 Use the directory on the left or select multiple rooms for group payment settlements.
               </p>
             </div>
@@ -1451,11 +1715,11 @@ function BillingContent() {
                   className="w-full h-11 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 px-3 text-zinc-900 dark:text-white focus:outline-none focus:border-rose-500 font-medium cursor-pointer"
                 >
                   <option value="Discount / Rebate">General Discount / Rebate</option>
-                  <option value="Early Checkout Rebate">Early Checkout Rebate</option>
-                  <option value="Corporate Rate Discount">Corporate Rate Discount</option>
-                  <option value="Service Recovery (Apology Discount)">Service Recovery (Apology Discount)</option>
-                  <option value="Complimentary Upgrade Adjustment">Complimentary Upgrade Adjustment</option>
-                  <option value="Long Stay Discount">Long Stay Discount</option>
+                  {DISCOUNT_REASONS.map((r) => (
+                    <option key={r.id} value={r.label}>
+                      {r.label}
+                    </option>
+                  ))}
                 </select>
               </div>
 
@@ -1847,360 +2111,39 @@ function BillingContent() {
           </div>
         </div>
       )}
+      </div>
 
       {/* ========================================================================= */}
       {/* 📄 HIGH-FIDELITY PRINTABLE TAX INVOICE MODAL (1-PAGE A4 GUARANTEE)         */}
       {/* ========================================================================= */}
       {showInvoiceModal && (
-        <div className="print-modal-overlay fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-2 sm:p-4 overflow-y-auto print:p-0 print:bg-white print:static print:overflow-visible">
-          <div className="print-invoice-sheet w-full max-w-3xl xl:max-w-4xl rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white text-zinc-900 p-4 sm:p-6 shadow-2xl space-y-3.5 print:p-0 print:border-none print:shadow-none print:w-full print:max-w-none print:space-y-2.5 max-h-[94vh] overflow-y-auto print:max-h-none print:overflow-visible">
-            
-            {/* Top Toolbar (Hidden when printing) */}
-            <div className="flex items-center justify-between pb-2.5 border-b border-zinc-200 print:hidden no-print">
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-black uppercase font-mono tracking-wider text-zinc-700">
-                  {isLiveTaxBillView ? "Live Folio Tax Invoice (Rule 46)" : "Official Tax Invoice"}
-                </span>
-                <span className="rounded-md bg-emerald-100 text-emerald-800 border border-emerald-300 px-2 py-0.5 text-[11px] font-mono font-bold">
-                  Verified GST Tax Invoice
-                </span>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => window.print()}
-                  className="h-9 px-4 rounded-xl bg-zinc-950 hover:bg-zinc-800 text-white text-xs font-extrabold transition shadow flex items-center gap-1.5 cursor-pointer"
-                >
-                  <Printer className="h-3.5 w-3.5" /> Print Tax Invoice
-                </button>
-                <button onClick={() => setShowInvoiceModal(false)} className="text-zinc-500 hover:text-zinc-900 p-1.5 cursor-pointer">
-                  <X className="h-5 w-5" />
-                </button>
-              </div>
-            </div>
-
-            {/* PRINTABLE TAX INVOICE DOCUMENT */}
-            <div className="space-y-2.5 text-xs text-zinc-900 font-sans print:text-black leading-snug">
-              {/* Header: Hotel Identity & GST */}
-              <div className="text-center pb-1.5 border-b border-zinc-900">
-                <h1 className="text-lg sm:text-xl font-black tracking-wide uppercase">
-                  Tax Invoice
-                </h1>
-                <div className="text-xs font-bold text-zinc-800 uppercase mt-0.5">
-                  {activeProperty?.legalName || activeProperty?.displayName || "Hotel Ambarish Grand Residency"}
-                </div>
-                <div className="text-[10.5px] text-zinc-600 font-mono mt-0.5">
-                  {activeProperty?.address || "MD Shah Road, Paltan Bazar, Guwahati, Assam - 781008"} | GSTIN: {activeProperty?.gstin || "18AACCB2447F1ZX"} | State Code: {activeProperty?.stateCode || "18"}
-                </div>
-              </div>
-
-              {/* 1. TOP HEADER KEY-VALUE METADATA BOX */}
-              {(() => {
-                const btcPayment = payments.find((p: any) => p.method === "DIRECT_BILL");
-                let btcSnapshot: any = null;
-                if (btcPayment?.payerSnapshot) {
-                  try {
-                    btcSnapshot = JSON.parse(btcPayment.payerSnapshot);
-                  } catch (e) {}
-                }
-
-                const companyName = activeStay?.primaryGuest?.companyName || btcSnapshot?.companyName || "—";
-                const companyGstin = activeStay?.primaryGuest?.gstin || btcSnapshot?.gstin || "—";
-                const roomNo = activeStay?.roomAssignments?.[0]?.room?.number || "206";
-                const billNo = selectedInvoice?.invoiceNo || (activeStay?.folio?.invoices?.[0]?.invoiceNo) || `INV-2627-0${roomNo}`;
-                const grcNo = `GRC-2627-0${roomNo}`;
-
-                return (
-                  <div className="border border-zinc-900 p-2.5 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 font-mono text-[11px] leading-tight">
-                    {/* Left Column */}
-                    <div className="space-y-0.5">
-                      <div className="flex">
-                        <span className="w-28 font-bold text-zinc-800 shrink-0">Bill / Inv No.</span>
-                        <span className="font-bold text-zinc-950">: {billNo}</span>
-                      </div>
-                      <div className="flex">
-                        <span className="w-28 font-bold text-zinc-800 shrink-0">Guest Name</span>
-                        <span className="font-bold uppercase text-zinc-950">: {activeStay?.primaryGuest?.name || "JAMUNA SINGHA"}</span>
-                      </div>
-                      <div className="flex">
-                        <span className="w-28 font-bold text-zinc-800 shrink-0">Address</span>
-                        <span>: {activeStay?.primaryGuest?.city ? `${activeStay.primaryGuest.city}, ${activeStay.primaryGuest.state || "ASSAM"}` : "ASSAM / INDIA"}</span>
-                      </div>
-                      <div className="flex">
-                        <span className="w-28 font-bold text-zinc-800 shrink-0">Contact No.</span>
-                        <span>: {activeStay?.primaryGuest?.phone || "—"}</span>
-                      </div>
-                      <div className="flex">
-                        <span className="w-28 font-bold text-zinc-800 shrink-0">Company</span>
-                        <span className="font-bold">: {companyName}</span>
-                      </div>
-                      <div className="flex">
-                        <span className="w-28 font-bold text-zinc-800 shrink-0">Company GST</span>
-                        <span className="font-mono">: {companyGstin}</span>
-                      </div>
-                    </div>
-
-                    {/* Right Column */}
-                    <div className="space-y-0.5">
-                      <div className="flex">
-                        <span className="w-32 font-bold text-zinc-800 shrink-0">Date & Time</span>
-                        <span>: {new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })} {new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}</span>
-                      </div>
-                      <div className="flex">
-                        <span className="w-32 font-bold text-zinc-800 shrink-0">Room No.</span>
-                        <span className="font-bold text-xs">: {roomNo}</span>
-                      </div>
-                      <div className="flex">
-                        <span className="w-32 font-bold text-zinc-800 shrink-0">GRC / Regn. No.</span>
-                        <span>: {grcNo}</span>
-                      </div>
-                      <div className="flex">
-                        <span className="w-32 font-bold text-zinc-800 shrink-0">Arrival Date</span>
-                        <span>: {activeStay?.arrivalAt ? new Date(activeStay.arrivalAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : "—"}</span>
-                      </div>
-                      <div className="flex">
-                        <span className="w-32 font-bold text-zinc-800 shrink-0">Departure Date</span>
-                        <span>: {new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}</span>
-                      </div>
-                      <div className="flex">
-                        <span className="w-32 font-bold text-zinc-800 shrink-0">Pax / Occupancy</span>
-                        <span>: {activeStay?.adults || 1} Adult{activeStay?.adults > 1 ? "s" : ""}</span>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })()}
-
-              {/* 2. DATE-WISE CHARGES BREAKDOWN TABLE */}
-              <div className="border border-zinc-900 overflow-hidden">
-                <table className="w-full text-left font-mono text-[11px] border-collapse">
-                  <thead className="border-b border-zinc-900 bg-zinc-100 font-bold">
-                    <tr>
-                      <th className="p-1.5 border-r border-zinc-400 w-28 whitespace-nowrap">Date</th>
-                      <th className="p-1.5 border-r border-zinc-400">Description / Service</th>
-                      <th className="p-1.5 border-r border-zinc-400 w-20 text-center">SAC/HSN</th>
-                      <th className="p-1.5 border-r border-zinc-400 text-right w-24">Taxable (₹)</th>
-                      <th className="p-1.5 border-r border-zinc-400 text-right w-18">CGST (₹)</th>
-                      <th className="p-1.5 border-r border-zinc-400 text-right w-18">SGST (₹)</th>
-                      <th className="p-1.5 text-right w-24">Total (₹)</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-zinc-300">
-                    {rawEntries.map((e: any) => {
-                      const taxHalf = ((e.totalAmount || 0) - (e.taxableAmount || 0)) / 2;
-                      const isFood = e.chargeCode?.includes("FOOD") || e.chargeCode?.includes("RESTAURANT");
-                      const dStr = e.serviceDate ? new Date(e.serviceDate).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : (e.createdAt?.slice(0, 10) || "—");
-
-                      return (
-                        <tr key={e.id} className="hover:bg-zinc-50">
-                          <td className="p-1.5 border-r border-zinc-300 font-mono whitespace-nowrap text-[10.5px]">
-                            {dStr}
-                          </td>
-                          <td className="p-1.5 border-r border-zinc-300 font-medium text-zinc-900 text-xs">
-                            {e.description}
-                          </td>
-                          <td className="p-1.5 border-r border-zinc-300 text-center text-[10.5px]">
-                            {e.sacHsn || (isFood ? "996331" : "996311")}
-                          </td>
-                          <td className="p-1.5 border-r border-zinc-300 text-right tabular-nums">
-                            {(e.taxableAmount || 0).toFixed(2)}
-                          </td>
-                          <td className="p-1.5 border-r border-zinc-300 text-right tabular-nums">
-                            {taxHalf.toFixed(2)}
-                          </td>
-                          <td className="p-1.5 border-r border-zinc-300 text-right tabular-nums">
-                            {taxHalf.toFixed(2)}
-                          </td>
-                          <td className="p-1.5 text-right font-bold tabular-nums">
-                            {(e.totalAmount || 0).toFixed(2)}
-                          </td>
-                        </tr>
-                      );
-                    })}
-
-                    {rawEntries.length === 0 && (
-                      <tr>
-                        <td colSpan={7} className="p-3 text-center text-zinc-500 italic">
-                          No charges posted to folio yet.
-                        </td>
-                      </tr>
-                    )}
-
-                    {/* Summary Row */}
-                    <tr className="bg-zinc-100 border-t border-zinc-900 font-bold text-[11px]">
-                      <td className="p-1.5 border-r border-zinc-400" colSpan={3}>
-                        STAY SUMMARY: {stayCalculations.nights} NIGHT{stayCalculations.nights > 1 ? "S" : ""} DURATION
-                      </td>
-                      <td className="p-1.5 border-r border-zinc-400 text-right tabular-nums">
-                        {totalTaxable.toFixed(2)}
-                      </td>
-                      <td className="p-1.5 border-r border-zinc-400 text-right tabular-nums">
-                        {(totalTaxes / 2).toFixed(2)}
-                      </td>
-                      <td className="p-1.5 border-r border-zinc-400 text-right tabular-nums">
-                        {(totalTaxes / 2).toFixed(2)}
-                      </td>
-                      <td className="p-1.5 text-right font-black tabular-nums">
-                        {totalCharges.toFixed(2)}
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-
-              {/* 3. GST BREAKDOWN & PAYMENTS GRID (LEFT) + TOTALS SUMMARY BOX (RIGHT) */}
-              <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 pt-0.5 items-start page-break-avoid">
-                
-                {/* Left Block: GST Slab Breakdown & Payment Receipts List */}
-                <div className="sm:col-span-7 space-y-2.5">
-                  
-                  {/* GST Table */}
-                  <div className="border border-zinc-900 overflow-hidden">
-                    <table className="w-full text-left font-mono text-[10.5px] border-collapse">
-                      <thead className="bg-zinc-100 border-b border-zinc-900 font-bold">
-                        <tr>
-                          <th className="p-1 border-r border-zinc-400">GST Slab</th>
-                          <th className="p-1 border-r border-zinc-400 text-right">Taxable Amt</th>
-                          <th className="p-1 border-r border-zinc-400 text-right">CGST</th>
-                          <th className="p-1 border-r border-zinc-400 text-right">SGST</th>
-                          <th className="p-1 text-right font-black">Total Amt</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr>
-                          <td className="p-1 border-r border-zinc-300 font-bold">GST 5.00%</td>
-                          <td className="p-1 border-r border-zinc-300 text-right tabular-nums">
-                            {totalTaxable.toFixed(2)}
-                          </td>
-                          <td className="p-1 border-r border-zinc-300 text-right tabular-nums">
-                            {(totalTaxes / 2).toFixed(2)}
-                          </td>
-                          <td className="p-1 border-r border-zinc-300 text-right tabular-nums">
-                            {(totalTaxes / 2).toFixed(2)}
-                          </td>
-                          <td className="p-1 text-right font-bold tabular-nums">
-                            {totalCharges.toFixed(2)}
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-
-                  {/* Payment Receipts Breakdown Table */}
-                  <div className="border border-zinc-900 overflow-hidden">
-                    <table className="w-full text-left font-mono text-[10.5px] border-collapse">
-                      <thead className="bg-zinc-100 border-b border-zinc-900 font-bold">
-                        <tr>
-                          <th className="p-1 border-r border-zinc-400 w-24">Date</th>
-                          <th className="p-1 border-r border-zinc-400 w-28">Receipt #</th>
-                          <th className="p-1 border-r border-zinc-400">Mode / Channel</th>
-                          <th className="p-1 border-r border-zinc-400">Ledger / Ref</th>
-                          <th className="p-1 text-right w-24">Amount (₹)</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-zinc-300">
-                        {payments.map((p: any) => {
-                          const isBTC = p.method === "DIRECT_BILL";
-                          const pDate = p.receivedAt ? new Date(p.receivedAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : "—";
-                          return (
-                            <tr key={p.id}>
-                              <td className="p-1 border-r border-zinc-300 whitespace-nowrap">
-                                {pDate}
-                              </td>
-                              <td className="p-1 border-r border-zinc-300 font-bold text-zinc-900">
-                                {p.receiptNo}
-                              </td>
-                              <td className="p-1 border-r border-zinc-300 font-bold">
-                                {isBTC ? "BTC / DIRECT BILL" : p.method}
-                              </td>
-                              <td className="p-1 border-r border-zinc-300 text-zinc-700 truncate max-w-[130px]">
-                                {isBTC ? "Company Ledger" : p.reference || "Bank / Cash"}
-                              </td>
-                              <td className="p-1 text-right font-bold text-emerald-700 tabular-nums">
-                                {(p.amount || 0).toFixed(2)}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                        {payments.length === 0 && (
-                          <tr>
-                            <td colSpan={5} className="p-2 text-center text-zinc-500 italic">
-                              No payments or advances recorded yet
-                            </td>
-                          </tr>
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-
-                {/* Right Block: Totals Calculation Summary Box */}
-                <div className="sm:col-span-5 flex flex-col justify-between font-mono text-[11px] border border-zinc-900 p-2.5 bg-zinc-50 space-y-2">
-                  <div className="space-y-1">
-                    <div className="flex justify-between font-bold text-zinc-900 text-xs">
-                      <span>Gross Bill Amount</span>
-                      <span className="font-black text-sm">{totalCharges.toFixed(2)}</span>
-                    </div>
-                    <div className="flex justify-between text-zinc-700">
-                      <span>Less Advance / Settled</span>
-                      <span className="text-emerald-700 font-bold">- {totalPayments.toFixed(2)}</span>
-                    </div>
-                    <div className="flex justify-between text-zinc-700">
-                      <span>Less Bill Discount</span>
-                      <span>- 0.00</span>
-                    </div>
-                    <div className="flex justify-between text-zinc-700">
-                      <span>Round Off (+/-)</span>
-                      <span>0.00</span>
-                    </div>
-                  </div>
-
-                  <div className="border-t border-zinc-900 pt-1.5">
-                    <div className="flex justify-between font-black text-base text-zinc-950 items-baseline">
-                      <span>Net Balance Due</span>
-                      <span className={currentBalance > 0.5 ? "text-rose-600" : "text-emerald-700"}>
-                        ₹ {Math.max(0, currentBalance).toFixed(2)}
-                      </span>
-                    </div>
-                    {currentBalance <= 0.5 && (
-                      <div className="text-[9.5px] text-emerald-700 font-bold text-right uppercase tracking-wider">
-                        ✓ Folio Cleared & Settled
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* 4. AMOUNT IN WORDS */}
-              <div className="font-mono text-[11px] font-bold uppercase pt-1 border-t border-zinc-300 page-break-avoid">
-                Amount In Words:{" "}
-                <span className="text-zinc-900 font-extrabold">
-                  {numberToWordsINR(Math.max(0, Math.round(totalCharges > 0 ? totalCharges : totalPayments)))}
-                </span>
-              </div>
-
-              {/* 5. HOTEL POLICIES & STATUTORY SIGNATURE BLOCK */}
-              <div className="pt-2 border-t border-zinc-400 space-y-4 text-[10.5px] font-mono page-break-avoid">
-                <div className="space-y-0.5 text-zinc-600 text-[10px]">
-                  <div>* Check out time is 12:00 Noon.</div>
-                  <div>* Please handover your room key at the reception when checking out.</div>
-                  <div>* Thank you for staying with us. We hope you enjoyed your stay!</div>
-                </div>
-
-                <div className="flex justify-between items-end pt-4 font-bold text-xs">
-                  <div className="border-t border-zinc-800 pt-1 w-44 text-center">
-                    Guest's Signature
-                  </div>
-                  <div className="border-t border-zinc-800 pt-1 w-56 text-center">
-                    For {activeProperty?.displayName?.toUpperCase() || "HOTEL AMBARISH GRAND RESIDENCY"}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+        <PrintableTaxInvoiceModal
+          isOpen={showInvoiceModal}
+          onClose={() => setShowInvoiceModal(false)}
+          isLiveTaxBillView={isLiveTaxBillView}
+          property={{
+            displayName: activeProperty?.displayName || "HOTEL AMBARISH GRAND RESIDENCY",
+            legalName: activeProperty?.legalName || "AMBARISH RESIDENCY",
+            address: activeProperty?.address || "MD Shah Road, Paltan Bazar, Guwahati, Assam, 781008, India",
+            phone: activeProperty?.phone || "9864341211, 0361 2547102",
+            email: (activeProperty as any)?.email || "reservation.ambarish@gmail.com",
+            website: (activeProperty as any)?.website || "www.hotelambarish.com",
+            gstin: activeProperty?.gstin || "18AACCB2447F1ZX",
+            stateCode: activeProperty?.stateCode || "18",
+          }}
+          stay={activeStay}
+          roomNumber={activeRoomNumber}
+          allRooms={allGroupRooms}
+          isMultiRoomGroup={isMultiRoomGroup}
+          groupBillingMode={groupBillingMode}
+          invoiceData={selectedInvoice}
+          ledgerEntries={modeFilteredEntries}
+          payments={payments}
+          cashierName="Front Desk Cashier"
+          receptionistName="Gobin Tamang"
+        />
       )}
-    </div>
+    </>
   );
 }
 

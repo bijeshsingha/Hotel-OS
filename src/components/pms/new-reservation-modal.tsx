@@ -1,5 +1,3 @@
-"use client";
-
 import React, { useState, useMemo } from "react";
 import {
   X,
@@ -17,8 +15,13 @@ import {
   Users,
   Tag,
   AlertCircle,
+  Briefcase,
+  Layers,
+  Info,
 } from "lucide-react";
 import { calculateGST, formatINR } from "@/lib/gst/calculator";
+import { BOOKING_SOURCES, POPULAR_TOUR_AGENCIES, PAYMENT_METHODS } from "@/data";
+import { CompanySelector } from "./company-selector";
 
 interface NewReservationModalProps {
   isOpen: boolean;
@@ -65,14 +68,20 @@ export function NewReservationModal({
     guestGstin: "",
     guestNationality: "Indian",
     roomTypeId: roomCategories[0]?.id || "",
+    roomCount: 1,
     assignedRoomId: "",
     arrivalDate: todayStr,
     departureDate: tomorrowStr,
     adults: 2,
     children: 0,
-    source: "DIRECT",
+    source: "DIRECT_PHONE",
+    selectedAgencyPreset: "Yashraj Travels",
+    agencyName: "Yashraj Travels",
+    agencyPhone: "+91 98640 12345",
+    companyName: "",
     channelRef: "",
-    ratePerNight: 3500,
+    ratePerNight: 3200,
+    isComplimentary: false,
     depositAmount: 0,
     depositMethod: "UPI",
     notes: "",
@@ -90,25 +99,28 @@ export function NewReservationModal({
     return rooms.filter((r) => !form.roomTypeId || r.roomTypeId === form.roomTypeId);
   }, [rooms, form.roomTypeId]);
 
-  // Pricing calculation
+  // Pricing calculation (Nights x Rooms x Rate)
   const pricingQuote = useMemo(() => {
     if (!form.arrivalDate || !form.departureDate) {
-      return { nightsCount: 1, subtotal: 0, taxAmount: 0, totalAmount: 0, balanceDue: 0 };
+      return { nightsCount: 1, roomCount: 1, subtotal: 0, taxAmount: 0, totalAmount: 0, balanceDue: 0, effectiveTaxRate: 5 };
     }
     const start = new Date(form.arrivalDate);
     const end = new Date(form.departureDate);
     const diffTime = end.getTime() - start.getTime();
     const nightsCount = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
+    const roomCount = Math.max(1, Number(form.roomCount) || 1);
 
-    const rate = Number(form.ratePerNight) || 0;
-    const subtotal = rate * nightsCount;
+    const rate = form.isComplimentary ? 0 : (Number(form.ratePerNight) || 0);
+    const subtotal = rate * nightsCount * roomCount;
 
-    const gst = calculateGST({
-      grossOrBaseAmount: subtotal,
-      isInclusive: false,
-      sacHsn: "996311",
-      supplierStateCode: activeProperty?.stateCode || "18",
-    });
+    const gst = form.isComplimentary
+      ? { taxableAmount: 0, taxAmount: 0, totalAmount: 0, components: { effectiveTaxRate: 0 } }
+      : calculateGST({
+          grossOrBaseAmount: subtotal,
+          isInclusive: false,
+          sacHsn: "996311",
+          supplierStateCode: activeProperty?.stateCode || "18",
+        });
 
     const totalAmount = gst.totalAmount;
     const deposit = Number(form.depositAmount) || 0;
@@ -116,13 +128,14 @@ export function NewReservationModal({
 
     return {
       nightsCount,
+      roomCount,
       subtotal: gst.taxableAmount,
       taxAmount: gst.taxAmount,
       totalAmount,
       balanceDue,
-      effectiveTaxRate: gst.components.effectiveTaxRate,
+      effectiveTaxRate: gst.components?.effectiveTaxRate || 5,
     };
-  }, [form.arrivalDate, form.departureDate, form.ratePerNight, form.depositAmount, activeProperty?.stateCode]);
+  }, [form.arrivalDate, form.departureDate, form.roomCount, form.ratePerNight, form.depositAmount, form.isComplimentary, activeProperty?.stateCode]);
 
   if (!isOpen) return null;
 
@@ -131,11 +144,11 @@ export function NewReservationModal({
     setError(null);
 
     if (!form.guestName.trim()) {
-      setError("Primary Guest Name is required.");
+      setError("Primary Guest / Booker Name is required.");
       return;
     }
     if (!form.guestPhone.trim()) {
-      setError("Primary Guest Mobile Phone is required.");
+      setError("Mobile Phone Number is required.");
       return;
     }
     if (!form.roomTypeId) {
@@ -143,12 +156,15 @@ export function NewReservationModal({
       return;
     }
     if (!form.arrivalDate || !form.departureDate) {
-      setError("Arrival and Departure dates are mandatory.");
+      setError("Check-In and Check-Out dates are mandatory.");
       return;
     }
 
     setLoading(true);
     try {
+      const isAgency = form.source === "TRAVEL_AGENT";
+      const isCorporate = form.source === "CORPORATE";
+
       const res = await fetch("/api/v1/reservations", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -162,14 +178,18 @@ export function NewReservationModal({
           guestGstin: form.guestGstin.trim() || undefined,
           guestNationality: form.guestNationality,
           roomTypeId: form.roomTypeId,
+          roomCount: Number(form.roomCount) || 1,
           assignedRoomId: form.assignedRoomId || undefined,
           arrivalDate: form.arrivalDate,
           departureDate: form.departureDate,
           adults: Number(form.adults) || 2,
           children: Number(form.children) || 0,
           source: form.source,
+          agencyName: isAgency ? (form.agencyName || form.selectedAgencyPreset) : undefined,
+          agencyPhone: isAgency ? form.agencyPhone : undefined,
+          companyName: isCorporate ? form.companyName : undefined,
           channelRef: form.channelRef.trim() || undefined,
-          ratePerNight: Number(form.ratePerNight) || 3500,
+          ratePerNight: form.isComplimentary ? 0 : (Number(form.ratePerNight) || 3200),
           depositAmount: Number(form.depositAmount) || 0,
           depositMethod: form.depositMethod,
           notes: form.notes.trim() || undefined,
@@ -188,52 +208,209 @@ export function NewReservationModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 animate-in fade-in">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/75 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 animate-in fade-in">
       <div className="w-full max-w-3xl bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
         
         {/* Modal Header */}
-        <div className="p-4 sm:p-6 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between bg-zinc-50/50 dark:bg-zinc-900/40 shrink-0">
+        <div className="p-4 sm:p-5 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between bg-zinc-50/70 dark:bg-zinc-900/40 shrink-0">
           <div className="flex items-center gap-3">
             <div className="h-10 w-10 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shadow-md shadow-indigo-600/30">
               <Calendar className="h-5 w-5" />
             </div>
             <div>
               <h3 className="text-base sm:text-lg font-black text-zinc-900 dark:text-white flex items-center gap-2">
-                <span>Create New Future Reservation</span>
+                <span>New Advance / Future Reservation</span>
                 <span className="text-[10px] font-mono font-bold bg-indigo-100 dark:bg-indigo-500/20 text-indigo-800 dark:text-indigo-300 px-2 py-0.5 rounded-full border border-indigo-200 dark:border-indigo-500/30">
-                  GST Rule 46
+                  Advance Booking
                 </span>
               </h3>
               <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-                Book advance stay, pre-allocate room category, and collect advance booking deposit.
+                Take advance booking from Guest, Tour Agency, or OTA. Physical GRC is filled at check-in time.
               </p>
             </div>
           </div>
 
           <button
             onClick={onClose}
-            className="p-2 rounded-xl text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition"
+            className="p-2 rounded-xl text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition cursor-pointer"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
 
+        {/* Explain Future Reservation vs GRC Banner */}
+        <div className="mx-4 sm:mx-6 mt-3.5 p-3 rounded-2xl bg-blue-50/80 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800/60 text-xs text-blue-900 dark:text-blue-200 flex items-start gap-2.5">
+          <Info className="h-4 w-4 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
+          <div className="leading-snug space-y-0.5">
+            <strong className="block text-blue-950 dark:text-blue-100 font-bold">
+              ℹ️ Future Reservation Workflow (No GRC needed right now)
+            </strong>
+            <p className="text-[11px] text-blue-800/90 dark:text-blue-300">
+              Saving this form confirms the future booking and reserves room inventory. When the guest physically arrives on the check-in date, click <strong>"Check-In"</strong> to verify ID and fill the official GRC.
+            </p>
+          </div>
+        </div>
+
         {/* Error Banner */}
         {error && (
-          <div className="mx-4 sm:mx-6 mt-4 p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-xs flex items-center gap-2 font-medium">
+          <div className="mx-4 sm:mx-6 mt-3 p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-xs flex items-center gap-2 font-medium">
             <AlertCircle className="h-4 w-4 shrink-0 text-rose-600 dark:text-rose-400" />
             <span>{error}</span>
           </div>
         )}
 
         {/* Form Body */}
-        <form onSubmit={handleSubmit} className="p-4 sm:p-6 overflow-y-auto space-y-6 flex-1">
+        <form onSubmit={handleSubmit} className="p-4 sm:p-6 overflow-y-auto space-y-5 flex-1">
           
-          {/* Section 1: Guest Information */}
+          {/* Section 1: Booking Source & Tour Agency Selection */}
           <div className="space-y-3">
             <div className="text-xs font-bold font-mono text-zinc-500 uppercase tracking-wider flex items-center gap-2">
+              <Briefcase className="h-3.5 w-3.5 text-indigo-500" />
+              <span>1. Booking Source & Tour Agency</span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+              <div className="space-y-1">
+                <label className="text-[11px] font-bold text-zinc-700 dark:text-zinc-300">
+                  Booking Source / Channel *
+                </label>
+                <select
+                  value={form.source}
+                  onChange={(e) => {
+                    const src = e.target.value;
+                    setForm({
+                      ...form,
+                      source: src,
+                      agencyName: src === "TRAVEL_AGENT" ? form.agencyName || "Yashraj Travels" : "",
+                    });
+                  }}
+                  className="w-full h-9 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs text-zinc-900 dark:text-white font-bold focus:border-indigo-500 focus:outline-none transition shadow-xs cursor-pointer"
+                >
+                  {BOOKING_SOURCES.map((src) => (
+                    <option key={src.code} value={src.code}>
+                      {src.name} ({src.tag})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Tour Agency Selector (Shown when source is TRAVEL_AGENT) */}
+              {form.source === "TRAVEL_AGENT" && (
+                <>
+                  <div className="space-y-1 sm:col-span-2">
+                    <label className="text-[11px] font-bold text-zinc-700 dark:text-zinc-300 flex items-center justify-between">
+                      <span>Select Tour Agency / Agent Master *</span>
+                      <span className="text-[10px] text-blue-600 dark:text-blue-400 font-mono font-bold">24+ Agencies</span>
+                    </label>
+                    <CompanySelector
+                      filterType="TRAVEL_AGENT"
+                      value={form.agencyName}
+                      activeProperty={activeProperty}
+                      placeholder="Search agency, agent name, GSTIN..."
+                      onSelect={(comp) => {
+                        setForm((prev) => ({
+                          ...prev,
+                          agencyName: comp.accountName,
+                          agencyPhone: comp.mobile || comp.phone || prev.agencyPhone,
+                          guestCity: comp.city || prev.guestCity,
+                          notes: comp.remarks ? `Agency terms: ${comp.remarks}` : prev.notes,
+                        }));
+                      }}
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-bold text-zinc-700 dark:text-zinc-300">
+                      Agency Contact Phone
+                    </label>
+                    <input
+                      type="tel"
+                      placeholder="Agency phone number"
+                      value={form.agencyPhone}
+                      onChange={(e) => setForm({ ...form, agencyPhone: e.target.value })}
+                      className="w-full h-9 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs text-zinc-900 dark:text-white font-mono focus:border-indigo-500 focus:outline-none transition shadow-xs"
+                    />
+                  </div>
+
+                  <div className="space-y-1 sm:col-span-2">
+                    <label className="text-[11px] font-bold text-zinc-700 dark:text-zinc-300">
+                      Agency Voucher / Booking Ref #
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. YSH-2026-9812 / Agoda YCS Ref"
+                      value={form.channelRef}
+                      onChange={(e) => setForm({ ...form, channelRef: e.target.value })}
+                      className="w-full h-9 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs text-zinc-900 dark:text-white font-mono focus:border-indigo-500 focus:outline-none transition shadow-xs"
+                    />
+                  </div>
+                </>
+              )}
+
+              {/* Corporate Company Master Selector (Shown when source is CORPORATE) */}
+              {form.source === "CORPORATE" && (
+                <>
+                  <div className="space-y-1 sm:col-span-2">
+                    <label className="text-[11px] font-bold text-zinc-700 dark:text-zinc-300 flex items-center justify-between">
+                      <span>Select Corporate Company Master *</span>
+                      <span className="text-[10px] text-indigo-600 dark:text-indigo-400 font-mono font-bold">24+ Companies</span>
+                    </label>
+                    <CompanySelector
+                      filterType="COMPANY"
+                      value={form.companyName}
+                      activeProperty={activeProperty}
+                      placeholder="Search company (e.g. ABB, Asian Paints, Patanjali...)"
+                      onSelect={(comp) => {
+                        setForm((prev) => ({
+                          ...prev,
+                          companyName: comp.accountName,
+                          guestGstin: comp.gstin || prev.guestGstin,
+                          guestPhone: prev.guestPhone || comp.mobile || comp.phone || "",
+                          guestCity: comp.city || prev.guestCity,
+                          notes: comp.remarks ? `Company terms: ${comp.remarks}` : prev.notes,
+                        }));
+                      }}
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-bold text-zinc-700 dark:text-zinc-300">
+                      Company GSTIN (B2B Tax Credit)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="15-digit GSTIN"
+                      value={form.guestGstin}
+                      onChange={(e) => setForm({ ...form, guestGstin: e.target.value.toUpperCase() })}
+                      className="w-full h-9 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs text-zinc-900 dark:text-white font-mono uppercase focus:border-indigo-500 focus:outline-none transition shadow-xs"
+                    />
+                  </div>
+                </>
+              )}
+
+              {/* OTA Reference ID */}
+              {(form.source === "MAKEMYTRIP" || form.source === "BOOKING_COM" || form.source === "AGODA" || form.source === "EXPEDIA") && (
+                <div className="space-y-1">
+                  <label className="text-[11px] font-bold text-zinc-700 dark:text-zinc-300">
+                    OTA Booking / Confirmation ID
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. MMT-891238912"
+                    value={form.channelRef}
+                    onChange={(e) => setForm({ ...form, channelRef: e.target.value })}
+                    className="w-full h-9 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs text-zinc-900 dark:text-white font-mono focus:border-indigo-500 focus:outline-none transition shadow-xs"
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+          
+          {/* Section 2: Guest Profile Information */}
+          <div className="space-y-3 pt-3 border-t border-zinc-200 dark:border-zinc-800">
+            <div className="text-xs font-bold font-mono text-zinc-500 uppercase tracking-wider flex items-center gap-2">
               <User className="h-3.5 w-3.5 text-indigo-500" />
-              <span>1. Guest Profile Information</span>
+              <span>2. Guest / Booker Information</span>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
@@ -247,7 +424,7 @@ export function NewReservationModal({
                   placeholder="e.g. Bijesh Singha"
                   value={form.guestName}
                   onChange={(e) => setForm({ ...form, guestName: e.target.value })}
-                  className="w-full h-9 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs text-zinc-900 dark:text-white focus:border-indigo-500 focus:outline-none transition shadow-xs"
+                  className="w-full h-9 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs text-zinc-900 dark:text-white focus:border-indigo-500 focus:outline-none transition shadow-xs font-semibold"
                 />
               </div>
 
@@ -261,13 +438,13 @@ export function NewReservationModal({
                   placeholder="10-digit mobile number"
                   value={form.guestPhone}
                   onChange={(e) => setForm({ ...form, guestPhone: e.target.value })}
-                  className="w-full h-9 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs text-zinc-900 dark:text-white font-mono focus:border-indigo-500 focus:outline-none transition shadow-xs"
+                  className="w-full h-9 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs text-zinc-900 dark:text-white font-mono focus:border-indigo-500 focus:outline-none transition shadow-xs font-semibold"
                 />
               </div>
 
               <div className="space-y-1">
                 <label className="text-[11px] font-bold text-zinc-700 dark:text-zinc-300">
-                  Email Address
+                  Email Address (Optional)
                 </label>
                 <input
                   type="email"
@@ -280,7 +457,7 @@ export function NewReservationModal({
 
               <div className="space-y-1">
                 <label className="text-[11px] font-bold text-zinc-700 dark:text-zinc-300">
-                  City
+                  City (Optional)
                 </label>
                 <input
                   type="text"
@@ -293,7 +470,7 @@ export function NewReservationModal({
 
               <div className="space-y-1">
                 <label className="text-[11px] font-bold text-zinc-700 dark:text-zinc-300">
-                  State / Country
+                  State / Origin
                 </label>
                 <input
                   type="text"
@@ -306,24 +483,23 @@ export function NewReservationModal({
 
               <div className="space-y-1">
                 <label className="text-[11px] font-bold text-zinc-700 dark:text-zinc-300">
-                  Guest GSTIN (for B2B ITC)
+                  Nationality
                 </label>
                 <input
                   type="text"
-                  placeholder="15-digit GSTIN (optional)"
-                  value={form.guestGstin}
-                  onChange={(e) => setForm({ ...form, guestGstin: e.target.value.toUpperCase() })}
-                  className="w-full h-9 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs text-zinc-900 dark:text-white font-mono uppercase focus:border-indigo-500 focus:outline-none transition shadow-xs"
+                  value={form.guestNationality}
+                  onChange={(e) => setForm({ ...form, guestNationality: e.target.value })}
+                  className="w-full h-9 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs text-zinc-900 dark:text-white focus:border-indigo-500 focus:outline-none transition shadow-xs"
                 />
               </div>
             </div>
           </div>
 
-          {/* Section 2: Dates, Room Category & Allocation */}
+          {/* Section 3: Dates, Room Count & Room Category */}
           <div className="space-y-3 pt-3 border-t border-zinc-200 dark:border-zinc-800">
             <div className="text-xs font-bold font-mono text-zinc-500 uppercase tracking-wider flex items-center gap-2">
               <Building className="h-3.5 w-3.5 text-indigo-500" />
-              <span>2. Stay Dates & Room Category Allocation</span>
+              <span>3. Stay Dates, Room Count & Category</span>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
@@ -336,7 +512,7 @@ export function NewReservationModal({
                   required
                   value={form.arrivalDate}
                   onChange={(e) => setForm({ ...form, arrivalDate: e.target.value })}
-                  className="w-full h-9 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs text-zinc-900 dark:text-white font-mono focus:border-indigo-500 focus:outline-none transition shadow-xs"
+                  className="w-full h-9 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs text-zinc-900 dark:text-white font-mono focus:border-indigo-500 focus:outline-none transition shadow-xs font-bold"
                 />
               </div>
 
@@ -350,7 +526,26 @@ export function NewReservationModal({
                   value={form.departureDate}
                   min={form.arrivalDate}
                   onChange={(e) => setForm({ ...form, departureDate: e.target.value })}
-                  className="w-full h-9 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs text-zinc-900 dark:text-white font-mono focus:border-indigo-500 focus:outline-none transition shadow-xs"
+                  className="w-full h-9 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs text-zinc-900 dark:text-white font-mono focus:border-indigo-500 focus:outline-none transition shadow-xs font-bold"
+                />
+              </div>
+
+              {/* Number of Rooms Input */}
+              <div className="space-y-1">
+                <label className="text-[11px] font-bold text-zinc-700 dark:text-zinc-300 flex items-center justify-between">
+                  <span>Number of Rooms *</span>
+                  <span className="text-[10px] text-indigo-600 dark:text-indigo-400 font-mono font-bold">
+                    {form.roomCount} Room{Number(form.roomCount) > 1 ? "s" : ""}
+                  </span>
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  max="20"
+                  required
+                  value={form.roomCount}
+                  onChange={(e) => setForm({ ...form, roomCount: Math.max(1, Number(e.target.value) || 1) })}
+                  className="w-full h-9 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs text-zinc-900 dark:text-white font-mono font-bold focus:border-indigo-500 focus:outline-none transition shadow-xs"
                 />
               </div>
 
@@ -362,26 +557,28 @@ export function NewReservationModal({
                   required
                   value={form.roomTypeId}
                   onChange={(e) => setForm({ ...form, roomTypeId: e.target.value, assignedRoomId: "" })}
-                  className="w-full h-9 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs text-zinc-900 dark:text-white font-medium focus:border-indigo-500 focus:outline-none transition shadow-xs"
+                  className="w-full h-9 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs text-zinc-900 dark:text-white font-semibold focus:border-indigo-500 focus:outline-none transition shadow-xs cursor-pointer"
                 >
                   {roomCategories.map((rc) => (
                     <option key={rc.id} value={rc.id}>
-                      {rc.name} ({rc.code}) • Cap {rc.capacity || 2}
+                      {rc.name} ({rc.code}) • ₹{rc.basePrice || 3200}
                     </option>
                   ))}
                 </select>
               </div>
+            </div>
 
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
               <div className="space-y-1">
                 <label className="text-[11px] font-bold text-zinc-700 dark:text-zinc-300">
-                  Pre-Assigned Room
+                  Pre-Assign Room (Optional)
                 </label>
                 <select
                   value={form.assignedRoomId}
                   onChange={(e) => setForm({ ...form, assignedRoomId: e.target.value })}
-                  className="w-full h-9 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs text-zinc-900 dark:text-white font-mono focus:border-indigo-500 focus:outline-none transition shadow-xs"
+                  className="w-full h-9 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs text-zinc-900 dark:text-white font-mono focus:border-indigo-500 focus:outline-none transition shadow-xs cursor-pointer"
                 >
-                  <option value="">Auto-Assign on Check-In</option>
+                  <option value="">Auto-Assign at Check-In</option>
                   {selectableRooms.map((r) => (
                     <option key={r.id} value={r.id}>
                       Room {r.number} (Floor {r.floor} • {r.roomState?.housekeepingStatus || "CLEAN"})
@@ -389,12 +586,10 @@ export function NewReservationModal({
                   ))}
                 </select>
               </div>
-            </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
               <div className="space-y-1">
                 <label className="text-[11px] font-bold text-zinc-700 dark:text-zinc-300">
-                  Adults
+                  Adults per Room
                 </label>
                 <input
                   type="number"
@@ -408,7 +603,7 @@ export function NewReservationModal({
 
               <div className="space-y-1">
                 <label className="text-[11px] font-bold text-zinc-700 dark:text-zinc-300">
-                  Children
+                  Children per Room
                 </label>
                 <input
                   type="number"
@@ -419,99 +614,84 @@ export function NewReservationModal({
                   className="w-full h-9 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs text-zinc-900 dark:text-white font-mono focus:border-indigo-500 focus:outline-none transition shadow-xs"
                 />
               </div>
-
-              <div className="space-y-1">
-                <label className="text-[11px] font-bold text-zinc-700 dark:text-zinc-300">
-                  Booking Channel Source
-                </label>
-                <select
-                  value={form.source}
-                  onChange={(e) => setForm({ ...form, source: e.target.value })}
-                  className="w-full h-9 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs text-zinc-900 dark:text-white font-bold focus:border-indigo-500 focus:outline-none transition shadow-xs"
-                >
-                  <option value="DIRECT">DIRECT (Front Desk)</option>
-                  <option value="PHONE">PHONE RESERVATION</option>
-                  <option value="WALK_IN">WALK-IN ADVANCE</option>
-                  <option value="BOOKING_COM">OTA - Booking.com</option>
-                  <option value="MAKEMYTRIP">OTA - MakeMyTrip</option>
-                  <option value="AGODA">OTA - Agoda</option>
-                  <option value="GOIBIBO">OTA - Goibibo</option>
-                  <option value="CORPORATE">CORPORATE BTC</option>
-                  <option value="TRAVEL_AGENT">TRAVEL AGENT</option>
-                </select>
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-[11px] font-bold text-zinc-700 dark:text-zinc-300">
-                  Channel Ref / OTA Booking ID
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. MMT-9821382"
-                  value={form.channelRef}
-                  onChange={(e) => setForm({ ...form, channelRef: e.target.value })}
-                  className="w-full h-9 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs text-zinc-900 dark:text-white font-mono focus:border-indigo-500 focus:outline-none transition shadow-xs"
-                />
-              </div>
             </div>
           </div>
 
-          {/* Section 3: Tariff & Advance Deposit Payment */}
+          {/* Section 4: Agreed Tariff & Advance Deposit */}
           <div className="space-y-3 pt-3 border-t border-zinc-200 dark:border-zinc-800">
-            <div className="text-xs font-bold font-mono text-zinc-500 uppercase tracking-wider flex items-center gap-2">
-              <CreditCard className="h-3.5 w-3.5 text-indigo-500" />
-              <span>3. Agreed Tariff, Rates & Advance Deposit</span>
+            <div className="flex items-center justify-between">
+              <div className="text-xs font-bold font-mono text-zinc-500 uppercase tracking-wider flex items-center gap-2">
+                <CreditCard className="h-3.5 w-3.5 text-indigo-500" />
+                <span>4. Agreed Rate & Advance Deposit</span>
+              </div>
+
+              {/* Complimentary Toggle */}
+              <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-emerald-800 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 px-2.5 py-1 rounded-lg border border-emerald-200 dark:border-emerald-800">
+                <input
+                  type="checkbox"
+                  checked={form.isComplimentary}
+                  onChange={(e) => setForm({ ...form, isComplimentary: e.target.checked })}
+                  className="w-4 h-4 rounded text-emerald-600 cursor-pointer"
+                />
+                <span>🎁 Complimentary (₹0 Free Stay)</span>
+              </label>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div className="space-y-1">
                 <label className="text-[11px] font-bold text-zinc-700 dark:text-zinc-300">
-                  Agreed Room Rate / Night (₹)
+                  Agreed Rate / Room / Night (₹) *
                 </label>
-                <input
-                  type="number"
-                  required
-                  min="0"
-                  step="100"
-                  value={form.ratePerNight}
-                  onChange={(e) => setForm({ ...form, ratePerNight: Number(e.target.value) })}
-                  className="w-full h-9 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs text-zinc-900 dark:text-white font-mono font-bold focus:border-indigo-500 focus:outline-none transition shadow-xs"
-                />
+                <div className="relative">
+                  <span className="absolute left-3 top-2.5 text-zinc-400 font-bold font-mono text-xs">₹</span>
+                  <input
+                    type="number"
+                    required={!form.isComplimentary}
+                    disabled={form.isComplimentary}
+                    placeholder={form.isComplimentary ? "0 (Complimentary)" : "Enter custom rate"}
+                    value={form.isComplimentary ? 0 : form.ratePerNight}
+                    onChange={(e) => setForm({ ...form, ratePerNight: Number(e.target.value) })}
+                    className="w-full h-9 pl-7 pr-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs text-zinc-900 dark:text-white font-mono font-bold focus:border-indigo-500 focus:outline-none transition shadow-xs disabled:opacity-60 disabled:bg-zinc-100 dark:disabled:bg-zinc-800"
+                  />
+                </div>
               </div>
 
               <div className="space-y-1">
                 <label className="text-[11px] font-bold text-zinc-700 dark:text-zinc-300">
                   Advance Deposit Paid (₹)
                 </label>
-                <input
-                  type="number"
-                  min="0"
-                  step="100"
-                  value={form.depositAmount}
-                  onChange={(e) => setForm({ ...form, depositAmount: Number(e.target.value) })}
-                  className="w-full h-9 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs text-emerald-700 dark:text-emerald-400 font-mono font-bold focus:border-indigo-500 focus:outline-none transition shadow-xs"
-                />
+                <div className="relative">
+                  <span className="absolute left-3 top-2.5 text-zinc-400 font-bold font-mono text-xs">₹</span>
+                  <input
+                    type="number"
+                    placeholder="0"
+                    value={form.depositAmount}
+                    onChange={(e) => setForm({ ...form, depositAmount: Number(e.target.value) })}
+                    className="w-full h-9 pl-7 pr-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs text-emerald-700 dark:text-emerald-400 font-mono font-bold focus:border-indigo-500 focus:outline-none transition shadow-xs"
+                  />
+                </div>
               </div>
 
               <div className="space-y-1">
                 <label className="text-[11px] font-bold text-zinc-700 dark:text-zinc-300">
-                  Deposit Payment Method
+                  Deposit Payment Channel
                 </label>
                 <select
                   value={form.depositMethod}
                   onChange={(e) => setForm({ ...form, depositMethod: e.target.value })}
-                  className="w-full h-9 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs text-zinc-900 dark:text-white font-bold focus:border-indigo-500 focus:outline-none transition shadow-xs"
+                  className="w-full h-9 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs text-zinc-900 dark:text-white font-bold focus:border-indigo-500 focus:outline-none transition shadow-xs cursor-pointer"
                 >
-                  <option value="UPI">UPI (Google Pay / PhonePe)</option>
+                  <option value="UPI">UPI (Google Pay / PhonePe / QR)</option>
                   <option value="CASH">CASH</option>
                   <option value="CARD">CREDIT / DEBIT CARD</option>
-                  <option value="BANK_TRANSFER">NEFT / RTGS</option>
+                  <option value="BANK_TRANSFER">NEFT / RTGS (Bank Transfer)</option>
+                  <option value="DIRECT_BILL">BTC (Direct Bill to Company/Agency)</option>
                   <option value="OTA_VCC">OTA VIRTUAL CARD</option>
                 </select>
               </div>
             </div>
 
-            {/* Special Requests */}
+            {/* Special Requests / Notes */}
             <div className="space-y-1 pt-1">
               <label className="text-[11px] font-bold text-zinc-700 dark:text-zinc-300">
                 Special Requests / Front Desk Notes
@@ -526,29 +706,34 @@ export function NewReservationModal({
             </div>
           </div>
 
-          {/* Pricing Summary Box */}
-          <div className="rounded-2xl border border-indigo-200 dark:border-indigo-900/60 bg-indigo-50/60 dark:bg-indigo-950/20 p-4 space-y-2 text-xs">
-            <div className="font-bold text-indigo-900 dark:text-indigo-300 uppercase tracking-wider text-[11px] flex items-center justify-between">
-              <span>Estimated Billing & GST Breakdown ({pricingQuote.nightsCount} Night{pricingQuote.nightsCount > 1 ? "s" : ""})</span>
-              <span className="font-mono">{formatINR(form.ratePerNight)}/night</span>
+          {/* Pricing & GST Breakdown Box */}
+          <div className="rounded-2xl border border-indigo-200 dark:border-indigo-900/60 bg-indigo-50/70 dark:bg-indigo-950/20 p-4 space-y-2 text-xs">
+            <div className="font-bold text-indigo-950 dark:text-indigo-200 uppercase tracking-wider text-[11px] flex items-center justify-between flex-wrap gap-2">
+              <span className="flex items-center gap-1.5">
+                <Layers className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
+                <span>Estimated Billing: {pricingQuote.roomCount} Room{pricingQuote.roomCount > 1 ? "s" : ""} x {pricingQuote.nightsCount} Night{pricingQuote.nightsCount > 1 ? "s" : ""}</span>
+              </span>
+              <span className="font-mono text-indigo-800 dark:text-indigo-300 font-extrabold">
+                {formatINR(form.ratePerNight)}/room/night
+              </span>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 border-t border-indigo-200 dark:border-indigo-900/40 text-zinc-700 dark:text-zinc-300 font-mono">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-indigo-200 dark:border-indigo-900/40 text-zinc-700 dark:text-zinc-300 font-mono">
               <div>
-                <span className="text-[10px] text-zinc-500 block">Taxable Base:</span>
-                <strong className="text-zinc-900 dark:text-white">{formatINR(pricingQuote.subtotal)}</strong>
+                <span className="text-[10px] text-zinc-500 block">Base Taxable ({pricingQuote.roomCount} Rms):</span>
+                <strong className="text-zinc-900 dark:text-white font-bold">{formatINR(pricingQuote.subtotal)}</strong>
               </div>
               <div>
                 <span className="text-[10px] text-zinc-500 block">GST ({pricingQuote.effectiveTaxRate || 5}%):</span>
-                <strong className="text-zinc-900 dark:text-white">{formatINR(pricingQuote.taxAmount)}</strong>
+                <strong className="text-zinc-900 dark:text-white font-bold">{formatINR(pricingQuote.taxAmount)}</strong>
               </div>
               <div>
                 <span className="text-[10px] text-zinc-500 block">Total Tariff:</span>
-                <strong className="text-indigo-700 dark:text-indigo-400 font-bold">{formatINR(pricingQuote.totalAmount)}</strong>
+                <strong className="text-indigo-700 dark:text-indigo-400 font-black text-sm">{formatINR(pricingQuote.totalAmount)}</strong>
               </div>
               <div>
                 <span className="text-[10px] text-zinc-500 block">Balance on Arrival:</span>
-                <strong className="text-emerald-700 dark:text-emerald-400 font-bold">{formatINR(pricingQuote.balanceDue)}</strong>
+                <strong className="text-emerald-700 dark:text-emerald-400 font-black text-sm">{formatINR(pricingQuote.balanceDue)}</strong>
               </div>
             </div>
           </div>
@@ -556,11 +741,11 @@ export function NewReservationModal({
         </form>
 
         {/* Footer Actions */}
-        <div className="p-4 sm:p-5 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-end gap-3 bg-zinc-50/50 dark:bg-zinc-900/40 shrink-0">
+        <div className="p-4 sm:p-5 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-end gap-3 bg-zinc-50/70 dark:bg-zinc-900/40 shrink-0">
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2.5 rounded-xl border border-zinc-300 dark:border-zinc-700 font-bold text-xs text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition"
+            className="px-4 py-2.5 rounded-xl border border-zinc-300 dark:border-zinc-700 font-bold text-xs text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition cursor-pointer"
           >
             Cancel
           </button>
@@ -569,14 +754,14 @@ export function NewReservationModal({
             type="button"
             disabled={loading}
             onClick={handleSubmit}
-            className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold text-xs transition flex items-center gap-2 shadow-lg shadow-indigo-600/30 active:scale-95 disabled:opacity-50"
+            className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold text-xs transition flex items-center gap-2 shadow-lg shadow-indigo-600/30 active:scale-95 disabled:opacity-50 cursor-pointer"
           >
             {loading ? (
               <span>Saving Reservation...</span>
             ) : (
               <>
-                <CheckCircle2 className="h-4 w-4" />
-                <span>Confirm & Issue Booking</span>
+                <CheckCircle2 className="h-4 w-4 shrink-0" />
+                <span>Confirm Future Booking</span>
               </>
             )}
           </button>

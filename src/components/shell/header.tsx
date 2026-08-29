@@ -119,14 +119,14 @@ export function AppHeader() {
 
   return (
     <>
-      <header className="sticky top-0 z-40 w-full bg-white/95 dark:bg-[#09090b]/95 backdrop-blur-md border-b border-zinc-200 dark:border-[#27272a] px-3.5 sm:px-6 py-2.5 text-zinc-900 dark:text-zinc-100 shadow-sm transition-colors duration-150">
-        <div className="flex items-center justify-between gap-4">
+      <header className="sticky top-0 z-40 w-full bg-white/90 dark:bg-[#09090b]/90 backdrop-blur-md border-b border-zinc-200/80 dark:border-zinc-800 px-3.5 sm:px-5 py-2 text-zinc-900 dark:text-zinc-100 shadow-xs transition-colors duration-150">
+        <div className="flex items-center justify-between gap-3">
           {/* Left: Clean Brand & Property Switcher */}
-          <div className="flex items-center gap-2 sm:gap-3">
+          <div className="flex items-center gap-2.5 sm:gap-3">
             {/* Sidebar Collapse/Expand Toggle Button */}
             <button
               onClick={toggleSidebar}
-              className="p-1.5 rounded-lg text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition border border-transparent hover:border-zinc-200 dark:hover:border-zinc-700"
+              className="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800/80 transition border border-zinc-200/60 dark:border-zinc-800"
               title={sidebarCollapsed ? "Expand Sidebar (Ctrl+B)" : "Collapse Sidebar (Ctrl+B)"}
             >
               {sidebarCollapsed ? (
@@ -137,20 +137,20 @@ export function AppHeader() {
             </button>
 
             <div className="flex items-center gap-2">
-              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-600 dark:bg-white text-white dark:text-zinc-950 font-black text-xs tracking-tight shadow-sm">
+              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-600 dark:bg-white text-white dark:text-zinc-950 font-black text-xs tracking-tight shadow-xs">
                 H
               </div>
               <div className="flex items-center gap-1.5">
-                <span className="text-sm font-black tracking-tight text-zinc-900 dark:text-white">
+                <span className="text-sm font-bold tracking-tight text-zinc-900 dark:text-white">
                   Hotel OS
                 </span>
-                <span className="rounded px-1.5 py-0.5 text-[10px] font-mono font-semibold text-zinc-600 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 hidden sm:inline-block">
+                <span className="rounded px-1.5 py-0.5 text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 hidden sm:inline-block">
                   v1.0
                 </span>
               </div>
             </div>
 
-            <div className="h-4 w-px bg-zinc-300 dark:bg-zinc-800 mx-1 hidden sm:block" />
+            <div className="h-4 w-px bg-zinc-200 dark:bg-zinc-800 mx-0.5 hidden sm:block" />
 
             {/* Property Switcher */}
             <div className="relative">
@@ -161,7 +161,7 @@ export function AppHeader() {
                   setShowUserMenu(false);
                   setShowNotifications(false);
                 }}
-                className="flex items-center gap-2 rounded-lg bg-zinc-100 hover:bg-zinc-200 dark:bg-[#18181b] dark:hover:bg-zinc-800 px-3 py-1.5 text-xs font-semibold text-zinc-900 dark:text-zinc-200 border border-zinc-300 dark:border-zinc-700 transition shadow-sm"
+                className="flex items-center gap-2 rounded-lg bg-zinc-100/80 hover:bg-zinc-200/80 dark:bg-zinc-900 dark:hover:bg-zinc-800 px-3 py-1.5 text-xs font-semibold text-zinc-800 dark:text-zinc-200 border border-zinc-200 dark:border-zinc-800 transition shadow-xs cursor-pointer"
               >
                 <Building2 className="h-3.5 w-3.5 text-zinc-500 dark:text-zinc-400" />
                 <span className="font-bold text-zinc-900 dark:text-white">{activeProperty?.displayName || "Select Property"}</span>
@@ -173,7 +173,7 @@ export function AppHeader() {
                 <>
                   <div className="fixed inset-0 z-40" onClick={() => setShowPropMenu(false)} />
                   <div className="absolute left-0 mt-2 w-80 rounded-2xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-[#121215] p-2.5 shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-75 space-y-1">
-                    <div className="px-2.5 py-1 text-[10px] font-mono uppercase tracking-wider text-zinc-500 dark:text-zinc-400 font-bold">
+                    <div className="px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
                       Switch Property
                     </div>
                     {availableProperties.map((p) => (
@@ -191,7 +191,7 @@ export function AppHeader() {
                       >
                         <div>
                           <div className="font-bold">{p.displayName}</div>
-                          <div className="text-[10px] text-zinc-500 dark:text-zinc-400 font-mono">
+                          <div className="text-[10.5px] text-zinc-500 dark:text-zinc-400 font-mono">
                             {p.code} • GSTIN: {p.gstin || "N/A"}
                           </div>
                         </div>
@@ -206,7 +206,7 @@ export function AppHeader() {
                         className="w-full text-left rounded-xl px-3 py-2 text-xs flex items-center gap-2 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-600/10 font-bold transition border border-dashed border-blue-400 dark:border-blue-500/30"
                       >
                         <Plus className="h-4 w-4" />
-                        <span>+ Onboard New Hotel Property</span>
+                        <span>Onboard New Hotel Property</span>
                       </Link>
                     </div>
                   </div>
@@ -215,10 +215,10 @@ export function AppHeader() {
             </div>
 
             {/* Business Date Badge */}
-            <div className="hidden sm:flex items-center gap-1.5 rounded-lg bg-zinc-100 dark:bg-[#18181b] border border-zinc-300 dark:border-zinc-800 px-2.5 py-1 text-xs text-zinc-700 dark:text-zinc-300 font-mono">
+            <div className="hidden sm:flex items-center gap-1.5 rounded-lg bg-zinc-100/80 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-2.5 py-1 text-xs text-zinc-700 dark:text-zinc-300">
               <span className="h-2 w-2 rounded-full bg-emerald-500 inline-block animate-pulse" />
-              <span className="text-zinc-500 text-[11px]">DATE:</span>
-              <span className="font-bold text-zinc-900 dark:text-white">{activeProperty?.businessDate || "2026-08-20"}</span>
+              <span className="text-zinc-500 text-[11px] font-semibold">Date:</span>
+              <span className="font-mono font-bold text-zinc-900 dark:text-white">{activeProperty?.businessDate || new Date().toISOString().split("T")[0]}</span>
             </div>
           </div>
 
@@ -227,17 +227,17 @@ export function AppHeader() {
             {/* THEME TOGGLE SWITCH */}
             <button
               onClick={toggleTheme}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-zinc-100 hover:bg-zinc-200 dark:bg-[#18181b] dark:hover:bg-zinc-800 text-xs font-bold text-zinc-800 dark:text-zinc-200 shadow-sm transition active:scale-95"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-100/80 hover:bg-zinc-200/80 dark:bg-zinc-900 dark:hover:bg-zinc-800 text-xs font-semibold text-zinc-800 dark:text-zinc-200 shadow-xs transition active:scale-95 cursor-pointer"
               title={`Switch to ${theme === "dark" ? "Light" : "Dark"} Mode`}
             >
               {theme === "dark" ? (
                 <>
-                  <Sun className="h-3.5 w-3.5 text-amber-400 animate-in spin-in-180 duration-200" />
+                  <Sun className="h-3.5 w-3.5 text-amber-400" />
                   <span className="hidden sm:inline">Light</span>
                 </>
               ) : (
                 <>
-                  <Moon className="h-3.5 w-3.5 text-indigo-600 animate-in spin-in-180 duration-200" />
+                  <Moon className="h-3.5 w-3.5 text-indigo-600" />
                   <span className="hidden sm:inline">Dark</span>
                 </>
               )}
@@ -248,7 +248,7 @@ export function AppHeader() {
               href={activeProperty?.code ? `/order?property=${encodeURIComponent(activeProperty.code)}` : activeProperty?.id ? `/order?propertyId=${activeProperty.id}` : "/order"}
               target="_blank"
               rel="noopener noreferrer"
-              className="hidden md:flex items-center gap-1.5 rounded-lg bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 hover:border-zinc-400 dark:hover:border-zinc-700 px-3 py-1.5 text-xs text-zinc-800 dark:text-zinc-200 hover:text-zinc-950 dark:hover:text-white transition font-medium shadow-sm"
+              className="hidden md:flex items-center gap-1.5 rounded-lg bg-zinc-100/80 hover:bg-zinc-200/80 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 px-3 py-1.5 text-xs text-zinc-700 dark:text-zinc-300 hover:text-zinc-950 dark:hover:text-white transition font-medium shadow-xs"
               title={`Open In-Room Guest Dining QR Portal for ${activeProperty?.displayName || "hotel"}`}
             >
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
