@@ -220,7 +220,7 @@ export function CompanySelector({
               className="w-full py-1.5 px-3 rounded-xl bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/40 dark:hover:bg-indigo-900/50 border border-indigo-200 dark:border-indigo-800/60 text-indigo-700 dark:text-indigo-300 font-bold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer"
             >
               <Plus className="h-3.5 w-3.5" />
-              <span>+ Add New Company / Travel Agent</span>
+              <span>Add New Company / Travel Agent</span>
             </button>
           </div>
 

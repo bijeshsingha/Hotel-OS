@@ -107,7 +107,7 @@ export function CompanyDirectoryModal({
               className="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold text-xs flex items-center gap-1.5 transition shadow-sm active:scale-95 cursor-pointer"
             >
               <Plus className="h-4 w-4" />
-              <span>+ Add Company / Agent</span>
+              <span>Add Company / Agent</span>
             </button>
 
             <button
