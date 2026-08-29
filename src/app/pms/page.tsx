@@ -727,15 +727,6 @@ function PMSFrontDeskContent() {
               <span>Add Room to Guest</span>
             </button>
 
-            {/* Corporate Companies & Travel Agents Directory */}
-            <button
-              onClick={() => setShowCompanyDirectoryModal(true)}
-              className="h-9 px-3.5 rounded-xl bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-200 dark:border-indigo-500/30 hover:bg-indigo-100 dark:hover:bg-indigo-500/20 text-xs font-bold text-indigo-800 dark:text-indigo-300 flex items-center gap-1.5 transition shadow-xs cursor-pointer"
-            >
-              <Briefcase className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
-              <span>Companies & Agents (24+)</span>
-            </button>
-
             {/* Walk-in Check-in Primary Action */}
             <button
               onClick={() => {

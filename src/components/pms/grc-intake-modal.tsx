@@ -63,6 +63,12 @@ export function GrcIntakeModal({
   const [repeatGuest, setRepeatGuest] = useState<any | null>(null);
   const [isLookingUpPhone, setIsLookingUpPhone] = useState(false);
 
+  // Current date & time helper
+  const now = new Date();
+  const pad2 = (n: number) => String(n).padStart(2, "0");
+  const todayStr = `${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(now.getDate())}`;
+  const currentTimeStr = `${pad2(now.getHours())}:${pad2(now.getMinutes())}`;
+
   // Form State
   const [formData, setFormData] = useState({
     // Stay & Room
@@ -70,7 +76,8 @@ export function GrcIntakeModal({
     additionalRoomIds: [] as string[],
     roomRates: {} as Record<string, string>,
     groupBilling: true,
-    arrivalDateTime: new Date().toISOString().replace("T", " ").slice(0, 16),
+    arrivalDate: todayStr,
+    arrivalTime: currentTimeStr,
     departureDate: new Date(Date.now() + 86400000 * 2).toISOString().split("T")[0],
     mealPlan: "EP", // EP, CP, MAP, AP
     extraPaxCount: 0,
@@ -372,7 +379,7 @@ export function GrcIntakeModal({
             idType: formData.idType,
             idLast4: formData.idLast4,
           },
-          arrivalAt: formData.arrivalDateTime,
+          arrivalAt: `${formData.arrivalDate}T${formData.arrivalTime || "14:00"}:00`,
           expectedDepartureAt: formData.departureDate,
           adults: Number(formData.adults) || 2,
           children: Number(formData.children) || 0,
@@ -493,50 +500,71 @@ export function GrcIntakeModal({
 
               {/* Row 1: Room Assignment & Schedule */}
               <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-                <div className="space-y-1 sm:col-span-2">
-                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">Select Vacant Room *</label>
+                <div className="space-y-1 sm:col-span-1">
+                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">
+                    Select Room *
+                  </label>
                   <select
                     required
                     value={formData.roomId}
                     onChange={(e) => setFormData({ ...formData, roomId: e.target.value })}
                     className="w-full h-10 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white text-xs font-mono font-bold focus:border-blue-500 focus:outline-none"
                   >
-                    <option value="">-- Choose Vacant Room --</option>
+                    <option value="">-- Choose Room --</option>
                     {rooms
                       .filter((r) => r.roomState?.occupancyStatus === "VACANT" || r.id === formData.roomId)
                       .map((r) => {
                         const bedType = r.roomType?.bedType || (r.wing === "TWIN" ? "Twin Beds" : "King Bed");
                         return (
                           <option key={r.id} value={r.id}>
-                            Room {r.number} — {r.roomType?.name} [{bedType}] (Floor {r.floor})
+                            Room {r.number} — {r.roomType?.name} [{bedType}]
                           </option>
                         );
                       })}
                   </select>
                 </div>
 
-                <div className="space-y-1">
-                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">
-                    Check-In Time
+                {/* Non-editable Check-In Date */}
+                <div className="space-y-1 sm:col-span-1">
+                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap flex items-center justify-between">
+                    <span>Check-In Date</span>
+                    <span className="text-[10px] text-zinc-400 font-mono font-medium">🔒 Locked</span>
                   </label>
                   <input
-                    type="text"
+                    type="date"
                     disabled
                     readOnly
-                    value={formData.arrivalDateTime}
-                    className="w-full h-10 px-3 rounded-xl bg-zinc-100 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-zinc-500 dark:text-zinc-400 font-mono text-xs cursor-not-allowed select-none opacity-80"
-                    title="Auto-filled with current system timestamp"
+                    value={formData.arrivalDate}
+                    className="w-full h-10 px-3 rounded-xl bg-zinc-100 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400 font-mono text-xs cursor-not-allowed select-none font-bold"
+                    title="Check-in date is locked to the current business day"
                   />
                 </div>
 
-                <div className="space-y-1">
+                {/* Editable Check-In Time */}
+                <div className="space-y-1 sm:col-span-1">
+                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap flex items-center justify-between">
+                    <span>Check-In Time *</span>
+                    <span className="text-[10px] text-blue-600 dark:text-blue-400 font-mono font-bold">Editable</span>
+                  </label>
+                  <input
+                    type="time"
+                    required
+                    value={formData.arrivalTime}
+                    onChange={(e) => setFormData({ ...formData, arrivalTime: e.target.value })}
+                    className="w-full h-10 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white font-mono text-xs font-bold focus:border-blue-500 focus:outline-none cursor-pointer shadow-xs"
+                    title="Change check-in arrival time"
+                  />
+                </div>
+
+                {/* Expected Departure Date */}
+                <div className="space-y-1 sm:col-span-1">
                   <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">
                     Expected Departure *
                   </label>
                   <input
                     type="date"
                     required
-                    min={new Date().toISOString().split("T")[0]}
+                    min={formData.arrivalDate || new Date().toISOString().split("T")[0]}
                     value={formData.departureDate}
                     onChange={(e) => setFormData({ ...formData, departureDate: e.target.value })}
                     className="w-full h-10 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white font-mono text-xs focus:border-blue-500 focus:outline-none cursor-pointer"

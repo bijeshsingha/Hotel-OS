@@ -3,6 +3,7 @@ import {
   BedDouble,
   Sparkles,
   Receipt,
+  Briefcase,
   Moon,
   Wrench,
   BarChart3,
@@ -47,6 +48,13 @@ export const NAV_ITEMS: NavItem[] = [
     icon: Receipt,
     badge: "B",
     description: "Guest ledgers, tax invoices & charge posting",
+  },
+  {
+    label: "Corporate & Agents",
+    href: "/companies",
+    icon: Briefcase,
+    badge: "24",
+    description: "Master B2B Corporate Ledger, GSTIN & Travel Agents",
   },
   {
     label: "Night Audit",
