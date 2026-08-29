@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
-import { getCompanyMasterList } from "@/lib/db/company-service";
+import { getCompanyMasterList, addCompanyToMaster } from "@/lib/db/company-service";
 
 export async function GET(request: Request) {
   try {
@@ -66,29 +66,26 @@ export async function POST(request: Request) {
       if (org?.id) organizationId = org.id;
     }
 
-    const created = await (prisma as any).companyMaster.create({
-      data: {
-        organizationId,
-        propertyId: propertyId || null,
-        accountType,
-        accountName: accountName.trim(),
-        shortName: shortName?.trim() || null,
-        city: city?.trim() || null,
-        address: address?.trim() || null,
-        phone: phone?.trim() || null,
-        mobile: mobile?.trim() || null,
-        email: email?.trim() || null,
-        faxNo: faxNo?.trim() || null,
-        gstin: gstin?.trim() ? gstin.trim().toUpperCase() : null,
-        panNo: panNo?.trim() ? panNo.trim().toUpperCase() : null,
-        foodPlan,
-        fbDiscountPercent: Number(fbDiscountPercent) || 0,
-        creditLimit: Number(creditLimit) || 0,
-        openingBalance: Number(openingBalance) || 0,
-        commissionPercent: Number(commissionPercent) || 0,
-        remarks: remarks?.trim() || null,
-        status: "ACTIVE",
-      },
+    const created = await addCompanyToMaster({
+      organizationId,
+      propertyId: propertyId || null,
+      accountType,
+      accountName: accountName.trim(),
+      shortName: shortName?.trim() || null,
+      city: city?.trim() || null,
+      address: address?.trim() || null,
+      phone: phone?.trim() || null,
+      mobile: mobile?.trim() || null,
+      email: email?.trim() || null,
+      faxNo: faxNo?.trim() || null,
+      gstin: gstin?.trim() ? gstin.trim().toUpperCase() : null,
+      panNo: panNo?.trim() ? panNo.trim().toUpperCase() : null,
+      foodPlan,
+      fbDiscountPercent: Number(fbDiscountPercent) || 0,
+      creditLimit: Number(creditLimit) || 0,
+      openingBalance: Number(openingBalance) || 0,
+      commissionPercent: Number(commissionPercent) || 0,
+      remarks: remarks?.trim() || null,
     });
 
     return NextResponse.json({ success: true, company: created });

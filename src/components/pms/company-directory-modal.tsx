@@ -21,6 +21,8 @@ import {
 import { AddCompanyModal } from "./company-modal";
 import { CompanyItem } from "./company-selector";
 
+import initialCompaniesJson from "@/data/initial-companies.json";
+
 interface CompanyDirectoryModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -28,13 +30,34 @@ interface CompanyDirectoryModalProps {
   onSelectForBooking?: (company: CompanyItem) => void;
 }
 
+const defaultCompanies: CompanyItem[] = (initialCompaniesJson as any[]).map((c, idx) => ({
+  id: `comp-init-${idx + 1}`,
+  accountType: (c.accountType as any) || "COMPANY",
+  accountName: c.accountName,
+  shortName: c.shortName || null,
+  city: c.city || null,
+  address: c.address || null,
+  phone: c.phone || null,
+  mobile: c.mobile || null,
+  email: c.email || null,
+  gstin: c.gstin || null,
+  panNo: c.panNo || null,
+  foodPlan: c.foodPlan || "EP",
+  fbDiscountPercent: 0,
+  creditLimit: c.creditLimit || 0,
+  openingBalance: 0,
+  commissionPercent: c.commissionPercent || 0,
+  remarks: c.remarks || null,
+  status: (c.status as any) || "ACTIVE",
+}));
+
 export function CompanyDirectoryModal({
   isOpen,
   onClose,
   activeProperty,
   onSelectForBooking,
 }: CompanyDirectoryModalProps) {
-  const [companies, setCompanies] = useState<CompanyItem[]>([]);
+  const [companies, setCompanies] = useState<CompanyItem[]>(defaultCompanies);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<"ALL" | "COMPANY" | "TRAVEL_AGENT">("ALL");
@@ -48,13 +71,39 @@ export function CompanyDirectoryModal({
       );
       if (res.ok) {
         const data = await res.json();
-        setCompanies(data);
+        if (Array.isArray(data) && data.length > 0) {
+          setCompanies(data);
+          return;
+        }
       }
     } catch (e) {
-      console.error("Failed to load company directory:", e);
+      console.warn("Client fallback to default companies:", e);
     } finally {
       setLoading(false);
     }
+
+    // Instant client filter fallback
+    let filtered = [...defaultCompanies];
+    if (typeFilter !== "ALL") {
+      if (typeFilter === "TRAVEL_AGENT") {
+        filtered = filtered.filter((c) => c.accountType === "TRAVEL_AGENT" || c.accountType === "OTA");
+      } else {
+        filtered = filtered.filter((c) => c.accountType === typeFilter);
+      }
+    }
+    if (search && search.trim()) {
+      const q = search.trim().toLowerCase();
+      filtered = filtered.filter(
+        (c) =>
+          c.accountName?.toLowerCase().includes(q) ||
+          c.shortName?.toLowerCase().includes(q) ||
+          c.gstin?.toLowerCase().includes(q) ||
+          c.mobile?.toLowerCase().includes(q) ||
+          c.city?.toLowerCase().includes(q) ||
+          c.address?.toLowerCase().includes(q)
+      );
+    }
+    setCompanies(filtered);
   };
 
   useEffect(() => {
