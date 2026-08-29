@@ -256,6 +256,7 @@ export async function checkInGuest({
     idLast4?: string;
     age?: number;
     gender?: string;
+    referralChannel?: string;
   };
   roomIds: string[];
   groupBilling?: boolean;
@@ -350,8 +351,8 @@ export async function checkInGuest({
       data: {
         name: canonicalGuestName || guest.name,
         addressJson: fullAddressJson,
-        gstin: guestData.gstin || guest.gstin,
-        companyName: guestData.companyName || guest.companyName,
+        gstin: guestData.gstin !== undefined ? (guestData.gstin || null) : guest.gstin,
+        companyName: guestData.companyName !== undefined ? (guestData.companyName || null) : guest.companyName,
       },
     });
   }
@@ -718,7 +719,7 @@ export async function checkInGuest({
       arrivedFrom: guestData.arrivedFrom || "",
       goingTo: guestData.goingTo || "",
       purposeOfVisit: guestData.purposeOfVisit || "Tourism / Holiday",
-      referralChannel: "Direct / Walk-In",
+      referralChannel: guestData.referralChannel || (guestData.companyName ? `Corporate (${guestData.companyName})` : "Direct / Walk-In"),
       mobilePhone: guestData.phone || "",
       alternatePhone: guestData.phone || "",
       email: guestData.email || "",

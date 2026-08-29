@@ -24,6 +24,8 @@ export async function POST(
       depositAmount = 0,
       depositMethod = "CASH",
       depositRef = "",
+      companyName = "",
+      gstin = "",
       notes = "",
       userId,
       idPhotoUrl,
@@ -126,6 +128,8 @@ export async function POST(
           email: registration.email,
           nationality: registration.nationality,
           addressJson,
+          companyName: companyName || undefined,
+          gstin: gstin || undefined,
           preferences: registration.purposeOfVisit ? `Purpose: ${registration.purposeOfVisit}` : null,
         },
       });
@@ -135,6 +139,8 @@ export async function POST(
         data: {
           name: canonicalGuestName || guest.name,
           addressJson,
+          companyName: companyName !== undefined ? (companyName || null) : guest.companyName,
+          gstin: gstin !== undefined ? (gstin || null) : guest.gstin,
         },
       });
     }
@@ -478,8 +484,16 @@ export async function POST(
           amount: depAmt,
           method: depositMethod || "CASH",
           status: "SUCCEEDED",
-          reference: depositRef && depositRef.trim().length > 0 ? depositRef.trim() : null,
-          payerSnapshot: JSON.stringify({ name: registration.fullName, phone: registration.mobilePhone }),
+          reference: depositRef && depositRef.trim().length > 0
+            ? depositRef.trim()
+            : (depositMethod === "DIRECT_BILL" ? `BTC-${companyName || guest?.companyName || "CORP"}` : null),
+          payerSnapshot: JSON.stringify({
+            name: registration.fullName,
+            phone: registration.mobilePhone,
+            companyName: companyName || guest?.companyName || "",
+            gstin: gstin || guest?.gstin || "",
+            billToCompany: depositMethod === "DIRECT_BILL",
+          }),
         },
       });
 

@@ -58,6 +58,7 @@ export async function POST(request: Request) {
           companyName: companyName || folio.stay?.primaryGuest?.companyName,
           gstin: gstin || folio.stay?.primaryGuest?.gstin,
           isGroupPayment: true,
+          billToCompany: method === "DIRECT_BILL",
           groupMasterReceiptNo: groupReceiptNo,
           groupRooms: roomListStr,
           allocatedAmount: allocAmt,
