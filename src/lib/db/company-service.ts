@@ -23,18 +23,26 @@ export interface CompanyMasterItem {
   status?: "ACTIVE" | "INACTIVE";
 }
 
-export async function ensureDefaultCompanies(organizationId: string) {
+export async function ensureDefaultCompanies(organizationId?: string) {
   try {
+    let orgId = organizationId;
+    if (!orgId) {
+      const org = await prisma.organization.findFirst();
+      orgId = org?.id || "org_ambarish";
+    }
+
     // Check if any companies already exist in DB
-    const count = await (prisma as any).companyMaster.count({
-      where: { organizationId },
-    });
+    const count = await (prisma as any).companyMaster.count();
 
     if (count === 0) {
+      const prop = await prisma.property.findFirst();
+      const propertyId = prop?.id || "prop_ambarish";
+
       for (const item of initialCompanies) {
         await (prisma as any).companyMaster.create({
           data: {
-            organizationId,
+            organizationId: orgId,
+            propertyId,
             accountType: item.accountType || "COMPANY",
             accountName: item.accountName,
             shortName: item.shortName || null,
@@ -59,13 +67,16 @@ export async function ensureDefaultCompanies(organizationId: string) {
   }
 }
 
-export async function getCompanyMasterList(organizationId: string, search?: string, type?: string) {
+export async function getCompanyMasterList(organizationId?: string, search?: string, type?: string) {
   await ensureDefaultCompanies(organizationId);
 
   return await (prisma as any).companyMaster.findMany({
     where: {
-      organizationId,
-      ...(type && type !== "ALL" ? { accountType: type } : {}),
+      ...(type && type !== "ALL"
+        ? type === "TRAVEL_AGENT"
+          ? { accountType: { in: ["TRAVEL_AGENT", "OTA"] } }
+          : { accountType: type }
+        : {}),
       ...(search
         ? {
             OR: [
@@ -74,6 +85,7 @@ export async function getCompanyMasterList(organizationId: string, search?: stri
               { gstin: { contains: search } },
               { mobile: { contains: search } },
               { city: { contains: search } },
+              { address: { contains: search } },
             ],
           }
         : {}),

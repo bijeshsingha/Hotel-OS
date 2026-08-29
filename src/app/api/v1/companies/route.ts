@@ -9,12 +9,15 @@ export async function GET(request: Request) {
     const search = searchParams.get("query") || "";
     const type = searchParams.get("type") || "ALL";
 
-    let organizationId = "org_grand_guwahati";
+    let organizationId = "org_ambarish";
     if (propertyId) {
       const property = await prisma.property.findUnique({
         where: { id: propertyId },
       });
-      if (property) organizationId = property.organizationId;
+      if (property?.organizationId) organizationId = property.organizationId;
+    } else {
+      const org = await prisma.organization.findFirst();
+      if (org?.id) organizationId = org.id;
     }
 
     const companies = await getCompanyMasterList(organizationId, search, type);
@@ -52,12 +55,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Company / Travel Agent Name is required." }, { status: 400 });
     }
 
-    let organizationId = "org_grand_guwahati";
+    let organizationId = "org_ambarish";
     if (propertyId) {
       const property = await prisma.property.findUnique({
         where: { id: propertyId },
       });
-      if (property) organizationId = property.organizationId;
+      if (property?.organizationId) organizationId = property.organizationId;
+    } else {
+      const org = await prisma.organization.findFirst();
+      if (org?.id) organizationId = org.id;
     }
 
     const created = await (prisma as any).companyMaster.create({
