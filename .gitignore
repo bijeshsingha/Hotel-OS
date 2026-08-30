@@ -48,3 +48,8 @@ prisma/backups/
 scratch/
 *.Bak
 *.bak
+
+# local server scripts
+start-server*.bat
+start-server*.vbs
+stop-server*.bat

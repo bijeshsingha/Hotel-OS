@@ -177,18 +177,6 @@ export function PrintableTaxInvoiceModal({
       new Date(stay.arrivalAt).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false })
     : "—";
 
-  const departureDateStr = stay?.actualDepartureAt
-    ? new Date(stay.actualDepartureAt).toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" })
-    : stay?.expectedDepartureAt
-    ? new Date(stay.expectedDepartureAt).toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" })
-    : new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" });
-
-  // Compute Nights
-  const arrDate = stay?.arrivalAt ? new Date(stay.arrivalAt) : new Date();
-  const depDate = stay?.actualDepartureAt ? new Date(stay.actualDepartureAt) : stay?.expectedDepartureAt ? new Date(stay.expectedDepartureAt) : new Date();
-  const diffTime = Math.abs(depDate.getTime() - arrDate.getTime());
-  const nightsCount = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
-
   // Room String
   const displayRoomNo = groupBillingMode === "YES" && isMultiRoomGroup && allRooms.length > 0
     ? allRooms.join(", ")
@@ -203,13 +191,13 @@ export function PrintableTaxInvoiceModal({
         {
           description: "Room Rent",
           sacHsn: "996311",
-          qty: nightsCount,
+          qty: 1,
           rate: 1800,
-          totalAmount: 1800 * nightsCount * 1.05,
-          taxableAmount: 1800 * nightsCount,
-          taxAmount: 1800 * nightsCount * 0.05,
-          cgstAmount: (1800 * nightsCount * 0.05) / 2,
-          sgstAmount: (1800 * nightsCount * 0.05) / 2,
+          totalAmount: 1800 * 1.05,
+          taxableAmount: 1800,
+          taxAmount: 1800 * 0.05,
+          cgstAmount: (1800 * 0.05) / 2,
+          sgstAmount: (1800 * 0.05) / 2,
           igstAmount: 0,
           cgstRate: 2.5,
           sgstRate: 2.5,
@@ -217,6 +205,36 @@ export function PrintableTaxInvoiceModal({
           discountAmount: 0,
         },
       ];
+
+  // Compute actual billed nights from the invoice line items
+  // Count Room Tariff lines (or their qty sum)
+  const roomTariffLines = lines.filter((l) =>
+    l.sacHsn === "996311" ||
+    l.description?.toLowerCase().includes("room tariff") ||
+    l.description?.toLowerCase().includes("room rent") ||
+    (l as any).chargeCode === "ROOM_TARIFF"
+  );
+  const totalTariffQty = roomTariffLines.reduce((sum, l) => sum + (l.qty || 1), 0);
+  const numRooms = (groupBillingMode === "YES" && isMultiRoomGroup && allRooms.length > 0) ? allRooms.length : 1;
+  const billedNights = totalTariffQty > 0 ? Math.max(1, Math.ceil(totalTariffQty / numRooms)) : 1;
+
+  const arrDate = stay?.arrivalAt ? new Date(stay.arrivalAt) : new Date();
+  let nightsCount = billedNights;
+  if (stay?.actualDepartureAt) {
+    const actDepDate = new Date(stay.actualDepartureAt);
+    const actElapsedDays = Math.max(1, Math.ceil(Math.abs(actDepDate.getTime() - arrDate.getTime()) / (1000 * 60 * 60 * 24)));
+    nightsCount = Math.min(actElapsedDays, billedNights);
+  }
+
+  // Date of Departure on Invoice:
+  // If guest is checked out, show actual departure.
+  // In live bill or in-house, show the departure date corresponding to the billed nights (arrDate + nightsCount days).
+  const departureDateStr = stay?.actualDepartureAt
+    ? new Date(stay.actualDepartureAt).toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" })
+    : (() => {
+        const effDep = new Date(arrDate.getTime() + nightsCount * 24 * 60 * 60 * 1000);
+        return effDep.toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" });
+      })();
 
   // Totals calculations
   let totalTaxable = 0;
