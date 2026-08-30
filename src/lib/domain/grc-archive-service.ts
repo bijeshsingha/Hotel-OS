@@ -198,11 +198,15 @@ export async function syncGrcEditsEverywhere(updatedGrc: any) {
       // Update each room assignment with its specific rate if defined
       if (stay.roomAssignments && stay.roomAssignments.length > 0) {
         for (const assignment of stay.roomAssignments) {
-          const specificRate = customRoomRates[assignment.room.id] !== undefined
-            ? Number(customRoomRates[assignment.room.id])
-            : (customRoomRates[assignment.room.number] !== undefined
-                ? Number(customRoomRates[assignment.room.number])
-                : numTariff);
+          let specificRate = numTariff;
+          if (customRoomRates[assignment.room.id] !== undefined) {
+            specificRate = Number(customRoomRates[assignment.room.id]);
+          } else if (customRoomRates[assignment.room.number] !== undefined) {
+            specificRate = Number(customRoomRates[assignment.room.number]);
+          } else if (assignment.moveReason?.startsWith("AGREED_RATE:")) {
+            const parsedMoveRate = Number(assignment.moveReason.replace("AGREED_RATE:", ""));
+            if (!isNaN(parsedMoveRate)) specificRate = parsedMoveRate;
+          }
           
           const isRoomComp = isComp || specificRate === 0;
           await prisma.roomAssignment.update({
@@ -227,39 +231,69 @@ export async function syncGrcEditsEverywhere(updatedGrc: any) {
       let totalDailyTariff = numTariff;
       if (stay.roomAssignments && stay.roomAssignments.length > 1) {
         totalDailyTariff = stay.roomAssignments.reduce((sum, a) => {
-          const specificRate = customRoomRates[a.room.id] !== undefined
-            ? Number(customRoomRates[a.room.id])
-            : (customRoomRates[a.room.number] !== undefined
-                ? Number(customRoomRates[a.room.number])
-                : numTariff);
+          let specificRate = numTariff;
+          if (customRoomRates[a.room.id] !== undefined) {
+            specificRate = Number(customRoomRates[a.room.id]);
+          } else if (customRoomRates[a.room.number] !== undefined) {
+            specificRate = Number(customRoomRates[a.room.number]);
+          } else if (a.moveReason?.startsWith("AGREED_RATE:")) {
+            const parsedMoveRate = Number(a.moveReason.replace("AGREED_RATE:", ""));
+            if (!isNaN(parsedMoveRate)) specificRate = parsedMoveRate;
+          }
           return sum + (isNaN(specificRate) ? 0 : specificRate);
         }, 0);
       }
 
-      // Update Folio Entry charges for room tariff
+      // Update Folio Entry charges for room tariff with per-room rates
       if (stay.folio) {
-        const roomGst = isComp || totalDailyTariff === 0
-          ? { taxableAmount: 0, taxAmount: 0, totalAmount: 0, components: [] }
-          : calculateGST({
-              grossOrBaseAmount: totalDailyTariff,
-              isInclusive: true,
-              sacHsn: "996311",
-              supplierStateCode: stay.property?.stateCode || "18",
-              customTaxRate: 5,
-            });
-
         for (const w of stay.folio.windows) {
           const tariffEntries = w.entries.filter(
             (e) => e.chargeCode === "ROOM_TARIFF" || e.sourceType === "PMS_NIGHTLY_CHARGE"
           );
           for (const entry of tariffEntries) {
+            let entryRate = numTariff;
+
+            // Extract room number from description (e.g. "Room Tariff - Room 302 (Night 1)")
+            const roomMatch = entry.description?.match(/-\s*Room\s+([A-Za-z0-9-]+)/i) || entry.description?.match(/Room\s+(\d+[\w-]*)/i);
+            const entryRoomNum = roomMatch ? roomMatch[1] : null;
+
+            if (entryRoomNum) {
+              const matchedAssignment = stay.roomAssignments?.find(
+                (a) => a.room?.number === entryRoomNum || a.room?.id === entryRoomNum
+              );
+              let specificRate = numTariff;
+              if (customRoomRates[entryRoomNum] !== undefined) {
+                specificRate = Number(customRoomRates[entryRoomNum]);
+              } else if (matchedAssignment?.room?.id && customRoomRates[matchedAssignment.room.id] !== undefined) {
+                specificRate = Number(customRoomRates[matchedAssignment.room.id]);
+              } else if (matchedAssignment?.moveReason?.startsWith("AGREED_RATE:")) {
+                const parsedMoveRate = Number(matchedAssignment.moveReason.replace("AGREED_RATE:", ""));
+                if (!isNaN(parsedMoveRate)) specificRate = parsedMoveRate;
+              }
+              entryRate = isNaN(specificRate) ? numTariff : specificRate;
+            } else if (stay.roomAssignments && stay.roomAssignments.length > 1) {
+              // Lumped entry for all rooms together
+              entryRate = totalDailyTariff;
+            }
+
+            const isEntryComp = isComp || entryRate === 0;
+            const entryGst = isEntryComp
+              ? { taxableAmount: 0, taxAmount: 0, totalAmount: 0, components: [] }
+              : calculateGST({
+                  grossOrBaseAmount: entryRate,
+                  isInclusive: true,
+                  sacHsn: "996311",
+                  supplierStateCode: stay.property?.stateCode || "18",
+                  customTaxRate: 5,
+                });
+
             await prisma.folioEntry.update({
               where: { id: entry.id },
               data: {
-                unitAmount: totalDailyTariff,
-                taxableAmount: roomGst.taxableAmount,
-                totalAmount: roomGst.totalAmount,
-                taxComponentsJson: JSON.stringify(roomGst.components),
+                unitAmount: entryRate,
+                taxableAmount: entryGst.taxableAmount,
+                totalAmount: entryGst.totalAmount,
+                taxComponentsJson: JSON.stringify(entryGst.components),
               },
             });
           }
