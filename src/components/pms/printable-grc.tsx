@@ -145,7 +145,7 @@ export function PrintableGrcModal({
       : "—";
 
   const handleCopyLink = () => {
-    const text = `Hotel OS Digital GRC: ${registrationNumber} | Guest: ${
+    const text = `ROVESTA Digital GRC: ${registrationNumber} | Guest: ${
       data.fullName
     } | Room: ${roomNum} | Arrival: ${arrivalTime} | Verified ID: ${
       data.idDocumentType || data.idType || "AADHAAR"
@@ -971,7 +971,7 @@ export function PrintableGrcModal({
 
         {/* Bottom Footer Close */}
         <div className="px-4 py-2.5 bg-zinc-200/60 dark:bg-zinc-900/60 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-between text-xs text-zinc-500 font-mono">
-          <span>Hotel OS GRC Engine • Single-Page A4 Ready</span>
+          <span>ROVESTA GRC Engine • Single-Page A4 Ready</span>
           <button
             type="button"
             onClick={onClose}

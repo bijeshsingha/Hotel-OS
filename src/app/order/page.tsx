@@ -441,7 +441,7 @@ function GuestOrderContent() {
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-1.5 min-w-0">
                 <h1 className="text-xs sm:text-sm font-bold tracking-tight text-zinc-900 dark:text-white truncate">
-                  {menuData?.property?.displayName || menuData?.property?.name || "Hotel OS"}
+                  {menuData?.property?.displayName || menuData?.property?.name || "ROVESTA"}
                 </h1>
                 {menuData?.property?.code && (
                   <span className="bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 text-[9px] sm:text-[10px] font-mono font-bold px-1.5 py-0.5 rounded shrink-0">

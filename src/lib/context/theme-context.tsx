@@ -22,7 +22,17 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     setThemeState(savedTheme);
     applyThemeToDOM(savedTheme);
     setMounted(true);
+
+    // Disable mousewheel scroll value changes on number inputs globally
+    const handleWheel = () => {
+      if (document.activeElement && (document.activeElement as HTMLInputElement).type === "number") {
+        (document.activeElement as HTMLElement).blur();
+      }
+    };
+    window.addEventListener("wheel", handleWheel, { passive: true });
+    return () => window.removeEventListener("wheel", handleWheel);
   }, []);
+
 
   const applyThemeToDOM = (t: Theme) => {
     const root = document.documentElement;

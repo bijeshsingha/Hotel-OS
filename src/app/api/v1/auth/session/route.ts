@@ -1,11 +1,19 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
+import { ensurePropertyDateSynchronized } from "@/lib/domain/night-audit-service";
 
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const requestedIdentifier = searchParams.get("email") || searchParams.get("username");
     const requestedPropertyId = searchParams.get("propertyId");
+
+    // Auto-sync all properties to today's date and rollover if needed
+    const rawProps = await prisma.property.findMany({ select: { id: true } });
+    for (const p of rawProps) {
+      await ensurePropertyDateSynchronized(p.id);
+    }
+
 
     // Map clean usernames to email addresses
     const usernameAliases: Record<string, string> = {

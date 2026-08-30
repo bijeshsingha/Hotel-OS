@@ -616,38 +616,61 @@ export function DigitalCheckInReviewModal({
                                   </span>
                                 </div>
 
-                                <div className="flex items-center gap-2">
-                                  <div className="relative flex items-center">
-                                    <span className="absolute left-2.5 text-xs text-zinc-400 font-bold font-mono">₹</span>
-                                    <input
-                                      type="number"
+                                  <div className="flex items-center gap-2">
+                                    {/* Per-Room Comp Toggle */}
+                                    <button
+                                      type="button"
                                       disabled={isAlreadyCheckedIn || loading}
-                                      placeholder="Agreed Tariff"
-                                      value={roomRates[id] || ""}
-                                      onChange={(e) =>
-                                        setRoomRates((prev) => ({ ...prev, [id]: e.target.value }))
-                                      }
-                                      className="w-28 h-9 pl-6 pr-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white font-mono text-xs font-bold focus:border-blue-500 focus:outline-none"
-                                    />
+                                      onClick={() => {
+                                        const isComp = roomRates[id] === "0" || roomRates[id] === "COMP";
+                                        setRoomRates((prev) => ({
+                                          ...prev,
+                                          [id]: isComp ? (r?.roomType?.basePrice ? String(r.roomType.basePrice) : "3200") : "0",
+                                        }));
+                                      }}
+                                      className={`px-2 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1 cursor-pointer border ${
+                                        roomRates[id] === "0" || roomRates[id] === "COMP"
+                                          ? "bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800 shadow-xs"
+                                          : "bg-white dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 border-zinc-200 dark:border-zinc-700 hover:text-emerald-700 hover:bg-emerald-50"
+                                      }`}
+                                      title="Toggle complimentary stay for this specific room"
+                                    >
+                                      <span>🎁</span>
+                                      <span>{roomRates[id] === "0" || roomRates[id] === "COMP" ? "Comp (₹0)" : "Comp"}</span>
+                                    </button>
+
+                                    <div className="relative flex items-center">
+                                      <span className="absolute left-2.5 text-xs text-zinc-400 font-bold font-mono">₹</span>
+                                      <input
+                                        type="number"
+                                        disabled={isAlreadyCheckedIn || loading || roomRates[id] === "0" || roomRates[id] === "COMP"}
+                                        placeholder="Agreed Tariff"
+                                        value={roomRates[id] === "0" || roomRates[id] === "COMP" ? "0" : (roomRates[id] || "")}
+                                        onChange={(e) =>
+                                          setRoomRates((prev) => ({ ...prev, [id]: e.target.value }))
+                                        }
+                                        className="w-28 h-9 pl-6 pr-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white font-mono text-xs font-bold focus:border-blue-500 focus:outline-none disabled:opacity-60 disabled:bg-zinc-100 dark:disabled:bg-zinc-800"
+                                      />
+                                    </div>
+                                    <button
+                                      type="button"
+                                      disabled={isAlreadyCheckedIn || loading}
+                                      onClick={() => {
+                                        setAdditionalRoomIds((prev) => prev.filter((rid) => rid !== id));
+                                        setRoomExtraPax((prev) => {
+                                          const n = { ...prev };
+                                          delete n[id];
+                                          return n;
+                                        });
+                                      }}
+                                      className="p-2 text-zinc-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-lg transition cursor-pointer"
+                                      title="Remove Room"
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </button>
                                   </div>
-                                  <button
-                                    type="button"
-                                    disabled={isAlreadyCheckedIn || loading}
-                                    onClick={() => {
-                                      setAdditionalRoomIds((prev) => prev.filter((rid) => rid !== id));
-                                      setRoomExtraPax((prev) => {
-                                        const n = { ...prev };
-                                        delete n[id];
-                                        return n;
-                                      });
-                                    }}
-                                    className="p-2 text-zinc-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-lg transition"
-                                    title="Remove Room"
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </button>
                                 </div>
-                              </div>
+
 
                               {/* Bottom row: Extra Pax Stepper */}
                               <div className="flex items-center justify-between p-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-900/90 border border-zinc-200 dark:border-zinc-800 text-xs shadow-xs">

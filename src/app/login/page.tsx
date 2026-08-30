@@ -70,19 +70,24 @@ export default function LoginPage() {
       <div className="w-full max-w-md space-y-6">
         {/* Brand Header */}
         <div className="text-center space-y-2">
-          <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-zinc-950 font-black text-xl tracking-tight shadow-xl shadow-white/10 mb-2">
-            H
+          <div className="flex justify-center mb-3">
+            <img
+              src="/brand/rovesta-app-icon.png"
+              alt="ROVESTA Logo"
+              className="h-16 w-16 rounded-2xl shadow-2xl shadow-blue-900/30 object-contain border border-blue-500/20"
+            />
           </div>
           <h1 className="text-2xl font-black tracking-tight text-white flex items-center justify-center gap-2">
-            <span>Hotel OS</span>
-            <span className="rounded-lg bg-zinc-800 px-2 py-0.5 text-xs font-mono font-bold text-zinc-300 border border-zinc-700">
-              v1.0
+            <span>ROVESTA</span>
+            <span className="rounded-lg bg-blue-600/20 px-2 py-0.5 text-xs font-mono font-bold text-blue-400 border border-blue-500/30">
+              OS v1.0
             </span>
           </h1>
           <p className="text-xs text-zinc-400 font-mono">
             Cloud Hospitality Operating System • Multi-Property Edition
           </p>
         </div>
+
 
         {/* Main Login Card */}
         <div className="rounded-3xl border border-zinc-800/90 bg-[#111114]/90 backdrop-blur-xl p-6 sm:p-7 shadow-2xl space-y-5">
@@ -158,7 +163,7 @@ export default function LoginPage() {
               disabled={loading}
               className="w-full rounded-xl bg-white hover:bg-zinc-200 text-zinc-950 py-3 font-black text-xs sm:text-sm shadow-xl transition flex items-center justify-center gap-2 disabled:opacity-50 active:scale-98"
             >
-              {loading ? "Authenticating Terminal..." : "Sign In to Hotel OS"}
+              {loading ? "Authenticating Terminal..." : "Sign In to ROVESTA"}
               <ArrowRight className="h-4 w-4" />
             </button>
           </form>
@@ -237,7 +242,7 @@ export default function LoginPage() {
         {/* Footer info */}
         <div className="text-center text-[11px] text-zinc-600 font-mono space-y-1">
           <div>GST Rule 46 Compliant • Multi-Property Isolated Tenancy</div>
-          <div>© 2026 Hotel OS. All rights reserved.</div>
+          <div>© 2026 ROVESTA. All rights reserved.</div>
         </div>
       </div>
     </div>

@@ -17,6 +17,7 @@ import {
   BarChart3,
   FileText,
 } from "lucide-react";
+import { PageHeader } from "@/components/ui";
 
 export default function NightAuditPage() {
   const { activeProperty, refreshKey, refreshData } = useHotel();
@@ -27,6 +28,7 @@ export default function NightAuditPage() {
   const [postingResults, setPostingResults] = useState<any[]>([]);
   const [closeResult, setCloseResult] = useState<any | null>(null);
   const [timeUntilMidnight, setTimeUntilMidnight] = useState("");
+
 
   // Update Countdown to 12:00 AM Midnight
   useEffect(() => {
@@ -151,36 +153,22 @@ export default function NightAuditPage() {
   };
 
   return (
-    <div className="space-y-4 max-w-[1500px] mx-auto w-full text-zinc-900 dark:text-zinc-100">
+    <div className="space-y-4 max-w-[1600px] mx-auto w-full text-zinc-900 dark:text-zinc-100">
       {/* Top Banner */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 sm:p-5 rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200/80 dark:border-zinc-800/80 shadow-xs">
-        <div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <h1 className="text-base sm:text-lg font-bold text-zinc-900 dark:text-white flex items-center gap-2">
-              <Moon className="h-4.5 w-4.5 text-indigo-500 dark:text-indigo-400" />
-              Night Audit & Day Close
-            </h1>
-            <span className="rounded-md px-2 py-0.5 text-[10px] font-semibold text-indigo-700 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-200 dark:border-indigo-800/60 uppercase">
-              12 AM – 12 AM Day Cycle
-            </span>
-          </div>
-          <p className="text-xs text-zinc-500 mt-0.5">
-            Pre-close verification, room tariff posting & immediate business date rollover
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2 flex-wrap">
-          <div className="rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 px-3.5 py-2 text-xs text-zinc-700 dark:text-zinc-300 flex items-center gap-2 shadow-xs">
-            <Calendar className="h-4 w-4 text-zinc-400" />
-            <span>Operational Date: <strong className="text-zinc-900 dark:text-white font-mono font-bold">{activeProperty?.businessDate}</strong></span>
-          </div>
-
-          <div className="rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 px-3.5 py-2 text-xs text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5 shadow-xs">
+      <PageHeader
+        title="Night Audit & Day Close"
+        description="Pre-close verification, room tariff posting & immediate business date rollover"
+        icon={Moon}
+        badge="12 AM – 12 AM Day Cycle"
+        badgeVariant="info"
+        businessDate={activeProperty?.businessDate}
+        metadata={
+          <div className="rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 px-3.5 py-2 text-xs text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5 shadow-xs shrink-0">
             <Clock className="h-4 w-4 text-amber-500" />
             <span>Next Midnight: <strong className="text-emerald-600 dark:text-emerald-400 font-mono">{timeUntilMidnight}</strong></span>
           </div>
-
-          {/* Instant Anytime Day Close Button */}
+        }
+        actions={
           <button
             onClick={handleInstantDayClose}
             disabled={actionLoading}
@@ -190,11 +178,11 @@ export default function NightAuditPage() {
             <ShieldCheck className="h-4 w-4" />
             <span>{actionLoading ? "Closing Day..." : "⚡ Hit Day Close Now"}</span>
           </button>
-        </div>
-      </div>
+        }
+      />
 
       {/* Sub-Navigation Tabs under Night Audit */}
-      <div className="flex items-center gap-2 border-b border-zinc-200 dark:border-zinc-800 pb-3">
+      <div className="flex items-center gap-2 border-b border-zinc-200 dark:border-zinc-800 pb-3 flex-wrap">
         <div className="flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold bg-indigo-600 text-white shadow-sm shadow-indigo-600/20">
           <ShieldCheck className="h-4 w-4" />
           <span>Night Audit & Day Close</span>
@@ -208,8 +196,9 @@ export default function NightAuditPage() {
         </Link>
       </div>
 
-      {/* Stepper Progress */}
-      <div className="grid grid-cols-3 gap-3">
+      {/* Stepper Progress (Responsive: vertical on mobile, 3-column on tablet/desktop) */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+
         <div
           className={`flex items-center gap-2.5 p-3.5 rounded-2xl border text-xs transition shadow-xs ${
             step === 1

@@ -14,7 +14,7 @@ export default function NotFound() {
           Page Not Found
         </h2>
         <p className="text-xs text-zinc-600 dark:text-zinc-400 font-medium">
-          The requested route or resource could not be found in Hotel OS.
+          The requested route or resource could not be found in ROVESTA.
         </p>
       </div>
 

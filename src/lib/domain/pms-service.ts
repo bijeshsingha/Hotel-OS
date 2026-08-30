@@ -452,25 +452,67 @@ export async function checkInGuest({
       data: { folioId: folio.id },
     });
 
+    const primaryRoomId = roomIds[0];
+
     for (const room of rooms) {
+      const isPrimaryRoom = room.id === primaryRoomId;
       let roomBasePrice = 3200;
-      const isComp = Boolean(isComplimentary || agreedTariff === 0);
-      if (isComp) {
-        roomBasePrice = 0;
-      } else if (roomRates && roomRates[room.id] !== undefined && roomRates[room.id] !== "") {
-        roomBasePrice = Number(roomRates[room.id]);
-      } else if (agreedTariff !== undefined && agreedTariff !== null) {
-        roomBasePrice = Number(agreedTariff);
-      } else if (room.roomTypeId) {
-        const rateVersion = await prisma.ratePlanVersion.findFirst({
-          where: { roomTypeId: room.roomTypeId, active: true },
-          orderBy: { createdAt: "desc" },
-        });
-        if (rateVersion?.pricingJson) {
-          try {
-            const pricing = JSON.parse(rateVersion.pricingJson);
-            if (pricing.basePrice) roomBasePrice = Number(pricing.basePrice);
-          } catch {}
+      let isComp = false;
+
+      // 1. Check if room has an explicit custom rate in roomRates (by room ID or room number)
+      const hasCustomRate =
+        roomRates &&
+        ((roomRates[room.id] !== undefined && roomRates[room.id] !== "") ||
+          (room.number && roomRates[room.number] !== undefined && roomRates[room.number] !== ""));
+
+      if (hasCustomRate) {
+        const rawVal =
+          roomRates[room.id] !== undefined && roomRates[room.id] !== ""
+            ? roomRates[room.id]
+            : roomRates[room.number];
+        const numVal = Number(rawVal);
+        if (rawVal === "COMP" || rawVal === "0" || numVal === 0) {
+          isComp = true;
+          roomBasePrice = 0;
+        } else {
+          isComp = false;
+          roomBasePrice = isNaN(numVal) ? 3200 : numVal;
+        }
+      } else if (isPrimaryRoom) {
+        // Primary room inherits top-level isComplimentary or agreedTariff
+        isComp = Boolean(isComplimentary || agreedTariff === 0);
+        if (isComp) {
+          roomBasePrice = 0;
+        } else if (agreedTariff !== undefined && agreedTariff !== null) {
+          roomBasePrice = Number(agreedTariff);
+          isComp = roomBasePrice === 0;
+        } else if (room.roomTypeId) {
+          const rateVersion = await prisma.ratePlanVersion.findFirst({
+            where: { roomTypeId: room.roomTypeId, active: true },
+            orderBy: { createdAt: "desc" },
+          });
+          if (rateVersion?.pricingJson) {
+            try {
+              const pricing = JSON.parse(rateVersion.pricingJson);
+              if (pricing.basePrice) roomBasePrice = Number(pricing.basePrice);
+            } catch {}
+          }
+        }
+      } else {
+        // Additional room without custom entry in roomRates: use room category base price
+        if (room.roomTypeId) {
+          const rateVersion = await prisma.ratePlanVersion.findFirst({
+            where: { roomTypeId: room.roomTypeId, active: true },
+            orderBy: { createdAt: "desc" },
+          });
+          if (rateVersion?.pricingJson) {
+            try {
+              const pricing = JSON.parse(rateVersion.pricingJson);
+              if (pricing.basePrice) roomBasePrice = Number(pricing.basePrice);
+            } catch {}
+          }
+        } else if (agreedTariff !== undefined && agreedTariff !== null && Number(agreedTariff) > 0 && !isComplimentary) {
+          roomBasePrice = Number(agreedTariff);
         }
       }
 
@@ -479,7 +521,7 @@ export async function checkInGuest({
           stayId: stay.id,
           roomId: room.id,
           startsAt: new Date(),
-          moveReason: `AGREED_RATE:${roomBasePrice}`,
+          moveReason: isComp ? "AGREED_RATE:0" : `AGREED_RATE:${roomBasePrice}`,
           rateHandling: isComp ? "COMPLIMENTARY" : (checkoutType === "FIXED_TIME" ? "FIXED_TIME" : `24_HOURS:${gracePeriodMinutes}`),
         },
       });
@@ -557,7 +599,10 @@ export async function checkInGuest({
     });
   } else {
     // SEPARATE STAYS & FOLIOS FOR EACH ROOM
+    const primaryRoomId = roomIds[0];
+
     for (const room of rooms) {
+      const isPrimaryRoom = room.id === primaryRoomId;
       const stay = await prisma.stay.create({
         data: {
           organizationId: property.organizationId, propertyId, primaryGuestId: guest.id,
@@ -568,22 +613,60 @@ export async function checkInGuest({
       stayIdsForDeposit.push(stay.id);
 
       let roomBasePrice = 3200;
-      const isComp = Boolean(isComplimentary || agreedTariff === 0);
-      if (isComp) {
-        roomBasePrice = 0;
-      } else if (roomRates && roomRates[room.id] !== undefined && roomRates[room.id] !== "") {
-        roomBasePrice = Number(roomRates[room.id]);
-      } else if (agreedTariff !== undefined && agreedTariff !== null) {
-        roomBasePrice = Number(agreedTariff);
-      } else if (room.roomTypeId) {
-        const rateVersion = await prisma.ratePlanVersion.findFirst({
-          where: { roomTypeId: room.roomTypeId, active: true }, orderBy: { createdAt: "desc" },
-        });
-        if (rateVersion?.pricingJson) {
-          try {
-            const pricing = JSON.parse(rateVersion.pricingJson);
-            if (pricing.basePrice) roomBasePrice = Number(pricing.basePrice);
-          } catch {}
+      let isComp = false;
+
+      // 1. Check if room has an explicit custom rate in roomRates (by room ID or room number)
+      const hasCustomRate =
+        roomRates &&
+        ((roomRates[room.id] !== undefined && roomRates[room.id] !== "") ||
+          (room.number && roomRates[room.number] !== undefined && roomRates[room.number] !== ""));
+
+      if (hasCustomRate) {
+        const rawVal =
+          roomRates[room.id] !== undefined && roomRates[room.id] !== ""
+            ? roomRates[room.id]
+            : roomRates[room.number];
+        const numVal = Number(rawVal);
+        if (rawVal === "COMP" || rawVal === "0" || numVal === 0) {
+          isComp = true;
+          roomBasePrice = 0;
+        } else {
+          isComp = false;
+          roomBasePrice = isNaN(numVal) ? 3200 : numVal;
+        }
+      } else if (isPrimaryRoom) {
+        // Primary room inherits top-level isComplimentary or agreedTariff
+        isComp = Boolean(isComplimentary || agreedTariff === 0);
+        if (isComp) {
+          roomBasePrice = 0;
+        } else if (agreedTariff !== undefined && agreedTariff !== null) {
+          roomBasePrice = Number(agreedTariff);
+          isComp = roomBasePrice === 0;
+        } else if (room.roomTypeId) {
+          const rateVersion = await prisma.ratePlanVersion.findFirst({
+            where: { roomTypeId: room.roomTypeId, active: true }, orderBy: { createdAt: "desc" },
+          });
+          if (rateVersion?.pricingJson) {
+            try {
+              const pricing = JSON.parse(rateVersion.pricingJson);
+              if (pricing.basePrice) roomBasePrice = Number(pricing.basePrice);
+            } catch {}
+          }
+        }
+      } else {
+        // Additional room without custom entry in roomRates: use room category base price
+        if (room.roomTypeId) {
+          const rateVersion = await prisma.ratePlanVersion.findFirst({
+            where: { roomTypeId: room.roomTypeId, active: true }, orderBy: { createdAt: "desc" },
+          });
+          if (rateVersion?.pricingJson) {
+            try {
+              const pricing = JSON.parse(rateVersion.pricingJson);
+              if (pricing.basePrice) roomBasePrice = Number(pricing.basePrice);
+            } catch {}
+          }
+        } else if (agreedTariff !== undefined && agreedTariff !== null && Number(agreedTariff) > 0 && !isComplimentary) {
+          roomBasePrice = Number(agreedTariff);
         }
       }
 
@@ -592,7 +675,7 @@ export async function checkInGuest({
           stayId: stay.id,
           roomId: room.id,
           startsAt: new Date(),
-          moveReason: `AGREED_RATE:${roomBasePrice}`,
+          moveReason: isComp ? "AGREED_RATE:0" : `AGREED_RATE:${roomBasePrice}`,
           rateHandling: isComp ? "COMPLIMENTARY" : (checkoutType === "FIXED_TIME" ? "FIXED_TIME" : `24_HOURS:${gracePeriodMinutes}`),
         },
       });
@@ -703,7 +786,7 @@ export async function checkInGuest({
       propertyId: property.id,
       registrationNo: grcSeq.formattedNumber,
       status: "CHECKED_IN",
-      fullName: guestData.name,
+      fullName: guestData.fullName || guestData.name || guest.name,
       age: guestData.age ? Number(guestData.age) : undefined,
       gender: guestData.gender || "Male",
       nationality: guestData.nationality || "Indian",
@@ -720,9 +803,9 @@ export async function checkInGuest({
       goingTo: guestData.goingTo || "",
       purposeOfVisit: guestData.purposeOfVisit || "Tourism / Holiday",
       referralChannel: guestData.referralChannel || (guestData.companyName ? `Corporate (${guestData.companyName})` : "Direct / Walk-In"),
-      mobilePhone: guestData.phone || "",
-      alternatePhone: guestData.phone || "",
-      email: guestData.email || "",
+      mobilePhone: guestData.mobilePhone || guestData.phone || guest.phone,
+      alternatePhone: guestData.alternatePhone || guestData.phone || "",
+      email: guestData.email || guest.email || "",
       driverName: guestData.driverName || "",
       vehicleNumber: guestData.vehicleNumber || "",
       coGuestsJson: coGuests ? JSON.stringify(coGuests) : null,

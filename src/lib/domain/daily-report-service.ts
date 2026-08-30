@@ -151,13 +151,19 @@ export async function getDailyMidnightReport(
     where: {
       propertyId,
       status: "PAID",
-      paidAt: {
-        gte: localStart < startUtc ? localStart : startUtc,
-        lte: localEnd > endUtc ? localEnd : endUtc,
-      },
+      OR: [
+        { businessDate: reportDate },
+        {
+          paidAt: {
+            gte: localStart < startUtc ? localStart : startUtc,
+            lte: localEnd > endUtc ? localEnd : endUtc,
+          },
+        },
+      ],
     },
     orderBy: { paidAt: "desc" },
   });
+
 
   // 3. Fetch Folio Entries (Charges) for this service date / 12-to-12 window
   const folioEntries = await prisma.folioEntry.findMany({

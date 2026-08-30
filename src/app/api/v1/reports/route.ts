@@ -39,10 +39,17 @@ export async function GET(request: Request) {
         paymentWhere.receivedAt = dateFilter;
       }
 
+
       const expenseWhere: any = { propertyId, status: "PAID" };
-      if (dateFilter) {
+      if (date) {
+        expenseWhere.OR = [
+          { businessDate: date },
+          { paidAt: dateFilter },
+        ];
+      } else if (dateFilter) {
         expenseWhere.paidAt = dateFilter;
       }
+
 
       const [payments, expenses, property] = await Promise.all([
         prisma.payment.findMany({

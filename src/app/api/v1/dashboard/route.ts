@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
+import { ensurePropertyDateSynchronized } from "@/lib/domain/night-audit-service";
 
 export async function GET(request: Request) {
   try {
@@ -9,6 +10,10 @@ export async function GET(request: Request) {
     if (!propertyId) {
       return NextResponse.json({ error: "propertyId is required" }, { status: 400 });
     }
+
+    // Auto-sync property business date to today
+    await ensurePropertyDateSynchronized(propertyId);
+
 
     const property = await prisma.property.findUniqueOrThrow({
       where: { id: propertyId },

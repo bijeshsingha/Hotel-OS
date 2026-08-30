@@ -12,31 +12,54 @@ import {
   X,
   Wrench,
 } from "lucide-react";
-import { HOUSEKEEPING_COLUMNS } from "@/data";
+import { PageHeader, SegmentedControl } from "@/components/ui";
+import { apiCache } from "@/lib/cache/api-cache";
+
 
 export default function HousekeepingPage() {
   const { activeProperty, refreshKey, refreshData } = useHotel();
   const [tasks, setTasks] = useState<any[]>([]);
   const [rooms, setRooms] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<"board" | "tasks">("board");
+
 
   // Inspection modal
   const [inspectModal, setInspectModal] = useState<any | null>(null);
   const [inspectionDefectNote, setInspectionDefectNote] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
 
-  const loadData = async () => {
-    if (!activeProperty) return;
-    setLoading(true);
-    try {
-      const [tasksRes, roomsRes] = await Promise.all([
-        fetch(`/api/v1/housekeeping/tasks?propertyId=${activeProperty.id}`),
-        fetch(`/api/v1/rooms?propertyId=${activeProperty.id}`),
-      ]);
+  // Close modal on Escape
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setInspectModal(null);
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
-      const tasksData = await tasksRes.json();
-      const roomsData = await roomsRes.json();
+  const loadData = async (forceFresh = false) => {
+    if (!activeProperty) return;
+    const tasksUrl = `/api/v1/housekeeping/tasks?propertyId=${activeProperty.id}`;
+    const roomsUrl = `/api/v1/rooms?propertyId=${activeProperty.id}`;
+
+    // Read cached immediately for 0ms render
+    if (!forceFresh) {
+      const cachedTasks = apiCache.get(tasksUrl);
+      const cachedRooms = apiCache.get(roomsUrl);
+      if (cachedTasks && cachedRooms) {
+        setTasks(cachedTasks);
+        setRooms(cachedRooms);
+      } else {
+        setLoading(true);
+      }
+    }
+
+    try {
+      const [tasksData, roomsData] = await Promise.all([
+        apiCache.swrFetch(tasksUrl, undefined, (cached) => setTasks(cached)),
+        apiCache.swrFetch(roomsUrl, undefined, (cached) => setRooms(cached)),
+      ]);
 
       setTasks(Array.isArray(tasksData) ? tasksData : []);
       setRooms(Array.isArray(roomsData) ? roomsData : []);
@@ -52,7 +75,12 @@ export default function HousekeepingPage() {
   }, [activeProperty, refreshKey]);
 
   const handleTaskStatus = async (taskId: string, status: string, notes?: string) => {
-    setActionLoading(true);
+    // 1. Optimistic Update (0ms instant response)
+    const prevTasks = [...tasks];
+    setTasks((prev) =>
+      prev.map((t) => (t.id === taskId ? { ...t, status, notes: notes || t.notes } : t))
+    );
+
     try {
       const res = await fetch("/api/v1/housekeeping/tasks", {
         method: "PATCH",
@@ -61,17 +89,29 @@ export default function HousekeepingPage() {
       });
       if (!res.ok) throw new Error("Status update failed");
 
-      await loadData();
-      await refreshData();
+      apiCache.invalidate("housekeeping");
+      refreshData();
     } catch (err: any) {
+      // Rollback on failure
+      setTasks(prevTasks);
       alert(`Error updating task: ${err.message}`);
-    } finally {
-      setActionLoading(false);
     }
   };
 
   const handleRoomHKState = async (roomId: string, housekeepingStatus: string) => {
-    setActionLoading(true);
+    // 1. Optimistic Update (0ms instant response)
+    const prevRooms = [...rooms];
+    setRooms((prev) =>
+      prev.map((r) =>
+        r.id === roomId
+          ? {
+              ...r,
+              roomState: { ...r.roomState, housekeepingStatus },
+            }
+          : r
+      )
+    );
+
     try {
       const res = await fetch(`/api/v1/rooms/${roomId}/state`, {
         method: "POST",
@@ -80,14 +120,16 @@ export default function HousekeepingPage() {
       });
       if (!res.ok) throw new Error("Room state update failed");
 
-      await loadData();
-      await refreshData();
+      apiCache.invalidate("rooms");
+      apiCache.invalidate("pms");
+      refreshData();
     } catch (err: any) {
+      // Rollback on failure
+      setRooms(prevRooms);
       alert(`Error: ${err.message}`);
-    } finally {
-      setActionLoading(false);
     }
   };
+
 
   const outOfOrderRooms = rooms.filter(
     (r) =>
@@ -118,53 +160,32 @@ export default function HousekeepingPage() {
   );
 
   return (
-    <div className="space-y-4 max-w-[1500px] mx-auto w-full text-zinc-900 dark:text-zinc-100">
+    <div className="space-y-4 max-w-[1600px] mx-auto w-full text-zinc-900 dark:text-zinc-100">
       {/* Top Banner */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 sm:p-5 rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200/80 dark:border-zinc-800/80 shadow-xs">
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-base sm:text-lg font-bold text-zinc-900 dark:text-white flex items-center gap-2">
-              <Sparkles className="h-4.5 w-4.5 text-blue-600 dark:text-blue-400" />
-              Housekeeping Board
-            </h1>
-            <span className="rounded-md px-2 py-0.5 text-[10px] font-semibold text-zinc-600 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 uppercase">
-              H01–H05
-            </span>
-          </div>
-          <p className="text-xs text-zinc-500 mt-0.5">
-            Turnaround cleaning, supervisor inspections & room state transitions
-          </p>
-        </div>
+      <PageHeader
+        title="Housekeeping Board"
+        description="Turnaround cleaning, supervisor inspections & room state transitions"
+        icon={Sparkles}
+        badge="H01–H05"
+        badgeVariant="neutral"
+        businessDate={activeProperty?.businessDate}
+        actions={
+          <SegmentedControl
+            value={activeTab}
+            onChange={(val) => setActiveTab(val as "board" | "tasks")}
+            options={[
+              { value: "board", label: "Kanban Board" },
+              { value: "tasks", label: "Tasks", badge: tasks.length },
+            ]}
+          />
+        }
+      />
 
-        <div className="flex items-center gap-1.5 bg-zinc-100 dark:bg-zinc-900 p-1 rounded-xl border border-zinc-200 dark:border-zinc-800">
-          <button
-            onClick={() => setActiveTab("board")}
-            className={`rounded-lg px-3.5 py-1.5 text-xs font-semibold transition ${
-              activeTab === "board"
-                ? "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-xs"
-                : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200"
-            }`}
-          >
-            Kanban Board
-          </button>
-          <button
-            onClick={() => setActiveTab("tasks")}
-            className={`rounded-lg px-3.5 py-1.5 text-xs font-semibold transition ${
-              activeTab === "tasks"
-                ? "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-xs"
-                : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200"
-            }`}
-          >
-            Tasks ({tasks.length})
-          </button>
-        </div>
-      </div>
-
-      {/* TAB 1: KANBAN BOARD */}
+      {/* TAB 1: KANBAN BOARD (Responsive horizontally swipeable with scroll snapping on mobile) */}
       {activeTab === "board" && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-3.5">
+        <div className="flex md:grid md:grid-cols-4 gap-3.5 overflow-x-auto snap-x snap-mandatory pb-4 md:pb-0 scrollbar-thin">
           {/* DIRTY */}
-          <div className="rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200/80 dark:border-zinc-800/80 p-4 space-y-3 flex flex-col justify-between shadow-xs">
+          <div className="rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200/80 dark:border-zinc-800/80 p-4 space-y-3 flex flex-col justify-between shadow-xs min-w-[280px] sm:min-w-[320px] md:min-w-0 snap-center shrink-0 md:shrink">
             <div>
               <div className="flex items-center justify-between pb-2.5 border-b border-zinc-100 dark:border-zinc-800 text-xs font-semibold text-amber-700 dark:text-amber-400">
                 <span className="flex items-center gap-1.5">
@@ -212,7 +233,7 @@ export default function HousekeepingPage() {
           </div>
 
           {/* CLEAN */}
-          <div className="rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200/80 dark:border-zinc-800/80 p-4 space-y-3 flex flex-col justify-between shadow-xs">
+          <div className="rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200/80 dark:border-zinc-800/80 p-4 space-y-3 flex flex-col justify-between shadow-xs min-w-[280px] sm:min-w-[320px] md:min-w-0 snap-center shrink-0 md:shrink">
             <div>
               <div className="flex items-center justify-between pb-2.5 border-b border-zinc-100 dark:border-zinc-800 text-xs font-semibold text-blue-700 dark:text-blue-400">
                 <span className="flex items-center gap-1.5">
@@ -257,7 +278,7 @@ export default function HousekeepingPage() {
           </div>
 
           {/* INSPECTED */}
-          <div className="rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200/80 dark:border-zinc-800/80 p-4 space-y-3 flex flex-col justify-between shadow-xs">
+          <div className="rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200/80 dark:border-zinc-800/80 p-4 space-y-3 flex flex-col justify-between shadow-xs min-w-[280px] sm:min-w-[320px] md:min-w-0 snap-center shrink-0 md:shrink">
             <div>
               <div className="flex items-center justify-between pb-2.5 border-b border-zinc-100 dark:border-zinc-800 text-xs font-semibold text-emerald-700 dark:text-emerald-400">
                 <span className="flex items-center gap-1.5">
@@ -301,7 +322,7 @@ export default function HousekeepingPage() {
           </div>
 
           {/* OUT OF ORDER */}
-          <div className="rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200/80 dark:border-zinc-800/80 p-4 space-y-3 flex flex-col justify-between shadow-xs">
+          <div className="rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200/80 dark:border-zinc-800/80 p-4 space-y-3 flex flex-col justify-between shadow-xs min-w-[280px] sm:min-w-[320px] md:min-w-0 snap-center shrink-0 md:shrink">
             <div>
               <div className="flex items-center justify-between pb-2.5 border-b border-zinc-100 dark:border-zinc-800 text-xs font-semibold text-rose-700 dark:text-rose-400">
                 <span className="flex items-center gap-1.5">
@@ -353,6 +374,7 @@ export default function HousekeepingPage() {
       )}
 
       {/* TAB 2: TASKS LIST */}
+
       {activeTab === "tasks" && (
         <div className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-[#111114] overflow-hidden shadow-xs">
           <div className="p-4 sm:p-5 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between">

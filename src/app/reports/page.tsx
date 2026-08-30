@@ -48,8 +48,11 @@ import {
   RefreshCw,
   Archive,
 } from "lucide-react";
+import { apiCache } from "@/lib/cache/api-cache";
+import { PageHeader, StatCard, SegmentedControl } from "@/components/ui";
 
 export default function ReportsPage() {
+
   const { activeProperty, refreshKey, refreshData } = useHotel();
   const [reportType, setReportType] = useState<
     "CASHIER_COLLECTIONS_EXPENSES" | "FRONT_OFFICE" | "REVENUE" | "FNB"
@@ -121,22 +124,47 @@ export default function ReportsPage() {
     return () => clearInterval(interval);
   }, []);
 
-  // Fetch Report Data
-  const loadReportData = () => {
-    if (!activeProperty) return;
-    setLoading(true);
-    const dateParam = selectedDate || activeProperty.businessDate;
+  // Global Escape key listener to close reports modal
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setShowAddExpenseModal(false);
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
-    fetch(`/api/v1/reports?propertyId=${activeProperty.id}&type=${reportType}&date=${dateParam}`)
-      .then((res) => res.json())
-      .then((d) => setData(d))
-      .catch((err) => console.error("Report error:", err))
-      .finally(() => setLoading(false));
+  // Fetch Report Data with SWR (0ms instant render from cache)
+  const loadReportData = async (forceFresh = false) => {
+    if (!activeProperty) return;
+    const dateParam = selectedDate || activeProperty.businessDate;
+    const reportUrl = `/api/v1/reports?propertyId=${activeProperty.id}&type=${reportType}&date=${dateParam}`;
+
+    if (!forceFresh) {
+      const cached = apiCache.get(reportUrl);
+      if (cached) {
+        setData(cached);
+      } else {
+        setLoading(true);
+      }
+    }
+
+    try {
+      const d = await apiCache.swrFetch(reportUrl, undefined, (cached) => {
+        setData(cached);
+      });
+      setData(d);
+    } catch (err) {
+      console.error("Report error:", err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
     loadReportData();
   }, [activeProperty, reportType, selectedDate, refreshKey]);
+
+
 
   // Navigate Date
   const shiftDate = (days: number) => {
@@ -206,6 +234,7 @@ export default function ReportsPage() {
     setExpenseSubmitting(true);
     setExpenseError(null);
     try {
+      const targetBusinessDate = selectedDate || activeProperty.businessDate || new Date().toISOString().split("T")[0];
       const res = await fetch("/api/v1/expenses", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -219,6 +248,7 @@ export default function ReportsPage() {
           paymentMethod: expenseForm.paymentMethod,
           reference: expenseForm.reference,
           notes: expenseForm.notes,
+          businessDate: targetBusinessDate,
           createdByName: "Front Desk Cashier",
         }),
       });
@@ -238,18 +268,22 @@ export default function ReportsPage() {
         notes: "",
       });
 
+      apiCache.invalidate("reports");
+      // Reload report data immediately
+      await loadReportData(true);
+      await refreshData();
+
       setTimeout(() => {
         setShowAddExpenseModal(false);
         setExpenseSuccess(null);
-      }, 1200);
-
-      loadReportData();
-      refreshData();
+      }, 800);
     } catch (err: any) {
       setExpenseError(err.message);
+
     } finally {
       setExpenseSubmitting(false);
     }
+
   };
 
   // Filtered Transactions for Cashier Report
@@ -357,51 +391,44 @@ export default function ReportsPage() {
   const isToday = (selectedDate || activeProperty?.businessDate) === activeProperty?.businessDate;
 
   return (
-    <div className="space-y-4 max-w-[1500px] mx-auto w-full text-zinc-900 dark:text-zinc-100 pb-12">
+    <div className="space-y-4 max-w-[1600px] mx-auto w-full text-zinc-900 dark:text-zinc-100 pb-12">
+
       {/* Top Banner */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 sm:p-5 rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200/80 dark:border-zinc-800/80 shadow-xs">
-        <div>
+      <PageHeader
+        title="Daily Operational & Manager Reporting"
+        description="24-hour midnight-to-midnight financial reconciliations, cash drawer balances & manager audits"
+        icon={BarChart3}
+        badge="12 AM – 12 AM Midnight Cycle"
+        badgeVariant="info"
+        businessDate={activeProperty?.businessDate}
+        actions={
           <div className="flex items-center gap-2 flex-wrap">
-            <h1 className="text-base sm:text-lg font-bold text-zinc-900 dark:text-white flex items-center gap-2">
-              <BarChart3 className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
-              Daily Operational & Manager Reporting
-            </h1>
-            <span className="rounded-md px-2 py-0.5 text-[10px] font-semibold text-indigo-700 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-200 dark:border-indigo-800/60 flex items-center gap-1 uppercase">
-              <Moon className="h-3 w-3" /> 12 AM – 12 AM Midnight Cycle
-            </span>
+            {reportType === "CASHIER_COLLECTIONS_EXPENSES" && (
+              <>
+                <button
+                  onClick={() => setShowAddExpenseModal(true)}
+                  className="flex items-center gap-1.5 rounded-xl bg-rose-50 border border-rose-200 hover:bg-rose-100 dark:bg-rose-950/40 dark:border-rose-800/60 dark:hover:bg-rose-900/50 px-3.5 py-2 text-xs font-semibold text-rose-700 dark:text-rose-300 transition shadow-xs cursor-pointer"
+                >
+                  <Plus className="h-4 w-4" /> Record Expense
+                </button>
+                <button
+                  onClick={() => setShowPrintModal(true)}
+                  className="flex items-center gap-1.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 border border-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 dark:border-zinc-700 px-3.5 py-2 text-xs font-semibold text-zinc-800 dark:text-zinc-200 transition shadow-xs cursor-pointer"
+                >
+                  <Printer className="h-4 w-4 text-zinc-500 dark:text-zinc-400" /> Print Cashier Sheet
+                </button>
+              </>
+            )}
+
+            <button
+              onClick={exportCSV}
+              className="flex items-center gap-1.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-200 dark:text-zinc-950 px-4 py-2 text-xs font-semibold transition shadow-xs cursor-pointer"
+            >
+              <Download className="h-4 w-4" /> Export CSV
+            </button>
           </div>
-          <p className="text-xs text-zinc-500 mt-0.5">
-            24-hour midnight-to-midnight financial reconciliations, cash drawer balances & manager audits
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2 flex-wrap">
-
-          {reportType === "CASHIER_COLLECTIONS_EXPENSES" && (
-            <>
-              <button
-                onClick={() => setShowAddExpenseModal(true)}
-                className="flex items-center gap-1.5 rounded-xl bg-rose-50 border border-rose-200 hover:bg-rose-100 dark:bg-rose-950/40 dark:border-rose-800/60 dark:hover:bg-rose-900/50 px-3.5 py-2 text-xs font-semibold text-rose-700 dark:text-rose-300 transition shadow-xs cursor-pointer"
-              >
-                <Plus className="h-4 w-4" /> Record Expense
-              </button>
-              <button
-                onClick={() => setShowPrintModal(true)}
-                className="flex items-center gap-1.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 border border-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 dark:border-zinc-700 px-3.5 py-2 text-xs font-semibold text-zinc-800 dark:text-zinc-200 transition shadow-xs cursor-pointer"
-              >
-                <Printer className="h-4 w-4 text-zinc-500 dark:text-zinc-400" /> Print Cashier Sheet
-              </button>
-            </>
-          )}
-
-          <button
-            onClick={exportCSV}
-            className="flex items-center gap-1.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-200 dark:text-zinc-950 px-4 py-2 text-xs font-semibold transition shadow-xs cursor-pointer"
-          >
-            <Download className="h-4 w-4" /> Export CSV
-          </button>
-        </div>
-      </div>
+        }
+      />
 
       {snapshotMsg && (
         <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800/60 text-xs font-semibold text-emerald-800 dark:text-emerald-300 flex items-center gap-2 shadow-xs animate-in fade-in">
@@ -479,48 +506,19 @@ export default function ReportsPage() {
       </div>
 
       {/* Main Report Navigation Tabs */}
-      <div className="flex items-center gap-1.5 border-b border-zinc-200 dark:border-zinc-800 pb-3 flex-wrap">
-        <button
-          onClick={() => setReportType("CASHIER_COLLECTIONS_EXPENSES")}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition cursor-pointer ${
-            reportType === "CASHIER_COLLECTIONS_EXPENSES"
-              ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 shadow-xs"
-              : "bg-zinc-100 hover:bg-zinc-200 text-zinc-700 dark:bg-zinc-900 dark:hover:bg-zinc-800 dark:text-zinc-300"
-          }`}
-        >
-          <Wallet className="h-4 w-4" /> Cashier Collections & Expenses
-        </button>
-        <button
-          onClick={() => setReportType("FRONT_OFFICE")}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition cursor-pointer ${
-            reportType === "FRONT_OFFICE"
-              ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 shadow-xs"
-              : "bg-zinc-100 hover:bg-zinc-200 text-zinc-700 dark:bg-zinc-900 dark:hover:bg-zinc-800 dark:text-zinc-300"
-          }`}
-        >
-          <BedDouble className="h-4 w-4" /> Front Desk Room Rack
-        </button>
-        <button
-          onClick={() => setReportType("REVENUE")}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition cursor-pointer ${
-            reportType === "REVENUE"
-              ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 shadow-xs"
-              : "bg-zinc-100 hover:bg-zinc-200 text-zinc-700 dark:bg-zinc-900 dark:hover:bg-zinc-800 dark:text-zinc-300"
-          }`}
-        >
-          <TrendingUp className="h-4 w-4" /> Revenue & Tax Ledger
-        </button>
-        <button
-          onClick={() => setReportType("FNB")}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition cursor-pointer ${
-            reportType === "FNB"
-              ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 shadow-xs"
-              : "bg-zinc-100 hover:bg-zinc-200 text-zinc-700 dark:bg-zinc-900 dark:hover:bg-zinc-800 dark:text-zinc-300"
-          }`}
-        >
-          <UtensilsCrossed className="h-4 w-4" /> F&B / Restaurant Dining
-        </button>
+      <div className="border-b border-zinc-200 dark:border-zinc-800 pb-3">
+        <SegmentedControl
+          value={reportType}
+          onChange={(val) => setReportType(val as any)}
+          options={[
+            { value: "CASHIER_COLLECTIONS_EXPENSES", label: "Cashier Collections & Expenses", icon: Wallet },
+            { value: "FRONT_OFFICE", label: "Front Desk Room Rack", icon: BedDouble },
+            { value: "REVENUE", label: "Revenue & Tax Ledger", icon: TrendingUp },
+            { value: "FNB", label: "F&B / Restaurant Dining", icon: UtensilsCrossed },
+          ]}
+        />
       </div>
+
 
       {/* ========================================================================= */}
       {/* TAB 1: CASHIER COLLECTIONS & EXPENSES LEDGER */}

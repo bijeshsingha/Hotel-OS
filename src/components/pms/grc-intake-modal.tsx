@@ -419,6 +419,7 @@ export function GrcIntakeModal({
   };
 
   const selectedRoom = rooms.find((r) => r.id === formData.roomId);
+  const primaryRoom = selectedRoom;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-2 sm:p-4 overflow-y-auto animate-in fade-in">
@@ -647,12 +648,15 @@ export function GrcIntakeModal({
                     {formData.additionalRoomIds.map((id) => {
                       const r = rooms.find((room) => room.id === id);
                       const roomPaxCount = formData.roomExtraPax?.[id] || 0;
+                      const isRoomComp = formData.roomRates[id] === "0" || formData.roomRates[id] === "COMP";
+                      const currentRate = formData.roomRates[id] !== undefined ? formData.roomRates[id] : (r?.roomType?.basePrice ? String(r.roomType.basePrice) : "3200");
+
                       return (
                         <div
                           key={id}
                           className="p-3 rounded-xl bg-blue-50/70 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800/50 space-y-2 shadow-xs"
                         >
-                          <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center justify-between gap-2 flex-wrap">
                             <div className="flex items-center gap-2">
                               <span className="px-2.5 py-1 rounded-lg bg-blue-100 dark:bg-blue-500/20 text-blue-800 dark:text-blue-300 font-bold font-mono text-xs border border-blue-200 dark:border-blue-500/30">
                                 Room {r?.number}
@@ -663,19 +667,45 @@ export function GrcIntakeModal({
                             </div>
 
                             <div className="flex items-center gap-2">
+                              {/* Per-Room Comp Toggle */}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setFormData((prev) => {
+                                    const nextRate = isRoomComp
+                                      ? (r?.roomType?.basePrice ? String(r.roomType.basePrice) : "3200")
+                                      : "0";
+                                    return {
+                                      ...prev,
+                                      roomRates: { ...prev.roomRates, [id]: nextRate },
+                                    };
+                                  });
+                                }}
+                                className={`px-2 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1 cursor-pointer border ${
+                                  isRoomComp
+                                    ? "bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800 shadow-xs"
+                                    : "bg-white dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 border-zinc-200 dark:border-zinc-700 hover:text-emerald-700 hover:bg-emerald-50"
+                                }`}
+                                title="Toggle complimentary stay for this specific room"
+                              >
+                                <span>🎁</span>
+                                <span>{isRoomComp ? "Comp (₹0)" : "Comp"}</span>
+                              </button>
+
                               <div className="relative flex items-center">
                                 <span className="absolute left-2 text-xs text-zinc-400 font-bold font-mono">₹</span>
                                 <input
                                   type="number"
                                   placeholder="Rate"
-                                  value={formData.roomRates[id] || ""}
+                                  disabled={isRoomComp}
+                                  value={isRoomComp ? "0" : currentRate}
                                   onChange={(e) =>
                                     setFormData((prev) => ({
                                       ...prev,
                                       roomRates: { ...prev.roomRates, [id]: e.target.value },
                                     }))
                                   }
-                                  className="w-24 h-8 pl-5 pr-2 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white font-mono text-xs font-bold focus:border-blue-500 focus:outline-none"
+                                  className="w-24 h-8 pl-5 pr-2 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white font-mono text-xs font-bold focus:border-blue-500 focus:outline-none disabled:opacity-60 disabled:bg-zinc-100 dark:disabled:bg-zinc-800"
                                 />
                               </div>
                               <button
@@ -683,15 +713,18 @@ export function GrcIntakeModal({
                                 onClick={() =>
                                   setFormData((prev) => {
                                     const nextPax = { ...(prev.roomExtraPax || {}) };
+                                    const nextRates = { ...(prev.roomRates || {}) };
                                     delete nextPax[id];
+                                    delete nextRates[id];
                                     return {
                                       ...prev,
                                       additionalRoomIds: prev.additionalRoomIds.filter((rid) => rid !== id),
                                       roomExtraPax: nextPax,
+                                      roomRates: nextRates,
                                     };
                                   })
                                 }
-                                className="p-1.5 text-zinc-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-colors"
+                                className="p-1.5 text-zinc-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-colors cursor-pointer"
                                 title="Remove Room"
                               >
                                 <X className="w-4 h-4" />
@@ -761,9 +794,15 @@ export function GrcIntakeModal({
                     value=""
                     onChange={(e) => {
                       if (e.target.value) {
+                        const newId = e.target.value;
+                        const roomObj = rooms.find((r) => r.id === newId);
+                        const defaultRate = roomObj?.roomType?.basePrice
+                          ? String(roomObj.roomType.basePrice)
+                          : "3200";
                         setFormData((prev) => ({
                           ...prev,
-                          additionalRoomIds: [...prev.additionalRoomIds, e.target.value],
+                          additionalRoomIds: [...prev.additionalRoomIds, newId],
+                          roomRates: { ...prev.roomRates, [newId]: defaultRate },
                         }));
                       }
                     }}
@@ -1629,10 +1668,12 @@ export function GrcIntakeModal({
 
             {/* 6. ADVANCE PAYMENT & SETTLEMENT */}
             <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-[#09090b] p-4 space-y-3.5 shadow-xs">
-              <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 pb-2">
+              <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 pb-2 flex-wrap gap-2">
                 <span className="font-bold text-zinc-900 dark:text-white uppercase tracking-wider flex items-center gap-2 text-xs">
                   <CreditCard className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-                  6. Room Tariff, Complimentary Option & Advance Deposit
+                  {formData.additionalRoomIds.length > 0
+                    ? `6. Primary Room (Room ${primaryRoom?.number || ""}) Tariff, Complimentary & Deposit`
+                    : "6. Room Tariff, Complimentary Option & Advance Deposit"}
                 </span>
 
                 {/* Complimentary Room Option */}
@@ -1642,22 +1683,67 @@ export function GrcIntakeModal({
                     checked={formData.isComplimentary}
                     onChange={(e) => {
                       const checked = e.target.checked;
-                      setFormData({
-                        ...formData,
+                      setFormData((prev) => ({
+                        ...prev,
                         isComplimentary: checked,
-                        agreedTariff: checked ? "0" : formData.agreedTariff,
-                      });
+                        agreedTariff: checked ? "0" : (prev.agreedTariff === "0" ? String(primaryRoom?.roomType?.basePrice || 3200) : prev.agreedTariff),
+                      }));
                     }}
                     className="w-4 h-4 rounded text-emerald-600 cursor-pointer"
                   />
-                  <span>🎁 Complimentary Room (₹0 Free Stay)</span>
+                  <span>🎁 {formData.additionalRoomIds.length > 0 ? `Room ${primaryRoom?.number || "1"} Complimentary (₹0)` : "Complimentary Room (₹0 Free Stay)"}</span>
                 </label>
               </div>
+
+              {/* Multi-Room Tariff Summary Breakdown */}
+              {formData.additionalRoomIds.length > 0 && (
+                <div className="p-3 rounded-xl bg-white dark:bg-zinc-900 border border-blue-200 dark:border-blue-800/60 space-y-2 text-xs">
+                  <div className="font-bold text-zinc-800 dark:text-zinc-200 flex items-center justify-between flex-wrap gap-2">
+                    <span>Group Booking Room Tariffs Breakdown:</span>
+                    <span className="font-mono text-blue-600 dark:text-blue-400 font-black">
+                      Total Daily: ₹{
+                        (formData.isComplimentary ? 0 : (Number(formData.agreedTariff) || Number(primaryRoom?.roomType?.basePrice) || 3200)) +
+                        formData.additionalRoomIds.reduce((sum, rid) => {
+                          const rObj = rooms.find((r) => r.id === rid);
+                          const rateVal = formData.roomRates[rid];
+                          if (rateVal === "0" || rateVal === "COMP") return sum;
+                          const rRate = rateVal !== undefined && rateVal !== "" ? Number(rateVal) : (rObj?.roomType?.basePrice || 3200);
+                          return sum + (isNaN(rRate) ? 3200 : rRate);
+                        }, 0)
+                      }
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                    <div className="p-2 rounded-lg bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 flex items-center justify-between">
+                      <span className="font-bold text-zinc-700 dark:text-zinc-300">Room {primaryRoom?.number} (Primary):</span>
+                      <span className={`font-mono font-bold ${formData.isComplimentary ? "text-emerald-600 dark:text-emerald-400" : "text-zinc-900 dark:text-white"}`}>
+                        {formData.isComplimentary ? "🎁 Comp (₹0)" : `₹${formData.agreedTariff || primaryRoom?.roomType?.basePrice || 3200}`}
+                      </span>
+                    </div>
+                    {formData.additionalRoomIds.map((rid) => {
+                      const rObj = rooms.find((r) => r.id === rid);
+                      const rateVal = formData.roomRates[rid];
+                      const isComp = rateVal === "0" || rateVal === "COMP";
+                      const rateDisplay = isComp ? "🎁 Comp (₹0)" : `₹${rateVal !== undefined && rateVal !== "" ? rateVal : (rObj?.roomType?.basePrice || 3200)}`;
+                      return (
+                        <div key={rid} className="p-2 rounded-lg bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 flex items-center justify-between">
+                          <span className="font-bold text-zinc-700 dark:text-zinc-300">Room {rObj?.number}:</span>
+                          <span className={`font-mono font-bold ${isComp ? "text-emerald-600 dark:text-emerald-400" : "text-zinc-900 dark:text-white"}`}>
+                            {rateDisplay}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
               <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
                 <div className="space-y-1">
                   <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">
-                    Agreed Room Rate (₹)
+                    {formData.additionalRoomIds.length > 0
+                      ? `Primary Rate (Room ${primaryRoom?.number || ""}) (₹)`
+                      : "Agreed Room Rate (₹)"}
                   </label>
                   <div className="relative flex items-center">
                     <span className="absolute left-3 text-zinc-400 font-bold font-mono text-xs">₹</span>
@@ -1671,6 +1757,7 @@ export function GrcIntakeModal({
                     />
                   </div>
                 </div>
+
 
                 <div className="space-y-1">
                   <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">

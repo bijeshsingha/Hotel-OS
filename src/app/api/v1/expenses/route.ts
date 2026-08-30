@@ -34,6 +34,8 @@ export async function POST(request: Request) {
       paymentMethod,
       reference,
       notes,
+      businessDate,
+      paidAt,
       createdByName = "Staff",
     } = body;
 
@@ -58,6 +60,7 @@ export async function POST(request: Request) {
 
     const count = await prisma.expense.count({ where: { propertyId } });
     const voucherNo = `EXP-${property.code}-2627-${String(count + 1).padStart(4, "0")}`;
+    const targetBusinessDate = businessDate || property.businessDate || new Date().toISOString().split("T")[0];
 
     const expense = await prisma.expense.create({
       data: {
@@ -73,13 +76,15 @@ export async function POST(request: Request) {
         paymentMethod,
         reference: reference || null,
         notes: notes || null,
-        businessDate: property.businessDate || new Date().toISOString().split("T")[0],
+        businessDate: targetBusinessDate,
+        paidAt: paidAt ? new Date(paidAt) : new Date(),
         createdByName,
         status: "PAID",
       },
     });
 
     return NextResponse.json({ success: true, expense });
+
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

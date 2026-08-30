@@ -15,6 +15,8 @@ import {
   Calendar,
   ArrowUpRight,
   CheckCircle2,
+  Clock,
+  ChevronRight,
 } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -25,6 +27,7 @@ import {
   Tooltip,
   CartesianGrid,
 } from "recharts";
+import { PageHeader, StatCard } from "@/components/ui";
 
 export default function DashboardPage() {
   const { activeProperty, refreshKey } = useHotel();
@@ -55,165 +58,143 @@ export default function DashboardPage() {
   const { kpis, trendHistory, propertiesComparison } = data;
 
   return (
-    <div className="space-y-4 max-w-[1500px] mx-auto w-full">
+    <div className="space-y-4 max-w-[1600px] mx-auto w-full">
       {/* Top Property Info Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200/80 dark:border-zinc-800/80 shadow-xs">
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-lg sm:text-xl font-bold text-zinc-900 dark:text-white tracking-tight">
-              {activeProperty?.displayName}
-            </h1>
-            <span className="rounded-md px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 uppercase tracking-wide">
-              Live
-            </span>
-          </div>
-          <p className="text-xs text-zinc-500 mt-0.5">
-            GSTIN: <span className="font-mono">{data.property.gstin || "N/A"}</span> • Code: <span className="font-mono">{activeProperty?.code}</span>
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2 text-xs">
-          <div className="rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 px-3 py-1.5 text-right shadow-xs">
-            <span className="text-zinc-400 text-[10px] block font-semibold uppercase">Business Date</span>
-            <span className="font-bold font-mono text-zinc-800 dark:text-zinc-200">{activeProperty?.businessDate}</span>
-          </div>
-          <div className="rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 px-3 py-1.5 text-right shadow-xs">
+      <PageHeader
+        title={activeProperty?.displayName || "Hotel Management Dashboard"}
+        description={`GSTIN: ${data.property?.gstin || "N/A"} • Property Code: ${activeProperty?.code || "DEFAULT"} • Multi-Property Portfolio`}
+        badge="Live"
+        badgeVariant="live"
+        businessDate={activeProperty?.businessDate}
+        metadata={
+          <div className="rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 px-3 py-1.5 text-right shadow-xs shrink-0">
             <span className="text-zinc-400 text-[10px] block font-semibold uppercase">Audit Cutoff</span>
-            <span className="font-bold font-mono text-amber-600 dark:text-amber-400">03:00 AM</span>
+            <span className="font-bold font-mono text-xs text-amber-600 dark:text-amber-400">03:00 AM</span>
           </div>
-        </div>
-      </div>
+        }
+      />
 
       {/* Front Desk & Operations Launchpad */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
         <a
           href="/pms"
-          className="group p-4 rounded-2xl bg-gradient-to-br from-emerald-950/30 via-zinc-900 to-zinc-950 border border-emerald-500/20 hover:border-emerald-500/50 transition-all shadow-sm space-y-2.5"
+          className="group p-4 rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200/80 dark:border-zinc-800/80 hover:border-emerald-400 dark:hover:border-emerald-500/50 transition-all shadow-xs space-y-2.5"
         >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
-              <span className="p-2 rounded-xl bg-emerald-500/15 text-emerald-400">
+              <span className="h-9 w-9 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
                 <BedDouble className="h-4.5 w-4.5" />
               </span>
               <div>
-                <h3 className="text-sm font-bold text-white group-hover:text-emerald-400 transition">PMS Room Rack</h3>
-                <p className="text-xs text-zinc-400">35 Rooms Ready • 100% Vacant</p>
+                <h3 className="text-sm font-bold text-zinc-900 dark:text-white group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition">
+                  PMS Room Rack
+                </h3>
+                <p className="text-xs text-zinc-500">
+                  {kpis.totalRooms} Rooms Total • {kpis.inspectedRooms} Clean & Ready
+                </p>
               </div>
             </div>
-            <ArrowUpRight className="h-4 w-4 text-emerald-400 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition" />
+            <ArrowUpRight className="h-4 w-4 text-zinc-400 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition" />
           </div>
-          <div className="pt-2 border-t border-white/5 flex items-center justify-between text-xs">
-            <span className="text-zinc-400">Front Desk Check-In</span>
-            <span className="font-semibold text-emerald-400">Open Grid →</span>
+          <div className="pt-2 border-t border-zinc-100 dark:border-zinc-800/80 flex items-center justify-between text-xs">
+            <span className="text-zinc-500">Front Desk & Intake</span>
+            <span className="font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-0.5">
+              Open Grid <ChevronRight className="h-3 w-3" />
+            </span>
           </div>
         </a>
 
         <a
           href="/pms?tab=reservations"
-          className="group p-4 rounded-2xl bg-gradient-to-br from-blue-950/30 via-zinc-900 to-zinc-950 border border-blue-500/20 hover:border-blue-500/50 transition-all shadow-sm space-y-2.5"
+          className="group p-4 rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200/80 dark:border-zinc-800/80 hover:border-blue-400 dark:hover:border-blue-500/50 transition-all shadow-xs space-y-2.5"
         >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
-              <span className="p-2 rounded-xl bg-blue-500/15 text-blue-400">
+              <span className="h-9 w-9 rounded-xl bg-blue-50 dark:bg-blue-950/50 border border-blue-200 dark:border-blue-800/60 text-blue-600 dark:text-blue-400 flex items-center justify-center">
                 <Calendar className="h-4.5 w-4.5" />
               </span>
               <div>
-                <h3 className="text-sm font-bold text-white group-hover:text-blue-400 transition">Future Bookings</h3>
-                <p className="text-xs text-zinc-400">Advance Room Reservations</p>
+                <h3 className="text-sm font-bold text-zinc-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition">
+                  Future Bookings
+                </h3>
+                <p className="text-xs text-zinc-500">Advance Room Reservations</p>
               </div>
             </div>
-            <ArrowUpRight className="h-4 w-4 text-blue-400 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition" />
+            <ArrowUpRight className="h-4 w-4 text-zinc-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition" />
           </div>
-          <div className="pt-2 border-t border-white/5 flex items-center justify-between text-xs">
-            <span className="text-zinc-400">Create & Manage Bookings</span>
-            <span className="font-semibold text-blue-400">+ New Booking →</span>
+          <div className="pt-2 border-t border-zinc-100 dark:border-zinc-800/80 flex items-center justify-between text-xs">
+            <span className="text-zinc-500">Create & Manage Bookings</span>
+            <span className="font-semibold text-blue-600 dark:text-blue-400 flex items-center gap-0.5">
+              Bookings Suite <ChevronRight className="h-3 w-3" />
+            </span>
           </div>
         </a>
 
         <a
           href="/order"
-          className="group p-4 rounded-2xl bg-gradient-to-br from-amber-950/30 via-zinc-900 to-zinc-950 border border-amber-500/20 hover:border-amber-500/50 transition-all shadow-sm space-y-2.5"
+          className="group p-4 rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200/80 dark:border-zinc-800/80 hover:border-amber-400 dark:hover:border-amber-500/50 transition-all shadow-xs space-y-2.5 sm:col-span-2 lg:col-span-1"
         >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
-              <span className="p-2 rounded-xl bg-amber-500/15 text-amber-400">
+              <span className="h-9 w-9 rounded-xl bg-amber-50 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-800/60 text-amber-600 dark:text-amber-400 flex items-center justify-center">
                 <UtensilsCrossed className="h-4.5 w-4.5" />
               </span>
               <div>
-                <h3 className="text-sm font-bold text-white group-hover:text-amber-400 transition">In-Room Dining POS</h3>
-                <p className="text-xs text-zinc-400">93 Menu Items Active</p>
+                <h3 className="text-sm font-bold text-zinc-900 dark:text-white group-hover:text-amber-600 dark:group-hover:text-amber-400 transition">
+                  In-Room Dining POS
+                </h3>
+                <p className="text-xs text-zinc-500">93 Menu Items Active</p>
               </div>
             </div>
-            <ArrowUpRight className="h-4 w-4 text-amber-400 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition" />
+            <ArrowUpRight className="h-4 w-4 text-zinc-400 group-hover:text-amber-600 dark:group-hover:text-amber-400 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition" />
           </div>
-          <div className="pt-2 border-t border-white/5 flex items-center justify-between text-xs">
-            <span className="text-zinc-400">Restaurant & Room Service</span>
-            <span className="font-semibold text-amber-400">Open Menu →</span>
+          <div className="pt-2 border-t border-zinc-100 dark:border-zinc-800/80 flex items-center justify-between text-xs">
+            <span className="text-zinc-500">Restaurant & Room Service</span>
+            <span className="font-semibold text-amber-600 dark:text-amber-400 flex items-center gap-0.5">
+              Open Menu <ChevronRight className="h-3 w-3" />
+            </span>
           </div>
         </a>
       </div>
 
-      {/* KPI Stats Grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
+      {/* KPI Stats Grid (4 -> 2 -> 1 Responsive Reflow) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
         {/* Occupancy % */}
-        <div className="p-4 rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200/80 dark:border-zinc-800/80 hover:border-zinc-300 dark:hover:border-zinc-700 transition shadow-xs">
-          <div className="flex items-center justify-between text-zinc-500 dark:text-zinc-400">
-            <span className="text-xs font-semibold uppercase tracking-wider">Occupancy</span>
-            <BedDouble className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-          </div>
-          <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-2xl sm:text-3xl font-bold text-zinc-900 dark:text-white tabular-nums">{kpis.occupancyPct}%</span>
-            <span className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold flex items-center">
-              <ArrowUpRight className="h-3.5 w-3.5" /> +4.2%
-            </span>
-          </div>
-          <div className="mt-1 text-xs text-zinc-500">
-            {kpis.inHouseStays} / {kpis.totalRooms} rooms occupied
-          </div>
-        </div>
+        <StatCard
+          label="Occupancy"
+          value={`${kpis.occupancyPct}%`}
+          subtext={`${kpis.inHouseStays} / ${kpis.totalRooms} rooms occupied`}
+          icon={BedDouble}
+          variant="blue"
+          badge="+4.2%"
+        />
 
         {/* RevPAR */}
-        <div className="p-4 rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200/80 dark:border-zinc-800/80 hover:border-zinc-300 dark:hover:border-zinc-700 transition shadow-xs">
-          <div className="flex items-center justify-between text-zinc-500 dark:text-zinc-400">
-            <span className="text-xs font-semibold uppercase tracking-wider">RevPAR</span>
-            <TrendingUp className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-          </div>
-          <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-2xl sm:text-3xl font-bold text-zinc-900 dark:text-white tabular-nums">{formatINR(kpis.revpar)}</span>
-          </div>
-          <div className="mt-1 text-xs text-zinc-500">
-            ADR: <span className="text-zinc-800 dark:text-zinc-200 font-semibold">{formatINR(kpis.adr)}</span>
-          </div>
-        </div>
+        <StatCard
+          label="RevPAR"
+          value={formatINR(kpis.revpar)}
+          subtext={`ADR: ${formatINR(kpis.adr)} / occupied`}
+          icon={TrendingUp}
+          variant="green"
+        />
 
         {/* Total Day Revenue */}
-        <div className="p-4 rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200/80 dark:border-zinc-800/80 hover:border-zinc-300 dark:hover:border-zinc-700 transition shadow-xs">
-          <div className="flex items-center justify-between text-zinc-500 dark:text-zinc-400">
-            <span className="text-xs font-semibold uppercase tracking-wider">Day Revenue</span>
-            <DollarSign className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-          </div>
-          <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-2xl sm:text-3xl font-bold text-zinc-900 dark:text-white tabular-nums">{formatINR(kpis.grossRevenue)}</span>
-          </div>
-          <div className="mt-1 text-xs text-zinc-500 flex items-center justify-between">
-            <span>Room: {formatINR(kpis.roomRevenue)}</span>
-            <span>F&B: {formatINR(kpis.fbRevenue)}</span>
-          </div>
-        </div>
+        <StatCard
+          label="Day Revenue"
+          value={formatINR(kpis.grossRevenue)}
+          subtext={`Room: ${formatINR(kpis.roomRevenue)} • F&B: ${formatINR(kpis.fbRevenue)}`}
+          icon={DollarSign}
+          variant="amber"
+        />
 
-        {/* Total Taxes & Folios */}
-        <div className="p-4 rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200/80 dark:border-zinc-800/80 hover:border-zinc-300 dark:hover:border-zinc-700 transition shadow-xs">
-          <div className="flex items-center justify-between text-zinc-500 dark:text-zinc-400">
-            <span className="text-xs font-semibold uppercase tracking-wider">GST Collected</span>
-            <Receipt className="h-4 w-4 text-purple-600 dark:text-purple-400" />
-          </div>
-          <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-2xl sm:text-3xl font-bold text-zinc-900 dark:text-white tabular-nums">{formatINR(kpis.totalTaxes)}</span>
-          </div>
-          <div className="mt-1 text-xs text-zinc-500">
-            Folio Balances: <span className="text-rose-600 dark:text-rose-400 font-semibold">{formatINR(kpis.outstandingFolioBalance)}</span>
-          </div>
-        </div>
+        {/* Total Taxes & Outstanding */}
+        <StatCard
+          label="GST Collected"
+          value={formatINR(kpis.totalTaxes)}
+          subtext={`Folio Balances: ${formatINR(kpis.outstandingFolioBalance)}`}
+          icon={Receipt}
+          variant="default"
+        />
       </div>
 
       {/* 14-Day Performance Trend Chart & Operational Status */}
@@ -349,7 +330,7 @@ export default function DashboardPage() {
               key={prop.id}
               className={`rounded-2xl p-4 border transition flex flex-col justify-between shadow-xs ${
                 prop.id === activeProperty?.id
-                  ? "bg-blue-50/50 dark:bg-zinc-900/80 border-blue-300 dark:border-blue-500/40"
+                  ? "bg-blue-50/40 dark:bg-blue-950/20 border-blue-300 dark:border-blue-500/40"
                   : "bg-zinc-50/50 dark:bg-zinc-900/30 border-zinc-200/80 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700"
               }`}
             >

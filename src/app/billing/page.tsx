@@ -31,6 +31,8 @@ import {
 } from "lucide-react";
 import { DISCOUNT_REASONS, PAYMENT_METHODS } from "@/data";
 import { PrintableTaxInvoiceModal } from "@/components/billing/printable-tax-invoice";
+import { apiCache } from "@/lib/cache/api-cache";
+
 
 // Helper to match charges with specific rooms in separate billing mode
 function isEntryForRoom(entry: any, roomNumber: string, allOtherRoomNumbers: string[]): boolean {
@@ -164,13 +166,50 @@ function BillingContent() {
   // Grace Period control state (in minutes)
   const [gracePeriodMinutes, setGracePeriodMinutes] = useState<number>(60);
 
+  // Global Escape key listener to close billing modals
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setShowPaymentModal(false);
+        setShowRefundModal(false);
+        setShowManualChargeModal(false);
+        setShowDiscountModal(false);
+        setShowInvoiceModal(false);
+        setShowGroupPaymentModal(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
+
   // Load in-house and past stays for current property
-  const loadStays = async () => {
+  const loadStays = async (forceFresh = false) => {
     if (!activeProperty?.id) return;
-    setLoading(true);
+    const staysUrl = `/api/v1/stays?propertyId=${activeProperty.id}`;
+
+    // Instant SWR cache lookup (0ms render)
+    if (!forceFresh) {
+      const cached = apiCache.get(staysUrl);
+      if (cached && Array.isArray(cached)) {
+        setStays(cached);
+        if (cached.length > 0 && !selectedStayId) {
+          const inHouse = cached.find((s: any) => s.status === "IN_HOUSE");
+          const targetStay = inHouse || cached[0];
+          setSelectedStayId(targetStay.id);
+          const firstRoom = targetStay.roomAssignments?.[0]?.room?.number || "";
+          setSelectedRoomNumber(firstRoom);
+        }
+      } else {
+        setLoading(true);
+      }
+    }
+
     try {
-      const res = await fetch(`/api/v1/stays?propertyId=${activeProperty.id}`);
-      const data = await res.json();
+      const data = await apiCache.swrFetch(staysUrl, undefined, (cached) => {
+        if (Array.isArray(cached)) setStays(cached);
+      });
+
       if (Array.isArray(data)) {
         setStays(data);
         if (data.length > 0 && !selectedStayId) {
@@ -187,6 +226,7 @@ function BillingContent() {
       setLoading(false);
     }
   };
+
 
   // Load specific folio for selected stay with dynamic 24h synchronization
   const loadFolio = async (folioId: string, grace?: number) => {
@@ -835,7 +875,7 @@ function BillingContent() {
 
   return (
     <>
-      <div className="billing-dashboard-view no-print print:hidden min-h-[calc(100vh-60px)] bg-slate-50/60 dark:bg-[#09090b] text-zinc-900 dark:text-zinc-100 p-3 sm:p-4 xl:p-5 space-y-3.5 xl:space-y-4 transition-colors duration-150">
+      <div className="billing-dashboard-view no-print print:hidden max-w-[1600px] mx-auto w-full text-zinc-900 dark:text-zinc-100 space-y-4 transition-colors duration-150">
         
         {/* 1. MASTER TOP HEADER & ACTIONS (CLEAN 1440x900 BAR) */}
       <div className="rounded-2xl bg-white dark:bg-[#121215] border border-zinc-200/80 dark:border-zinc-800/80 p-3.5 sm:p-4 shadow-xs">

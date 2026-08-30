@@ -90,7 +90,10 @@ export function AppSidebar() {
         {!sidebarCollapsed && (
           <div className="rounded-xl border border-zinc-200/80 dark:border-zinc-800 bg-zinc-50/80 dark:bg-[#121215] p-3 text-xs text-zinc-600 dark:text-zinc-400 space-y-1">
             <div className="font-bold text-zinc-900 dark:text-white flex items-center justify-between text-xs">
-              <span>Hotel OS</span>
+              <div className="flex items-center gap-1.5">
+                <img src="/brand/rovesta-mark.png" alt="ROVESTA" className="h-3.5 w-auto object-contain" />
+                <span className="font-black tracking-wide">ROVESTA</span>
+              </div>
               <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
                 ONLINE
@@ -101,6 +104,7 @@ export function AppSidebar() {
             </div>
           </div>
         )}
+
 
         {/* Sidebar Collapse/Expand Toggle Button */}
         <button

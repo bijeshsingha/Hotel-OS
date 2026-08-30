@@ -5,10 +5,22 @@ import { ThemeProvider } from "@/lib/context/theme-context";
 import { AppShell } from "@/components/shell/app-shell";
 
 export const metadata: Metadata = {
-  title: "Hotel OS — Cloud Operating System",
+  title: "ROVESTA — Cloud Hotel Operating System",
   description:
     "Fast, minimal, and integrated PMS, POS, Folio & GST Invoicing, Housekeeping, and Night Audit for hospitality operations.",
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/icon.png", type: "image/png", sizes: "512x512" },
+      { url: "/brand/icon-32x32.png", type: "image/png", sizes: "32x32" },
+      { url: "/brand/icon-192x192.png", type: "image/png", sizes: "192x192" },
+    ],
+    apple: [
+      { url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
+    ],
+  },
 };
+
 
 export default function RootLayout({
   children,
@@ -17,37 +29,6 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <head>
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              try {
-                const savedTheme = localStorage.getItem('hotelos-theme') || 'light';
-                if (savedTheme === 'dark') {
-                  document.documentElement.classList.add('dark');
-                  document.documentElement.classList.remove('light');
-                  document.documentElement.setAttribute('data-theme', 'dark');
-                  document.documentElement.style.colorScheme = 'dark';
-                } else {
-                  document.documentElement.classList.remove('dark');
-                  document.documentElement.classList.add('light');
-                  document.documentElement.setAttribute('data-theme', 'light');
-                  document.documentElement.style.colorScheme = 'light';
-                }
-              } catch (e) {}
-
-              // Disable mousewheel scroll value changes on number inputs globally
-              if (typeof window !== 'undefined') {
-                window.addEventListener('wheel', function(e) {
-                  if (document.activeElement && document.activeElement.type === 'number') {
-                    document.activeElement.blur();
-                  }
-                }, { passive: true });
-              }
-            `,
-          }}
-        />
-      </head>
       <body className="bg-slate-50 text-slate-900 dark:bg-[#09090b] dark:text-zinc-100 antialiased selection:bg-blue-600 selection:text-white font-sans min-h-screen transition-colors duration-150">
         <ThemeProvider>
           <HotelProvider>
@@ -58,3 +39,4 @@ export default function RootLayout({
     </html>
   );
 }
+

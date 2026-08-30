@@ -44,15 +44,30 @@ import {
   Check,
 } from "lucide-react";
 import {
+
   ID_PROOF_TYPES,
   PURPOSE_OF_VISIT_OPTIONS,
   MEAL_PLANS,
   COMMON_NATIONALITIES,
+  EXPENSE_CATEGORIES,
+  PAYMENT_METHODS,
 } from "@/data";
+import { formatINR } from "@/lib/gst/calculator";
 import { CompanySelector, CompanyItem } from "@/components/pms/company-selector";
 import initialCompaniesJson from "@/data/initial-companies.json";
 
+
+const ADMIN_SECTIONS = [
+  { id: "HOTEL" as const, label: "Hotel & Property", shortLabel: "Hotel", icon: Building2 },
+  { id: "GRC" as const, label: "GRC & Registrations", shortLabel: "GRC", icon: FileText },
+  { id: "RATES" as const, label: "Room Rates & Tariffs", shortLabel: "Rates", icon: DollarSign },
+  { id: "ROOMS" as const, label: "Rooms & Bedding", shortLabel: "Rooms", icon: BedDouble },
+  { id: "EXPENSES" as const, label: "Expenses & Outflows", shortLabel: "Expenses", icon: Receipt },
+  { id: "SECURITY" as const, label: "Admin Security & PIN", shortLabel: "Security", icon: Shield },
+];
+
 export default function AdminPortalPage() {
+
   const { activeProperty, refreshData, refreshKey } = useHotel();
 
   // Authentication State
@@ -65,8 +80,9 @@ export default function AdminPortalPage() {
 
   // Active Tab
   const [activeTab, setActiveTab] = useState<
-    "HOTEL" | "GRC" | "RATES" | "ROOMS" | "COMPANIES" | "SECURITY"
+    "HOTEL" | "GRC" | "RATES" | "ROOMS" | "EXPENSES" | "SECURITY"
   >("HOTEL");
+
 
   // Notifications
   const [toastMessage, setToastMessage] = useState<{ text: string; type: "success" | "error" } | null>(null);
@@ -609,6 +625,178 @@ export default function AdminPortalPage() {
     }
   };
 
+  // ----------------------------------------------------
+  // TAB 5: EXPENSES & PETTY CASH OUTFLOWS EDITOR
+  // ----------------------------------------------------
+  const [expensesList, setExpensesList] = useState<any[]>([]);
+  const [expensesLoading, setExpensesLoading] = useState(false);
+  const [expenseSearchQuery, setExpenseSearchQuery] = useState("");
+  const [expenseCategoryFilter, setExpenseCategoryFilter] = useState("ALL");
+  const [expenseMethodFilter, setExpenseMethodFilter] = useState("ALL");
+  const [editingExpense, setEditingExpense] = useState<any | null>(null);
+  const [showAddExpenseModal, setShowAddExpenseModal] = useState(false);
+  const [expenseSaving, setExpenseSaving] = useState(false);
+
+  const [expenseForm, setExpenseForm] = useState({
+    id: "",
+    voucherNo: "",
+    category: "PETTY_CASH",
+    payeeName: "",
+    description: "",
+    amount: "0",
+    taxAmount: "0",
+    paymentMethod: "CASH",
+    reference: "",
+    notes: "",
+    paidAt: "",
+    status: "PAID",
+  });
+
+  const fetchExpenses = async () => {
+    if (!activeProperty?.id) return;
+    setExpensesLoading(true);
+    try {
+      const res = await fetch(`/api/v1/expenses?propertyId=${activeProperty.id}`);
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        setExpensesList(data);
+      }
+    } catch (err: any) {
+      showToast("Failed to fetch expenses: " + err.message, "error");
+    } finally {
+      setExpensesLoading(false);
+    }
+  };
+
+  const handleOpenAddExpense = () => {
+    setExpenseForm({
+      id: "",
+      voucherNo: "",
+      category: "PETTY_CASH",
+      payeeName: "",
+      description: "",
+      amount: "0",
+      taxAmount: "0",
+      paymentMethod: "CASH",
+      reference: "",
+      notes: "",
+      paidAt: new Date().toISOString().slice(0, 16),
+      status: "PAID",
+    });
+    setEditingExpense(null);
+    setShowAddExpenseModal(true);
+  };
+
+  const handleOpenEditExpense = (expense: any) => {
+    setExpenseForm({
+      id: expense.id,
+      voucherNo: expense.voucherNo || "",
+      category: expense.category || "PETTY_CASH",
+      payeeName: expense.payeeName || "",
+      description: expense.description || "",
+      amount: String(expense.amount || 0),
+      taxAmount: String(expense.taxAmount || 0),
+      paymentMethod: expense.paymentMethod || "CASH",
+      reference: expense.reference || "",
+      notes: expense.notes || "",
+      paidAt: expense.paidAt ? new Date(expense.paidAt).toISOString().slice(0, 16) : new Date().toISOString().slice(0, 16),
+      status: expense.status || "PAID",
+    });
+    setEditingExpense(expense);
+    setShowAddExpenseModal(true);
+  };
+
+  const handleSaveExpense = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!activeProperty?.id) return;
+
+    if (!expenseForm.payeeName.trim()) {
+      showToast("Payee / Vendor name is required", "error");
+      return;
+    }
+
+    const numAmount = Number(expenseForm.amount);
+    if (isNaN(numAmount) || numAmount <= 0) {
+      showToast("Please enter a valid expense amount", "error");
+      return;
+    }
+
+    setExpenseSaving(true);
+    try {
+      if (editingExpense?.id) {
+        const res = await fetch(`/api/v1/expenses/${editingExpense.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            category: expenseForm.category,
+            payeeName: expenseForm.payeeName,
+            description: expenseForm.description || expenseForm.category,
+            amount: numAmount,
+            taxAmount: Number(expenseForm.taxAmount || 0),
+            paymentMethod: expenseForm.paymentMethod,
+            reference: expenseForm.reference,
+            notes: expenseForm.notes,
+            paidAt: expenseForm.paidAt ? new Date(expenseForm.paidAt).toISOString() : undefined,
+            status: expenseForm.status,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Failed to update expense");
+        showToast(`Expense voucher ${data.expense?.voucherNo || ""} updated successfully!`);
+      } else {
+        const res = await fetch(`/api/v1/expenses`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            propertyId: activeProperty.id,
+            category: expenseForm.category,
+            payeeName: expenseForm.payeeName,
+            description: expenseForm.description || expenseForm.category,
+            amount: numAmount,
+            taxAmount: Number(expenseForm.taxAmount || 0),
+            paymentMethod: expenseForm.paymentMethod,
+            reference: expenseForm.reference,
+            notes: expenseForm.notes,
+            createdByName: "Admin",
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Failed to record expense");
+        showToast(`Expense voucher ${data.expense?.voucherNo || ""} created successfully!`);
+      }
+
+      setShowAddExpenseModal(false);
+      setEditingExpense(null);
+      await fetchExpenses();
+      await refreshData();
+    } catch (err: any) {
+      showToast("Error saving expense: " + err.message, "error");
+    } finally {
+      setExpenseSaving(false);
+    }
+  };
+
+  const handleDeleteExpense = async (expense: any) => {
+    const confirmDelete = window.confirm(
+      `Are you sure you want to permanently delete Expense Voucher ${expense.voucherNo} (₹${expense.totalAmount} to ${expense.payeeName})?`
+    );
+    if (!confirmDelete) return;
+
+    try {
+      const res = await fetch(`/api/v1/expenses/${expense.id}?hardDelete=true`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to delete expense");
+
+      showToast(`Expense ${expense.voucherNo} deleted successfully.`);
+      await fetchExpenses();
+      await refreshData();
+    } catch (err: any) {
+      showToast("Error deleting expense: " + err.message, "error");
+    }
+  };
+
   // Initial tab loading
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -616,6 +804,7 @@ export default function AdminPortalPage() {
     fetchRates();
     if (activeTab === "HOTEL") fetchHotelDetails();
     if (activeTab === "GRC") fetchGrcList();
+    if (activeTab === "EXPENSES") fetchExpenses();
   }, [isAuthenticated, activeTab, activeProperty?.id, refreshKey]);
 
   useEffect(() => {
@@ -626,17 +815,18 @@ export default function AdminPortalPage() {
     return () => clearTimeout(timer);
   }, [grcSearch]);
 
+
   // ====================================================
   // SCREEN 1: LOCKED AUTHENTICATION GATE
   // ====================================================
   if (!isAuthenticated) {
     return (
       <div className="min-h-[85vh] flex items-center justify-center p-4">
-        <div className="w-full max-w-md bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6">
+        <div className="w-full max-w-md bg-white dark:bg-[#111114] border border-zinc-200/80 dark:border-zinc-800/80 rounded-3xl p-6 sm:p-8 shadow-xl space-y-6">
           
           <div className="text-center space-y-2">
-            <div className="h-16 w-16 rounded-3xl bg-gradient-to-br from-indigo-600 via-purple-700 to-zinc-900 text-white flex items-center justify-center mx-auto shadow-xl shadow-indigo-600/30">
-              <Shield className="h-8 w-8" />
+            <div className="h-14 w-14 rounded-2xl bg-blue-50 dark:bg-blue-600/10 border border-blue-200/80 dark:border-blue-500/20 text-blue-600 dark:text-blue-400 flex items-center justify-center mx-auto shadow-xs">
+              <Shield className="h-7 w-7" />
             </div>
             <h1 className="text-xl font-black text-zinc-900 dark:text-white tracking-tight">
               Master Admin Portal
@@ -647,31 +837,29 @@ export default function AdminPortalPage() {
           </div>
 
           {authError && (
-            <div className="p-3.5 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/60 text-rose-800 dark:text-rose-300 text-xs font-bold flex items-center gap-2">
+            <div className="p-3.5 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/60 text-rose-800 dark:text-rose-300 text-xs font-bold flex items-center gap-2">
               <AlertTriangle className="h-4 w-4 shrink-0 text-rose-600" />
               <span>{authError}</span>
             </div>
           )}
 
           <form onSubmit={handleLogin} className="space-y-4">
-            <div className="space-y-1">
-              <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-600 dark:text-zinc-400">
+            <div className="space-y-1.5">
+              <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300">
                 Admin Username
               </label>
-              <div className="relative">
-                <input
-                  type="text"
-                  required
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  className="w-full h-11 px-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs text-zinc-900 dark:text-white font-mono font-bold focus:border-indigo-600 focus:outline-none"
-                  placeholder="admin"
-                />
-              </div>
+              <input
+                type="text"
+                required
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                className="w-full h-11 px-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-base sm:text-xs text-zinc-900 dark:text-white font-mono font-bold focus:border-blue-600 focus:outline-none transition"
+                placeholder="admin"
+              />
             </div>
 
-            <div className="space-y-1">
-              <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-600 dark:text-zinc-400">
+            <div className="space-y-1.5">
+              <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300">
                 Master Password
               </label>
               <div className="relative">
@@ -680,7 +868,7 @@ export default function AdminPortalPage() {
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full h-11 px-3.5 pr-10 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs text-zinc-900 dark:text-white font-mono font-bold focus:border-indigo-600 focus:outline-none"
+                  className="w-full h-11 px-3.5 pr-10 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-base sm:text-xs text-zinc-900 dark:text-white font-mono font-bold focus:border-blue-600 focus:outline-none transition"
                   placeholder="Enter admin password..."
                 />
                 <button
@@ -693,9 +881,9 @@ export default function AdminPortalPage() {
               </div>
             </div>
 
-            <div className="p-3 rounded-xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 text-[11px] text-zinc-500 font-mono space-y-1">
+            <div className="p-3 rounded-xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200/80 dark:border-zinc-800 text-[11px] text-zinc-500 font-mono space-y-1">
               <div className="font-bold text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
-                <KeyRound className="h-3.5 w-3.5 text-indigo-500" />
+                <KeyRound className="h-3.5 w-3.5 text-blue-600" />
                 <span>Default Admin Login:</span>
               </div>
               <div>Username: <strong className="text-zinc-900 dark:text-white">admin</strong></div>
@@ -705,7 +893,7 @@ export default function AdminPortalPage() {
             <button
               type="submit"
               disabled={authLoading}
-              className="w-full h-11 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-black text-xs flex items-center justify-center gap-2 transition shadow-lg shadow-indigo-600/30 active:scale-98 cursor-pointer disabled:opacity-50"
+              className="w-full h-11 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center justify-center gap-2 transition shadow-xs active:scale-98 cursor-pointer disabled:opacity-50"
             >
               {authLoading ? (
                 <>
@@ -730,7 +918,7 @@ export default function AdminPortalPage() {
   // SCREEN 2: AUTHENTICATED MASTER ADMIN PORTAL
   // ====================================================
   return (
-    <div className="space-y-4 max-w-[1600px] mx-auto w-full text-zinc-900 dark:text-zinc-100 pb-16">
+    <div className="space-y-4 max-w-[1600px] mx-auto w-full text-zinc-900 dark:text-zinc-100 pb-16 px-3 sm:px-4 lg:px-6">
       
       {/* Toast Notification */}
       {toastMessage && (
@@ -750,340 +938,388 @@ export default function AdminPortalPage() {
         </div>
       )}
 
-      {/* 1. TOP EXECUTIVE HEADER */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-5 rounded-3xl bg-white dark:bg-[#111114] border border-zinc-200/90 dark:border-zinc-800 shadow-xs">
-        <div className="flex items-center gap-3.5">
-          <div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-indigo-600 via-purple-700 to-zinc-900 text-white flex items-center justify-center shadow-lg shadow-indigo-500/20 shrink-0">
-            <SlidersHorizontal className="h-6 w-6" />
+      {/* 1. TOP EXECUTIVE PAGE HEADER */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 sm:p-5 rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200/80 dark:border-zinc-800/80 shadow-xs">
+        <div>
+          <div className="text-[11px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider mb-0.5">
+            Master admin / {ADMIN_SECTIONS.find((s) => s.id === activeTab)?.label || "Hotel & property"}
           </div>
-          <div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-lg sm:text-xl font-black text-zinc-900 dark:text-white tracking-tight">
-                Master Database & Admin Suite
-              </h1>
-              <span className="inline-flex items-center gap-1 text-[11px] font-bold font-mono px-2.5 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                Live DB Connected (SQLite)
-              </span>
-            </div>
-            <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5 font-medium">
-              Administrative editor for Hotel details, GRC guest records, room rates & tariffs, inventory, and system master data.
-            </p>
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <h1 className="text-xl sm:text-2xl font-black text-zinc-900 dark:text-white tracking-tight">
+              Master Database & Admin Suite
+            </h1>
+            <span className="inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60 font-mono">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 inline-block animate-pulse" />
+              Database connected
+            </span>
           </div>
+          <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 font-medium">
+            Manage property identity, tax records, operating defaults and system data.
+          </p>
         </div>
 
-        {/* Lock / Logout Button */}
-        <div className="flex items-center gap-2.5 self-end md:self-auto">
+        {/* Lock / Logout Action */}
+        <div className="flex items-center gap-2 self-start sm:self-center shrink-0">
           <button
             type="button"
             onClick={handleLogout}
-            className="h-10 px-4 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 font-bold text-xs flex items-center gap-2 transition cursor-pointer"
+            className="h-10 px-3.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 font-semibold text-xs flex items-center gap-2 transition cursor-pointer border border-zinc-200/80 dark:border-zinc-700"
           >
             <Lock className="h-4 w-4 text-zinc-500" />
-            <span>Lock Admin</span>
+            <span>Lock admin</span>
           </button>
         </div>
       </div>
 
-      {/* 2. ADMIN NAVIGATION TABS */}
-      <div className="p-1.5 rounded-2xl bg-zinc-100 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 flex items-center gap-1 overflow-x-auto shadow-xs text-xs font-bold">
-        <button
-          type="button"
-          onClick={() => setActiveTab("HOTEL")}
-          className={`px-4 py-2.5 rounded-xl transition flex items-center gap-2 whitespace-nowrap cursor-pointer ${
-            activeTab === "HOTEL"
-              ? "bg-white dark:bg-[#18181b] text-indigo-600 dark:text-indigo-400 shadow-sm font-black border border-zinc-200/60 dark:border-zinc-700"
-              : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
-          }`}
-        >
-          <Building2 className="h-4 w-4" />
-          <span>1. Hotel & Property Master</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab("GRC")}
-          className={`px-4 py-2.5 rounded-xl transition flex items-center gap-2 whitespace-nowrap cursor-pointer ${
-            activeTab === "GRC"
-              ? "bg-white dark:bg-[#18181b] text-indigo-600 dark:text-indigo-400 shadow-sm font-black border border-zinc-200/60 dark:border-zinc-700"
-              : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
-          }`}
-        >
-          <FileText className="h-4 w-4" />
-          <span>2. GRC & Registrations Editor</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab("RATES")}
-          className={`px-4 py-2.5 rounded-xl transition flex items-center gap-2 whitespace-nowrap cursor-pointer ${
-            activeTab === "RATES"
-              ? "bg-white dark:bg-[#18181b] text-indigo-600 dark:text-indigo-400 shadow-sm font-black border border-zinc-200/60 dark:border-zinc-700"
-              : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
-          }`}
-        >
-          <DollarSign className="h-4 w-4" />
-          <span>3. Room Rates & Tariffs</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab("ROOMS")}
-          className={`px-4 py-2.5 rounded-xl transition flex items-center gap-2 whitespace-nowrap cursor-pointer ${
-            activeTab === "ROOMS"
-              ? "bg-white dark:bg-[#18181b] text-indigo-600 dark:text-indigo-400 shadow-sm font-black border border-zinc-200/60 dark:border-zinc-700"
-              : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
-          }`}
-        >
-          <BedDouble className="h-4 w-4" />
-          <span>4. Rooms & Bedding Inventory</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab("SECURITY")}
-          className={`px-4 py-2.5 rounded-xl transition flex items-center gap-2 whitespace-nowrap cursor-pointer ${
-            activeTab === "SECURITY"
-              ? "bg-white dark:bg-[#18181b] text-indigo-600 dark:text-indigo-400 shadow-sm font-black border border-zinc-200/60 dark:border-zinc-700"
-              : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
-          }`}
-        >
-          <Shield className="h-4 w-4" />
-          <span>5. Admin Security & PIN</span>
-        </button>
+      {/* 2. ADMIN NAVIGATION (Mobile & Tablet Top Bars) */}
+      {/* Mobile: 6 compact numbered controls (< 768px) */}
+      <div className="md:hidden grid grid-cols-6 gap-1 p-1 rounded-xl bg-zinc-100 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 text-xs font-bold">
+        {ADMIN_SECTIONS.map((sec, idx) => (
+          <button
+            key={sec.id}
+            type="button"
+            onClick={() => setActiveTab(sec.id)}
+            className={`py-2 px-0.5 rounded-lg text-center transition flex flex-col items-center justify-center gap-0.5 min-h-[44px] cursor-pointer ${
+              activeTab === sec.id
+                ? "bg-white dark:bg-[#18181b] text-blue-600 dark:text-blue-400 shadow-xs font-black border border-zinc-200 dark:border-zinc-700"
+                : "text-zinc-500 hover:text-zinc-900 dark:hover:text-white"
+            }`}
+            title={sec.label}
+          >
+            <span className="text-[12px] font-black">{idx + 1}</span>
+            <span className="text-[9px] truncate max-w-full font-medium">{sec.shortLabel}</span>
+          </button>
+        ))}
       </div>
 
-      {/* ====================================================
-          TAB CONTENT 1: HOTEL DETAILS
-      ==================================================== */}
-      {activeTab === "HOTEL" && (
-        <div className="bg-white dark:bg-[#111114] border border-zinc-200/90 dark:border-zinc-800 rounded-3xl p-6 space-y-6 shadow-xs">
-          <div className="border-b border-zinc-200 dark:border-zinc-800 pb-4 flex items-center justify-between">
-            <div>
-              <h2 className="text-base font-extrabold text-zinc-900 dark:text-white flex items-center gap-2">
-                <Building2 className="h-5 w-5 text-indigo-600" />
-                <span>Hotel & Property Master Configuration</span>
-              </h2>
-              <p className="text-xs text-zinc-500 mt-0.5">
-                Official property identity, legal entity name, GSTIN Rule 46 data, and business cycle defaults.
-              </p>
-            </div>
+      {/* Tablet: Horizontal scroll bar (768px - 1023px) */}
+      <div className="hidden md:flex lg:hidden items-center gap-1.5 p-1.5 rounded-2xl bg-zinc-100 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 overflow-x-auto shadow-xs text-xs font-bold scrollbar-none">
+        {ADMIN_SECTIONS.map((sec, idx) => {
+          const Icon = sec.icon;
+          return (
+            <button
+              key={sec.id}
+              type="button"
+              onClick={() => setActiveTab(sec.id)}
+              className={`h-10 px-3.5 rounded-xl transition flex items-center gap-2 whitespace-nowrap cursor-pointer shrink-0 ${
+                activeTab === sec.id
+                  ? "bg-white dark:bg-[#18181b] text-blue-600 dark:text-blue-400 shadow-xs font-bold border border-zinc-200 dark:border-zinc-700"
+                  : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
+              }`}
+            >
+              <Icon className="h-4 w-4" />
+              <span>{idx + 1}. {sec.label}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* 3. MAIN WORKSPACE WITH DESKTOP 2-COLUMN LAYOUT */}
+      <div className="flex flex-col lg:flex-row items-start gap-4">
+        
+        {/* Desktop: 220–240px vertical panel on the left (>= 1024px) */}
+        <div className="hidden lg:flex flex-col w-56 xl:w-60 shrink-0 p-2 rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200/80 dark:border-zinc-800/80 shadow-xs space-y-1 sticky top-[70px]">
+          <div className="px-3 py-2 text-[11px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">
+            Admin Sections
           </div>
-
-          {hotelLoading ? (
-            <div className="py-12 text-center font-mono text-xs text-zinc-400 flex items-center justify-center gap-2">
-              <RefreshCw className="h-4 w-4 animate-spin" />
-              <span>Loading hotel configuration...</span>
-            </div>
-          ) : (
-            <form onSubmit={saveHotelDetails} className="space-y-6">
-              
-              {/* Row 1: Names & Codes */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="space-y-1">
-                  <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">
-                    Display / Marketing Name *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={hotelForm.displayName}
-                    onChange={(e) => setHotelForm({ ...hotelForm, displayName: e.target.value })}
-                    className="w-full h-10 px-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs font-bold text-zinc-900 dark:text-white focus:border-indigo-600 focus:outline-none"
-                    placeholder="e.g. Hotel Ambarish Grand Residency"
-                  />
+          {ADMIN_SECTIONS.map((sec, idx) => {
+            const Icon = sec.icon;
+            const isSelected = activeTab === sec.id;
+            return (
+              <button
+                key={sec.id}
+                type="button"
+                onClick={() => setActiveTab(sec.id)}
+                className={`w-full min-h-[44px] px-3 py-2.5 rounded-xl transition flex items-center justify-between text-left text-xs cursor-pointer ${
+                  isSelected
+                    ? "bg-blue-50 dark:bg-blue-600/10 text-blue-700 dark:text-blue-400 font-bold border-l-2 border-blue-600 shadow-xs"
+                    : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-50 dark:hover:bg-zinc-900/50 font-medium"
+                }`}
+              >
+                <div className="flex items-center gap-2.5 truncate">
+                  <Icon className={`h-4 w-4 shrink-0 ${isSelected ? "text-blue-600 dark:text-blue-400" : "text-zinc-400"}`} />
+                  <span className="truncate">{idx + 1}. {sec.label}</span>
                 </div>
-
-                <div className="space-y-1">
-                  <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">
-                    Legal / Invoicing Business Name *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={hotelForm.legalName}
-                    onChange={(e) => setHotelForm({ ...hotelForm, legalName: e.target.value })}
-                    className="w-full h-10 px-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs font-bold text-zinc-900 dark:text-white focus:border-indigo-600 focus:outline-none"
-                    placeholder="e.g. AMBARISH RESIDENCY"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">
-                    Property Short Code
-                  </label>
-                  <input
-                    type="text"
-                    value={hotelForm.code}
-                    onChange={(e) => setHotelForm({ ...hotelForm, code: e.target.value.toUpperCase() })}
-                    className="w-full h-10 px-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs font-mono font-bold text-zinc-900 dark:text-white focus:border-indigo-600 focus:outline-none"
-                    placeholder="GUW-01"
-                  />
-                </div>
-              </div>
-
-              {/* Row 2: Tax & Legal */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="space-y-1">
-                  <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">
-                    Hotel GSTIN Number (15-Digit) *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={hotelForm.gstin}
-                    onChange={(e) => setHotelForm({ ...hotelForm, gstin: e.target.value.toUpperCase() })}
-                    className="w-full h-10 px-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs font-mono font-black text-indigo-700 dark:text-indigo-400 focus:border-indigo-600 focus:outline-none"
-                    placeholder="18AACCB2447F1ZX"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">
-                    State Code (GST) *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={hotelForm.stateCode}
-                    onChange={(e) => setHotelForm({ ...hotelForm, stateCode: e.target.value })}
-                    className="w-full h-10 px-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs font-mono font-bold text-zinc-900 dark:text-white focus:border-indigo-600 focus:outline-none"
-                    placeholder="18 (Assam)"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">
-                    Organization PAN
-                  </label>
-                  <input
-                    type="text"
-                    value={hotelForm.orgPan}
-                    onChange={(e) => setHotelForm({ ...hotelForm, orgPan: e.target.value.toUpperCase() })}
-                    className="w-full h-10 px-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs font-mono font-bold text-zinc-900 dark:text-white focus:border-indigo-600 focus:outline-none"
-                    placeholder="AACCB2447F"
-                  />
-                </div>
-              </div>
-
-              {/* Row 3: Contact & Address */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="space-y-1 md:col-span-1">
-                  <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">
-                    Official Contact Phone
-                  </label>
-                  <input
-                    type="text"
-                    value={hotelForm.phone}
-                    onChange={(e) => setHotelForm({ ...hotelForm, phone: e.target.value })}
-                    className="w-full h-10 px-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs font-mono text-zinc-900 dark:text-white focus:border-indigo-600 focus:outline-none"
-                    placeholder="+91 361 254 0001"
-                  />
-                </div>
-
-                <div className="space-y-1 md:col-span-1">
-                  <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">
-                    Official Email
-                  </label>
-                  <input
-                    type="email"
-                    value={hotelForm.email}
-                    onChange={(e) => setHotelForm({ ...hotelForm, email: e.target.value })}
-                    className="w-full h-10 px-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs font-mono text-zinc-900 dark:text-white focus:border-indigo-600 focus:outline-none"
-                    placeholder="reservations@hotelambarish.com"
-                  />
-                </div>
-
-                <div className="space-y-1 md:col-span-1">
-                  <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">
-                    Full Address (Prints on Tax Invoices)
-                  </label>
-                  <input
-                    type="text"
-                    value={hotelForm.address}
-                    onChange={(e) => setHotelForm({ ...hotelForm, address: e.target.value })}
-                    className="w-full h-10 px-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs text-zinc-900 dark:text-white focus:border-indigo-600 focus:outline-none"
-                    placeholder="Paltan Bazaar, Station Road, Guwahati - 781008, Assam"
-                  />
-                </div>
-              </div>
-
-              {/* Row 4: Operational Business Cycle */}
-              <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800">
-                <div className="space-y-1">
-                  <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">
-                    Active Business Date
-                  </label>
-                  <input
-                    type="date"
-                    value={hotelForm.businessDate}
-                    onChange={(e) => setHotelForm({ ...hotelForm, businessDate: e.target.value })}
-                    className="w-full h-10 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs font-mono font-bold text-zinc-900 dark:text-white focus:border-indigo-600 focus:outline-none"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">
-                    Default Check-In Time
-                  </label>
-                  <input
-                    type="time"
-                    value={hotelForm.checkinTime}
-                    onChange={(e) => setHotelForm({ ...hotelForm, checkinTime: e.target.value })}
-                    className="w-full h-10 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs font-mono font-bold text-zinc-900 dark:text-white focus:border-indigo-600 focus:outline-none"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">
-                    Default Checkout Time
-                  </label>
-                  <input
-                    type="time"
-                    value={hotelForm.checkoutTime}
-                    onChange={(e) => setHotelForm({ ...hotelForm, checkoutTime: e.target.value })}
-                    className="w-full h-10 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs font-mono font-bold text-zinc-900 dark:text-white focus:border-indigo-600 focus:outline-none"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">
-                    Night Audit Cutoff
-                  </label>
-                  <input
-                    type="time"
-                    value={hotelForm.auditCutoff}
-                    onChange={(e) => setHotelForm({ ...hotelForm, auditCutoff: e.target.value })}
-                    className="w-full h-10 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs font-mono font-bold text-zinc-900 dark:text-white focus:border-indigo-600 focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              {/* Submit Action */}
-              <div className="flex justify-end pt-2">
-                <button
-                  type="submit"
-                  disabled={hotelSaving}
-                  className="h-11 px-6 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-black text-xs flex items-center gap-2 transition shadow-lg shadow-indigo-600/30 active:scale-98 cursor-pointer disabled:opacity-50"
-                >
-                  {hotelSaving ? (
-                    <>
-                      <RefreshCw className="h-4 w-4 animate-spin" />
-                      <span>Saving to Database...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Save className="h-4 w-4" />
-                      <span>Save Hotel Master Changes</span>
-                    </>
-                  )}
-                </button>
-              </div>
-
-            </form>
-          )}
+                {isSelected && <ChevronRight className="h-3.5 w-3.5 text-blue-600 shrink-0" />}
+              </button>
+            );
+          })}
         </div>
-      )}
+
+        {/* Tab Content Canvas */}
+        <div className="flex-1 min-w-0 w-full space-y-4">
+
+          {/* ====================================================
+              TAB CONTENT 1: HOTEL & PROPERTY CONFIGURATION FORM
+          ==================================================== */}
+          {activeTab === "HOTEL" && (
+            <div className="bg-white dark:bg-[#111114] border border-zinc-200/80 dark:border-zinc-800/80 rounded-2xl p-5 sm:p-6 space-y-6 shadow-xs">
+              
+              <div className="border-b border-zinc-200/80 dark:border-zinc-800 pb-4">
+                <h2 className="text-base font-bold text-zinc-900 dark:text-white flex items-center gap-2">
+                  <Building2 className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                  <span>Hotel & Property Master Configuration</span>
+                </h2>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+                  Official property identity, legal entity name, GSTIN Rule 46 records, and business cycle defaults.
+                </p>
+              </div>
+
+              {hotelLoading ? (
+                <div className="py-16 text-center font-mono text-xs text-zinc-400 flex items-center justify-center gap-2">
+                  <RefreshCw className="h-4 w-4 animate-spin text-blue-600" />
+                  <span>Loading hotel configuration...</span>
+                </div>
+              ) : (
+                <form onSubmit={saveHotelDetails} className="space-y-6">
+                  
+                  {/* GROUP 1: Identity & Tax */}
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <span className="h-2 w-2 rounded-full bg-blue-600" />
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">
+                        1. Identity & Tax
+                      </h3>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {/* Display / Marketing Name */}
+                      <div className="space-y-1.5">
+                        <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                          Display / Marketing Name <span className="text-rose-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={hotelForm.displayName}
+                          onChange={(e) => setHotelForm({ ...hotelForm, displayName: e.target.value })}
+                          className="w-full h-11 px-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-base sm:text-xs font-bold text-zinc-900 dark:text-white focus:border-blue-600 focus:outline-none transition"
+                          placeholder="e.g. Hotel Ambarish Grand Residency"
+                        />
+                      </div>
+
+                      {/* Legal / Invoicing Business Name */}
+                      <div className="space-y-1.5">
+                        <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                          Legal / Invoicing Business Name <span className="text-rose-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={hotelForm.legalName}
+                          onChange={(e) => setHotelForm({ ...hotelForm, legalName: e.target.value })}
+                          className="w-full h-11 px-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-base sm:text-xs font-bold text-zinc-900 dark:text-white focus:border-blue-600 focus:outline-none transition"
+                          placeholder="e.g. AMBARISH RESIDENCY"
+                        />
+                      </div>
+
+                      {/* Property Short Code */}
+                      <div className="space-y-1.5">
+                        <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                          Property Short Code
+                        </label>
+                        <input
+                          type="text"
+                          value={hotelForm.code}
+                          onChange={(e) => setHotelForm({ ...hotelForm, code: e.target.value.toUpperCase() })}
+                          className="w-full h-11 px-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-base sm:text-xs font-mono font-bold text-zinc-900 dark:text-white focus:border-blue-600 focus:outline-none transition"
+                          placeholder="GUW-01"
+                        />
+                      </div>
+
+                      {/* Hotel GSTIN Number */}
+                      <div className="space-y-1.5">
+                        <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                          Hotel GSTIN Number (15-Digit) <span className="text-rose-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={hotelForm.gstin}
+                          onChange={(e) => setHotelForm({ ...hotelForm, gstin: e.target.value.toUpperCase() })}
+                          className="w-full h-11 px-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-base sm:text-xs font-mono font-bold text-blue-700 dark:text-blue-400 focus:border-blue-600 focus:outline-none transition"
+                          placeholder="18AACCB2447F1ZX"
+                        />
+                      </div>
+
+                      {/* State Code (GST) */}
+                      <div className="space-y-1.5">
+                        <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                          State Code (GST) <span className="text-rose-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={hotelForm.stateCode}
+                          onChange={(e) => setHotelForm({ ...hotelForm, stateCode: e.target.value })}
+                          className="w-full h-11 px-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-base sm:text-xs font-mono font-bold text-zinc-900 dark:text-white focus:border-blue-600 focus:outline-none transition"
+                          placeholder="18 (Assam)"
+                        />
+                      </div>
+
+                      {/* Organization PAN */}
+                      <div className="space-y-1.5">
+                        <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                          Organization PAN
+                        </label>
+                        <input
+                          type="text"
+                          value={hotelForm.orgPan}
+                          onChange={(e) => setHotelForm({ ...hotelForm, orgPan: e.target.value.toUpperCase() })}
+                          className="w-full h-11 px-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-base sm:text-xs font-mono font-bold text-zinc-900 dark:text-white focus:border-blue-600 focus:outline-none transition"
+                          placeholder="AACCB2447F"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* GROUP 2: Contact & Invoice Details */}
+                  <div className="space-y-3 pt-2">
+                    <div className="flex items-center gap-2">
+                      <span className="h-2 w-2 rounded-full bg-blue-600" />
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">
+                        2. Contact & Invoice Details
+                      </h3>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {/* Official Contact Phone */}
+                      <div className="space-y-1.5">
+                        <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                          Official Contact Phone
+                        </label>
+                        <input
+                          type="text"
+                          value={hotelForm.phone}
+                          onChange={(e) => setHotelForm({ ...hotelForm, phone: e.target.value })}
+                          className="w-full h-11 px-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-base sm:text-xs font-mono text-zinc-900 dark:text-white focus:border-blue-600 focus:outline-none transition"
+                          placeholder="+91 361 254 0001"
+                        />
+                      </div>
+
+                      {/* Official Email */}
+                      <div className="space-y-1.5">
+                        <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                          Official Email
+                        </label>
+                        <input
+                          type="email"
+                          value={hotelForm.email}
+                          onChange={(e) => setHotelForm({ ...hotelForm, email: e.target.value })}
+                          className="w-full h-11 px-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-base sm:text-xs font-mono text-zinc-900 dark:text-white focus:border-blue-600 focus:outline-none transition"
+                          placeholder="reservations@hotelambarish.com"
+                        />
+                      </div>
+
+                      {/* Full Address */}
+                      <div className="space-y-1.5 sm:col-span-2">
+                        <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                          Full Address Printed on Tax Invoices
+                        </label>
+                        <textarea
+                          rows={2}
+                          value={hotelForm.address}
+                          onChange={(e) => setHotelForm({ ...hotelForm, address: e.target.value })}
+                          className="w-full p-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-base sm:text-xs text-zinc-900 dark:text-white focus:border-blue-600 focus:outline-none transition resize-none"
+                          placeholder="Paltan Bazaar, Station Road, Guwahati - 781008, Assam"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* GROUP 3: Operating Defaults */}
+                  <div className="space-y-3 pt-2">
+                    <div className="flex items-center gap-2">
+                      <span className="h-2 w-2 rounded-full bg-blue-600" />
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">
+                        3. Operating Defaults
+                      </h3>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 p-4 rounded-xl bg-zinc-50/80 dark:bg-zinc-900/40 border border-zinc-200/60 dark:border-zinc-800/60">
+                      {/* Active Business Date */}
+                      <div className="space-y-1.5">
+                        <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                          Active Business Date
+                        </label>
+                        <input
+                          type="date"
+                          value={hotelForm.businessDate}
+                          onChange={(e) => setHotelForm({ ...hotelForm, businessDate: e.target.value })}
+                          className="w-full h-11 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-base sm:text-xs font-mono font-bold text-zinc-900 dark:text-white focus:border-blue-600 focus:outline-none transition"
+                        />
+                      </div>
+
+                      {/* Check-In Time */}
+                      <div className="space-y-1.5">
+                        <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                          Default Check-In Time
+                        </label>
+                        <input
+                          type="time"
+                          value={hotelForm.checkinTime}
+                          onChange={(e) => setHotelForm({ ...hotelForm, checkinTime: e.target.value })}
+                          className="w-full h-11 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-base sm:text-xs font-mono font-bold text-zinc-900 dark:text-white focus:border-blue-600 focus:outline-none transition"
+                        />
+                      </div>
+
+                      {/* Checkout Time */}
+                      <div className="space-y-1.5">
+                        <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                          Default Checkout Time
+                        </label>
+                        <input
+                          type="time"
+                          value={hotelForm.checkoutTime}
+                          onChange={(e) => setHotelForm({ ...hotelForm, checkoutTime: e.target.value })}
+                          className="w-full h-11 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-base sm:text-xs font-mono font-bold text-zinc-900 dark:text-white focus:border-blue-600 focus:outline-none transition"
+                        />
+                      </div>
+
+                      {/* Night Audit Cutoff */}
+                      <div className="space-y-1.5">
+                        <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                          Night Audit Cutoff
+                        </label>
+                        <input
+                          type="time"
+                          value={hotelForm.auditCutoff}
+                          onChange={(e) => setHotelForm({ ...hotelForm, auditCutoff: e.target.value })}
+                          className="w-full h-11 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-base sm:text-xs font-mono font-bold text-zinc-900 dark:text-white focus:border-blue-600 focus:outline-none transition"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* SAVE ACTION BAR */}
+                  <div className="pt-4 border-t border-zinc-200/80 dark:border-zinc-800 flex flex-col sm:flex-row items-center justify-between gap-3">
+                    <div className="text-xs text-zinc-500 dark:text-zinc-400 font-medium text-center sm:text-left">
+                      All property & tax fields are saved directly to the database.
+                    </div>
+                    <button
+                      type="submit"
+                      disabled={hotelSaving}
+                      className="h-11 px-6 w-full sm:w-auto rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center justify-center gap-2 transition shadow-xs active:scale-98 cursor-pointer disabled:opacity-50"
+                    >
+                      {hotelSaving ? (
+                        <>
+                          <RefreshCw className="h-4 w-4 animate-spin" />
+                          <span>Saving Hotel Master...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Save className="h-4 w-4" />
+                          <span>Save Hotel Master</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                </form>
+              )}
+            </div>
+          )}
+
 
       {/* ====================================================
           TAB CONTENT 2: GRC & REGISTRATIONS EDITOR
@@ -1094,7 +1330,7 @@ export default function AdminPortalPage() {
             <div className="space-y-1">
               <div className="flex items-center gap-3 flex-wrap">
                 <h2 className="text-base font-extrabold text-zinc-900 dark:text-white flex items-center gap-2">
-                  <FileText className="h-5 w-5 text-indigo-600" />
+                  <FileText className="h-5 w-5 text-blue-600" />
                   <span>GRC & Guest Registration Records Editor</span>
                 </h2>
                 <div className="inline-flex rounded-xl bg-zinc-100 dark:bg-zinc-800/80 p-1 border border-zinc-200 dark:border-zinc-700 text-xs font-bold">
@@ -1103,7 +1339,7 @@ export default function AdminPortalPage() {
                     onClick={() => { setGrcViewMode("ACTIVE"); }}
                     className={`px-3 py-1 rounded-lg transition cursor-pointer ${
                       grcViewMode === "ACTIVE"
-                        ? "bg-white dark:bg-zinc-900 text-indigo-600 dark:text-indigo-400 shadow-xs font-black"
+                        ? "bg-white dark:bg-zinc-900 text-blue-600 dark:text-blue-400 shadow-xs font-black"
                         : "text-zinc-500 hover:text-zinc-900 dark:hover:text-white"
                     }`}
                   >
@@ -1114,7 +1350,7 @@ export default function AdminPortalPage() {
                     onClick={() => { setGrcViewMode("ARCHIVED"); }}
                     className={`px-3 py-1 rounded-lg transition cursor-pointer flex items-center gap-1 ${
                       grcViewMode === "ARCHIVED"
-                        ? "bg-white dark:bg-zinc-900 text-indigo-600 dark:text-indigo-400 shadow-xs font-black"
+                        ? "bg-white dark:bg-zinc-900 text-blue-600 dark:text-blue-400 shadow-xs font-black"
                         : "text-zinc-500 hover:text-zinc-900 dark:hover:text-white"
                     }`}
                   >
@@ -1138,7 +1374,7 @@ export default function AdminPortalPage() {
                 placeholder="Search GRC No, Name, Mobile, Room..."
                 value={grcSearch}
                 onChange={(e) => setGrcSearch(e.target.value)}
-                className="w-full h-9 pl-9 pr-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-xs text-zinc-900 dark:text-white placeholder-zinc-400 focus:border-indigo-600 focus:outline-none"
+                className="w-full h-9 pl-9 pr-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-xs text-zinc-900 dark:text-white placeholder-zinc-400 focus:border-blue-600 focus:outline-none"
               />
             </div>
           </div>
@@ -1179,7 +1415,7 @@ export default function AdminPortalPage() {
 
                       return (
                         <tr key={data.id || data.registrationNo || Math.random()} className="hover:bg-zinc-50/60 dark:hover:bg-zinc-800/40 transition">
-                          <td className="py-3 px-4 font-mono font-black text-indigo-700 dark:text-indigo-400">
+                          <td className="py-3 px-4 font-mono font-black text-blue-700 dark:text-blue-400">
                             {data.registrationNo}
                           </td>
                           <td className="py-3 px-3">
@@ -1267,7 +1503,7 @@ export default function AdminPortalPage() {
                                 <button
                                   type="button"
                                   onClick={() => handleOpenGrcEdit(data)}
-                                  className="p-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-600 text-indigo-700 hover:text-white dark:bg-indigo-950/60 dark:hover:bg-indigo-600 dark:text-indigo-300 transition cursor-pointer"
+                                  className="p-1.5 rounded-lg bg-blue-50 hover:bg-blue-600 text-blue-700 hover:text-white dark:bg-blue-950/60 dark:hover:bg-blue-600 dark:text-blue-300 transition cursor-pointer"
                                   title="Edit GRC record & synchronize everywhere"
                                 >
                                   <Edit3 className="h-3.5 w-3.5" />
@@ -2714,7 +2950,7 @@ export default function AdminPortalPage() {
                   <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-[#09090b] p-4 space-y-3.5 shadow-xs">
                     <div className="border-b border-zinc-200 dark:border-zinc-800 pb-2">
                       <span className="font-bold text-zinc-900 dark:text-white uppercase tracking-wider flex items-center gap-2 text-xs">
-                        <Shield className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+                        <Shield className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                         7. Registration Operational Status & Signature
                       </span>
                     </div>
@@ -2825,7 +3061,7 @@ export default function AdminPortalPage() {
                     </div>
                     <div>
                       <span className="text-[10px] font-bold uppercase text-zinc-400 block">Room Number</span>
-                      <strong className="text-indigo-600 dark:text-indigo-400">Room {selectedArchiveSnapshot.preAssignedRoom || "—"}</strong>
+                      <strong className="text-blue-600 dark:text-blue-400">Room {selectedArchiveSnapshot.preAssignedRoom || "—"}</strong>
                     </div>
                     <div>
                       <span className="text-[10px] font-bold uppercase text-zinc-400 block">Age / Gender</span>
@@ -2886,7 +3122,7 @@ export default function AdminPortalPage() {
         <div className="bg-white dark:bg-[#111114] border border-zinc-200/90 dark:border-zinc-800 rounded-3xl p-6 space-y-6 shadow-xs">
           <div>
             <h2 className="text-base font-extrabold text-zinc-900 dark:text-white flex items-center gap-2">
-              <DollarSign className="h-5 w-5 text-indigo-600" />
+              <DollarSign className="h-5 w-5 text-blue-600" />
               <span>Room Category Tariffs & Pricing Master</span>
             </h2>
             <p className="text-xs text-zinc-500 mt-0.5">
@@ -2911,7 +3147,7 @@ export default function AdminPortalPage() {
                         <div className="font-extrabold text-sm text-zinc-900 dark:text-white">
                           {rt.name}
                         </div>
-                        <div className="text-[10px] font-mono text-indigo-600 dark:text-indigo-400 font-bold">
+                        <div className="text-[10px] font-mono text-blue-600 dark:text-blue-400 font-bold">
                           Code: {rt.code} • {rt.roomCount} Rooms Assigned
                         </div>
                       </div>
@@ -2926,7 +3162,7 @@ export default function AdminPortalPage() {
                           Base Tariff per Night (₹) *
                         </label>
                         <div className="relative">
-                          <span className="absolute left-3 top-2 font-mono font-bold text-indigo-600 text-xs">₹</span>
+                          <span className="absolute left-3 top-2 font-mono font-bold text-blue-600 text-xs">₹</span>
                           <input
                             type="number"
                             value={rt.basePrice}
@@ -2936,7 +3172,7 @@ export default function AdminPortalPage() {
                                 prev.map((item) => (item.id === rt.id ? { ...item, basePrice: val } : item))
                               );
                             }}
-                            className="w-full h-9 pl-7 pr-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 font-mono font-black text-xs text-zinc-900 dark:text-white focus:border-indigo-600 focus:outline-none"
+                            className="w-full h-9 pl-7 pr-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 font-mono font-black text-xs text-zinc-900 dark:text-white focus:border-blue-600 focus:outline-none"
                           />
                         </div>
                       </div>
@@ -2986,7 +3222,7 @@ export default function AdminPortalPage() {
                       type="button"
                       disabled={ratesSavingId === rt.id}
                       onClick={() => updateRate(rt)}
-                      className="w-full h-9 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition shadow-sm cursor-pointer disabled:opacity-50"
+                      className="w-full h-9 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition shadow-sm cursor-pointer disabled:opacity-50"
                     >
                       {ratesSavingId === rt.id ? (
                         <>
@@ -3016,7 +3252,7 @@ export default function AdminPortalPage() {
           <div className="p-5 rounded-3xl bg-white dark:bg-[#111114] border border-zinc-200/90 dark:border-zinc-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xs">
             <div>
               <h2 className="text-base font-extrabold text-zinc-900 dark:text-white flex items-center gap-2">
-                <BedDouble className="h-5 w-5 text-indigo-600" />
+                <BedDouble className="h-5 w-5 text-blue-600" />
                 <span>Room Matrix & Inventory Master ({roomsList.length} Rooms)</span>
               </h2>
               <p className="text-xs text-zinc-500 mt-0.5">
@@ -3111,7 +3347,7 @@ export default function AdminPortalPage() {
                               housekeepingStatus: r.roomState?.housekeepingStatus || "CLEAN",
                               sellabilityStatus: r.roomState?.sellabilityStatus || "SELLABLE",
                             })}
-                            className="px-3 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-600 text-indigo-700 hover:text-white dark:bg-indigo-950/60 dark:hover:bg-indigo-600 dark:text-indigo-300 transition font-sans font-bold text-xs cursor-pointer inline-flex items-center gap-1"
+                            className="px-3 py-1 rounded-lg bg-blue-50 hover:bg-blue-600 text-blue-700 hover:text-white dark:bg-blue-950/60 dark:hover:bg-blue-600 dark:text-blue-300 transition font-sans font-bold text-xs cursor-pointer inline-flex items-center gap-1"
                           >
                             <Edit3 className="h-3 w-3" />
                             <span>Edit Room</span>
@@ -3220,7 +3456,7 @@ export default function AdminPortalPage() {
                     <button
                       type="submit"
                       disabled={roomSaving}
-                      className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold cursor-pointer shadow-md disabled:opacity-50"
+                      className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold cursor-pointer shadow-md disabled:opacity-50"
                     >
                       {roomSaving ? "Saving..." : "Save Room"}
                     </button>
@@ -3310,7 +3546,7 @@ export default function AdminPortalPage() {
                     </button>
                     <button
                       type="submit"
-                      className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold cursor-pointer shadow-md"
+                      className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold cursor-pointer shadow-md"
                     >
                       Create Room
                     </button>
@@ -3323,13 +3559,486 @@ export default function AdminPortalPage() {
       )}
 
       {/* ====================================================
-          TAB CONTENT 5: SECURITY & ADMIN CREDENTIALS
+          TAB CONTENT 5: EXPENSES & PETTY CASH OUTFLOWS EDITOR
+      ==================================================== */}
+      {activeTab === "EXPENSES" && (() => {
+        // Filter logic
+        const filteredExpenses = expensesList.filter((e) => {
+          const matchesSearch =
+            !expenseSearchQuery ||
+            e.voucherNo?.toLowerCase().includes(expenseSearchQuery.toLowerCase()) ||
+            e.payeeName?.toLowerCase().includes(expenseSearchQuery.toLowerCase()) ||
+            e.description?.toLowerCase().includes(expenseSearchQuery.toLowerCase()) ||
+            e.reference?.toLowerCase().includes(expenseSearchQuery.toLowerCase());
+
+          const matchesCategory =
+            expenseCategoryFilter === "ALL" || e.category === expenseCategoryFilter;
+
+          const matchesMethod =
+            expenseMethodFilter === "ALL" || e.paymentMethod === expenseMethodFilter;
+
+          return matchesSearch && matchesCategory && matchesMethod;
+        });
+
+        // Totals
+        const totalExpensesSum = expensesList.reduce((acc, e) => acc + (e.totalAmount || 0), 0);
+        const cashOutflow = expensesList
+          .filter((e) => e.paymentMethod === "CASH")
+          .reduce((acc, e) => acc + (e.totalAmount || 0), 0);
+        const nonCashOutflow = totalExpensesSum - cashOutflow;
+
+        return (
+          <div className="space-y-4">
+            {/* Top Header Card */}
+            <div className="p-5 rounded-3xl bg-white dark:bg-[#111114] border border-zinc-200/90 dark:border-zinc-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xs">
+              <div>
+                <h2 className="text-base font-extrabold text-zinc-900 dark:text-white flex items-center gap-2">
+                  <Receipt className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                  <span>Expenses, Petty Cash & Cash Outflows Editor</span>
+                </h2>
+                <p className="text-xs text-zinc-500 mt-0.5">
+                  Audit, edit, void, or record operational expense vouchers, vendor payouts, maintenance, and petty cash transactions.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={fetchExpenses}
+                  className="h-9 px-3 rounded-xl bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 font-bold text-xs flex items-center gap-1.5 transition cursor-pointer"
+                  title="Reload expenses"
+                >
+                  <RefreshCw className={`h-3.5 w-3.5 ${expensesLoading ? "animate-spin" : ""}`} />
+                  <span>Refresh</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleOpenAddExpense}
+                  className="h-9 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-black text-xs flex items-center gap-1.5 transition shadow-sm cursor-pointer"
+                >
+                  <Plus className="h-4 w-4" />
+                  <span>Record New Expense</span>
+                </button>
+              </div>
+            </div>
+
+            {/* 3 KPI Summary Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="p-4 rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200/80 dark:border-zinc-800/80 shadow-xs space-y-1">
+                <div className="text-[11px] font-bold uppercase tracking-wider text-zinc-500">
+                  Total Expenses Recorded
+                </div>
+                <div className="text-xl sm:text-2xl font-black text-zinc-900 dark:text-white tabular-nums">
+                  {formatINR(totalExpensesSum)}
+                </div>
+                <div className="text-[10.5px] text-zinc-400">
+                  {expensesList.length} Total Voucher{expensesList.length === 1 ? "" : "s"}
+                </div>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200/80 dark:border-zinc-800/80 shadow-xs space-y-1">
+                <div className="text-[11px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">
+                  Front Desk Cash Payouts
+                </div>
+                <div className="text-xl sm:text-2xl font-black text-amber-600 dark:text-amber-400 tabular-nums">
+                  {formatINR(cashOutflow)}
+                </div>
+                <div className="text-[10.5px] text-zinc-400">
+                  Deducted from Front Desk Cash Drawer
+                </div>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200/80 dark:border-zinc-800/80 shadow-xs space-y-1">
+                <div className="text-[11px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">
+                  Bank / UPI / Card Outflows
+                </div>
+                <div className="text-xl sm:text-2xl font-black text-blue-600 dark:text-blue-400 tabular-nums">
+                  {formatINR(nonCashOutflow)}
+                </div>
+                <div className="text-[10.5px] text-zinc-400">
+                  Paid via Digital / Bank Accounts
+                </div>
+              </div>
+            </div>
+
+            {/* Filter & Search Bar */}
+            <div className="p-3.5 rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200/80 dark:border-zinc-800 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+              <div className="relative w-full sm:w-72">
+                <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-zinc-400" />
+                <input
+                  type="text"
+                  placeholder="Search voucher #, payee, desc, ref..."
+                  value={expenseSearchQuery}
+                  onChange={(e) => setExpenseSearchQuery(e.target.value)}
+                  className="w-full h-9 pl-9 pr-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-xs text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:border-blue-500"
+                />
+              </div>
+
+              <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto">
+                <select
+                  value={expenseCategoryFilter}
+                  onChange={(e) => setExpenseCategoryFilter(e.target.value)}
+                  className="h-9 px-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 font-bold text-zinc-700 dark:text-zinc-300 focus:outline-none focus:border-blue-500 cursor-pointer"
+                >
+                  <option value="ALL">All Categories</option>
+                  {EXPENSE_CATEGORIES.map((cat) => (
+                    <option key={cat.id} value={cat.id}>
+                      {cat.label}
+                    </option>
+                  ))}
+                </select>
+
+                <select
+                  value={expenseMethodFilter}
+                  onChange={(e) => setExpenseMethodFilter(e.target.value)}
+                  className="h-9 px-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 font-bold text-zinc-700 dark:text-zinc-300 focus:outline-none focus:border-blue-500 cursor-pointer"
+                >
+                  <option value="ALL">All Payment Methods</option>
+                  <option value="CASH">💵 Cash Drawer</option>
+                  <option value="UPI">📱 UPI / QR</option>
+                  <option value="BANK_TRANSFER">🏦 Bank Transfer</option>
+                  <option value="CARD">💳 Card</option>
+                  <option value="CHEQUE">📝 Cheque</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Expenses Table */}
+            <div className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-[#111114] overflow-hidden shadow-xs">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="border-b border-zinc-200 dark:border-zinc-800 text-[10.5px] font-mono uppercase tracking-wider text-zinc-500 dark:text-zinc-400 bg-slate-50 dark:bg-zinc-900/80">
+                      <th className="py-3 px-4 font-bold">Voucher No</th>
+                      <th className="py-3 px-3 font-bold">Date & Time</th>
+                      <th className="py-3 px-3 font-bold">Category</th>
+                      <th className="py-3 px-3 font-bold">Payee / Vendor</th>
+                      <th className="py-3 px-3 font-bold">Description & Reference</th>
+                      <th className="py-3 px-3 font-bold">Payment Method</th>
+                      <th className="py-3 px-3 font-bold text-right">Amount (₹)</th>
+                      <th className="py-3 px-4 font-bold text-right">Admin Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-zinc-200/60 dark:divide-zinc-800/60">
+                    {filteredExpenses.map((exp: any) => {
+                      const catObj = EXPENSE_CATEGORIES.find((c) => c.id === exp.category);
+                      const catLabel = catObj?.label || exp.category;
+                      const isVoided = exp.status === "VOIDED";
+
+                      return (
+                        <tr
+                          key={exp.id}
+                          className={`hover:bg-zinc-50/70 dark:hover:bg-zinc-900/50 transition ${
+                            isVoided ? "opacity-50 line-through bg-zinc-50 dark:bg-zinc-950/40" : ""
+                          }`}
+                        >
+                          {/* Voucher No */}
+                          <td className="py-2.5 px-4 font-mono font-bold text-blue-600 dark:text-blue-400">
+                            <span>{exp.voucherNo || "EXP-VOUCHER"}</span>
+                            {isVoided && (
+                              <span className="ml-1.5 px-1.5 py-0.2 rounded text-[9px] bg-rose-100 dark:bg-rose-950 text-rose-700 font-bold uppercase no-underline inline-block">
+                                Voided
+                              </span>
+                            )}
+                          </td>
+
+                          {/* Date */}
+                          <td className="py-2.5 px-3 font-mono text-zinc-600 dark:text-zinc-400 text-[11px] whitespace-nowrap">
+                            {exp.paidAt ? new Date(exp.paidAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : exp.businessDate || "—"}
+                          </td>
+
+                          {/* Category */}
+                          <td className="py-2.5 px-3">
+                            <span className="px-2 py-0.5 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 text-[11px] font-bold whitespace-nowrap">
+                              {catLabel}
+                            </span>
+                          </td>
+
+                          {/* Payee */}
+                          <td className="py-2.5 px-3 font-bold text-zinc-900 dark:text-white">
+                            {exp.payeeName}
+                          </td>
+
+                          {/* Description & Reference */}
+                          <td className="py-2.5 px-3 text-zinc-600 dark:text-zinc-300 max-w-xs">
+                            <div className="truncate">{exp.description}</div>
+                            {exp.reference && (
+                              <div className="text-[10px] font-mono text-zinc-400 truncate">
+                                Ref: {exp.reference}
+                              </div>
+                            )}
+                          </td>
+
+                          {/* Payment Method */}
+                          <td className="py-2.5 px-3">
+                            <span className={`px-2 py-0.5 rounded-md text-[11px] font-semibold border inline-flex items-center gap-1 ${
+                              exp.paymentMethod === "CASH"
+                                ? "bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-800"
+                                : exp.paymentMethod === "UPI"
+                                ? "bg-blue-50 dark:bg-blue-950/40 text-blue-800 dark:text-blue-300 border-blue-200 dark:border-blue-800"
+                                : "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800"
+                            }`}>
+                              {exp.paymentMethod === "CASH" ? "💵 Cash" : exp.paymentMethod === "UPI" ? "📱 UPI" : exp.paymentMethod === "BANK_TRANSFER" ? "🏦 Bank" : exp.paymentMethod}
+                            </span>
+                          </td>
+
+                          {/* Amount */}
+                          <td className="py-2.5 px-3 font-mono font-bold text-zinc-900 dark:text-white text-right tabular-nums text-sm">
+                            {formatINR(exp.totalAmount || exp.amount || 0)}
+                          </td>
+
+                          {/* Actions */}
+                          <td className="py-2.5 px-4 text-right whitespace-nowrap space-x-1">
+                            <button
+                              type="button"
+                              onClick={() => handleOpenEditExpense(exp)}
+                              className="px-2.5 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/50 dark:hover:bg-blue-900 text-blue-700 dark:text-blue-300 font-bold text-[11px] transition cursor-pointer"
+                              title="Edit Expense Voucher"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteExpense(exp)}
+                              className="px-2 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/50 dark:hover:bg-rose-900 text-rose-700 dark:text-rose-300 font-bold text-[11px] transition cursor-pointer"
+                              title="Delete Expense Record"
+                            >
+                              Delete
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+
+                    {filteredExpenses.length === 0 && (
+                      <tr>
+                        <td colSpan={8} className="p-8 text-center text-zinc-400 italic">
+                          {expensesList.length === 0 ? "No expense vouchers recorded yet." : "No expenses match your search filter."}
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Add / Edit Expense Modal */}
+            {showAddExpenseModal && (
+              <div className="fixed inset-0 z-50 overflow-y-auto bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
+                <div className="w-full max-w-lg bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-3xl shadow-2xl overflow-hidden">
+                  <div className="p-4 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between bg-zinc-50 dark:bg-zinc-900/60">
+                    <div className="flex items-center gap-2">
+                      <div className="h-8 w-8 rounded-xl bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 flex items-center justify-center text-blue-600 dark:text-blue-400">
+                        <Receipt className="h-4 w-4" />
+                      </div>
+                      <h3 className="font-extrabold text-sm text-zinc-900 dark:text-white">
+                        {editingExpense ? `Edit Expense Voucher (${editingExpense.voucherNo})` : "Record New Expense Outflow"}
+                      </h3>
+                    </div>
+                    <button
+                      onClick={() => setShowAddExpenseModal(false)}
+                      className="p-1 text-zinc-400 hover:text-white cursor-pointer"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+
+                  <form onSubmit={handleSaveExpense} className="p-5 space-y-4 text-xs">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <label className="block font-bold uppercase text-[10.5px] text-zinc-700 dark:text-zinc-300">
+                          Expense Category *
+                        </label>
+                        <select
+                          required
+                          value={expenseForm.category}
+                          onChange={(e) => {
+                            const cat = e.target.value;
+                            const found = EXPENSE_CATEGORIES.find((c) => c.id === cat);
+                            setExpenseForm({
+                              ...expenseForm,
+                              category: cat,
+                              description: found ? found.defaultDescription : expenseForm.description,
+                            });
+                          }}
+                          className="w-full h-10 px-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 font-bold text-zinc-900 dark:text-white focus:outline-none focus:border-blue-500"
+                        >
+                          {EXPENSE_CATEGORIES.map((cat) => (
+                            <option key={cat.id} value={cat.id}>
+                              {cat.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="block font-bold uppercase text-[10.5px] text-zinc-700 dark:text-zinc-300">
+                          Payment Method *
+                        </label>
+                        <select
+                          required
+                          value={expenseForm.paymentMethod}
+                          onChange={(e) => setExpenseForm({ ...expenseForm, paymentMethod: e.target.value })}
+                          className="w-full h-10 px-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 font-bold text-zinc-900 dark:text-white focus:outline-none focus:border-blue-500"
+                        >
+                          <option value="CASH">💵 Cash (Front Desk Drawer)</option>
+                          <option value="UPI">📱 UPI / QR Code</option>
+                          <option value="BANK_TRANSFER">🏦 Bank Transfer / NEFT</option>
+                          <option value="CARD">💳 Credit / Debit Card</option>
+                          <option value="CHEQUE">📝 Cheque</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <label className="block font-bold uppercase text-[10.5px] text-zinc-700 dark:text-zinc-300">
+                          Payee Name / Vendor / Staff *
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="e.g. Ramesh Linens or Electricity Dept"
+                          value={expenseForm.payeeName}
+                          onChange={(e) => setExpenseForm({ ...expenseForm, payeeName: e.target.value })}
+                          className="w-full h-10 px-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 font-bold text-zinc-900 dark:text-white focus:outline-none focus:border-blue-500"
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="block font-bold uppercase text-[10.5px] text-zinc-700 dark:text-zinc-300">
+                          Date & Time *
+                        </label>
+                        <input
+                          type="datetime-local"
+                          required
+                          value={expenseForm.paidAt}
+                          onChange={(e) => setExpenseForm({ ...expenseForm, paidAt: e.target.value })}
+                          className="w-full h-10 px-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 font-mono text-zinc-900 dark:text-white focus:outline-none focus:border-blue-500"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-3">
+                      <div className="space-y-1 col-span-2">
+                        <label className="block font-bold uppercase text-[10.5px] text-zinc-700 dark:text-zinc-300">
+                          Net Amount (₹) *
+                        </label>
+                        <input
+                          type="number"
+                          required
+                          step="0.01"
+                          placeholder="0.00"
+                          value={expenseForm.amount}
+                          onChange={(e) => setExpenseForm({ ...expenseForm, amount: e.target.value })}
+                          className="w-full h-10 px-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 font-mono font-black text-base text-zinc-900 dark:text-white focus:outline-none focus:border-blue-500"
+                        />
+                      </div>
+
+                      <div className="space-y-1 col-span-1">
+                        <label className="block font-bold uppercase text-[10.5px] text-zinc-700 dark:text-zinc-300">
+                          GST / Tax (₹)
+                        </label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          placeholder="0.00"
+                          value={expenseForm.taxAmount}
+                          onChange={(e) => setExpenseForm({ ...expenseForm, taxAmount: e.target.value })}
+                          className="w-full h-10 px-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 font-mono text-zinc-900 dark:text-white focus:outline-none focus:border-blue-500"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="block font-bold uppercase text-[10.5px] text-zinc-700 dark:text-zinc-300">
+                        Description / Purpose *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="Narration of expense"
+                        value={expenseForm.description}
+                        onChange={(e) => setExpenseForm({ ...expenseForm, description: e.target.value })}
+                        className="w-full h-10 px-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white focus:outline-none focus:border-blue-500"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <label className="block font-bold uppercase text-[10.5px] text-zinc-700 dark:text-zinc-300">
+                          Reference / UTR / Cheque #
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g. UTR-98129381 or Bill #102"
+                          value={expenseForm.reference}
+                          onChange={(e) => setExpenseForm({ ...expenseForm, reference: e.target.value })}
+                          className="w-full h-10 px-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 font-mono text-zinc-900 dark:text-white focus:outline-none focus:border-blue-500"
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="block font-bold uppercase text-[10.5px] text-zinc-700 dark:text-zinc-300">
+                          Status
+                        </label>
+                        <select
+                          value={expenseForm.status}
+                          onChange={(e) => setExpenseForm({ ...expenseForm, status: e.target.value })}
+                          className="w-full h-10 px-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 font-bold text-zinc-900 dark:text-white focus:outline-none focus:border-blue-500"
+                        >
+                          <option value="PAID">PAID (Settled)</option>
+                          <option value="VOIDED">VOIDED (Cancelled)</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="block font-bold uppercase text-[10.5px] text-zinc-700 dark:text-zinc-300">
+                        Internal Notes / Remarks
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="Optional internal remarks"
+                        value={expenseForm.notes}
+                        onChange={(e) => setExpenseForm({ ...expenseForm, notes: e.target.value })}
+                        className="w-full h-10 px-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white focus:outline-none focus:border-blue-500"
+                      />
+                    </div>
+
+                    <div className="flex justify-end gap-2 pt-3 border-t border-zinc-200 dark:border-zinc-800">
+                      <button
+                        type="button"
+                        onClick={() => setShowAddExpenseModal(false)}
+                        className="px-4 py-2.5 rounded-xl bg-zinc-100 dark:bg-zinc-800 font-bold cursor-pointer hover:bg-zinc-200 dark:hover:bg-zinc-700"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={expenseSaving}
+                        className="px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold cursor-pointer shadow-md disabled:opacity-50 flex items-center gap-1.5"
+                      >
+                        {expenseSaving ? "Saving..." : editingExpense ? "Update Expense" : "Record Expense"}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
+      {/* ====================================================
+          TAB CONTENT 6: SECURITY & ADMIN CREDENTIALS
       ==================================================== */}
       {activeTab === "SECURITY" && (
         <div className="bg-white dark:bg-[#111114] border border-zinc-200/90 dark:border-zinc-800 rounded-3xl p-6 space-y-6 shadow-xs">
           <div className="border-b border-zinc-200 dark:border-zinc-800 pb-4">
             <h2 className="text-base font-extrabold text-zinc-900 dark:text-white flex items-center gap-2">
-              <Shield className="h-5 w-5 text-indigo-600" />
+              <Shield className="h-5 w-5 text-blue-600" />
               <span>Master Admin Security & Role Governance</span>
             </h2>
             <p className="text-xs text-zinc-500 mt-0.5">
@@ -3337,10 +4046,11 @@ export default function AdminPortalPage() {
             </p>
           </div>
 
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="p-5 rounded-2xl bg-zinc-50 dark:bg-[#18181b] border border-zinc-200 dark:border-zinc-800 space-y-4">
               <h3 className="text-xs font-black uppercase tracking-wider text-zinc-900 dark:text-white flex items-center gap-2">
-                <KeyRound className="h-4 w-4 text-indigo-600" />
+                <KeyRound className="h-4 w-4 text-blue-600" />
                 <span>Active Master Admin Account</span>
               </h3>
 
@@ -3359,14 +4069,14 @@ export default function AdminPortalPage() {
                 </div>
                 <div className="flex justify-between py-2">
                   <span className="text-zinc-500">Database Engine:</span>
-                  <span className="font-bold text-indigo-600">SQLite (dev.db)</span>
+                  <span className="font-bold text-blue-600">SQLite (dev.db)</span>
                 </div>
               </div>
             </div>
 
             <div className="p-5 rounded-2xl bg-zinc-50 dark:bg-[#18181b] border border-zinc-200 dark:border-zinc-800 space-y-3 text-xs">
               <h3 className="font-black uppercase tracking-wider text-zinc-900 dark:text-white flex items-center gap-2">
-                <Database className="h-4 w-4 text-indigo-600" />
+                <Database className="h-4 w-4 text-blue-600" />
                 <span>Automatic Database Protection</span>
               </h3>
               <p className="text-zinc-500">
@@ -3380,6 +4090,10 @@ export default function AdminPortalPage() {
         </div>
       )}
 
+        </div>
+      </div>
+
     </div>
   );
 }
+

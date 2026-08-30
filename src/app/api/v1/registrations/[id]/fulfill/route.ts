@@ -250,12 +250,36 @@ export async function POST(
           update: { occupancyStatus: "OCCUPIED", lastChangedAt: new Date() },
         });
 
-        // Determine Room Base Price
+        // Determine Room Base Price and Complimentary status
         let roomBasePrice = 3200;
-        if (roomRates[rm.id] !== undefined && Number(roomRates[rm.id]) > 0) {
-          roomBasePrice = Number(roomRates[rm.id]);
-        } else if (agreedTariff !== undefined && Number(agreedTariff) > 0) {
-          roomBasePrice = Number(agreedTariff);
+        let isThisRoomComp = false;
+
+        if (roomRates[rm.id] !== undefined && roomRates[rm.id] !== "") {
+          const rawVal = roomRates[rm.id];
+          const numVal = Number(rawVal);
+          if (rawVal === "COMP" || rawVal === "0" || numVal === 0) {
+            isThisRoomComp = true;
+            roomBasePrice = 0;
+          } else {
+            isThisRoomComp = false;
+            roomBasePrice = isNaN(numVal) ? 3200 : numVal;
+          }
+        } else if (rm.id === targetRooms[0]?.id) {
+          if (agreedTariff !== undefined && agreedTariff !== null && agreedTariff !== "") {
+            roomBasePrice = Number(agreedTariff);
+            isThisRoomComp = roomBasePrice === 0;
+          } else if (rm.roomTypeId) {
+            const rateVersion = await prisma.ratePlanVersion.findFirst({
+              where: { roomTypeId: rm.roomTypeId, active: true },
+              orderBy: { createdAt: "desc" },
+            });
+            if (rateVersion?.pricingJson) {
+              try {
+                const pricing = JSON.parse(rateVersion.pricingJson);
+                if (pricing.basePrice) roomBasePrice = Number(pricing.basePrice);
+              } catch {}
+            }
+          }
         } else if (rm.roomTypeId) {
           const rateVersion = await prisma.ratePlanVersion.findFirst({
             where: { roomTypeId: rm.roomTypeId, active: true },
@@ -270,13 +294,15 @@ export async function POST(
         }
 
         const initialNightPrice = roomBasePrice * 1;
-        const roomGst = calculateGST({
-          grossOrBaseAmount: initialNightPrice,
-          isInclusive: true,
-          sacHsn: "996311",
-          supplierStateCode: registration.property?.stateCode || "18",
-          customTaxRate: 5,
-        });
+        const roomGst = isThisRoomComp
+          ? { taxableAmount: 0, taxAmount: 0, totalAmount: 0, components: [] }
+          : calculateGST({
+              grossOrBaseAmount: initialNightPrice,
+              isInclusive: true,
+              sacHsn: "996311",
+              supplierStateCode: registration.property?.stateCode || "18",
+              customTaxRate: 5,
+            });
 
         await prisma.folioEntry.create({
           data: {
@@ -287,7 +313,9 @@ export async function POST(
             serviceDate: serviceDateStr,
             type: "CHARGE",
             chargeCode: "ROOM_TARIFF",
-            description: `Room Tariff - Room ${rm.number} (Night 1)`,
+            description: isThisRoomComp
+              ? `Room Tariff - Room ${rm.number} (Night 1 - COMPLIMENTARY)`
+              : `Room Tariff - Room ${rm.number} (Night 1)`,
             qty: 1,
             unitAmount: roomBasePrice,
             taxableAmount: roomGst.taxableAmount,
@@ -403,10 +431,34 @@ export async function POST(
         });
 
         let roomBasePrice = 3200;
-        if (roomRates[rm.id] !== undefined && Number(roomRates[rm.id]) > 0) {
-          roomBasePrice = Number(roomRates[rm.id]);
-        } else if (agreedTariff !== undefined && Number(agreedTariff) > 0) {
-          roomBasePrice = Number(agreedTariff);
+        let isThisRoomComp = false;
+
+        if (roomRates[rm.id] !== undefined && roomRates[rm.id] !== "") {
+          const rawVal = roomRates[rm.id];
+          const numVal = Number(rawVal);
+          if (rawVal === "COMP" || rawVal === "0" || numVal === 0) {
+            isThisRoomComp = true;
+            roomBasePrice = 0;
+          } else {
+            isThisRoomComp = false;
+            roomBasePrice = isNaN(numVal) ? 3200 : numVal;
+          }
+        } else if (rm.id === targetRooms[0]?.id) {
+          if (agreedTariff !== undefined && agreedTariff !== null && agreedTariff !== "") {
+            roomBasePrice = Number(agreedTariff);
+            isThisRoomComp = roomBasePrice === 0;
+          } else if (rm.roomTypeId) {
+            const rateVersion = await prisma.ratePlanVersion.findFirst({
+              where: { roomTypeId: rm.roomTypeId, active: true },
+              orderBy: { createdAt: "desc" },
+            });
+            if (rateVersion?.pricingJson) {
+              try {
+                const pricing = JSON.parse(rateVersion.pricingJson);
+                if (pricing.basePrice) roomBasePrice = Number(pricing.basePrice);
+              } catch {}
+            }
+          }
         } else if (rm.roomTypeId) {
           const rateVersion = await prisma.ratePlanVersion.findFirst({
             where: { roomTypeId: rm.roomTypeId, active: true },
@@ -421,13 +473,15 @@ export async function POST(
         }
 
         const initialNightPrice = roomBasePrice * 1;
-        const roomGst = calculateGST({
-          grossOrBaseAmount: initialNightPrice,
-          isInclusive: true,
-          sacHsn: "996311",
-          supplierStateCode: registration.property?.stateCode || "18",
-          customTaxRate: 5,
-        });
+        const roomGst = isThisRoomComp
+          ? { taxableAmount: 0, taxAmount: 0, totalAmount: 0, components: [] }
+          : calculateGST({
+              grossOrBaseAmount: initialNightPrice,
+              isInclusive: true,
+              sacHsn: "996311",
+              supplierStateCode: registration.property?.stateCode || "18",
+              customTaxRate: 5,
+            });
 
         await prisma.folioEntry.create({
           data: {
@@ -438,7 +492,9 @@ export async function POST(
             serviceDate: serviceDateStr,
             type: "CHARGE",
             chargeCode: "ROOM_TARIFF",
-            description: `Room Tariff - Room ${rm.number} (Night 1)`,
+            description: isThisRoomComp
+              ? `Room Tariff - Room ${rm.number} (Night 1 - COMPLIMENTARY)`
+              : `Room Tariff - Room ${rm.number} (Night 1)`,
             qty: 1,
             unitAmount: roomBasePrice,
             taxableAmount: roomGst.taxableAmount,

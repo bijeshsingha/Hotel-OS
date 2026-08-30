@@ -136,19 +136,20 @@ export function AppHeader() {
               )}
             </button>
 
-            <div className="flex items-center gap-2">
-              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-600 dark:bg-white text-white dark:text-zinc-950 font-black text-xs tracking-tight shadow-xs">
-                H
-              </div>
-              <div className="flex items-center gap-1.5">
-                <span className="text-sm font-bold tracking-tight text-zinc-900 dark:text-white">
-                  Hotel OS
-                </span>
-                <span className="rounded px-1.5 py-0.5 text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 hidden sm:inline-block">
-                  v1.0
-                </span>
-              </div>
-            </div>
+            <Link href="/" className="flex items-center gap-2 hover:opacity-90 transition">
+              <img
+                src="/brand/rovesta-mark.png"
+                alt="ROVESTA"
+                className="h-6 w-auto object-contain"
+              />
+              <span className="text-base font-black tracking-tight text-zinc-900 dark:text-white font-sans">
+                ROVESTA
+              </span>
+              <span className="rounded px-1.5 py-0.5 text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 hidden sm:inline-block">
+                OS
+              </span>
+            </Link>
+
 
             <div className="h-4 w-px bg-zinc-200 dark:bg-zinc-800 mx-0.5 hidden sm:block" />
 
@@ -217,8 +218,9 @@ export function AppHeader() {
             {/* Business Date Badge */}
             <div className="hidden sm:flex items-center gap-1.5 rounded-lg bg-zinc-100/80 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-2.5 py-1 text-xs text-zinc-700 dark:text-zinc-300">
               <span className="h-2 w-2 rounded-full bg-emerald-500 inline-block animate-pulse" />
-              <span className="text-zinc-500 text-[11px] font-semibold">Date:</span>
-              <span className="font-mono font-bold text-zinc-900 dark:text-white">{activeProperty?.businessDate || new Date().toISOString().split("T")[0]}</span>
+              <span suppressHydrationWarning className="font-mono font-bold text-zinc-900 dark:text-white">
+                {activeProperty?.businessDate || "2026-08-31"}
+              </span>
             </div>
           </div>
 

@@ -380,3 +380,55 @@ export async function closeOperationalDay(
     },
   };
 }
+
+/**
+ * Returns current calendar date (YYYY-MM-DD) in India Standard Time (Asia/Kolkata)
+ */
+export function getHotelTodayDate(): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+}
+
+/**
+ * Ensures property businessDate is automatically rolled over and synced to today's date.
+ * If the date is behind, it posts nightly room charges, snapshots the closed day, and advances to today.
+ */
+export async function ensurePropertyDateSynchronized(propertyId: string) {
+  const property = await prisma.property.findUnique({
+    where: { id: propertyId },
+    select: { id: true, businessDate: true },
+  });
+
+  if (!property) return null;
+
+  const todayStr = getHotelTodayDate();
+  let currentBizDate = property.businessDate;
+
+  // If business date is behind today, auto close each day and advance
+  while (currentBizDate < todayStr) {
+    try {
+      await postNightlyRoomCharges(propertyId);
+    } catch (e) {
+      console.warn(`[Auto-Audit] Charge posting error for ${currentBizDate}:`, e);
+    }
+
+    try {
+      const res = await closeOperationalDay(propertyId, "SYSTEM_AUTO_MIDNIGHT");
+      currentBizDate = res.nextBusinessDate;
+    } catch (e) {
+      console.warn(`[Auto-Audit] Day close rollover error for ${currentBizDate}:`, e);
+      await prisma.property.update({
+        where: { id: propertyId },
+        data: { businessDate: todayStr },
+      });
+      break;
+    }
+  }
+
+  return todayStr;
+}
+
