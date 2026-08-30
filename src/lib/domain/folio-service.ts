@@ -89,6 +89,7 @@ export async function recordPayment({
   reference,
   payerName,
   payerSnapshot,
+  isRefund = false,
   actorId,
 }: {
   folioId: string;
@@ -98,6 +99,7 @@ export async function recordPayment({
   reference?: string;
   payerName?: string;
   payerSnapshot?: string;
+  isRefund?: boolean;
   actorId?: string;
 }) {
   const folio = await prisma.folio.findUniqueOrThrow({
@@ -118,7 +120,11 @@ export async function recordPayment({
     throw new Error("No folio window available.");
   }
 
-  const docSeq = await getNextDocumentNumber(folio.propertyId, "RECEIPT");
+  const isActuallyRefund = isRefund || amount < 0 || method.toUpperCase().includes("REFUND") || method.toUpperCase().includes("PAYOUT");
+  const finalAmount = isActuallyRefund ? -Math.abs(amount) : Math.abs(amount);
+  const docType = isActuallyRefund ? "REFUND" : "RECEIPT";
+
+  const docSeq = await getNextDocumentNumber(folio.propertyId, docType);
   const isBTC = method === "DIRECT_BILL";
 
   const pSnapshot =
@@ -129,6 +135,7 @@ export async function recordPayment({
       companyName: folio.stay?.primaryGuest?.companyName || "",
       gstin: folio.stay?.primaryGuest?.gstin || "",
       billToCompany: isBTC,
+      isRefund: isActuallyRefund,
     });
 
   const payment = await prisma.payment.create({
@@ -137,9 +144,9 @@ export async function recordPayment({
       propertyId: folio.propertyId,
       folioId: folio.id,
       receiptNo: docSeq.formattedNumber,
-      amount,
+      amount: finalAmount,
       method,
-      reference: reference || (isBTC ? `BTC-${folio.stay?.primaryGuest?.companyName || "CORP"}` : undefined),
+      reference: reference || (isActuallyRefund ? "Advance Surplus Refund Payout" : (isBTC ? `BTC-${folio.stay?.primaryGuest?.companyName || "CORP"}` : undefined)),
       payerSnapshot: pSnapshot,
       status: "SUCCEEDED",
       createdById: actorId,
@@ -150,19 +157,20 @@ export async function recordPayment({
     data: {
       paymentId: payment.id,
       folioWindowId: windowId,
-      amount,
+      amount: finalAmount,
     },
   });
 
   await prisma.folio.update({
     where: { id: folio.id },
     data: {
-      balance: { decrement: amount },
+      balance: { decrement: finalAmount },
     },
   });
 
   return payment;
 }
+
 
 export async function checkoutAndIssueInvoice({
   stayId,

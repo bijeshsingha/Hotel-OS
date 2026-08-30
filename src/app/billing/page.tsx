@@ -27,6 +27,7 @@ import {
   Phone,
   FileText,
   UserCheck,
+  RotateCcw,
 } from "lucide-react";
 import { DISCOUNT_REASONS, PAYMENT_METHODS } from "@/data";
 import { PrintableTaxInvoiceModal } from "@/components/billing/printable-tax-invoice";
@@ -122,6 +123,7 @@ function BillingContent() {
   const [showManualChargeModal, setShowManualChargeModal] = useState(false);
   const [showDiscountModal, setShowDiscountModal] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [showRefundModal, setShowRefundModal] = useState(false);
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<any | null>(null);
   const [isLiveTaxBillView, setIsLiveTaxBillView] = useState(false);
@@ -150,6 +152,13 @@ function BillingContent() {
     gstin: "",
     creditPeriod: "30_DAYS",
     billingRemarks: "",
+  });
+
+  const [refundForm, setRefundForm] = useState({
+    amount: "0",
+    method: "UPI",
+    reference: "",
+    notes: "Advance surplus return at checkout",
   });
 
   // Grace Period control state (in minutes)
@@ -497,9 +506,17 @@ function BillingContent() {
     return activeDirectoryItem?.roomPayments ?? totalGroupPayments;
   }, [groupBillingMode, isMultiRoomGroup, totalGroupPayments, activeDirectoryItem]);
 
-  const currentBalance = useMemo(() => {
-    return Math.max(0, Math.round((totalCharges - totalPayments) * 100) / 100);
+  const netDifference = useMemo(() => {
+    return Math.round((totalCharges - totalPayments) * 100) / 100;
   }, [totalCharges, totalPayments]);
+
+  const currentBalance = useMemo(() => {
+    return Math.max(0, netDifference);
+  }, [netDifference]);
+
+  const surplusCredit = useMemo(() => {
+    return netDifference < 0 ? Math.abs(netDifference) : 0;
+  }, [netDifference]);
 
   // Post Manual / Restaurant Charge (5% GST Inclusive)
   const handlePostCharge = async (e: React.FormEvent) => {
@@ -593,12 +610,67 @@ function BillingContent() {
     }
   };
 
+  // Open Refund Payout Modal
+  const handleOpenRefundModal = (customAmount?: number) => {
+    const amt = customAmount !== undefined ? customAmount : surplusCredit;
+    setRefundForm({
+      amount: String(amt || 0),
+      method: "UPI",
+      reference: "",
+      notes: "Advance surplus return / checkout settlement",
+    });
+    setShowRefundModal(true);
+  };
+
+  // Process Refund Payout
+  const handleProcessRefund = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!folioData) return;
+    setActionLoading(true);
+    try {
+      const numAmt = Number(refundForm.amount);
+      if (numAmt <= 0) {
+        alert("Please enter a valid refund amount.");
+        setActionLoading(false);
+        return;
+      }
+
+      const res = await fetch(`/api/v1/folios/${folioData.id}/payments`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          amount: -Math.abs(numAmt),
+          method: refundForm.method,
+          reference: refundForm.reference || undefined,
+          payerName: folioData.stay?.primaryGuest?.name || "Guest",
+          isRefund: true,
+          billingRemarks: refundForm.notes,
+        }),
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || "Failed to process refund");
+      }
+
+      await loadFolio(folioData.id);
+      await loadStays();
+      setShowRefundModal(false);
+      alert(`Refund payout of ${formatINR(numAmt)} recorded successfully!`);
+    } catch (err: any) {
+      alert(`Refund error: ${err.message}`);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   // Open Live Tax Bill Print Modal
   const handleOpenLiveTaxBill = () => {
     setSelectedInvoice(null);
     setIsLiveTaxBillView(true);
     setShowInvoiceModal(true);
   };
+
 
   // Open Group Multi-Room Payment Modal
   const handleOpenGroupPaymentModal = () => {
@@ -725,6 +797,16 @@ function BillingContent() {
       });
       setShowPaymentModal(true);
       return;
+    }
+
+    if (surplusCredit > 0.5) {
+      const confirmRefund = window.confirm(
+        `This folio has an Advance Surplus of ${formatINR(surplusCredit)}.\n\nClick OK to record a ${formatINR(surplusCredit)} refund payout now.\nClick CANCEL to proceed with checkout retaining surplus as advance.`
+      );
+      if (confirmRefund) {
+        handleOpenRefundModal(surplusCredit);
+        return;
+      }
     }
 
     setActionLoading(true);
@@ -1278,19 +1360,44 @@ function BillingContent() {
                   </div>
                 </div>
 
-                <div className="p-3.5 rounded-2xl bg-white dark:bg-[#121215] border border-zinc-200/80 dark:border-zinc-800/80 shadow-xs space-y-0.5">
-                  <div className="text-[11px] text-zinc-500 dark:text-zinc-400 uppercase font-semibold tracking-wider">
-                    Outstanding Balance Due
+                <div className={`p-3.5 rounded-2xl border shadow-xs space-y-0.5 transition ${
+                  surplusCredit > 0
+                    ? "bg-amber-50/50 dark:bg-amber-950/20 border-amber-300 dark:border-amber-700/60"
+                    : currentBalance > 0
+                    ? "bg-white dark:bg-[#121215] border-zinc-200/80 dark:border-zinc-800/80"
+                    : "bg-emerald-50/40 dark:bg-emerald-950/20 border-emerald-300 dark:border-emerald-700/60"
+                }`}>
+                  <div className="flex items-center justify-between">
+                    <div className="text-[11px] uppercase font-semibold tracking-wider text-zinc-500 dark:text-zinc-400">
+                      {surplusCredit > 0 ? "Advance Surplus (Overpaid)" : "Outstanding Balance Due"}
+                    </div>
+                    {surplusCredit > 0 && (
+                      <button
+                        onClick={() => handleOpenRefundModal(surplusCredit)}
+                        className="px-2 py-0.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-zinc-950 font-black text-[10.5px] transition shadow-2xs flex items-center gap-1 cursor-pointer"
+                        title="Issue refund return to guest"
+                      >
+                        <span>↩️ Issue Refund</span>
+                      </button>
+                    )}
                   </div>
                   <div
                     className={`text-xl sm:text-2xl font-bold tabular-nums ${
-                      currentBalance > 0 ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400"
+                      surplusCredit > 0
+                        ? "text-amber-700 dark:text-amber-400"
+                        : currentBalance > 0
+                        ? "text-rose-600 dark:text-rose-400"
+                        : "text-emerald-600 dark:text-emerald-400"
                     }`}
                   >
-                    {formatINR(currentBalance)}
+                    {surplusCredit > 0 ? `+ ${formatINR(surplusCredit)}` : formatINR(currentBalance)}
                   </div>
                   <div className="text-[10.5px] text-zinc-400">
-                    {currentBalance > 0 ? "Pending Guest / Corporate Settlement" : "Folio is Fully Cleared"}
+                    {surplusCredit > 0
+                      ? "Refund Due at Checkout or Retain as Advance"
+                      : currentBalance > 0
+                      ? "Pending Guest / Corporate Settlement"
+                      : "✓ Folio is Exactly Settled & Cleared"}
                   </div>
                 </div>
               </div>
@@ -1447,14 +1554,22 @@ function BillingContent() {
                       {payments.map((p: any) => {
                         const isGroup = p.reference?.includes("GRP") || p.receiptNo?.includes("GRP");
                         const isBTC = p.method === "DIRECT_BILL";
+                        const isRefund = Number(p.amount) < 0 || p.method?.includes("REFUND") || p.method?.includes("PAYOUT");
 
                         return (
                           <tr key={p.id} className="hover:bg-zinc-50/70 dark:hover:bg-zinc-900/50 transition">
                             <td className="py-2 px-3 font-mono text-blue-600 dark:text-blue-400 font-semibold flex items-center gap-1.5">
-                              <span>{p.receiptNo}</span>
+                              <span className={isRefund ? "text-amber-600 dark:text-amber-400 font-bold" : ""}>
+                                {p.receiptNo}
+                              </span>
                               {isGroup && (
                                 <span className="text-[9.5px] bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 px-1.5 py-0.2 rounded font-bold">
                                   Group
+                                </span>
+                              )}
+                              {isRefund && (
+                                <span className="text-[9.5px] bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800 px-1.5 py-0.2 rounded font-black uppercase">
+                                  Refund
                                 </span>
                               )}
                             </td>
@@ -1464,7 +1579,9 @@ function BillingContent() {
                             <td className="py-2 px-3 font-medium text-zinc-800 dark:text-zinc-200">
                               <span
                                 className={`rounded-md border px-2 py-0.5 text-xs font-semibold inline-flex items-center gap-1.5 ${
-                                  isBTC
+                                  isRefund
+                                    ? "bg-rose-50 dark:bg-rose-950/60 text-rose-800 dark:text-rose-200 border-rose-300 dark:border-rose-700"
+                                    : isBTC
                                     ? "bg-amber-50 dark:bg-amber-950/60 text-amber-900 dark:text-amber-200 border-amber-200 dark:border-amber-700 shadow-xs"
                                     : p.method === "UPI"
                                     ? "bg-blue-50 dark:bg-blue-950/60 text-blue-800 dark:text-blue-200 border-blue-200 dark:border-blue-700"
@@ -1475,7 +1592,9 @@ function BillingContent() {
                                     : "bg-emerald-50 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-200 border-emerald-200 dark:border-emerald-700"
                                 }`}
                               >
-                                {isBTC ? (
+                                {isRefund ? (
+                                  <span>↩️ Refund Payout ({p.method.replace("_REFUND", "")})</span>
+                                ) : isBTC ? (
                                   <>
                                     <Building2 className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
                                     <span>Bill to Company (BTC)</span>
@@ -1494,12 +1613,15 @@ function BillingContent() {
                             <td className="py-2 px-3 font-mono text-zinc-600 dark:text-zinc-400 text-xs">
                               {p.reference && !p.reference.startsWith("GRC-DEPOSIT-") ? p.reference : "—"}
                             </td>
-                            <td className="py-2 px-3 font-mono font-bold text-emerald-600 dark:text-emerald-400 text-right tabular-nums text-sm">
-                              {formatINR(p.amount || 0)}
+                            <td className={`py-2 px-3 font-mono font-bold text-right tabular-nums text-sm ${
+                              isRefund ? "text-rose-600 dark:text-rose-400 font-black" : "text-emerald-600 dark:text-emerald-400"
+                            }`}>
+                              {isRefund ? `- ${formatINR(Math.abs(p.amount))}` : formatINR(p.amount || 0)}
                             </td>
                           </tr>
                         );
                       })}
+
                       {payments.length === 0 && (
                         <tr>
                           <td colSpan={5} className="p-5 text-center text-zinc-400 italic text-xs">
@@ -2031,8 +2153,124 @@ function BillingContent() {
       )}
 
       {/* ========================================================================= */}
+      {/* ↩️ REFUND PAYOUT & ADVANCE SURPLUS RETURN MODAL                           */}
+      {/* ========================================================================= */}
+      {showRefundModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in">
+          <div className="w-full max-w-lg rounded-3xl border border-amber-300 dark:border-amber-700/60 bg-white dark:bg-[#121215] p-6 shadow-2xl space-y-5 text-zinc-900 dark:text-white">
+            <div className="flex items-center justify-between pb-3 border-b border-zinc-200 dark:border-zinc-800">
+              <div className="flex items-center gap-2.5">
+                <div className="h-9 w-9 rounded-xl bg-amber-50 dark:bg-amber-950/60 border border-amber-300 dark:border-amber-700 flex items-center justify-center text-amber-600 dark:text-amber-400">
+                  <RotateCcw className="h-5 w-5" />
+                </div>
+                <div>
+                  <h2 className="text-base font-bold text-zinc-900 dark:text-white">
+                    Issue Refund / Advance Return
+                  </h2>
+                  <p className="text-xs text-zinc-500">
+                    Return surplus money to guest & reconcile folio ledger
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowRefundModal(false)}
+                className="h-8 w-8 rounded-full bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-600 dark:text-zinc-300 flex items-center justify-center transition cursor-pointer"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {/* Surplus Context Banner */}
+            <div className="p-3.5 rounded-2xl bg-amber-50/70 dark:bg-amber-950/30 border border-amber-300 dark:border-amber-800/60 space-y-1 text-xs">
+              <div className="flex items-center justify-between">
+                <span className="text-zinc-600 dark:text-zinc-400 font-medium">Guest Name:</span>
+                <strong className="text-zinc-900 dark:text-white font-bold">{formatGuestDisplayName(activeStay?.primaryGuest?.name)}</strong>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-zinc-600 dark:text-zinc-400 font-medium">Advance Overpayment:</span>
+                <strong className="font-mono font-bold text-amber-700 dark:text-amber-400">{formatINR(surplusCredit)}</strong>
+              </div>
+              <div className="flex items-center justify-between text-[11px] text-zinc-500 pt-1 border-t border-amber-200 dark:border-amber-800/50">
+                <span>Total Paid: {formatINR(totalPayments)}</span>
+                <span>Total Bill: {formatINR(totalCharges)}</span>
+              </div>
+            </div>
+
+            <form onSubmit={handleProcessRefund} className="space-y-4 text-xs sm:text-sm">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-zinc-700 dark:text-zinc-300 font-bold block mb-1.5">Refund Method *</label>
+                  <select
+                    value={refundForm.method}
+                    onChange={(e) => setRefundForm({ ...refundForm, method: e.target.value })}
+                    className="w-full h-11 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 px-3 text-zinc-900 dark:text-white font-bold focus:outline-none focus:border-amber-500"
+                  >
+                    <option value="UPI">📱 UPI Return / QR</option>
+                    <option value="CASH">💵 Cash Drawer Payout</option>
+                    <option value="BANK_TRANSFER">🏦 Bank Account Transfer</option>
+                    <option value="CARD_REFUND">💳 Card Reversal</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-zinc-700 dark:text-zinc-300 font-bold block mb-1.5">Refund Amount (₹) *</label>
+                  <input
+                    type="number"
+                    required
+                    step="0.01"
+                    value={refundForm.amount}
+                    onChange={(e) => setRefundForm({ ...refundForm, amount: e.target.value })}
+                    className="w-full h-11 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 px-3.5 text-zinc-900 dark:text-white focus:outline-none focus:border-amber-500 font-mono font-black text-base"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-zinc-700 dark:text-zinc-300 font-bold block mb-1.5">Refund UTR / Txn Reference (Optional)</label>
+                <input
+                  type="text"
+                  placeholder="e.g. UPI/REF-98129381 or Cash Voucher #"
+                  value={refundForm.reference}
+                  onChange={(e) => setRefundForm({ ...refundForm, reference: e.target.value })}
+                  className="w-full h-11 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 px-3.5 text-zinc-900 dark:text-white focus:outline-none focus:border-amber-500 font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="text-zinc-700 dark:text-zinc-300 font-bold block mb-1.5">Reason / Accounting Remarks</label>
+                <input
+                  type="text"
+                  value={refundForm.notes}
+                  onChange={(e) => setRefundForm({ ...refundForm, notes: e.target.value })}
+                  className="w-full h-11 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 px-3.5 text-zinc-900 dark:text-white focus:outline-none focus:border-amber-500 font-medium"
+                />
+              </div>
+
+              <div className="pt-3 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowRefundModal(false)}
+                  className="h-11 px-5 rounded-xl text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white font-bold cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={actionLoading}
+                  className="h-11 px-6 rounded-xl bg-amber-500 hover:bg-amber-600 text-zinc-950 font-black transition disabled:opacity-50 shadow-md flex items-center gap-2 cursor-pointer"
+                >
+                  <RotateCcw className="h-4 w-4" />
+                  <span>{actionLoading ? "Processing..." : "Confirm & Pay Out Refund"}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
       {/* 👥 GROUP MULTI-ROOM SETTLEMENT MODAL                                      */}
       {/* ========================================================================= */}
+
       {showGroupPaymentModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 overflow-y-auto animate-in fade-in">
           <div className="w-full max-w-xl rounded-3xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-[#121215] p-6 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto text-zinc-900 dark:text-white">

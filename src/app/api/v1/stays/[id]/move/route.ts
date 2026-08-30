@@ -8,13 +8,15 @@ export async function POST(
   try {
     const { id: stayId } = await params;
     const body = await request.json();
-    const { targetRoomId, reason, rateHandling, actorId } = body;
+    const { fromRoomId, targetRoomId, reason, rateHandling, customRate, actorId } = body;
 
     const result = await moveRoom({
       stayId,
+      fromRoomId,
       targetRoomId,
       reason,
       rateHandling,
+      customRate,
       actorId,
     });
 

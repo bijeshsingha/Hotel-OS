@@ -4,6 +4,7 @@ export type DocumentType =
   | "INVOICE"
   | "CREDIT_NOTE"
   | "RECEIPT"
+  | "REFUND"
   | "KOT"
   | "ORDER"
   | "RESERVATION"
@@ -28,6 +29,7 @@ export async function getNextDocumentNumber(
   if (documentType === "INVOICE") defaultPrefix = `INV-${fyShort}-`;
   else if (documentType === "CREDIT_NOTE") defaultPrefix = `CN-${fyShort}-`;
   else if (documentType === "RECEIPT") defaultPrefix = `REC-${fyShort}-`;
+  else if (documentType === "REFUND") defaultPrefix = `REF-${fyShort}-`;
   else if (documentType === "RESERVATION") defaultPrefix = `RES-${fyShort}-`;
   else if (documentType === "GRC") defaultPrefix = `GRC-${fyShort}-`;
   else if (documentType === "KOT") defaultPrefix = `KOT-`;

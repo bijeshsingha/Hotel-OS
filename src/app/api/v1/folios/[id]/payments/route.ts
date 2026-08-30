@@ -18,6 +18,7 @@ export async function POST(
       gstin,
       creditPeriod,
       billingRemarks,
+      isRefund,
       actorId,
     } = body;
 
@@ -41,6 +42,7 @@ export async function POST(
       reference: reference || (method === "DIRECT_BILL" ? `BTC-${companyName || "CORP"}` : undefined),
       payerName: companyName ? `${payerName || "Guest"} (${companyName})` : payerName,
       payerSnapshot: snapshotStr,
+      isRefund: Boolean(isRefund),
       actorId,
     });
 

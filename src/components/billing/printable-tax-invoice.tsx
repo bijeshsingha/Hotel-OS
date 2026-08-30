@@ -314,12 +314,17 @@ export function PrintableTaxInvoiceModal({
             ? new Date(p.receivedAt).toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" })
             : invoiceDateStr;
           const isBTC = p.method === "DIRECT_BILL";
-          const desc = isBTC ? "BILL TO COMPANY (BTC)" : `${p.method} ${p.receiptNo ? `(Rec: ${p.receiptNo})` : ""}`;
+          const isRefund = Number(p.amount) < 0 || p.method?.includes("REFUND") || p.method?.includes("PAYOUT");
+          const desc = isBTC
+            ? "BILL TO COMPANY (BTC)"
+            : isRefund
+            ? `REFUND / PAYOUT ${p.receiptNo ? `(Ref: ${p.receiptNo})` : ""}`
+            : `${p.method} ${p.receiptNo ? `(Rec: ${p.receiptNo})` : ""}`;
           return `
             <tr>
               <td style="padding: 3px 5px; border-right: 1px solid #111; border-bottom: 1px solid #111;">${pDate}</td>
               <td style="padding: 3px 5px; border-right: 1px solid #111; border-bottom: 1px solid #111; font-weight: 500;">${desc}</td>
-              <td style="padding: 3px 5px; text-align: right; font-weight: bold; border-bottom: 1px solid #111;">${(p.amount || 0).toFixed(2)}</td>
+              <td style="padding: 3px 5px; text-align: right; font-weight: bold; border-bottom: 1px solid #111; color: ${isRefund ? '#b91c1c' : '#000'};">${(p.amount || 0).toFixed(2)}</td>
             </tr>
           `;
         }).join("")
@@ -946,13 +951,20 @@ export function PrintableTaxInvoiceModal({
                         ? new Date(p.receivedAt).toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" })
                         : invoiceDateStr;
                       const isBTC = p.method === "DIRECT_BILL";
-                      const desc = isBTC ? "BILL TO COMPANY (BTC)" : `${p.method} ${p.receiptNo ? `(Rec: ${p.receiptNo})` : ""}`;
+                      const isRefund = Number(p.amount) < 0 || p.method?.includes("REFUND") || p.method?.includes("PAYOUT");
+                      const desc = isBTC
+                        ? "BILL TO COMPANY (BTC)"
+                        : isRefund
+                        ? `REFUND / PAYOUT ${p.receiptNo ? `(Ref: ${p.receiptNo})` : ""}`
+                        : `${p.method} ${p.receiptNo ? `(Rec: ${p.receiptNo})` : ""}`;
 
                       return (
                         <tr key={idx} className="divide-x divide-zinc-300">
                           <td className="p-1 whitespace-nowrap">{pDate}</td>
                           <td className="p-1 font-medium">{desc}</td>
-                          <td className="p-1 text-right font-bold tabular-nums">{(p.amount || 0).toFixed(2)}</td>
+                          <td className={`p-1 text-right font-bold tabular-nums ${isRefund ? "text-rose-700 font-black" : ""}`}>
+                            {(p.amount || 0).toFixed(2)}
+                          </td>
                         </tr>
                       );
                     })}

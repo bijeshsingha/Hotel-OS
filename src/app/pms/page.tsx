@@ -111,8 +111,11 @@ function PMSFrontDeskContent() {
   const [regSearchQuery, setRegSearchQuery] = useState<string>("");
 
   const [moveForm, setMoveForm] = useState({
+    fromRoomId: "",
+    fromRoomNumber: "",
     targetRoomId: "",
     reason: "Guest requested room change",
+    rateHandling: "RETAIN_RATE" as "RETAIN_RATE" | "USE_TARGET_BASE" | "COMPLIMENTARY",
   });
 
   // Add Room to In-House Guest Modal State
@@ -251,6 +254,25 @@ function PMSFrontDeskContent() {
     }
   };
 
+  // Open Move Room Modal & safely dismiss any open room inspection popups
+  const handleOpenMoveModal = (stay: any, currentRoom?: any, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setSelectedRoomForInspect(null); // Cleanly dismiss room inspector modal
+    setSelectedStayForMove(stay);
+
+    const roomToMove = currentRoom || (stay.roomAssignments && stay.roomAssignments[0]?.room) || null;
+
+    setMoveForm({
+      fromRoomId: roomToMove?.id || (stay.roomAssignments && stay.roomAssignments[0]?.roomId) || "",
+      fromRoomNumber: roomToMove?.number || (stay.roomAssignments && stay.roomAssignments[0]?.room?.number) || "",
+      targetRoomId: "",
+      reason: "Guest requested room change",
+      rateHandling: "RETAIN_RATE",
+    });
+
+    setShowMoveModal(true);
+  };
+
   // Handle Move Room Submit
   const handleMoveSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -258,12 +280,14 @@ function PMSFrontDeskContent() {
 
     setActionLoading(true);
     try {
-      const res = await fetch(`/api/v1/stays/${selectedStayForMove.id}/move-room`, {
+      const res = await fetch(`/api/v1/stays/${selectedStayForMove.id}/move`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          fromRoomId: moveForm.fromRoomId || undefined,
           targetRoomId: moveForm.targetRoomId,
-          reason: moveForm.reason,
+          reason: moveForm.reason || "Guest requested room change",
+          rateHandling: moveForm.rateHandling || "RETAIN_RATE",
         }),
       });
 
@@ -271,6 +295,8 @@ function PMSFrontDeskContent() {
       if (!res.ok) throw new Error(data.error || "Room move failed");
 
       setShowMoveModal(false);
+      setSelectedStayForMove(null);
+      setSelectedRoomForInspect(null);
       await loadData();
       await refreshData();
     } catch (err: any) {
@@ -592,12 +618,8 @@ function PMSFrontDeskContent() {
               </button>
 
               <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setSelectedStayForMove(activeStay);
-                  setShowMoveModal(true);
-                }}
-                className="h-8 px-2.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 font-medium text-xs flex items-center justify-center gap-1 transition"
+                onClick={(e) => handleOpenMoveModal(activeStay, room, e)}
+                className="h-8 px-2.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 font-medium text-xs flex items-center justify-center gap-1 transition cursor-pointer"
                 title="Move Room"
               >
                 <ArrowRightLeft className="h-3.5 w-3.5" />
@@ -1139,13 +1161,20 @@ function PMSFrontDeskContent() {
                       <td className="px-3.5 py-2.5 text-right space-x-1.5">
                         <button
                           onClick={() => router.push(`/billing?stayId=${stay.id}`)}
-                          className="px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 font-bold text-white text-xs transition shadow-xs"
+                          className="px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 font-bold text-white text-xs transition shadow-xs cursor-pointer"
                         >
                           Folio
                         </button>
                         <button
+                          onClick={(e) => handleOpenMoveModal(stay, stay.roomAssignments?.[0]?.room, e)}
+                          className="px-2.5 py-1 rounded-lg bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 font-bold text-zinc-700 dark:text-zinc-300 text-xs transition shadow-xs cursor-pointer"
+                          title="Move Room / Room Change"
+                        >
+                          Move
+                        </button>
+                        <button
                           onClick={(e) => handleDirectCheckout(stay.id, e)}
-                          className="px-2.5 py-1 rounded-lg bg-rose-600/90 hover:bg-rose-600 font-bold text-white text-xs transition shadow-xs"
+                          className="px-2.5 py-1 rounded-lg bg-rose-600/90 hover:bg-rose-600 font-bold text-white text-xs transition shadow-xs cursor-pointer"
                         >
                           Checkout
                         </button>
@@ -1630,132 +1659,7 @@ function PMSFrontDeskContent() {
         </div>
       )}
 
-      {/* 7. SLIDE-OVER ROOM INSPECTOR DRAWER WITH BED SETUP DETAILS */}
-      {selectedRoomForInspect && (
-        <div className="fixed inset-0 z-50 overflow-hidden bg-black/60 backdrop-blur-sm animate-in fade-in">
-          <div className="absolute inset-y-0 right-0 max-w-full flex pl-10">
-            <div className="w-screen max-w-md bg-white dark:bg-[#121215] border-l border-zinc-200 dark:border-zinc-800 p-6 space-y-6 shadow-2xl overflow-y-auto">
-              
-              {/* Header */}
-              <div className="flex items-center justify-between pb-4 border-b border-zinc-200 dark:border-zinc-800">
-                <div className="flex items-center gap-3">
-                  <span className="text-3xl font-black font-mono text-zinc-900 dark:text-white">
-                    Room {selectedRoomForInspect.number}
-                  </span>
-                  <span className="px-2.5 py-1 rounded-md text-xs font-mono font-bold bg-zinc-100 dark:bg-white/10 text-zinc-900 dark:text-white">
-                    {selectedRoomForInspect.roomType?.code}
-                  </span>
-                </div>
 
-                <button
-                  onClick={() => setSelectedRoomForInspect(null)}
-                  className="p-2 rounded-xl text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition"
-                >
-                  <X className="h-5 w-5" />
-                </button>
-              </div>
-
-              {/* Room & Bed Specifications */}
-              <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/60 p-4 space-y-2.5 text-xs shadow-xs">
-                <div className="font-bold text-zinc-900 dark:text-white uppercase tracking-wider text-[11px] mb-1 flex items-center justify-between">
-                  <span>Physical Bed & Room Configuration</span>
-                  <span className="text-emerald-700 dark:text-emerald-400 font-mono font-bold">Floor {selectedRoomForInspect.floor}</span>
-                </div>
-
-                <div className="flex justify-between items-center py-1 border-b border-zinc-200 dark:border-zinc-800">
-                  <span className="text-zinc-500 dark:text-zinc-400">Bed Configuration:</span>
-                  <strong className="text-amber-800 dark:text-amber-300 font-bold flex items-center gap-1">
-                    {getBedCategory(selectedRoomForInspect) === "TWIN" ? "🛏️🛏️ 2x Single Beds (Twin Setup)" : getBedCategory(selectedRoomForInspect) === "SUITE" ? "👑 1x King Bed + Living Lounge" : "🛏️ 1x King Bed (Double Large)"}
-                  </strong>
-                </div>
-
-                <div className="flex justify-between py-1 border-b border-zinc-200 dark:border-zinc-800">
-                  <span className="text-zinc-500 dark:text-zinc-400">Category Name:</span>
-                  <strong className="text-zinc-900 dark:text-white">{selectedRoomForInspect.roomType?.name}</strong>
-                </div>
-
-                <div className="flex justify-between py-1 border-b border-zinc-200 dark:border-zinc-800">
-                  <span className="text-zinc-500 dark:text-zinc-400">Max Guest Capacity:</span>
-                  <strong className="text-zinc-900 dark:text-white font-mono">Max {selectedRoomForInspect.roomType?.capacity || 2} Adults (+1 Extra Bed)</strong>
-                </div>
-
-                <div className="flex justify-between py-1">
-                  <span className="text-zinc-500 dark:text-zinc-400">Housekeeping Status:</span>
-                  <span className={`font-bold font-mono px-2 py-0.5 rounded text-[10px] ${
-                    selectedRoomForInspect.roomState?.housekeepingStatus === "CLEAN" 
-                      ? "bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-500/40"
-                      : "bg-amber-100 dark:bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-500/40"
-                  }`}>
-                    {selectedRoomForInspect.roomState?.housekeepingStatus || "CLEAN"}
-                  </span>
-                </div>
-              </div>
-
-              {/* In-House Guest Details if Occupied */}
-              {selectedRoomForInspect.roomState?.occupancyStatus === "OCCUPIED" ? (
-                <div className="rounded-xl border border-blue-200 dark:border-blue-500/30 bg-blue-50 dark:bg-blue-950/20 p-4 space-y-3 shadow-xs">
-                  <div className="text-xs font-bold text-blue-700 dark:text-blue-400 uppercase tracking-wider flex items-center gap-2">
-                    <User className="h-4 w-4" />
-                    In-House Guest Information
-                  </div>
-
-                  {(() => {
-                    const activeStay = stays.find(s => 
-                      s.status === "IN_HOUSE" && s.roomAssignments?.some((ra: any) => ra.roomId === selectedRoomForInspect.id)
-                    ) || selectedRoomForInspect.assignments?.[0]?.stay;
-
-                    if (!activeStay) return <div className="text-xs text-zinc-500 dark:text-zinc-400">No active stay details found.</div>;
-
-                    return (
-                      <div className="space-y-2 text-xs">
-                        <div className="flex justify-between"><span className="text-zinc-500 dark:text-zinc-400">Guest Name:</span><strong className="text-zinc-900 dark:text-white font-bold text-sm">{formatGuestDisplayName(activeStay.primaryGuest?.name)}</strong></div>
-                        <div className="flex justify-between"><span className="text-zinc-500 dark:text-zinc-400">Mobile Phone:</span><strong className="text-zinc-900 dark:text-white font-mono">{activeStay.primaryGuest?.phone || "N/A"}</strong></div>
-                        <div className="flex justify-between"><span className="text-zinc-500 dark:text-zinc-400">Occupants:</span><strong className="text-zinc-900 dark:text-white font-mono">{activeStay.adults} Adults</strong></div>
-                        <div className="flex justify-between"><span className="text-zinc-500 dark:text-zinc-400">Folio Balance:</span><strong className="text-emerald-700 dark:text-emerald-400 font-mono font-bold text-sm">{formatINR(activeStay.folio?.balance || 0)}</strong></div>
-
-                        <div className="pt-3 border-t border-blue-200 dark:border-blue-900/40 flex flex-col gap-2">
-                          <button
-                            onClick={() => {
-                              setSelectedRoomForInspect(null);
-                              router.push(`/billing?stayId=${activeStay.id}`);
-                            }}
-                            className="w-full h-10 rounded-xl bg-blue-600 hover:bg-blue-500 font-bold text-xs text-white transition flex items-center justify-center gap-2 shadow-xs"
-                          >
-                            <Receipt className="h-4 w-4" />
-                            <span>View Folio & Billing</span>
-                          </button>
-
-                          <button
-                            onClick={(e) => handleDirectCheckout(activeStay.id, e)}
-                            className="w-full h-10 rounded-xl bg-rose-600/90 hover:bg-rose-600 font-bold text-xs text-white transition flex items-center justify-center gap-2 shadow-xs"
-                          >
-                            <span>Checkout & Print GST Invoice</span>
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })()}
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  <button
-                    onClick={() => {
-                      setCheckInRoomId(selectedRoomForInspect.id);
-                      setSelectedRoomForInspect(null);
-                      setShowCheckInModal(true);
-                    }}
-                    className="w-full h-11 rounded-xl bg-emerald-600 hover:bg-emerald-500 font-extrabold text-sm text-white transition shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-2"
-                  >
-                    <UserPlus className="h-4 w-4" />
-                    <span>Check-In Guest to Room {selectedRoomForInspect.number}</span>
-                  </button>
-                </div>
-              )}
-
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* 8. DEDICATED GRC INTAKE MODAL (PHYSICAL GRC PAPER ENTRY & DIGITAL QR KIOSK) */}
       {showCheckInModal && (
@@ -1924,72 +1828,225 @@ function PMSFrontDeskContent() {
       )}
 
       {/* 12. MOVE ROOM MODAL */}
-      {showMoveModal && selectedStayForMove && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-700 rounded-2xl p-6 max-w-md w-full space-y-4 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 pb-3">
-              <div className="flex items-center gap-2">
-                <ArrowRightLeft className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                <h3 className="text-base font-bold text-zinc-900 dark:text-white">Move Room / Room Change</h3>
-              </div>
-              <button onClick={() => setShowMoveModal(false)} className="text-zinc-400 hover:text-zinc-900 dark:hover:text-white">
-                <X className="h-5 w-5" />
-              </button>
-            </div>
+      {showMoveModal && selectedStayForMove && (() => {
+        const guestName = formatGuestDisplayName(selectedStayForMove.primaryGuest?.name);
+        const stayRooms = selectedStayForMove.roomAssignments?.map((ra: any) => ra.room).filter(Boolean) || [];
 
-            <form onSubmit={handleMoveSubmit} className="space-y-4 text-xs">
-              <div>
-                <label className="font-semibold text-zinc-700 dark:text-zinc-300 block mb-1">Select New Vacant Room *</label>
-                <select
-                  required
-                  value={moveForm.targetRoomId}
-                  onChange={(e) => setMoveForm({ ...moveForm, targetRoomId: e.target.value })}
-                  className="w-full h-10 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white font-mono font-bold focus:border-blue-500 focus:outline-none"
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
+            <div className="bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6 max-w-lg w-full space-y-4 shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto">
+              
+              {/* Header */}
+              <div className="flex items-center justify-between border-b border-zinc-200/80 dark:border-zinc-800 pb-3.5">
+                <div className="flex items-center gap-2.5">
+                  <div className="h-9 w-9 rounded-xl bg-blue-50 dark:bg-blue-950/50 border border-blue-200 dark:border-blue-800 flex items-center justify-center text-blue-600 dark:text-blue-400">
+                    <ArrowRightLeft className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-base sm:text-lg font-bold text-zinc-900 dark:text-white">
+                      Move Room / Room Change
+                    </h3>
+                    <p className="text-xs text-zinc-500">
+                      Relocate resident guest or specific room in group booking.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowMoveModal(false);
+                    setSelectedStayForMove(null);
+                  }}
+                  className="h-8 w-8 rounded-full bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-600 dark:text-zinc-300 flex items-center justify-center transition cursor-pointer"
                 >
-                  <option value="">-- Choose New Vacant Room --</option>
-                  {rooms
-                    .filter(r => r.roomState?.occupancyStatus === "VACANT" && r.roomState?.housekeepingStatus === "CLEAN")
-                    .map((r) => {
-                      const bedCat = getBedCategory(r);
-                      return (
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+
+              {/* Resident Guest & Moving Room Info Card */}
+              <div className="p-3.5 rounded-2xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200/80 dark:border-zinc-800/80 space-y-2 text-xs">
+                <div className="flex items-center justify-between">
+                  <span className="text-zinc-500 dark:text-zinc-400 font-medium">Resident Guest:</span>
+                  <strong className="text-zinc-900 dark:text-white font-bold text-sm">{guestName}</strong>
+                </div>
+
+                {stayRooms.length > 1 ? (
+                  <div className="flex items-center justify-between pt-1 border-t border-zinc-200/60 dark:border-zinc-800/60">
+                    <span className="text-zinc-500 dark:text-zinc-400 font-medium">Room to Move Out:</span>
+                    <select
+                      value={moveForm.fromRoomId}
+                      onChange={(e) => {
+                        const selectedRoom = stayRooms.find((r: any) => r.id === e.target.value);
+                        setMoveForm({
+                          ...moveForm,
+                          fromRoomId: e.target.value,
+                          fromRoomNumber: selectedRoom?.number || "",
+                        });
+                      }}
+                      className="px-2.5 py-1 rounded-lg bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 font-mono font-bold text-blue-600 dark:text-blue-400 text-xs"
+                    >
+                      {stayRooms.map((r: any) => (
                         <option key={r.id} value={r.id}>
-                          Room {r.number} - {r.roomType?.name} [{bedCat === "TWIN" ? "🛏️🛏️ Twin" : "🛏️ King"}] (Floor {r.floor})
+                          Room {r.number} (Floor {r.floor})
                         </option>
-                      );
-                    })}
-                </select>
+                      ))}
+                    </select>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between pt-1 border-t border-zinc-200/60 dark:border-zinc-800/60">
+                    <span className="text-zinc-500 dark:text-zinc-400 font-medium">Current Room:</span>
+                    <strong className="font-mono font-bold text-zinc-900 dark:text-white">
+                      Room {moveForm.fromRoomNumber || stayRooms[0]?.number || "—"}
+                    </strong>
+                  </div>
+                )}
               </div>
 
-              <div>
-                <label className="font-semibold text-zinc-700 dark:text-zinc-300 block mb-1">Reason for Room Change</label>
-                <input
-                  type="text"
-                  value={moveForm.reason}
-                  onChange={(e) => setMoveForm({ ...moveForm, reason: e.target.value })}
-                  className="w-full h-10 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white text-xs focus:border-blue-500 focus:outline-none"
-                />
-              </div>
+              {/* Move Form */}
+              <form onSubmit={handleMoveSubmit} className="space-y-3.5 text-xs">
+                <div>
+                  <label className="font-bold text-zinc-800 dark:text-zinc-200 block mb-1.5 uppercase text-[10.5px] tracking-wider">
+                    Select Destination Room *
+                  </label>
+                  <select
+                    required
+                    value={moveForm.targetRoomId}
+                    onChange={(e) => setMoveForm({ ...moveForm, targetRoomId: e.target.value })}
+                    className="w-full h-11 px-3.5 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white font-mono font-bold focus:border-blue-500 focus:outline-none shadow-xs text-xs"
+                  >
+                    <option value="">-- Choose New Vacant Room --</option>
+                    {rooms
+                      .filter((r) => r.roomState?.occupancyStatus === "VACANT" && r.roomState?.housekeepingStatus === "CLEAN" && r.id !== moveForm.fromRoomId)
+                      .map((r) => {
+                        const bedCat = getBedCategory(r);
+                        return (
+                          <option key={r.id} value={r.id}>
+                            Room {r.number} — {r.roomType?.name || "Room"} [{bedCat === "TWIN" ? "🛏️🛏️ Twin" : "🛏️ King"}] (Floor {r.floor})
+                          </option>
+                        );
+                      })}
+                  </select>
+                </div>
 
-              <div className="flex items-center justify-end gap-3 pt-3 border-t border-zinc-200 dark:border-zinc-800">
-                <button
-                  type="button"
-                  onClick={() => setShowMoveModal(false)}
-                  className="px-4 py-2 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 text-xs font-semibold transition"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={actionLoading}
-                  className="px-6 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 font-bold text-white text-xs transition shadow-sm"
-                >
-                  {actionLoading ? "Moving..." : "Confirm Move"}
-                </button>
-              </div>
-            </form>
+                {/* Preset Reason Quick Buttons */}
+                <div>
+                  <label className="font-bold text-zinc-800 dark:text-zinc-200 block mb-1.5 uppercase text-[10.5px] tracking-wider">
+                    Reason for Room Change
+                  </label>
+                  <div className="flex flex-wrap gap-1.5 mb-2">
+                    {[
+                      "Guest requested room change",
+                      "AC / Maintenance defect",
+                      "Noise complaint / Disturbance",
+                      "Upgrade to higher category",
+                      "Bed configuration preference",
+                    ].map((preset) => (
+                      <button
+                        type="button"
+                        key={preset}
+                        onClick={() => setMoveForm({ ...moveForm, reason: preset })}
+                        className={`px-2.5 py-1 rounded-lg text-[11px] font-medium transition cursor-pointer border ${
+                          moveForm.reason === preset
+                            ? "bg-blue-50 border-blue-400 text-blue-700 dark:bg-blue-950/60 dark:border-blue-700 dark:text-blue-300 font-bold"
+                            : "bg-zinc-50 border-zinc-200 dark:bg-zinc-900 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100"
+                        }`}
+                      >
+                        {preset}
+                      </button>
+                    ))}
+                  </div>
+                  <input
+                    type="text"
+                    required
+                    value={moveForm.reason}
+                    onChange={(e) => setMoveForm({ ...moveForm, reason: e.target.value })}
+                    placeholder="Enter or select reason..."
+                    className="w-full h-10 px-3.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white text-xs focus:border-blue-500 focus:outline-none"
+                  />
+                </div>
+
+                {/* Tariff Handling Option */}
+                <div>
+                  <label className="font-bold text-zinc-800 dark:text-zinc-200 block mb-1.5 uppercase text-[10.5px] tracking-wider">
+                    Tariff Policy for Moved Room
+                  </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    <label className={`p-2.5 rounded-xl border cursor-pointer flex items-center gap-2 text-xs ${
+                      moveForm.rateHandling === "RETAIN_RATE"
+                        ? "bg-blue-50 border-blue-400 dark:bg-blue-950/60 dark:border-blue-700 font-bold text-blue-900 dark:text-blue-200"
+                        : "bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400"
+                    }`}>
+                      <input
+                        type="radio"
+                        name="ratePolicy"
+                        value="RETAIN_RATE"
+                        checked={moveForm.rateHandling === "RETAIN_RATE"}
+                        onChange={() => setMoveForm({ ...moveForm, rateHandling: "RETAIN_RATE" })}
+                        className="text-blue-600 cursor-pointer"
+                      />
+                      <span>Retain Agreed Rate</span>
+                    </label>
+
+                    <label className={`p-2.5 rounded-xl border cursor-pointer flex items-center gap-2 text-xs ${
+                      moveForm.rateHandling === "USE_TARGET_BASE"
+                        ? "bg-blue-50 border-blue-400 dark:bg-blue-950/60 dark:border-blue-700 font-bold text-blue-900 dark:text-blue-200"
+                        : "bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400"
+                    }`}>
+                      <input
+                        type="radio"
+                        name="ratePolicy"
+                        value="USE_TARGET_BASE"
+                        checked={moveForm.rateHandling === "USE_TARGET_BASE"}
+                        onChange={() => setMoveForm({ ...moveForm, rateHandling: "USE_TARGET_BASE" })}
+                        className="text-blue-600 cursor-pointer"
+                      />
+                      <span>New Base Rate</span>
+                    </label>
+
+                    <label className={`p-2.5 rounded-xl border cursor-pointer flex items-center gap-2 text-xs ${
+                      moveForm.rateHandling === "COMPLIMENTARY"
+                        ? "bg-blue-50 border-blue-400 dark:bg-blue-950/60 dark:border-blue-700 font-bold text-blue-900 dark:text-blue-200"
+                        : "bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400"
+                    }`}>
+                      <input
+                        type="radio"
+                        name="ratePolicy"
+                        value="COMPLIMENTARY"
+                        checked={moveForm.rateHandling === "COMPLIMENTARY"}
+                        onChange={() => setMoveForm({ ...moveForm, rateHandling: "COMPLIMENTARY" })}
+                        className="text-blue-600 cursor-pointer"
+                      />
+                      <span>🎁 Free (₹0)</span>
+                    </label>
+                  </div>
+                </div>
+
+                {/* Footer Buttons */}
+                <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-zinc-200/80 dark:border-zinc-800">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowMoveModal(false);
+                      setSelectedStayForMove(null);
+                    }}
+                    className="px-4 py-2.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 text-xs font-semibold transition cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={actionLoading || !moveForm.targetRoomId}
+                    className="px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 font-bold text-white text-xs transition shadow-sm cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+                  >
+                    <ArrowRightLeft className="h-3.5 w-3.5" />
+                    <span>{actionLoading ? "Moving Room..." : "Confirm Room Move"}</span>
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
+
 
       {/* DIGITAL CHECK-IN REVIEW & FULFILLMENT MODAL */}
       <DigitalCheckInReviewModal
@@ -2013,149 +2070,358 @@ function PMSFrontDeskContent() {
         }}
       />
 
-      {/* 13. ROOM INSPECTOR & MAINTENANCE DETAILS MODAL */}
-      {selectedRoomForInspect && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-700 rounded-3xl p-6 max-w-lg w-full space-y-5 shadow-2xl overflow-hidden">
-            {/* Header */}
-            <div className="flex items-start justify-between border-b border-zinc-200 dark:border-zinc-800 pb-4">
-              <div>
-                <div className="flex items-center gap-2.5">
-                  <span className="text-3xl font-black font-mono tracking-tight text-zinc-900 dark:text-white">
-                    Room {selectedRoomForInspect.number}
-                  </span>
-                  <span className="rounded-lg px-2.5 py-1 text-xs font-mono font-bold bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300">
-                    Floor {selectedRoomForInspect.floor}
+      {/* 13. UNIFIED ROOM & GUEST INSPECTION MODAL */}
+      {selectedRoomForInspect && (() => {
+        const room = selectedRoomForInspect;
+        const isOccupied = room.roomState?.occupancyStatus === "OCCUPIED";
+        const isDirty = room.roomState?.housekeepingStatus === "DIRTY";
+        const isOutOfOrder = room.roomState?.sellabilityStatus === "OUT_OF_ORDER" || (room.maintenanceIssues && room.maintenanceIssues.length > 0);
+        const bedCat = getBedCategory(room);
+
+        // Find active in-house stay for this room
+        const activeStay = stays.find(s => 
+          s.status === "IN_HOUSE" && s.roomAssignments?.some((ra: any) => ra.roomId === room.id || ra.room?.number === room.number)
+        ) || room.assignments?.[0]?.stay;
+
+        const assignedRoomObj = activeStay?.roomAssignments?.find((ra: any) => ra.roomId === room.id || ra.room?.number === room.number);
+        const inHouseGuest = activeStay?.primaryGuest;
+
+        // Find matching GRC record if available
+        const matchingGrc = registrations.find(r => 
+          r.mobilePhone === inHouseGuest?.phone ||
+          r.fullName === inHouseGuest?.name ||
+          (r.preAssignedRoom && r.preAssignedRoom.includes(room.number))
+        );
+
+        // Calculate agreed rate for this specific room
+        let agreedRateDisplay = "₹3,200/night";
+        if (assignedRoomObj?.rateHandling === "COMPLIMENTARY" || assignedRoomObj?.moveReason === "AGREED_RATE:0") {
+          agreedRateDisplay = "🎁 Complimentary (₹0)";
+        } else if (assignedRoomObj?.moveReason?.startsWith("AGREED_RATE:")) {
+          const parsedRate = Number(assignedRoomObj.moveReason.replace("AGREED_RATE:", ""));
+          if (!isNaN(parsedRate)) {
+            agreedRateDisplay = parsedRate === 0 ? "🎁 Complimentary (₹0)" : `₹${parsedRate.toLocaleString()}/night`;
+          }
+        } else if (matchingGrc?.agreedRoomTariff !== undefined) {
+          agreedRateDisplay = matchingGrc.agreedRoomTariff === 0 ? "🎁 Complimentary (₹0)" : `₹${matchingGrc.agreedRoomTariff.toLocaleString()}/night`;
+        }
+
+        // Multi-room group check
+        const groupRooms = activeStay?.roomAssignments?.map((ra: any) => ra.room?.number).filter(Boolean) || [];
+        const isGroupBooking = groupRooms.length > 1;
+
+        // Checkin / checkout dates formatting
+        const checkInFormatted = activeStay?.arrivalAt
+          ? new Date(activeStay.arrivalAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) +
+            ", " +
+            new Date(activeStay.arrivalAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: false })
+          : matchingGrc?.arrivalDateTime || "—";
+
+        const departureFormatted = activeStay?.expectedDepartureAt
+          ? new Date(activeStay.expectedDepartureAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
+          : matchingGrc?.expectedDepartureDate || "—";
+
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
+            <div className="bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-3xl p-5 sm:p-6 max-w-xl w-full space-y-4 shadow-2xl overflow-hidden max-h-[92vh] overflow-y-auto">
+              
+              {/* Header */}
+              <div className="flex items-start justify-between border-b border-zinc-200/80 dark:border-zinc-800 pb-3.5">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2.5 flex-wrap">
+                    <span className="text-2xl sm:text-3xl font-black font-mono tracking-tight text-zinc-900 dark:text-white">
+                      Room {room.number}
+                    </span>
+                    <span className="rounded-lg px-2.5 py-1 text-xs font-mono font-bold bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300">
+                      Floor {room.floor}
+                    </span>
+                    <span className={`px-2.5 py-1 rounded-lg text-xs font-bold font-mono ${
+                      isOccupied
+                        ? "bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 border border-rose-200 dark:border-rose-800/60"
+                        : "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60"
+                    }`}>
+                      {isOccupied ? "🔴 Occupied" : "🟢 Vacant Ready"}
+                    </span>
+                  </div>
+                  <p className="text-xs font-semibold text-zinc-600 dark:text-zinc-400 flex items-center gap-2 flex-wrap">
+                    <span>{room.roomType?.name || (bedCat === "TWIN" ? "Deluxe Twin Room" : "Deluxe King Room")}</span>
+                    <span>•</span>
+                    <span>{bedCat === "TWIN" ? "🛏️🛏️ Twin Beds" : bedCat === "SUITE" ? "👑 King + Lounge" : "🛏️ King Bed (Double)"}</span>
+                    <span>•</span>
+                    <span className="text-zinc-500 font-mono">Max {room.roomType?.capacity || 2} Pax</span>
+                  </p>
+                </div>
+
+                <button
+                  onClick={() => setSelectedRoomForInspect(null)}
+                  className="h-8 w-8 rounded-full bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-600 dark:text-zinc-300 flex items-center justify-center transition cursor-pointer shrink-0"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+
+              {/* Status & Housekeeping Tile Bar */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                <div className="p-3 rounded-2xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200/80 dark:border-zinc-800/80 space-y-1">
+                  <span className="text-[10px] uppercase font-mono font-bold text-zinc-500 block">Occupancy</span>
+                  <span className={`text-xs sm:text-sm font-extrabold font-mono block ${
+                    isOccupied ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400"
+                  }`}>
+                    {isOccupied ? "Occupied (In-House)" : "Vacant Clean"}
                   </span>
                 </div>
-                <p className="text-xs font-semibold text-zinc-600 dark:text-zinc-400 mt-1">
-                  {selectedRoomForInspect.roomType?.name} • {getBedCategory(selectedRoomForInspect) === "TWIN" ? "🛏️🛏️ Twin Beds" : "🛏️ King Bed"}
-                </p>
-              </div>
 
-              <button
-                onClick={() => setSelectedRoomForInspect(null)}
-                className="h-8 w-8 rounded-full bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-600 dark:text-zinc-300 flex items-center justify-center transition cursor-pointer"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-
-            {/* Room State & Quick HK Actions */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="p-3 rounded-2xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800">
-                <span className="text-[10px] uppercase font-mono font-bold text-zinc-500 block">Occupancy</span>
-                <span className={`text-sm font-extrabold font-mono mt-0.5 block ${
-                  selectedRoomForInspect.roomState?.occupancyStatus === "OCCUPIED"
-                    ? "text-blue-600 dark:text-blue-400"
-                    : "text-emerald-600 dark:text-emerald-400"
-                }`}>
-                  {selectedRoomForInspect.roomState?.occupancyStatus === "OCCUPIED" ? "🔴 OCCUPIED" : "🟢 VACANT"}
-                </span>
-              </div>
-
-              <div className="p-3 rounded-2xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800">
-                <span className="text-[10px] uppercase font-mono font-bold text-zinc-500 block">Housekeeping</span>
-                <div className="flex items-center justify-between mt-0.5">
-                  <span className={`text-sm font-extrabold font-mono ${
-                    selectedRoomForInspect.roomState?.housekeepingStatus === "CLEAN"
-                      ? "text-emerald-600 dark:text-emerald-400"
-                      : "text-amber-600 dark:text-amber-400"
+                <div className="p-3 rounded-2xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200/80 dark:border-zinc-800/80 space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] uppercase font-mono font-bold text-zinc-500">Housekeeping</span>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const newStatus = isDirty ? "CLEAN" : "DIRTY";
+                        await handleQuickHKToggle(room.id, room.roomState?.housekeepingStatus || "CLEAN");
+                        setSelectedRoomForInspect((prev: any) => ({
+                          ...prev,
+                          roomState: { ...prev.roomState, housekeepingStatus: newStatus }
+                        }));
+                      }}
+                      className="text-[10px] font-bold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+                    >
+                      Toggle
+                    </button>
+                  </div>
+                  <span className={`text-xs sm:text-sm font-extrabold font-mono block ${
+                    !isDirty ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"
                   }`}>
-                    {selectedRoomForInspect.roomState?.housekeepingStatus === "CLEAN" ? "✨ CLEAN" : "🧹 DIRTY"}
+                    {!isDirty ? "✨ Clean" : "🧹 Dirty / Turnover"}
                   </span>
+                </div>
+
+                <div className="col-span-2 sm:col-span-1 p-3 rounded-2xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200/80 dark:border-zinc-800/80 space-y-1">
+                  <span className="text-[10px] uppercase font-mono font-bold text-zinc-500 block">Standard Tariff</span>
+                  <span className="text-xs sm:text-sm font-extrabold font-mono text-zinc-900 dark:text-white block">
+                    ₹3,200<span className="text-[10px] font-normal text-zinc-500">/nt</span>
+                  </span>
+                </div>
+              </div>
+
+              {/* OCCUPIED GUEST CARD */}
+              {isOccupied && activeStay ? (
+                <div className="rounded-2xl border border-blue-200 dark:border-blue-800/60 bg-blue-50/60 dark:bg-blue-950/20 p-4 space-y-3 shadow-xs">
+                  <div className="flex items-center justify-between border-b border-blue-200/70 dark:border-blue-900/50 pb-2">
+                    <div className="flex items-center gap-2">
+                      <div className="h-6 w-6 rounded-lg bg-blue-600 text-white flex items-center justify-center">
+                        <User className="h-3.5 w-3.5" />
+                      </div>
+                      <span className="text-xs font-bold text-blue-950 dark:text-blue-200 uppercase tracking-wider">
+                        In-House Resident Guest
+                      </span>
+                    </div>
+                    {isGroupBooking && (
+                      <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-indigo-100 text-indigo-800 dark:bg-indigo-950/80 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                        Group ({groupRooms.length} Rooms: {groupRooms.join(", ")})
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                    <div>
+                      <span className="text-[10.5px] font-medium text-zinc-500 dark:text-zinc-400 block">Primary Guest</span>
+                      <strong className="text-sm font-bold text-zinc-950 dark:text-white block">
+                        {formatGuestDisplayName(inHouseGuest?.name)}
+                      </strong>
+                      {inHouseGuest?.companyName && (
+                        <div className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-900 dark:text-amber-300 mt-0.5">
+                          <Building2 className="h-3 w-3" />
+                          <span>{inHouseGuest.companyName}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    <div>
+                      <span className="text-[10.5px] font-medium text-zinc-500 dark:text-zinc-400 block">Mobile Phone</span>
+                      <strong className="text-xs font-mono font-bold text-zinc-900 dark:text-zinc-100 block">
+                        {inHouseGuest?.phone ? (
+                          <a href={`tel:${inHouseGuest.phone}`} className="hover:underline text-blue-600 dark:text-blue-400 flex items-center gap-1">
+                            <Phone className="h-3 w-3" />
+                            {inHouseGuest.phone}
+                          </a>
+                        ) : "—"}
+                      </strong>
+                    </div>
+
+                    <div>
+                      <span className="text-[10.5px] font-medium text-zinc-500 dark:text-zinc-400 block">Check-In Arrival</span>
+                      <strong className="text-xs font-mono font-bold text-zinc-900 dark:text-zinc-100 block">
+                        {checkInFormatted}
+                      </strong>
+                    </div>
+
+                    <div>
+                      <span className="text-[10.5px] font-medium text-zinc-500 dark:text-zinc-400 block">Expected Departure</span>
+                      <strong className="text-xs font-mono font-bold text-zinc-900 dark:text-zinc-100 block">
+                        {departureFormatted}
+                      </strong>
+                    </div>
+
+                    <div>
+                      <span className="text-[10.5px] font-medium text-zinc-500 dark:text-zinc-400 block">Agreed Room Rate</span>
+                      <strong className="text-xs font-mono font-bold text-blue-700 dark:text-blue-300 block">
+                        {agreedRateDisplay}
+                      </strong>
+                    </div>
+
+                    <div>
+                      <span className="text-[10.5px] font-medium text-zinc-500 dark:text-zinc-400 block">Occupants / Pax</span>
+                      <strong className="text-xs font-mono font-bold text-zinc-900 dark:text-zinc-100 block">
+                        {activeStay.adults || 2} Adults{activeStay.children > 0 ? `, ${activeStay.children} Children` : ""}
+                      </strong>
+                    </div>
+                  </div>
+
+                  {/* Folio Balance & Actions */}
+                  <div className="pt-3 border-t border-blue-200/70 dark:border-blue-900/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                      <span className="text-[10.5px] text-zinc-500 dark:text-zinc-400 font-medium block">Live Folio Balance</span>
+                      <span className={`text-base font-extrabold font-mono ${
+                        (activeStay.folio?.balance ?? 0) > 0 ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400"
+                      }`}>
+                        {(activeStay.folio?.balance ?? 0) > 0 ? `Due: ${formatINR(activeStay.folio?.balance)}` : "✓ Fully Cleared"}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <button
+                        onClick={() => {
+                          setSelectedRoomForInspect(null);
+                          router.push(`/billing?stayId=${activeStay.id}`);
+                        }}
+                        className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs transition shadow-xs flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <Receipt className="h-3.5 w-3.5" />
+                        <span>View Folio & Bill</span>
+                      </button>
+
+                      {matchingGrc && (
+                        <button
+                          onClick={() => {
+                            setSelectedRegForPrint(matchingGrc);
+                            setShowGrcModal(true);
+                          }}
+                          className="px-3 py-2 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 font-bold text-xs transition flex items-center gap-1.5 cursor-pointer"
+                          title="Print / View GRC Form"
+                        >
+                          <Printer className="h-3.5 w-3.5" />
+                          <span>GRC</span>
+                        </button>
+                      )}
+
+                      <button
+                        onClick={(e) => handleOpenMoveModal(activeStay, room, e)}
+                        className="px-3 py-2 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 font-bold text-xs transition flex items-center gap-1.5 cursor-pointer"
+                        title="Move Room"
+                      >
+                        <ArrowRightLeft className="h-3.5 w-3.5" />
+                        <span>Move</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : !isOutOfOrder ? (
+                <div className="rounded-2xl border border-emerald-200 dark:border-emerald-800/60 bg-emerald-50/50 dark:bg-emerald-950/20 p-4 space-y-3 shadow-xs">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="h-6 w-6 rounded-lg bg-emerald-600 text-white flex items-center justify-center">
+                        <CheckCircle2 className="h-3.5 w-3.5" />
+                      </div>
+                      <span className="text-xs font-bold text-emerald-950 dark:text-emerald-200 uppercase tracking-wider">
+                        Room Ready for Check-In
+                      </span>
+                    </div>
+                    <span className="text-xs font-mono font-bold text-emerald-700 dark:text-emerald-400">
+                      Clean & Sanitized
+                    </span>
+                  </div>
+
+                  <p className="text-xs text-zinc-600 dark:text-zinc-300">
+                    This room is vacant, clean, and ready for immediate guest arrival or walk-in registration.
+                  </p>
+
                   <button
-                    onClick={async () => {
-                      const newStatus = selectedRoomForInspect.roomState?.housekeepingStatus === "CLEAN" ? "DIRTY" : "CLEAN";
-                      await handleQuickHKToggle(selectedRoomForInspect.id, selectedRoomForInspect.roomState?.housekeepingStatus || "CLEAN");
-                      setSelectedRoomForInspect((prev: any) => ({
-                        ...prev,
-                        roomState: { ...prev.roomState, housekeepingStatus: newStatus }
-                      }));
+                    onClick={() => {
+                      setCheckInRoomId(room.id);
+                      setSelectedRoomForInspect(null);
+                      setShowCheckInModal(true);
                     }}
-                    className="text-[10px] font-bold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+                    className="w-full h-10 rounded-xl bg-emerald-600 hover:bg-emerald-500 font-bold text-xs text-white transition shadow-xs flex items-center justify-center gap-2 cursor-pointer"
                   >
-                    Toggle
+                    <UserPlus className="h-4 w-4" />
+                    <span>Check-In Guest to Room {room.number}</span>
                   </button>
                 </div>
-              </div>
-            </div>
+              ) : null}
 
-            {/* Maintenance & Defects Section */}
-            <div className="rounded-2xl border border-rose-200 dark:border-rose-900/50 bg-rose-50/60 dark:bg-rose-950/20 p-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Wrench className="h-4 w-4 text-rose-600 dark:text-rose-400" />
-                  <span className="text-xs font-bold uppercase tracking-wider text-rose-900 dark:text-rose-200">
-                    Maintenance & Defect Tickets
+              {/* Maintenance & Defects Summary */}
+              <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/60 p-3.5 space-y-2.5 text-xs shadow-xs">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Wrench className="h-3.5 w-3.5 text-zinc-500" />
+                    <span className="font-bold text-zinc-800 dark:text-zinc-200 uppercase text-[11px] tracking-wide">
+                      Maintenance Status
+                    </span>
+                  </div>
+                  <span className={`font-mono text-xs font-bold ${
+                    (room.maintenanceIssues?.length || 0) > 0 ? "text-rose-600" : "text-emerald-600"
+                  }`}>
+                    {(room.maintenanceIssues?.length || 0) > 0 ? `${room.maintenanceIssues.length} Open Ticket(s)` : "✓ 0 Defects"}
                   </span>
                 </div>
-                <span className="text-[11px] font-mono font-bold text-rose-700 dark:text-rose-400">
-                  {selectedRoomForInspect.maintenanceIssues?.length || 0} Open
-                </span>
+
+                {room.maintenanceIssues && room.maintenanceIssues.length > 0 ? (
+                  <div className="space-y-2 pt-1 border-t border-zinc-200 dark:border-zinc-800">
+                    {room.maintenanceIssues.map((issue: any) => (
+                      <div key={issue.id} className="p-2.5 rounded-xl bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-xs flex items-center justify-between">
+                        <div>
+                          <span className="font-bold font-mono text-rose-600 mr-2">{issue.issueNo}</span>
+                          <span className="text-zinc-700 dark:text-zinc-300 font-medium">{issue.category} — {issue.description}</span>
+                        </div>
+                        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-rose-100 text-rose-800 font-mono">
+                          {issue.priority}
+                        </span>
+                      </div>
+                    ))}
+                    <div className="pt-1 flex justify-end">
+                      <button
+                        onClick={() => {
+                          setSelectedRoomForInspect(null);
+                          router.push("/maintenance");
+                        }}
+                        className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 cursor-pointer"
+                      >
+                        <span>Open Maintenance Desk</span>
+                        <ChevronRight className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-[11px] text-zinc-500">
+                    No active defect tickets or maintenance blocks logged for this room.
+                  </p>
+                )}
               </div>
 
-              {selectedRoomForInspect.maintenanceIssues && selectedRoomForInspect.maintenanceIssues.length > 0 ? (
-                <div className="space-y-2.5">
-                  {selectedRoomForInspect.maintenanceIssues.map((issue: any) => (
-                    <div
-                      key={issue.id}
-                      className="p-3 rounded-xl bg-white dark:bg-[#181214] border border-rose-200 dark:border-rose-800/60 text-xs space-y-1.5 shadow-xs"
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="font-mono font-bold text-rose-700 dark:text-rose-400">{issue.issueNo}</span>
-                        <div className="flex items-center gap-1.5">
-                          <span className="rounded px-1.5 py-0.5 text-[9px] font-mono font-bold uppercase bg-rose-100 dark:bg-rose-900 text-rose-800 dark:text-rose-300">
-                            {issue.priority}
-                          </span>
-                          <span className="rounded px-1.5 py-0.5 text-[9px] font-mono font-bold uppercase bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300">
-                            {issue.status}
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="font-semibold text-zinc-800 dark:text-zinc-200 text-xs">
-                        {issue.assetText ? `${issue.assetText} • ` : ""}{issue.category}
-                      </div>
-
-                      <p className="text-xs text-zinc-600 dark:text-zinc-300 leading-snug">
-                        {issue.description}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="p-3 text-center text-xs text-emerald-700 dark:text-emerald-400 font-medium">
-                  ✓ No open maintenance defects for this room.
-                </div>
-              )}
-
-              <div className="pt-2 flex items-center justify-end gap-2 border-t border-rose-200/60 dark:border-rose-900/30">
+              {/* Footer Close */}
+              <div className="flex justify-end pt-1">
                 <button
-                  onClick={() => {
-                    setSelectedRoomForInspect(null);
-                    router.push("/maintenance");
-                  }}
-                  className="rounded-xl bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-950 px-4 py-2 text-xs font-bold transition hover:opacity-90 flex items-center gap-1.5 cursor-pointer"
+                  onClick={() => setSelectedRoomForInspect(null)}
+                  className="px-5 py-2 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 font-bold text-xs transition cursor-pointer"
                 >
-                  <Wrench className="h-3.5 w-3.5" />
-                  <span>Go to Maintenance Desk →</span>
+                  Close
                 </button>
               </div>
             </div>
-
-            {/* Footer Close */}
-            <div className="flex justify-end pt-2">
-              <button
-                onClick={() => setSelectedRoomForInspect(null)}
-                className="px-5 py-2 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 font-bold text-xs transition cursor-pointer"
-              >
-                Close
-              </button>
-            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* 14. ADD ROOM TO EXISTING IN-HOUSE GUEST MODAL */}
       {showAddRoomModal && (
