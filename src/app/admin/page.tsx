@@ -2545,15 +2545,21 @@ export default function AdminPortalPage() {
                           checked={editingGrc.isComplimentary || editingGrc.agreedRoomTariff === 0}
                           onChange={(e) => {
                             const checked = e.target.checked;
-                            setEditingGrc({
-                              ...editingGrc,
+                            const newRate = checked ? 0 : (editingGrc.agreedRoomTariff || 3200);
+                            const pRoom = editingGrc.preAssignedRoom;
+                            setEditingGrc((prev: any) => ({
+                              ...prev,
                               isComplimentary: checked,
-                              agreedRoomTariff: checked ? 0 : (editingGrc.agreedRoomTariff || 3200),
-                            });
+                              agreedRoomTariff: newRate,
+                              roomRates: {
+                                ...(prev.roomRates || {}),
+                                ...(pRoom ? { [pRoom]: newRate } : {}),
+                              },
+                            }));
                           }}
                           className="w-4 h-4 rounded text-emerald-600 cursor-pointer"
                         />
-                        <span>🎁 Complimentary Room (₹0 Free Stay)</span>
+                        <span>🎁 {editingGrc.additionalRoomIds?.length > 0 ? `Room ${editingGrc.preAssignedRoom || "Primary"} Complimentary (₹0 Free)` : "Complimentary Room (₹0 Free Stay)"}</span>
                       </label>
                     </div>
 

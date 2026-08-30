@@ -148,7 +148,7 @@ export async function syncGrcEditsEverywhere(updatedGrc: any) {
     include: {
       property: true,
       primaryGuest: true,
-      roomAssignments: { include: { room: true } },
+      roomAssignments: { include: { room: { include: { roomType: true } } } },
       folio: {
         include: {
           windows: { include: { entries: true } },
@@ -185,7 +185,6 @@ export async function syncGrcEditsEverywhere(updatedGrc: any) {
     // C. Synchronize Agreed Room Tariff across RoomAssignment and Folio Charges
     if (agreedRoomTariff !== undefined && agreedRoomTariff !== null && agreedRoomTariff !== "") {
       const numTariff = Number(agreedRoomTariff);
-      const isComp = numTariff === 0;
 
       let notesObj: any = {};
       try {
@@ -195,34 +194,47 @@ export async function syncGrcEditsEverywhere(updatedGrc: any) {
       } catch {}
       const customRoomRates: Record<string, any> = notesObj.roomRates || {};
 
+      const primaryRoomNumber = preAssignedRoom
+        ? preAssignedRoom.replace(/^Room\s+/i, "").split(/[,;\s]+/)[0]
+        : null;
+
       // Update each room assignment with its specific rate if defined
       if (stay.roomAssignments && stay.roomAssignments.length > 0) {
         for (const assignment of stay.roomAssignments) {
-          let specificRate = numTariff;
-          if (customRoomRates[assignment.room.id] !== undefined) {
+          const isPrimaryAssignment = primaryRoomNumber
+            ? (assignment.room.number === primaryRoomNumber || assignment.room.id === primaryRoomNumber)
+            : assignment === stay.roomAssignments[0];
+
+          let specificRate = 3200;
+          if (isPrimaryAssignment) {
+            specificRate = numTariff;
+          } else if (customRoomRates[assignment.room.id] !== undefined) {
             specificRate = Number(customRoomRates[assignment.room.id]);
           } else if (customRoomRates[assignment.room.number] !== undefined) {
             specificRate = Number(customRoomRates[assignment.room.number]);
           } else if (assignment.moveReason?.startsWith("AGREED_RATE:")) {
             const parsedMoveRate = Number(assignment.moveReason.replace("AGREED_RATE:", ""));
             if (!isNaN(parsedMoveRate)) specificRate = parsedMoveRate;
+          } else {
+            specificRate = 3200;
           }
           
-          const isRoomComp = isComp || specificRate === 0;
+          const isRoomComp = specificRate === 0;
           await prisma.roomAssignment.update({
             where: { id: assignment.id },
             data: {
               moveReason: isRoomComp ? "AGREED_RATE:0" : `AGREED_RATE:${specificRate}`,
-              rateHandling: isRoomComp ? "COMPLIMENTARY" : undefined,
+              rateHandling: isRoomComp ? "COMPLIMENTARY" : "RETAIN_RATE",
             },
           });
         }
       } else {
+        const isComp = numTariff === 0;
         await prisma.roomAssignment.updateMany({
           where: { stayId: stay.id },
           data: {
             moveReason: isComp ? "AGREED_RATE:0" : `AGREED_RATE:${numTariff}`,
-            rateHandling: isComp ? "COMPLIMENTARY" : undefined,
+            rateHandling: isComp ? "COMPLIMENTARY" : "RETAIN_RATE",
           },
         });
       }
@@ -231,14 +243,22 @@ export async function syncGrcEditsEverywhere(updatedGrc: any) {
       let totalDailyTariff = numTariff;
       if (stay.roomAssignments && stay.roomAssignments.length > 1) {
         totalDailyTariff = stay.roomAssignments.reduce((sum, a) => {
-          let specificRate = numTariff;
-          if (customRoomRates[a.room.id] !== undefined) {
+          const isPrimaryAssignment = primaryRoomNumber
+            ? (a.room.number === primaryRoomNumber || a.room.id === primaryRoomNumber)
+            : a === stay.roomAssignments[0];
+
+          let specificRate = 3200;
+          if (isPrimaryAssignment) {
+            specificRate = numTariff;
+          } else if (customRoomRates[a.room.id] !== undefined) {
             specificRate = Number(customRoomRates[a.room.id]);
           } else if (customRoomRates[a.room.number] !== undefined) {
             specificRate = Number(customRoomRates[a.room.number]);
           } else if (a.moveReason?.startsWith("AGREED_RATE:")) {
             const parsedMoveRate = Number(a.moveReason.replace("AGREED_RATE:", ""));
             if (!isNaN(parsedMoveRate)) specificRate = parsedMoveRate;
+          } else {
+            specificRate = 3200;
           }
           return sum + (isNaN(specificRate) ? 0 : specificRate);
         }, 0);
@@ -261,14 +281,22 @@ export async function syncGrcEditsEverywhere(updatedGrc: any) {
               const matchedAssignment = stay.roomAssignments?.find(
                 (a) => a.room?.number === entryRoomNum || a.room?.id === entryRoomNum
               );
-              let specificRate = numTariff;
-              if (customRoomRates[entryRoomNum] !== undefined) {
+              const isPrimaryEntry = primaryRoomNumber
+                ? (entryRoomNum === primaryRoomNumber || matchedAssignment?.room?.id === primaryRoomNumber)
+                : (stay.roomAssignments?.[0]?.room?.number === entryRoomNum);
+
+              let specificRate = 3200;
+              if (isPrimaryEntry) {
+                specificRate = numTariff;
+              } else if (customRoomRates[entryRoomNum] !== undefined) {
                 specificRate = Number(customRoomRates[entryRoomNum]);
               } else if (matchedAssignment?.room?.id && customRoomRates[matchedAssignment.room.id] !== undefined) {
                 specificRate = Number(customRoomRates[matchedAssignment.room.id]);
               } else if (matchedAssignment?.moveReason?.startsWith("AGREED_RATE:")) {
                 const parsedMoveRate = Number(matchedAssignment.moveReason.replace("AGREED_RATE:", ""));
                 if (!isNaN(parsedMoveRate)) specificRate = parsedMoveRate;
+              } else {
+                specificRate = 3200;
               }
               entryRate = isNaN(specificRate) ? numTariff : specificRate;
             } else if (stay.roomAssignments && stay.roomAssignments.length > 1) {
@@ -276,7 +304,7 @@ export async function syncGrcEditsEverywhere(updatedGrc: any) {
               entryRate = totalDailyTariff;
             }
 
-            const isEntryComp = isComp || entryRate === 0;
+            const isEntryComp = entryRate === 0;
             const entryGst = isEntryComp
               ? { taxableAmount: 0, taxAmount: 0, totalAmount: 0, components: [] }
               : calculateGST({
