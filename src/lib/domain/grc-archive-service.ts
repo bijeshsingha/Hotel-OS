@@ -373,21 +373,22 @@ export async function syncGrcEditsEverywhere(updatedGrc: any) {
     }
 
     // E. Recalculate Folio Balance
-    if (stay.folioId) {
+    const targetFolioId = stay.folio?.id || stay.folioId;
+    if (targetFolioId) {
       const allEntries = await prisma.folioEntry.findMany({
-        where: { folioId: stay.folioId, status: "POSTED" },
+        where: { folioId: targetFolioId, status: "POSTED" },
       });
       const totalCharges = allEntries.reduce((sum, e) => sum + (e.totalAmount || 0), 0);
 
       const allPayments = await prisma.payment.findMany({
-        where: { folioId: stay.folioId, status: "SUCCEEDED" },
+        where: { folioId: targetFolioId, status: "SUCCEEDED" },
       });
       const totalPayments = allPayments.reduce((sum, p) => sum + (p.amount || 0), 0);
 
       const newBalance = Math.max(0, Math.round((totalCharges - totalPayments) * 100) / 100);
 
       await prisma.folio.update({
-        where: { id: stay.folioId },
+        where: { id: targetFolioId },
         data: { balance: newBalance },
       });
     }

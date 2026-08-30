@@ -498,11 +498,8 @@ function BillingContent() {
   }, [groupBillingMode, isMultiRoomGroup, totalGroupPayments, activeDirectoryItem]);
 
   const currentBalance = useMemo(() => {
-    if (groupBillingMode === "YES" || !isMultiRoomGroup) {
-      return folioData ? (folioData.balance ?? (totalCharges - totalPayments)) : 0;
-    }
-    return Math.max(0, totalCharges - totalPayments);
-  }, [groupBillingMode, isMultiRoomGroup, folioData, totalCharges, totalPayments]);
+    return Math.max(0, Math.round((totalCharges - totalPayments) * 100) / 100);
+  }, [totalCharges, totalPayments]);
 
   // Post Manual / Restaurant Charge (5% GST Inclusive)
   const handlePostCharge = async (e: React.FormEvent) => {
