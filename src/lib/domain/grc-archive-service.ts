@@ -187,21 +187,61 @@ export async function syncGrcEditsEverywhere(updatedGrc: any) {
       const numTariff = Number(agreedRoomTariff);
       const isComp = numTariff === 0;
 
-      // Update room assignments
-      await prisma.roomAssignment.updateMany({
-        where: { stayId: stay.id },
-        data: {
-          moveReason: isComp ? "AGREED_RATE:0" : `AGREED_RATE:${numTariff}`,
-          rateHandling: isComp ? "COMPLIMENTARY" : undefined,
-        },
-      });
+      let notesObj: any = {};
+      try {
+        if (updatedGrc.internalNotes) {
+          notesObj = typeof updatedGrc.internalNotes === "string" ? JSON.parse(updatedGrc.internalNotes) : updatedGrc.internalNotes;
+        }
+      } catch {}
+      const customRoomRates: Record<string, any> = notesObj.roomRates || {};
+
+      // Update each room assignment with its specific rate if defined
+      if (stay.roomAssignments && stay.roomAssignments.length > 0) {
+        for (const assignment of stay.roomAssignments) {
+          const specificRate = customRoomRates[assignment.room.id] !== undefined
+            ? Number(customRoomRates[assignment.room.id])
+            : (customRoomRates[assignment.room.number] !== undefined
+                ? Number(customRoomRates[assignment.room.number])
+                : numTariff);
+          
+          const isRoomComp = isComp || specificRate === 0;
+          await prisma.roomAssignment.update({
+            where: { id: assignment.id },
+            data: {
+              moveReason: isRoomComp ? "AGREED_RATE:0" : `AGREED_RATE:${specificRate}`,
+              rateHandling: isRoomComp ? "COMPLIMENTARY" : undefined,
+            },
+          });
+        }
+      } else {
+        await prisma.roomAssignment.updateMany({
+          where: { stayId: stay.id },
+          data: {
+            moveReason: isComp ? "AGREED_RATE:0" : `AGREED_RATE:${numTariff}`,
+            rateHandling: isComp ? "COMPLIMENTARY" : undefined,
+          },
+        });
+      }
+
+      // Calculate total daily room tariff for folio update
+      let totalDailyTariff = numTariff;
+      if (stay.roomAssignments && stay.roomAssignments.length > 1) {
+        totalDailyTariff = stay.roomAssignments.reduce((sum, a) => {
+          const specificRate = customRoomRates[a.room.id] !== undefined
+            ? Number(customRoomRates[a.room.id])
+            : (customRoomRates[a.room.number] !== undefined
+                ? Number(customRoomRates[a.room.number])
+                : numTariff);
+          return sum + (isNaN(specificRate) ? 0 : specificRate);
+        }, 0);
+      }
 
       // Update Folio Entry charges for room tariff
       if (stay.folio) {
-        const roomGst = isComp
+        const roomGst = isComp || totalDailyTariff === 0
           ? { taxableAmount: 0, taxAmount: 0, totalAmount: 0, components: [] }
           : calculateGST({
-              grossOrBaseAmount: numTariff,
+              grossOrBaseAmount: totalDailyTariff,
               isInclusive: true,
               sacHsn: "996311",
               supplierStateCode: stay.property?.stateCode || "18",
@@ -216,7 +256,7 @@ export async function syncGrcEditsEverywhere(updatedGrc: any) {
             await prisma.folioEntry.update({
               where: { id: entry.id },
               data: {
-                unitAmount: numTariff,
+                unitAmount: totalDailyTariff,
                 taxableAmount: roomGst.taxableAmount,
                 totalAmount: roomGst.totalAmount,
                 taxComponentsJson: JSON.stringify(roomGst.components),

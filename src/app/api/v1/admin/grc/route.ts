@@ -68,15 +68,27 @@ export async function GET(request: Request) {
         } catch {}
 
         // Query linked Stay for real-time operational rate and payments
+        let assignedRooms: { id: string; number: string; rate: number }[] = [];
+        let roomRates: Record<string, number> = {};
+
+        const recRoomNumbers = (rec.preAssignedRoom || "")
+          .replace(/^Room\s+/i, "")
+          .split(/[,;\s]+/)
+          .map((s) => s.trim())
+          .filter(Boolean);
+
         try {
           const stay = await prisma.stay.findFirst({
             where: {
               propertyId: rec.propertyId,
               OR: [
                 ...(rec.stayId ? [{ id: rec.stayId }] : []),
-                { primaryGuest: { phone: rec.mobilePhone } },
-                { primaryGuest: { name: rec.fullName } },
-                ...(rec.preAssignedRoom ? [{ roomAssignments: { some: { room: { number: rec.preAssignedRoom } } } }] : []),
+                ...(recRoomNumbers.length > 0
+                  ? [{ roomAssignments: { some: { room: { number: { in: recRoomNumbers } } } } }]
+                  : [
+                      { primaryGuest: { phone: rec.mobilePhone } },
+                      { primaryGuest: { name: rec.fullName } },
+                    ]),
               ],
             },
             include: {
@@ -86,12 +98,31 @@ export async function GET(request: Request) {
           });
 
           if (stay) {
-            const firstAssignment = stay.roomAssignments[0];
-            if (firstAssignment?.moveReason?.startsWith("AGREED_RATE:")) {
-              const parsedRate = Number(firstAssignment.moveReason.replace("AGREED_RATE:", ""));
-              if (!isNaN(parsedRate)) agreedRoomTariff = parsedRate;
-            } else if (firstAssignment?.rateHandling === "COMPLIMENTARY") {
-              agreedRoomTariff = 0;
+            if (stay.roomAssignments && stay.roomAssignments.length > 0) {
+              assignedRooms = stay.roomAssignments.map((ra) => {
+                let rate = agreedRoomTariff;
+                if (ra.moveReason?.startsWith("AGREED_RATE:")) {
+                  const parsedRate = Number(ra.moveReason.replace("AGREED_RATE:", ""));
+                  if (!isNaN(parsedRate)) rate = parsedRate;
+                } else if (ra.rateHandling === "COMPLIMENTARY") {
+                  rate = 0;
+                }
+                roomRates[ra.room.id] = rate;
+                roomRates[ra.room.number] = rate;
+                return {
+                  id: ra.room.id,
+                  number: ra.room.number,
+                  rate,
+                };
+              });
+
+              const firstAssignment = stay.roomAssignments[0];
+              if (firstAssignment?.moveReason?.startsWith("AGREED_RATE:")) {
+                const parsedRate = Number(firstAssignment.moveReason.replace("AGREED_RATE:", ""));
+                if (!isNaN(parsedRate)) agreedRoomTariff = parsedRate;
+              } else if (firstAssignment?.rateHandling === "COMPLIMENTARY") {
+                agreedRoomTariff = 0;
+              }
             }
 
             if (stay.folio?.payments && stay.folio.payments.length > 0) {
@@ -107,6 +138,8 @@ export async function GET(request: Request) {
           agreedRoomTariff,
           depositAmount,
           advancePaymentMethod,
+          assignedRooms,
+          roomRates,
         };
       })
     );
@@ -150,6 +183,10 @@ export async function PATCH(request: Request) {
       agreedRoomTariff,
       depositAmount,
       advancePaymentMethod,
+      coGuestsJson,
+      foreignPassportDetailsJson,
+      signatureDataUrl,
+      internalNotes,
     } = body;
 
     if (!id) {
@@ -159,7 +196,9 @@ export async function PATCH(request: Request) {
     const currentReg = await prisma.guestRegistration.findUnique({ where: { id } });
     let notesObj: any = {};
     try {
-      if (currentReg?.internalNotes) {
+      if (internalNotes) {
+        notesObj = typeof internalNotes === "string" ? JSON.parse(internalNotes) : internalNotes;
+      } else if (currentReg?.internalNotes) {
         notesObj = JSON.parse(currentReg.internalNotes);
       }
     } catch {
@@ -198,6 +237,9 @@ export async function PATCH(request: Request) {
         expectedDepartureDate: expectedDepartureDate !== undefined ? expectedDepartureDate : undefined,
         preAssignedRoom: preAssignedRoom !== undefined ? preAssignedRoom : undefined,
         depositAmount: depositAmount !== undefined ? Number(depositAmount) || 0 : undefined,
+        coGuestsJson: coGuestsJson !== undefined ? (typeof coGuestsJson === "string" ? coGuestsJson : JSON.stringify(coGuestsJson)) : undefined,
+        foreignPassportDetailsJson: foreignPassportDetailsJson !== undefined ? (typeof foreignPassportDetailsJson === "string" ? foreignPassportDetailsJson : JSON.stringify(foreignPassportDetailsJson)) : undefined,
+        signatureDataUrl: signatureDataUrl !== undefined ? signatureDataUrl : undefined,
         internalNotes: JSON.stringify(notesObj),
         status: status || undefined,
       },
