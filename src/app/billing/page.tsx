@@ -28,10 +28,15 @@ import {
   FileText,
   UserCheck,
   RotateCcw,
+  Trash2,
+  Archive,
+  FolderArchive,
+  History,
 } from "lucide-react";
 import { DISCOUNT_REASONS, PAYMENT_METHODS } from "@/data";
 import { PrintableTaxInvoiceModal } from "@/components/billing/printable-tax-invoice";
 import { apiCache } from "@/lib/cache/api-cache";
+import { calculate24HrBillableDays } from "@/lib/domain/pms-service";
 
 
 // Helper to match charges with specific rooms in separate billing mode
@@ -101,9 +106,14 @@ function BillingContent() {
   const [folioData, setFolioData] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Main Folio View Tabs: In-House Active Rooms vs. Settled & Departed Folios Archive
+  const [activeMainTab, setActiveMainTab] = useState<"IN_HOUSE" | "SETTLED_ARCHIVE">(
+    searchParams.get("tab") === "settled" ? "SETTLED_ARCHIVE" : "IN_HOUSE"
+  );
+
   // Search & Filter States for Stays / Folios
   const [staySearchQuery, setStaySearchQuery] = useState<string>("");
-  const [stayStatusFilter, setStayStatusFilter] = useState<"ALL" | "IN_HOUSE" | "CHECKED_OUT" | "WITH_BALANCE">("ALL");
+  const [stayStatusFilter, setStayStatusFilter] = useState<"ALL" | "WITH_BALANCE" | "SETTLED">("ALL");
 
   // Search & Filter States for Ledger Entries
   const [ledgerSearchQuery, setLedgerSearchQuery] = useState<string>("");
@@ -135,7 +145,7 @@ function BillingContent() {
   const [chargeForm, setChargeForm] = useState({
     chargeCode: "RESTAURANT_FOOD",
     description: "Dinner Service Bill",
-    amount: "650",
+    amount: "0",
     sacHsn: "996331",
   });
 
@@ -242,8 +252,24 @@ function BillingContent() {
 
   const handleGracePeriodChange = async (newGrace: number) => {
     setGracePeriodMinutes(newGrace);
-    if (folioData?.id) {
-      await loadFolio(folioData.id, newGrace);
+    if (!selectedStayId) return;
+
+    try {
+      // 1. Persist new grace period to the stay in the database
+      await fetch(`/api/v1/stays/${selectedStayId}/grace-period`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ gracePeriodMinutes: newGrace }),
+      });
+
+      // 2. Reload folio and stays fresh to update ledger charges and balance
+      if (folioData?.id) {
+        await loadFolio(folioData.id, newGrace);
+      }
+      await loadStays(true);
+      await refreshData();
+    } catch (e) {
+      console.error("Error updating grace period:", e);
     }
   };
 
@@ -251,12 +277,19 @@ function BillingContent() {
     loadStays();
   }, [activeProperty?.id, refreshKey]);
 
-  // When selected stay changes, fetch its live folio
+  // When selected stay changes, fetch its live folio and sync saved grace period
   useEffect(() => {
     if (selectedStayId && stays.length > 0) {
       const activeStay = stays.find((s) => s.id === selectedStayId);
+      let stayGrace = 60;
+      const rh = activeStay?.roomAssignments?.[0]?.rateHandling;
+      if (rh?.includes("24_HOURS:")) {
+        stayGrace = Number(rh.split(":")[1]) || 60;
+      }
+      setGracePeriodMinutes(stayGrace);
+
       if (activeStay?.folio?.id) {
-        loadFolio(activeStay.folio.id);
+        loadFolio(activeStay.folio.id, stayGrace);
       } else {
         setFolioData(null);
       }
@@ -387,24 +420,91 @@ function BillingContent() {
     return items;
   }, [stays]);
 
-  // Filtered Directory Items based on Search Query and Status Tabs
+  // Filtered Directory Items based on Active Main Tab (In-House vs Settled Archive) + Search + Sub-filters
   const filteredDirectoryItems = useMemo(() => {
     return directoryItems.filter((item) => {
-      // 1. Status Filter
-      if (stayStatusFilter === "IN_HOUSE" && item.status !== "IN_HOUSE") return false;
-      if (stayStatusFilter === "CHECKED_OUT" && item.status !== "CHECKED_OUT") return false;
-      if (stayStatusFilter === "WITH_BALANCE" && item.roomBalance <= 0) return false;
+      // 1. Main Tab Filter (Isolates In-House active rooms from Settled/Departed guests)
+      if (activeMainTab === "IN_HOUSE" && item.status !== "IN_HOUSE") {
+        return false;
+      }
+      if (activeMainTab === "SETTLED_ARCHIVE" && item.status !== "CHECKED_OUT" && item.status !== "COMPLETED") {
+        return false;
+      }
 
-      // 2. Search Query Filter
-      if (!staySearchQuery.trim()) return true;
-      const q = staySearchQuery.toLowerCase();
-      const roomNum = item.roomNumber.toLowerCase();
-      const guestName = item.guestName.toLowerCase();
-      const phone = (item.phone || "").toLowerCase();
-      const company = (item.companyName || "").toLowerCase();
-      return roomNum.includes(q) || guestName.includes(q) || phone.includes(q) || company.includes(q);
+      // 2. Sub-status Filter within tab
+      if (activeMainTab === "IN_HOUSE") {
+        if (stayStatusFilter === "WITH_BALANCE" && item.roomBalance <= 0.5) return false;
+        if (stayStatusFilter === "SETTLED" && item.roomBalance > 0.5) return false;
+      } else {
+        if (stayStatusFilter === "WITH_BALANCE" && !item.companyName) return false; // Corporate Accounts
+      }
+
+      // 3. Search Filter across room #, guest name, phone, company, and invoice #
+      if (staySearchQuery.trim()) {
+        const q = staySearchQuery.toLowerCase();
+        const roomMatch = item.roomNumber.toLowerCase().includes(q);
+        const guestMatch = item.guestName.toLowerCase().includes(q);
+        const phoneMatch = item.phone?.toLowerCase().includes(q);
+        const companyMatch = item.companyName?.toLowerCase().includes(q);
+        const invoiceMatch = item.stay?.folio?.windows?.[0]?.invoices?.some((inv: any) =>
+          inv.invoiceNo?.toLowerCase().includes(q)
+        );
+        return roomMatch || guestMatch || phoneMatch || companyMatch || Boolean(invoiceMatch);
+      }
+
+      return true;
     });
-  }, [directoryItems, staySearchQuery, stayStatusFilter]);
+  }, [directoryItems, activeMainTab, stayStatusFilter, staySearchQuery]);
+
+  // Counts for Top Tab Badges
+  const inHouseCount = useMemo(() => directoryItems.filter((d) => d.status === "IN_HOUSE").length, [directoryItems]);
+  const settledArchiveCount = useMemo(() => directoryItems.filter((d) => d.status === "CHECKED_OUT" || d.status === "COMPLETED").length, [directoryItems]);
+
+  // Respond immediately when sidebar sub-tabs are clicked (/billing?tab=settled or /billing?tab=in-house)
+  useEffect(() => {
+    const tabParam = searchParams.get("tab");
+    if (tabParam === "settled" && activeMainTab !== "SETTLED_ARCHIVE") {
+      setActiveMainTab("SETTLED_ARCHIVE");
+      setStayStatusFilter("ALL");
+      setStaySearchQuery("");
+      const settledItems = directoryItems.filter((d) => d.status === "CHECKED_OUT" || d.status === "COMPLETED");
+      if (settledItems.length > 0) {
+        setSelectedStayId(settledItems[0].stayId);
+        setSelectedRoomNumber(settledItems[0].roomNumber);
+      }
+    } else if ((tabParam === "in-house" || !tabParam) && activeMainTab !== "IN_HOUSE" && !searchParams.get("stayId")) {
+      setActiveMainTab("IN_HOUSE");
+      setStayStatusFilter("ALL");
+      setStaySearchQuery("");
+      const inHouseItems = directoryItems.filter((d) => d.status === "IN_HOUSE");
+      if (inHouseItems.length > 0) {
+        setSelectedStayId(inHouseItems[0].stayId);
+        setSelectedRoomNumber(inHouseItems[0].roomNumber);
+      }
+    }
+  }, [searchParams, directoryItems]);
+
+  const handleSwitchMainTab = (tab: "IN_HOUSE" | "SETTLED_ARCHIVE") => {
+    setActiveMainTab(tab);
+    setStayStatusFilter("ALL");
+    setStaySearchQuery("");
+
+    // Keep URL parameter synchronized for sidebar & browser history
+    const targetTab = tab === "SETTLED_ARCHIVE" ? "settled" : "in-house";
+    router.replace(`/billing?tab=${targetTab}`, { scroll: false });
+
+    // Auto-select first item in the selected tab
+    const targetItems = directoryItems.filter((d) =>
+      tab === "IN_HOUSE" ? d.status === "IN_HOUSE" : (d.status === "CHECKED_OUT" || d.status === "COMPLETED")
+    );
+    if (targetItems.length > 0) {
+      setSelectedStayId(targetItems[0].stayId);
+      setSelectedRoomNumber(targetItems[0].roomNumber);
+    } else {
+      setSelectedStayId("");
+      setSelectedRoomNumber("");
+    }
+  };
 
   const activeStay = stays.find((s) => s.id === selectedStayId);
   const activeDirectoryItem = directoryItems.find(
@@ -435,7 +535,9 @@ function BillingContent() {
         completedCycles: 0,
         remainingMinutes: 0,
         isWithinGrace: false,
-        checkoutCycleText: "24-Hr Cycle Billing",
+        isEarlyBird: false,
+        checkoutDeadlineText: "Standard Billing",
+        waivedNextNight: false,
       };
     }
     const arr = activeStay.arrivalAt ? new Date(activeStay.arrivalAt) : new Date();
@@ -446,31 +548,44 @@ function BillingContent() {
 
     let rate = 3200;
     let isComp = false;
+    let isRateInclusive = true;
 
     const assignment = activeStay.roomAssignments?.find((a: any) => a.room?.number === activeRoomNumber) || activeStay.roomAssignments?.[0];
     if (assignment?.rateHandling === "COMPLIMENTARY" || assignment?.moveReason === "AGREED_RATE:0") {
       rate = 0;
       isComp = true;
     } else if (assignment?.moveReason?.startsWith("AGREED_RATE:")) {
-      rate = Number(assignment.moveReason.replace("AGREED_RATE:", "")) || 3200;
+      const parts = assignment.moveReason.replace("AGREED_RATE:", "").split(":");
+      rate = Number(parts[0]) || 3200;
+      if (parts[1] === "EXC") isRateInclusive = false;
     } else if (folioData?.windows?.[0]) {
       const items = folioData.windows[0].entries || folioData.windows[0].lineItems || [];
       const roomCharge = items.find((i: any) => i.chargeCode?.includes("ROOM_TARIFF") && (i.description?.includes(activeRoomNumber) || true));
       if (roomCharge && roomCharge.unitAmount !== undefined) {
         rate = roomCharge.unitAmount;
         if (rate === 0) isComp = true;
+        if (roomCharge.taxableAmount && roomCharge.totalAmount && Math.abs(roomCharge.taxableAmount - roomCharge.unitAmount) < 0.01 && roomCharge.totalAmount > roomCharge.taxableAmount) {
+          isRateInclusive = false;
+        }
       }
     }
 
-    // Real-time 24-hr cycle metrics
+    // Real-time Early Bird & 24-hr cycle metrics
     const now = new Date();
     const elapsedMs = Math.max(0, now.getTime() - arr.getTime());
-    const elapsedHours = elapsedMs / (1000 * 60 * 60);
-    const completedCycles = Math.floor(elapsedHours / 24);
-    const remainingMinutes = Math.round((elapsedHours % 24) * 60);
+    const elapsedHours = (elapsedMs / (1000 * 60 * 60)).toFixed(1);
+    const completedCycles = Math.floor(elapsedMs / (24 * 60 * 60 * 1000));
+    const remainingMinutes = Math.round(((elapsedMs / (1000 * 60 * 60)) % 24) * 60);
+
+    const billableCalc = calculate24HrBillableDays(
+      arr,
+      now,
+      assignment?.rateHandling === "FIXED_TIME" ? "FIXED_TIME" : "24_HOURS",
+      gracePeriodMinutes
+    );
 
     const items = folioData?.windows?.[0]?.entries || folioData?.windows?.[0]?.lineItems || [];
-    const allRoomEntries = items.filter((i: any) => i.chargeCode?.includes("ROOM_TARIFF"));
+    const allRoomEntries = items.filter((i: any) => i.chargeCode?.includes("ROOM_TARIFF") && i.status === "POSTED");
     const chargedRoomEntries = allRoomEntries.filter((i: any) => {
       if (groupBillingMode === "YES") return true;
       if (allRoomEntries.length <= 1) return true;
@@ -478,23 +593,24 @@ function BillingContent() {
     });
     const chargedNights = chargedRoomEntries.length > 0
       ? chargedRoomEntries.reduce((sum: number, i: any) => sum + (i.qty || 1), 0)
-      : 1;
-
-    const isWithinGrace = completedCycles >= 1 && remainingMinutes <= gracePeriodMinutes;
+      : billableCalc.billableDays;
 
     return {
       nights: chargedNights,
       scheduledNights: diffDays,
       roomRatePerNight: rate,
+      isRateInclusive,
       isMultiNight: chargedNights > 1,
       isComplimentary: isComp,
-      elapsedHours: elapsedHours.toFixed(1),
+      elapsedHours,
       completedCycles,
       remainingMinutes,
-      isWithinGrace,
-      checkoutCycleText: "24-Hr Cycle Billing",
+      isWithinGrace: billableCalc.gracePeriodApplied,
+      isEarlyBird: billableCalc.isEarlyBird,
+      checkoutDeadlineText: billableCalc.checkoutDeadlineText,
+      waivedNextNight: gracePeriodMinutes >= 1440,
     };
-  }, [activeStay, activeRoomNumber, folioData, gracePeriodMinutes]);
+  }, [activeStay, activeRoomNumber, folioData, gracePeriodMinutes, groupBillingMode]);
 
   // Aggregate raw ledger line items from Prisma folio windows (entries)
   const rawEntries = useMemo(() => {
@@ -565,8 +681,8 @@ function BillingContent() {
     setActionLoading(true);
     try {
       const numAmt = Number(chargeForm.amount);
-      if (numAmt <= 0) {
-        alert("Please enter a valid charge amount.");
+      if (!chargeForm.amount || isNaN(numAmt) || numAmt <= 0) {
+        alert("Please enter a valid charge amount greater than ₹0 before posting.");
         setActionLoading(false);
         return;
       }
@@ -592,16 +708,47 @@ function BillingContent() {
       }
 
       await loadFolio(folioData.id);
-      await loadStays();
+      await loadStays(true);
       setShowManualChargeModal(false);
       setChargeForm({
         chargeCode: "RESTAURANT_FOOD",
         description: "Dinner Service Bill",
-        amount: "650",
+        amount: "0",
         sacHsn: "996331",
       });
     } catch (err: any) {
       alert(`Error posting charge: ${err.message}`);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Delete / Void Mistaken Folio Charge
+  const handleDeleteCharge = async (entryId: string, description: string, amount: number) => {
+    if (!folioData?.id) return;
+    const isConfirmed = window.confirm(
+      `Are you sure you want to delete "${description}" (${formatINR(amount)}) from this folio?\n\nThis will remove the charge and automatically recalculate the live folio balance.`
+    );
+    if (!isConfirmed) return;
+
+    setActionLoading(true);
+    try {
+      const res = await fetch(`/api/v1/folios/${folioData.id}/charges/${entryId}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason: "Mistaken charge deleted from billing folio" }),
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || "Failed to delete charge");
+      }
+
+      await loadFolio(folioData.id);
+      await loadStays(true);
+      await refreshData();
+    } catch (err: any) {
+      alert(`Error deleting charge: ${err.message}`);
     } finally {
       setActionLoading(false);
     }
@@ -879,7 +1026,7 @@ function BillingContent() {
       <div className="billing-dashboard-view no-print print:hidden max-w-[1600px] mx-auto w-full text-zinc-900 dark:text-zinc-100 space-y-4 transition-colors duration-150">
         
         {/* 1. MASTER TOP HEADER & ACTIONS (CLEAN 1440x900 BAR) */}
-      <div className="rounded-2xl bg-white dark:bg-[#121215] border border-zinc-200/80 dark:border-zinc-800/80 p-3.5 sm:p-4 shadow-xs">
+      <div className="rounded-2xl bg-white dark:bg-[#121215] border border-zinc-200/80 dark:border-zinc-800/80 p-3.5 sm:p-4 shadow-xs space-y-3">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <div className="h-10 w-10 rounded-xl bg-blue-600 dark:bg-white text-white dark:text-zinc-950 font-bold text-base flex items-center justify-center shadow-xs shrink-0">
@@ -907,93 +1054,165 @@ function BillingContent() {
             </div>
           </div>
 
-          {/* Action Toolbar */}
-          <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
-            {selectedGroupStayIds.length > 0 && (
-              <button
-                onClick={handleOpenGroupPaymentModal}
-                className="h-9 px-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1.5 transition shadow-xs cursor-pointer animate-in fade-in"
-              >
-                <Users className="h-4 w-4" />
-                <span>Group Payment ({selectedGroupStayIds.length})</span>
-              </button>
-            )}
+          {/* Top Main Tab Navigation: In-House vs Settled Archive */}
+          <div className="flex items-center gap-1.5 p-1 rounded-2xl bg-zinc-100/90 dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800/80">
+            <button
+              type="button"
+              onClick={() => handleSwitchMainTab("IN_HOUSE")}
+              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                activeMainTab === "IN_HOUSE"
+                  ? "bg-white dark:bg-zinc-800 text-blue-600 dark:text-blue-400 shadow-xs border border-zinc-200/60 dark:border-zinc-700"
+                  : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
+              }`}
+            >
+              <BedDouble className="h-3.5 w-3.5" />
+              <span>🏨 In-House Active Folios</span>
+              <span className={`px-2 py-0.2 rounded-md text-[10.5px] font-mono font-bold ${
+                activeMainTab === "IN_HOUSE"
+                  ? "bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800"
+                  : "bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400"
+              }`}>
+                {inHouseCount}
+              </span>
+            </button>
 
-            {selectedGroupStayIds.length > 0 && (
-              <button
-                onClick={handleExecuteGroupCheckout}
-                className="h-9 px-3.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-900 dark:text-white border border-zinc-200 dark:border-zinc-700 font-semibold text-xs flex items-center gap-1.5 transition shadow-xs cursor-pointer"
-              >
-                <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-                <span>Group Checkout</span>
-              </button>
-            )}
-
-            {folioData && (
-              <>
-                <button
-                  onClick={handleOpenLiveTaxBill}
-                  className="h-9 px-3.5 rounded-xl bg-zinc-100/80 hover:bg-zinc-200/80 dark:bg-zinc-900 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 font-semibold text-xs text-zinc-800 dark:text-zinc-200 flex items-center gap-1.5 transition shadow-xs cursor-pointer"
-                >
-                  <Printer className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
-                  <span>Print Tax Bill</span>
-                </button>
-
-                <button
-                  onClick={() => {
-                    setChargeForm({
-                      chargeCode: "RESTAURANT_FOOD",
-                      description: "Dinner Service Bill",
-                      amount: "650",
-                      sacHsn: "996331",
-                    });
-                    setShowManualChargeModal(true);
-                  }}
-                  className="h-9 px-3.5 rounded-xl bg-amber-50/80 dark:bg-amber-500/10 hover:bg-amber-100/80 dark:hover:bg-amber-500/20 border border-amber-200 dark:border-amber-500/30 text-amber-900 dark:text-amber-300 font-semibold text-xs flex items-center gap-1.5 transition shadow-xs cursor-pointer"
-                >
-                  <Plus className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
-                  <span>Post Charge</span>
-                </button>
-
-                <button
-                  onClick={() => {
-                    setDiscountForm({
-                      description: "Discount / Rebate",
-                      amount: "500",
-                      sacHsn: "996311",
-                    });
-                    setShowDiscountModal(true);
-                  }}
-                  className="h-9 px-3.5 rounded-xl bg-rose-50/80 dark:bg-rose-500/10 hover:bg-rose-100/80 dark:hover:bg-rose-500/20 border border-rose-200 dark:border-rose-500/30 text-rose-900 dark:text-rose-300 font-semibold text-xs flex items-center gap-1.5 transition shadow-xs cursor-pointer"
-                >
-                  <Plus className="h-3.5 w-3.5 text-rose-600 dark:text-rose-400" />
-                  <span>Add Discount</span>
-                </button>
-
-                <button
-                  onClick={() => {
-                    const hasCompany = Boolean(activeStay?.primaryGuest?.companyName);
-                    setPaymentForm({
-                      amount: String(Math.max(0, currentBalance)),
-                      method: hasCompany ? "DIRECT_BILL" : "UPI",
-                      reference: hasCompany ? `PO-${(activeStay.primaryGuest.companyName || "").slice(0, 10)}` : "",
-                      payerName: formatGuestDisplayName(activeStay?.primaryGuest?.name) || "Guest",
-                      companyName: activeStay?.primaryGuest?.companyName || "",
-                      gstin: activeStay?.primaryGuest?.gstin || "",
-                      creditPeriod: "30_DAYS",
-                      billingRemarks: "",
-                    });
-                    setShowPaymentModal(true);
-                  }}
-                  className="h-9 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center gap-1.5 transition shadow-sm shadow-blue-600/30 cursor-pointer"
-                >
-                  <CreditCard className="h-3.5 w-3.5" />
-                  <span>Collect Payment</span>
-                </button>
-              </>
-            )}
+            <button
+              type="button"
+              onClick={() => handleSwitchMainTab("SETTLED_ARCHIVE")}
+              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                activeMainTab === "SETTLED_ARCHIVE"
+                  ? "bg-white dark:bg-zinc-800 text-blue-600 dark:text-blue-400 shadow-xs border border-zinc-200/60 dark:border-zinc-700"
+                  : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
+              }`}
+            >
+              <Archive className="h-3.5 w-3.5" />
+              <span>📁 Settled & Checked-Out Archive</span>
+              <span className={`px-2 py-0.2 rounded-md text-[10.5px] font-mono font-bold ${
+                activeMainTab === "SETTLED_ARCHIVE"
+                  ? "bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800"
+                  : "bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400"
+              }`}>
+                {settledArchiveCount}
+              </span>
+            </button>
           </div>
         </div>
+
+        {/* Action Toolbar for In-House Stays */}
+        {activeMainTab === "IN_HOUSE" && (
+          <div className="flex items-center justify-between gap-2 pt-2 border-t border-zinc-100 dark:border-zinc-800/80 flex-wrap">
+            <div className="text-xs font-medium text-zinc-500 flex items-center gap-1.5">
+              <span className="h-2 w-2 rounded-full bg-emerald-500" />
+              <span>Showing {filteredDirectoryItems.length} currently occupied rooms</span>
+            </div>
+
+            <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+              {selectedGroupStayIds.length > 0 && (
+                <button
+                  onClick={handleOpenGroupPaymentModal}
+                  className="h-8.5 px-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1.5 transition shadow-xs cursor-pointer animate-in fade-in"
+                >
+                  <Users className="h-3.5 w-3.5" />
+                  <span>Group Payment ({selectedGroupStayIds.length})</span>
+                </button>
+              )}
+
+              {selectedGroupStayIds.length > 0 && (
+                <button
+                  onClick={handleExecuteGroupCheckout}
+                  className="h-8.5 px-3.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-900 dark:text-white border border-zinc-200 dark:border-zinc-700 font-semibold text-xs flex items-center gap-1.5 transition shadow-xs cursor-pointer"
+                >
+                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                  <span>Group Checkout</span>
+                </button>
+              )}
+
+              {folioData && (
+                <>
+                  <button
+                    onClick={handleOpenLiveTaxBill}
+                    className="h-8.5 px-3.5 rounded-xl bg-zinc-100/80 hover:bg-zinc-200/80 dark:bg-zinc-900 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 font-semibold text-xs text-zinc-800 dark:text-zinc-200 flex items-center gap-1.5 transition shadow-xs cursor-pointer"
+                  >
+                    <Printer className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
+                    <span>Live Tax Bill</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setChargeForm({
+                        chargeCode: "RESTAURANT_FOOD",
+                        description: "Dinner Service Bill",
+                        amount: "0",
+                        sacHsn: "996331",
+                      });
+                      setShowManualChargeModal(true);
+                    }}
+                    className="h-8.5 px-3.5 rounded-xl bg-amber-50/80 dark:bg-amber-500/10 hover:bg-amber-100/80 dark:hover:bg-amber-500/20 border border-amber-200 dark:border-amber-500/30 text-amber-900 dark:text-amber-300 font-semibold text-xs flex items-center gap-1.5 transition shadow-xs cursor-pointer"
+                  >
+                    <Plus className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+                    <span>Post Charge</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setDiscountForm({
+                        description: "Discount / Rebate",
+                        amount: "500",
+                        sacHsn: "996311",
+                      });
+                      setShowDiscountModal(true);
+                    }}
+                    className="h-8.5 px-3.5 rounded-xl bg-rose-50/80 dark:bg-rose-500/10 hover:bg-rose-100/80 dark:hover:bg-rose-500/20 border border-rose-200 dark:border-rose-500/30 text-rose-900 dark:text-rose-300 font-semibold text-xs flex items-center gap-1.5 transition shadow-xs cursor-pointer"
+                  >
+                    <Plus className="h-3.5 w-3.5 text-rose-600 dark:text-rose-400" />
+                    <span>Add Discount</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      const hasCompany = Boolean(activeStay?.primaryGuest?.companyName);
+                      setPaymentForm({
+                        amount: String(Math.max(0, currentBalance)),
+                        method: hasCompany ? "DIRECT_BILL" : "UPI",
+                        reference: hasCompany ? `PO-${(activeStay.primaryGuest.companyName || "").slice(0, 10)}` : "",
+                        payerName: formatGuestDisplayName(activeStay?.primaryGuest?.name) || "Guest",
+                        companyName: activeStay?.primaryGuest?.companyName || "",
+                        gstin: activeStay?.primaryGuest?.gstin || "",
+                        creditPeriod: "30_DAYS",
+                        billingRemarks: "",
+                      });
+                      setShowPaymentModal(true);
+                    }}
+                    className="h-8.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center gap-1.5 transition shadow-sm shadow-blue-600/30 cursor-pointer"
+                  >
+                    <CreditCard className="h-3.5 w-3.5" />
+                    <span>Collect Payment</span>
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Action Toolbar for Settled Archive */}
+        {activeMainTab === "SETTLED_ARCHIVE" && (
+          <div className="flex items-center justify-between gap-2 pt-2 border-t border-zinc-100 dark:border-zinc-800/80 flex-wrap">
+            <div className="text-xs font-medium text-zinc-500 flex items-center gap-1.5">
+              <Archive className="h-3.5 w-3.5 text-zinc-400" />
+              <span>Viewing historical settled folios & tax invoices ({filteredDirectoryItems.length} records)</span>
+            </div>
+
+            {folioData && (
+              <button
+                onClick={handleOpenLiveTaxBill}
+                className="h-8.5 px-4 rounded-xl bg-zinc-900 text-white hover:bg-zinc-800 dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-200 font-bold text-xs flex items-center gap-1.5 transition shadow-xs cursor-pointer"
+              >
+                <Printer className="h-3.5 w-3.5" />
+                <span>Print Final Tax Invoice</span>
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* 2. MAIN 2-COLUMN OPERATIONAL GRID */}
@@ -1004,24 +1223,36 @@ function BillingContent() {
           
           <div className="flex items-center justify-between pb-2 border-b border-zinc-200/80 dark:border-zinc-800">
             <span className="font-bold text-xs text-zinc-900 dark:text-white flex items-center gap-2 uppercase tracking-wider">
-              <Layers className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
-              Rooms Directory
+              {activeMainTab === "IN_HOUSE" ? (
+                <>
+                  <BedDouble className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                  In-House Rooms
+                </>
+              ) : (
+                <>
+                  <Archive className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
+                  Settled Archive
+                </>
+              )}
             </span>
             <div className="flex items-center gap-2">
-              <button
-                onClick={() => {
-                  if (selectedGroupStayIds.length === stays.length) {
-                    setSelectedGroupStayIds([]);
-                  } else {
-                    setSelectedGroupStayIds(stays.map((s) => s.id));
-                  }
-                }}
-                className="text-xs text-blue-600 dark:text-blue-400 hover:underline font-semibold cursor-pointer"
-              >
-                {selectedGroupStayIds.length > 0 ? "Clear" : "Select All"}
-              </button>
+              {activeMainTab === "IN_HOUSE" && (
+                <button
+                  onClick={() => {
+                    const inHouseStays = stays.filter((s) => s.status === "IN_HOUSE");
+                    if (selectedGroupStayIds.length === inHouseStays.length) {
+                      setSelectedGroupStayIds([]);
+                    } else {
+                      setSelectedGroupStayIds(inHouseStays.map((s) => s.id));
+                    }
+                  }}
+                  className="text-xs text-blue-600 dark:text-blue-400 hover:underline font-semibold cursor-pointer"
+                >
+                  {selectedGroupStayIds.length > 0 ? "Clear" : "Select All"}
+                </button>
+              )}
               <span className="text-[10.5px] text-zinc-500 dark:text-zinc-400 font-semibold bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 rounded-md">
-                {filteredDirectoryItems.length} / {directoryItems.length}
+                {filteredDirectoryItems.length} {activeMainTab === "IN_HOUSE" ? "Occupied" : "Settled"}
               </span>
             </div>
           </div>
@@ -1031,7 +1262,7 @@ function BillingContent() {
             <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-zinc-400 dark:text-zinc-500" />
             <input
               type="text"
-              placeholder="Search room #, guest name, company..."
+              placeholder={activeMainTab === "IN_HOUSE" ? "Search room #, guest name..." : "Search room, invoice #, guest, phone..."}
               value={staySearchQuery}
               onChange={(e) => setStaySearchQuery(e.target.value)}
               className="w-full h-9 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 pl-8.5 pr-8 text-xs text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none focus:border-blue-500 font-medium transition"
@@ -1047,48 +1278,63 @@ function BillingContent() {
           </div>
 
           {/* Quick Filter Tabs */}
-          <div className="grid grid-cols-4 gap-1 p-1 rounded-xl bg-zinc-100/80 dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 text-[11px] font-semibold text-center">
-            <button
-              onClick={() => setStayStatusFilter("ALL")}
-              className={`rounded-lg py-1.5 transition cursor-pointer ${
-                stayStatusFilter === "ALL"
-                  ? "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-xs font-bold"
-                  : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200"
-              }`}
-            >
-              All ({directoryItems.length})
-            </button>
-            <button
-              onClick={() => setStayStatusFilter("IN_HOUSE")}
-              className={`rounded-lg py-1.5 transition cursor-pointer ${
-                stayStatusFilter === "IN_HOUSE"
-                  ? "bg-emerald-600 text-white shadow-xs font-bold"
-                  : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200"
-              }`}
-            >
-              In-House ({directoryItems.filter((d) => d.status === "IN_HOUSE").length})
-            </button>
-            <button
-              onClick={() => setStayStatusFilter("WITH_BALANCE")}
-              className={`rounded-lg py-1.5 transition cursor-pointer ${
-                stayStatusFilter === "WITH_BALANCE"
-                  ? "bg-rose-600 text-white shadow-xs font-bold"
-                  : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200"
-              }`}
-            >
-              Due ({directoryItems.filter((d) => d.roomBalance > 0).length})
-            </button>
-            <button
-              onClick={() => setStayStatusFilter("CHECKED_OUT")}
-              className={`rounded-lg py-1.5 transition cursor-pointer ${
-                stayStatusFilter === "CHECKED_OUT"
-                  ? "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-xs font-bold"
-                  : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200"
-              }`}
-            >
-              Departed
-            </button>
-          </div>
+          {activeMainTab === "IN_HOUSE" ? (
+            <div className="grid grid-cols-3 gap-1 p-1 rounded-xl bg-zinc-100/80 dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 text-[11px] font-semibold text-center">
+              <button
+                onClick={() => setStayStatusFilter("ALL")}
+                className={`rounded-lg py-1.5 transition cursor-pointer ${
+                  stayStatusFilter === "ALL"
+                    ? "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-xs font-bold"
+                    : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200"
+                }`}
+              >
+                All ({inHouseCount})
+              </button>
+              <button
+                onClick={() => setStayStatusFilter("WITH_BALANCE")}
+                className={`rounded-lg py-1.5 transition cursor-pointer ${
+                  stayStatusFilter === "WITH_BALANCE"
+                    ? "bg-rose-600 text-white shadow-xs font-bold"
+                    : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200"
+                }`}
+              >
+                Due ({directoryItems.filter((d) => d.status === "IN_HOUSE" && d.roomBalance > 0.5).length})
+              </button>
+              <button
+                onClick={() => setStayStatusFilter("SETTLED")}
+                className={`rounded-lg py-1.5 transition cursor-pointer ${
+                  stayStatusFilter === "SETTLED"
+                    ? "bg-emerald-600 text-white shadow-xs font-bold"
+                    : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200"
+                }`}
+              >
+                Paid ({directoryItems.filter((d) => d.status === "IN_HOUSE" && d.roomBalance <= 0.5).length})
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-1 p-1 rounded-xl bg-zinc-100/80 dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 text-[11px] font-semibold text-center">
+              <button
+                onClick={() => setStayStatusFilter("ALL")}
+                className={`rounded-lg py-1.5 transition cursor-pointer ${
+                  stayStatusFilter === "ALL"
+                    ? "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-xs font-bold"
+                    : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200"
+                }`}
+              >
+                All Settled ({settledArchiveCount})
+              </button>
+              <button
+                onClick={() => setStayStatusFilter("WITH_BALANCE")}
+                className={`rounded-lg py-1.5 transition cursor-pointer ${
+                  stayStatusFilter === "WITH_BALANCE"
+                    ? "bg-amber-600 text-white shadow-xs font-bold"
+                    : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200"
+                }`}
+              >
+                Corporate ({directoryItems.filter((d) => (d.status === "CHECKED_OUT" || d.status === "COMPLETED") && d.companyName).length})
+              </button>
+            </div>
+          )}
 
           {/* Stays / Rooms List with Separated Individual Cards */}
           <div className="space-y-2 max-h-[calc(100vh-290px)] overflow-y-auto pr-0.5 flex-1">
@@ -1249,23 +1495,38 @@ function BillingContent() {
                   {/* 24-Hr Cycle Metric & Primary Action Button */}
                   <div className="flex items-center gap-3 shrink-0">
                     
-                    {/* 24-Hour Cycle Metric Indicator */}
+                    {/* 24-Hour & Early Bird Cycle Metric Indicator */}
                     <div className="text-xs text-zinc-700 dark:text-zinc-300 bg-zinc-50 dark:bg-zinc-900 px-3.5 py-2 rounded-xl border border-zinc-200/80 dark:border-zinc-800 flex items-center gap-2.5 shadow-2xs">
                       <Clock className="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
                       <div>
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex items-center gap-1.5 flex-wrap">
                           <span className="font-bold text-xs sm:text-sm text-zinc-900 dark:text-white block">
                             {stayCalculations.nights} Night{stayCalculations.nights > 1 ? "s" : ""} Billed
                           </span>
+                          {stayCalculations.isEarlyBird && (
+                            <span className="text-[9.5px] px-1.5 py-0.2 rounded bg-amber-50 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 font-bold border border-amber-300 dark:border-amber-700">
+                              🌟 Early Bird (5–11 AM)
+                            </span>
+                          )}
+                          {stayCalculations.isWithinGrace && (
+                            <span className="text-[9.5px] px-1.5 py-0.2 rounded bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 font-bold border border-emerald-300 dark:border-emerald-700">
+                              ⏳ In Grace Window
+                            </span>
+                          )}
+                          {stayCalculations.waivedNextNight && (
+                            <span className="text-[9.5px] px-1.5 py-0.2 rounded bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 font-bold border border-purple-300 dark:border-purple-700">
+                              ✓ Next Night Waived
+                            </span>
+                          )}
                           <span className="text-[9.5px] px-1.5 py-0.2 rounded bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 font-mono font-bold">
-                            Cycle {stayCalculations.completedCycles + 1} ({stayCalculations.elapsedHours}h Elapsed)
+                            {stayCalculations.elapsedHours}h Elapsed
                           </span>
                         </div>
-                        <span className="text-[10.5px] text-zinc-500 block font-mono">
+                        <span className="text-[10.5px] text-zinc-500 block font-mono mt-0.5">
                           {stayCalculations.isComplimentary ? (
                             <strong className="text-emerald-600 dark:text-emerald-400 font-bold">🎁 Complimentary (₹0/nt)</strong>
                           ) : (
-                            `${formatINR(stayCalculations.roomRatePerNight)}/night`
+                            `${formatINR(stayCalculations.roomRatePerNight)}/nt (${stayCalculations.isRateInclusive ? "Incl. GST" : "+Tax Extra"}) • ${stayCalculations.checkoutDeadlineText}`
                           )}
                         </span>
                       </div>
@@ -1311,6 +1572,43 @@ function BillingContent() {
                         <span>Print Final Invoice</span>
                       </button>
                     )}
+                  </div>
+                </div>
+
+                {/* GUEST FOLIO CREDENTIALS & METADATA BAR (GRC NO, INVOICE/BILL NO, CHECK-IN & DEPARTURE) */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-3 border-t border-zinc-100 dark:border-zinc-800/80 text-xs">
+                  <div className="p-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-900/80 border border-zinc-200/80 dark:border-zinc-800 flex flex-col justify-center shadow-2xs">
+                    <span className="text-[10px] uppercase font-bold text-zinc-500 dark:text-zinc-400">GRC Number</span>
+                    <span className="font-mono font-black text-blue-600 dark:text-blue-400 text-xs mt-0.5 truncate">
+                      {activeStay?.guestRegistration?.registrationNo || "GRC-2627-0019"}
+                    </span>
+                  </div>
+
+                  <div className="p-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-900/80 border border-zinc-200/80 dark:border-zinc-800 flex flex-col justify-center shadow-2xs">
+                    <span className="text-[10px] uppercase font-bold text-zinc-500 dark:text-zinc-400">Bill / Invoice No</span>
+                    <span className="font-mono font-black text-zinc-900 dark:text-zinc-100 text-xs mt-0.5 truncate">
+                      {folioData?.windows?.[0]?.invoices?.[0]?.invoiceNo || (activeStay?.status === "IN_HOUSE" ? `LIVE-BILL/${activeRoomNumber || "310"}` : `INV-2627-${activeRoomNumber || "310"}`)}
+                    </span>
+                  </div>
+
+                  <div className="p-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-900/80 border border-zinc-200/80 dark:border-zinc-800 flex flex-col justify-center shadow-2xs">
+                    <span className="text-[10px] uppercase font-bold text-zinc-500 dark:text-zinc-400">Check-In Date & Time</span>
+                    <span className="font-mono font-bold text-zinc-800 dark:text-zinc-200 text-xs mt-0.5 truncate">
+                      {activeStay?.arrivalAt ? new Date(activeStay.arrivalAt).toLocaleDateString("en-GB") + ", " + new Date(activeStay.arrivalAt).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true }) : (activeStay?.guestRegistration?.arrivalDateTime || "—")}
+                    </span>
+                  </div>
+
+                  <div className="p-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-900/80 border border-zinc-200/80 dark:border-zinc-800 flex flex-col justify-center shadow-2xs">
+                    <span className="text-[10px] uppercase font-bold text-zinc-500 dark:text-zinc-400">
+                      {activeStay?.actualDepartureAt ? "Checked Out At" : "Expected Departure"}
+                    </span>
+                    <span className="font-mono font-bold text-zinc-800 dark:text-zinc-200 text-xs mt-0.5 truncate">
+                      {activeStay?.actualDepartureAt
+                        ? new Date(activeStay.actualDepartureAt).toLocaleDateString("en-GB") + ", " + new Date(activeStay.actualDepartureAt).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true })
+                        : activeStay?.expectedDepartureAt
+                        ? new Date(activeStay.expectedDepartureAt).toLocaleDateString("en-GB") + " (12:00 PM)"
+                        : "—"}
+                    </span>
                   </div>
                 </div>
 
@@ -1504,6 +1802,7 @@ function BillingContent() {
                         <th className="py-2 px-3 text-right">Taxable</th>
                         <th className="py-2 px-3 text-right">GST</th>
                         <th className="py-2 px-3 text-right">Total Amount</th>
+                        <th className="py-2 px-3 text-right">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-zinc-200/60 dark:divide-zinc-800/60">
@@ -1548,12 +1847,26 @@ function BillingContent() {
                             <td className="py-2 px-3 font-mono font-bold text-zinc-950 dark:text-white text-right tabular-nums">
                               {formatINR(e.totalAmount || 0)}
                             </td>
+                            <td className="py-2 px-3 text-right">
+                              {activeStay?.status === "IN_HOUSE" && folioData?.status === "OPEN" && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteCharge(e.id, e.description, e.totalAmount || 0)}
+                                  disabled={actionLoading}
+                                  className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-bold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/60 border border-rose-200/60 dark:border-rose-800/60 hover:border-rose-300 dark:hover:border-rose-700 transition cursor-pointer disabled:opacity-50"
+                                  title="Delete mistaken charge from folio"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                  <span className="hidden sm:inline">Delete</span>
+                                </button>
+                              )}
+                            </td>
                           </tr>
                         );
                       })}
                       {entries.length === 0 && (
                         <tr>
-                          <td colSpan={6} className="p-5 text-center text-zinc-400 italic text-xs">
+                          <td colSpan={7} className="p-5 text-center text-zinc-400 italic text-xs">
                             {rawEntries.length === 0 ? "No charges posted yet" : "No charges match your search filter"}
                           </td>
                         </tr>
@@ -1766,20 +2079,19 @@ function BillingContent() {
                   value={chargeForm.chargeCode}
                   onChange={(e) => {
                     const val = e.target.value;
-                    const presets: Record<string, { desc: string; sac: string; defaultAmt: string }> = {
-                      RESTAURANT_FOOD: { desc: "Dinner Service Bill", sac: "996331", defaultAmt: "650" },
-                      ROOM_TARIFF: { desc: "Extra Bed / Stay Extension", sac: "996311", defaultAmt: "1000" },
-                      LAUNDRY: { desc: "Laundry & Pressing Service", sac: "9997", defaultAmt: "300" },
-                      TRANSPORT: { desc: "Cab / Airport Pick & Drop", sac: "9964", defaultAmt: "800" },
-                      MISC: { desc: "Miscellaneous Guest Service", sac: "9999", defaultAmt: "250" },
+                    const presets: Record<string, { desc: string; sac: string }> = {
+                      RESTAURANT_FOOD: { desc: "Dinner Service Bill", sac: "996331" },
+                      ROOM_TARIFF: { desc: "Extra Bed / Stay Extension", sac: "996311" },
+                      LAUNDRY: { desc: "Laundry & Pressing Service", sac: "9997" },
+                      TRANSPORT: { desc: "Cab / Airport Pick & Drop", sac: "9964" },
+                      MISC: { desc: "Miscellaneous Guest Service", sac: "9999" },
                     };
-                    const selected = presets[val] || { desc: "Guest Service Charge", sac: "996331", defaultAmt: "500" };
+                    const selected = presets[val] || { desc: "Guest Service Charge", sac: "996331" };
                     setChargeForm({
                       ...chargeForm,
                       chargeCode: val,
                       sacHsn: selected.sac,
                       description: selected.desc,
-                      amount: chargeForm.amount || selected.defaultAmt,
                     });
                   }}
                   className="w-full h-11 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 px-3.5 text-xs sm:text-sm text-zinc-900 dark:text-white font-semibold focus:outline-none focus:border-blue-500 transition cursor-pointer"
@@ -1824,7 +2136,7 @@ function BillingContent() {
                     required
                     step="0.01"
                     min="0.01"
-                    placeholder="0.00"
+                    placeholder="0"
                     value={chargeForm.amount}
                     onChange={(e) => setChargeForm({ ...chargeForm, amount: e.target.value })}
                     className="w-full h-11 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 pl-8 pr-3.5 text-base text-zinc-900 dark:text-white focus:outline-none focus:border-blue-500 font-mono font-black transition"

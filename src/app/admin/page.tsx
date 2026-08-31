@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useHotel } from "@/lib/context/hotel-context";
 import {
   Shield,
@@ -217,6 +217,7 @@ export default function AdminPortalPage() {
   const [editingGrc, setEditingGrc] = useState<any | null>(null);
   const [grcSaving, setGrcSaving] = useState(false);
   const [grcViewMode, setGrcViewMode] = useState<"ACTIVE" | "ARCHIVED">("ACTIVE");
+  const [grcStatusFilter, setGrcStatusFilter] = useState<"ALL" | "IN_HOUSE" | "CHECKED_OUT">("ALL");
   const [selectedArchiveSnapshot, setSelectedArchiveSnapshot] = useState<any | null>(null);
 
   const fetchGrcList = async () => {
@@ -236,6 +237,15 @@ export default function AdminPortalPage() {
       setGrcLoading(false);
     }
   };
+
+  const inHouseGrcCount = useMemo(() => grcList.filter((g) => g.status === "CHECKED_IN").length, [grcList]);
+  const checkedOutGrcCount = useMemo(() => grcList.filter((g) => g.status === "CHECKED_OUT").length, [grcList]);
+  const displayedGrcList = useMemo(() => {
+    if (grcViewMode === "ARCHIVED") return grcList;
+    if (grcStatusFilter === "IN_HOUSE") return grcList.filter((g) => g.status === "CHECKED_IN");
+    if (grcStatusFilter === "CHECKED_OUT") return grcList.filter((g) => g.status === "CHECKED_OUT");
+    return grcList;
+  }, [grcList, grcViewMode, grcStatusFilter]);
 
   const handleOpenGrcEdit = (data: any) => {
     if (roomsList.length === 0) {
@@ -292,6 +302,7 @@ export default function AdminPortalPage() {
     let roomExtraPax: Record<string, number> = {};
     let groupBilling = true;
 
+    let isRateInclusive = true;
     try {
       if (data.internalNotes) {
         const notes = typeof data.internalNotes === "string" ? JSON.parse(data.internalNotes) : data.internalNotes;
@@ -308,6 +319,7 @@ export default function AdminPortalPage() {
         if (notes.profession) profession = notes.profession;
         if (notes.title) title = notes.title;
         if (notes.agreedTariff !== undefined) agreedRoomTariff = Number(notes.agreedTariff);
+        if (notes.isRateInclusive !== undefined) isRateInclusive = Boolean(notes.isRateInclusive);
         if (Array.isArray(notes.additionalRoomIds)) additionalRoomIds = [...notes.additionalRoomIds];
         if (notes.roomRates && typeof notes.roomRates === "object") roomRates = { ...roomRates, ...notes.roomRates };
         if (notes.roomExtraPax && typeof notes.roomExtraPax === "object") roomExtraPax = notes.roomExtraPax;
@@ -340,14 +352,15 @@ export default function AdminPortalPage() {
       });
     }
 
-    let parsedPrimaryRoom = allParsedRooms[0] || data.assignedRoomNumber || data.preAssignedRoom || "";
+    let parsedPrimaryRoom = allParsedRooms[0] || data.assignedRoomNumber || data.preAssignedRoom || "310";
     const extraRooms = allParsedRooms.slice(1);
 
+    const validAdditionalIds: string[] = [];
     extraRooms.forEach((rn) => {
       const found = roomsList.find((r) => r.number === rn || r.id === rn);
       const rKey = found ? found.id : rn;
-      if (!additionalRoomIds.includes(rKey) && !additionalRoomIds.includes(rn)) {
-        additionalRoomIds.push(rKey);
+      if (!validAdditionalIds.includes(rKey)) {
+        validAdditionalIds.push(rKey);
       }
       if (roomRates[rKey] === undefined && roomRates[rn] === undefined) {
         roomRates[rKey] = found?.roomType?.basePrice || agreedRoomTariff || 3200;
@@ -356,6 +369,10 @@ export default function AdminPortalPage() {
         roomRates[rn] = found?.roomType?.basePrice || agreedRoomTariff || 3200;
       }
     });
+
+    if (allParsedRooms.length > 0) {
+      additionalRoomIds = validAdditionalIds;
+    }
 
     // Ensure roomRates has entry for each additional room
     additionalRoomIds.forEach((rid) => {
@@ -385,6 +402,7 @@ export default function AdminPortalPage() {
       children,
       agreedRoomTariff,
       isComplimentary: agreedRoomTariff === 0,
+      isRateInclusive,
       depositAmount,
       advancePaymentMethod,
       transactionRef,
@@ -434,6 +452,7 @@ export default function AdminPortalPage() {
         preAssignedRoom: editingGrc.preAssignedRoom,
         status: editingGrc.status,
         agreedRoomTariff: editingGrc.isComplimentary ? 0 : Number(editingGrc.agreedRoomTariff),
+        isRateInclusive: editingGrc.isRateInclusive !== false,
         depositAmount: Number(editingGrc.depositAmount) || 0,
         advancePaymentMethod: editingGrc.advancePaymentMethod,
         coGuestsJson: editingGrc.coGuests,
@@ -455,6 +474,7 @@ export default function AdminPortalPage() {
           profession: editingGrc.profession,
           title: editingGrc.title,
           agreedTariff: editingGrc.isComplimentary ? 0 : Number(editingGrc.agreedRoomTariff),
+          isRateInclusive: editingGrc.isRateInclusive !== false,
           depositAmount: Number(editingGrc.depositAmount) || 0,
           advancePaymentMethod: editingGrc.advancePaymentMethod,
           additionalRoomIds: editingGrc.additionalRoomIds || [],
@@ -1326,207 +1346,297 @@ export default function AdminPortalPage() {
       ==================================================== */}
       {activeTab === "GRC" && (
         <div className="space-y-4">
-          <div className="p-5 rounded-3xl bg-white dark:bg-[#111114] border border-zinc-200/90 dark:border-zinc-800 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 shadow-xs">
-            <div className="space-y-1">
-              <div className="flex items-center gap-3 flex-wrap">
-                <h2 className="text-base font-extrabold text-zinc-900 dark:text-white flex items-center gap-2">
-                  <FileText className="h-5 w-5 text-blue-600" />
-                  <span>GRC & Guest Registration Records Editor</span>
-                </h2>
-                <div className="inline-flex rounded-xl bg-zinc-100 dark:bg-zinc-800/80 p-1 border border-zinc-200 dark:border-zinc-700 text-xs font-bold">
+            <div className="p-5 rounded-3xl bg-white dark:bg-[#111114] border border-zinc-200/90 dark:border-zinc-800 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 shadow-xs">
+              <div className="space-y-2">
+                <div className="flex items-center gap-3 flex-wrap">
+                  <h2 className="text-base font-extrabold text-zinc-900 dark:text-white flex items-center gap-2">
+                    <FileText className="h-5 w-5 text-blue-600" />
+                    <span>GRC & Guest Registration Records Editor</span>
+                  </h2>
+                </div>
+
+                {/* Sub-Filters: All, Live In-House, Checked-Out Archive, File Backup */}
+                <div className="inline-flex rounded-xl bg-zinc-100 dark:bg-zinc-800/80 p-1 border border-zinc-200 dark:border-zinc-700 text-xs font-bold gap-1 flex-wrap">
                   <button
                     type="button"
-                    onClick={() => { setGrcViewMode("ACTIVE"); }}
-                    className={`px-3 py-1 rounded-lg transition cursor-pointer ${
-                      grcViewMode === "ACTIVE"
+                    onClick={() => { setGrcViewMode("ACTIVE"); setGrcStatusFilter("ALL"); }}
+                    className={`px-3 py-1.5 rounded-lg transition cursor-pointer flex items-center gap-1.5 ${
+                      grcViewMode === "ACTIVE" && grcStatusFilter === "ALL"
                         ? "bg-white dark:bg-zinc-900 text-blue-600 dark:text-blue-400 shadow-xs font-black"
                         : "text-zinc-500 hover:text-zinc-900 dark:hover:text-white"
                     }`}
                   >
-                    📋 Live Active GRCs
+                    <span>📋 All Records</span>
+                    <span className="px-1.5 py-0.2 rounded-md bg-zinc-200 dark:bg-zinc-700 text-[10px]">{grcList.length}</span>
                   </button>
+
+                  <button
+                    type="button"
+                    onClick={() => { setGrcViewMode("ACTIVE"); setGrcStatusFilter("IN_HOUSE"); }}
+                    className={`px-3 py-1.5 rounded-lg transition cursor-pointer flex items-center gap-1.5 ${
+                      grcViewMode === "ACTIVE" && grcStatusFilter === "IN_HOUSE"
+                        ? "bg-white dark:bg-zinc-900 text-emerald-600 dark:text-emerald-400 shadow-xs font-black"
+                        : "text-zinc-500 hover:text-zinc-900 dark:hover:text-white"
+                    }`}
+                  >
+                    <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                    <span>In-House Active</span>
+                    <span className="px-1.5 py-0.2 rounded-md bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 text-[10px] font-mono font-bold">{inHouseGrcCount}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => { setGrcViewMode("ACTIVE"); setGrcStatusFilter("CHECKED_OUT"); }}
+                    className={`px-3 py-1.5 rounded-lg transition cursor-pointer flex items-center gap-1.5 ${
+                      grcViewMode === "ACTIVE" && grcStatusFilter === "CHECKED_OUT"
+                        ? "bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white shadow-xs font-black"
+                        : "text-zinc-500 hover:text-zinc-900 dark:hover:text-white"
+                    }`}
+                  >
+                    <span>📁 Checked-Out History</span>
+                    <span className="px-1.5 py-0.2 rounded-md bg-zinc-200 dark:bg-zinc-700 text-[10px] font-mono">{checkedOutGrcCount}</span>
+                  </button>
+
                   <button
                     type="button"
                     onClick={() => { setGrcViewMode("ARCHIVED"); }}
-                    className={`px-3 py-1 rounded-lg transition cursor-pointer flex items-center gap-1 ${
+                    className={`px-3 py-1.5 rounded-lg transition cursor-pointer flex items-center gap-1.5 ${
                       grcViewMode === "ARCHIVED"
-                        ? "bg-white dark:bg-zinc-900 text-blue-600 dark:text-blue-400 shadow-xs font-black"
+                        ? "bg-white dark:bg-zinc-900 text-purple-600 dark:text-purple-400 shadow-xs font-black"
                         : "text-zinc-500 hover:text-zinc-900 dark:hover:text-white"
                     }`}
                   >
-                    <Database className="h-3 w-3 text-emerald-500" />
+                    <Database className="h-3.5 w-3.5 text-purple-500" />
                     <span>Permanent Backup Archive</span>
                   </button>
                 </div>
+
+                <p className="text-xs text-zinc-500">
+                  {grcViewMode === "ACTIVE"
+                    ? "Live operational records. Edits automatically synchronize across Guest CRM, Stays, and Folios."
+                    : "Immutable historical backups preserved in /prisma/backups/grc_archives. Deleted GRCs remain permanently safe here."}
+                </p>
               </div>
-              <p className="text-xs text-zinc-500">
-                {grcViewMode === "ACTIVE"
-                  ? "Live operational records. Edits automatically synchronize across Guest CRM, Stays, and Folios."
-                  : "Immutable historical backups preserved in /prisma/backups/grc_archives. Deleted GRCs remain permanently safe here."}
-              </p>
+
+              {/* Search Input */}
+              <div className="relative w-full md:w-80">
+                <Search className="absolute left-3.5 top-2.5 h-4 w-4 text-zinc-400" />
+                <input
+                  type="text"
+                  placeholder="Search GRC No, Name, Mobile, Room..."
+                  value={grcSearch}
+                  onChange={(e) => setGrcSearch(e.target.value)}
+                  className="w-full h-9 pl-9 pr-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-xs text-zinc-900 dark:text-white placeholder-zinc-400 focus:border-blue-600 focus:outline-none"
+                />
+              </div>
             </div>
 
-            {/* Search Input */}
-            <div className="relative w-full md:w-80">
-              <Search className="absolute left-3.5 top-2.5 h-4 w-4 text-zinc-400" />
-              <input
-                type="text"
-                placeholder="Search GRC No, Name, Mobile, Room..."
-                value={grcSearch}
-                onChange={(e) => setGrcSearch(e.target.value)}
-                className="w-full h-9 pl-9 pr-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-xs text-zinc-900 dark:text-white placeholder-zinc-400 focus:border-blue-600 focus:outline-none"
-              />
-            </div>
-          </div>
-
-          {/* GRC Table */}
-          <div className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-[#111114] overflow-hidden shadow-xs">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse text-xs">
-                <thead>
-                  <tr className="bg-zinc-50 dark:bg-zinc-900/60 text-zinc-500 uppercase font-mono text-[10px] border-b border-zinc-200 dark:border-zinc-800">
-                    <th className="py-3 px-4 font-bold">GRC No.</th>
-                    <th className="py-3 px-3 font-bold">Primary Guest</th>
-                    <th className="py-3 px-3 font-bold">Room & Dates</th>
-                    <th className="py-3 px-3 font-bold">Agreed Rent & Deposit</th>
-                    <th className="py-3 px-3 font-bold">Contact & ID</th>
-                    <th className="py-3 px-3 font-bold">City / Address</th>
-                    <th className="py-3 px-3 font-bold">{grcViewMode === "ARCHIVED" ? "Backup Action" : "Status"}</th>
-                    <th className="py-3 px-4 font-bold text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/60">
-                  {grcLoading ? (
-                    <tr>
-                      <td colSpan={8} className="py-12 text-center text-zinc-400 font-mono">
-                        Loading {grcViewMode === "ARCHIVED" ? "archive backup records" : "GRC records"}...
-                      </td>
+            {/* GRC Table */}
+            <div className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-[#111114] overflow-hidden shadow-xs">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="bg-zinc-50 dark:bg-zinc-900/60 text-zinc-500 uppercase font-mono text-[10px] border-b border-zinc-200 dark:border-zinc-800">
+                      <th className="py-3 px-4 font-bold">GRC No.</th>
+                      <th className="py-3 px-3 font-bold">Primary Guest</th>
+                      <th className="py-3 px-3 font-bold">Room & Dates</th>
+                      <th className="py-3 px-3 font-bold">Agreed Rent & Deposit</th>
+                      <th className="py-3 px-3 font-bold">Contact & ID</th>
+                      <th className="py-3 px-3 font-bold">City / Address</th>
+                      <th className="py-3 px-3 font-bold">{grcViewMode === "ARCHIVED" ? "Backup Action" : "Status"}</th>
+                      <th className="py-3 px-4 font-bold text-right">Actions</th>
                     </tr>
-                  ) : grcList.length === 0 ? (
-                    <tr>
-                      <td colSpan={8} className="py-12 text-center text-zinc-400 font-mono">
-                        No {grcViewMode === "ARCHIVED" ? "archived backup" : "GRC"} records found.
-                      </td>
-                    </tr>
-                  ) : (
-                    grcList.map((g) => {
-                      const data = grcViewMode === "ARCHIVED" ? (g.fullRecord || g) : g;
-                      const isArchivedMode = grcViewMode === "ARCHIVED";
+                  </thead>
+                  <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/60">
+                    {grcLoading ? (
+                      <tr>
+                        <td colSpan={8} className="py-12 text-center text-zinc-400 font-mono">
+                          Loading {grcViewMode === "ARCHIVED" ? "archive backup records" : "GRC records"}...
+                        </td>
+                      </tr>
+                    ) : displayedGrcList.length === 0 ? (
+                      <tr>
+                        <td colSpan={8} className="py-12 text-center text-zinc-400 font-mono">
+                          No {grcViewMode === "ARCHIVED" ? "archived backup" : "GRC"} records found.
+                        </td>
+                      </tr>
+                    ) : (
+                      displayedGrcList.map((g: any) => {
+                        const data = grcViewMode === "ARCHIVED" ? (g.fullRecord || g) : g;
+                        const isArchivedMode = grcViewMode === "ARCHIVED";
 
-                      return (
-                        <tr key={data.id || data.registrationNo || Math.random()} className="hover:bg-zinc-50/60 dark:hover:bg-zinc-800/40 transition">
-                          <td className="py-3 px-4 font-mono font-black text-blue-700 dark:text-blue-400">
-                            {data.registrationNo}
-                          </td>
-                          <td className="py-3 px-3">
-                            <div className="font-extrabold text-zinc-900 dark:text-white">
-                              {data.fullName}
-                            </div>
-                            <div className="text-[10px] text-zinc-400 font-mono">
-                              {data.gender || "Male"} • Age: {data.age || "—"} • {data.nationality || "Indian"}
-                            </div>
-                          </td>
-                          <td className="py-3 px-3 font-mono text-[11px]">
-                            <div className="font-bold text-zinc-800 dark:text-zinc-200">
-                              Room {data.preAssignedRoom || "—"}
-                            </div>
-                            <div className="text-[10px] text-zinc-400">
-                              In: {data.arrivalDateTime?.slice(0, 16) || "—"} | Out: {data.expectedDepartureDate || "—"}
-                            </div>
-                          </td>
-                          <td className="py-3 px-3 font-mono text-[11px]">
-                            <div className="font-bold text-zinc-900 dark:text-white">
-                              {data.agreedRoomTariff === 0 ? (
-                                <span className="text-emerald-600 font-bold">🎁 Complimentary (₹0)</span>
-                              ) : (
-                                `₹${(data.agreedRoomTariff ?? 3200).toLocaleString()}/nt`
-                              )}
-                            </div>
-                            <div className="text-[10px]">
-                              {Number(data.depositAmount || 0) > 0 ? (
-                                <span className="text-emerald-700 dark:text-emerald-400 font-bold">
-                                  Adv: ₹{Number(data.depositAmount).toLocaleString()} ({data.advancePaymentMethod || "UPI"})
+                        return (
+                          <tr key={data.id || data.registrationNo || Math.random()} className="hover:bg-zinc-50/60 dark:hover:bg-zinc-800/40 transition">
+                            <td className="py-3 px-4 font-mono font-black text-blue-700 dark:text-blue-400">
+                              {data.registrationNo}
+                            </td>
+                            <td className="py-3 px-3">
+                              <div className="font-extrabold text-zinc-900 dark:text-white">
+                                {data.fullName}
+                              </div>
+                              <div className="text-[10px] text-zinc-400 font-mono">
+                                {data.gender || "Male"} • Age: {data.age || "—"} • {data.nationality || "Indian"}
+                              </div>
+                            </td>
+                            <td className="py-3 px-3 font-mono text-[11px]">
+                              {(() => {
+                                const assignedRoomList = (data.assignedRooms && Array.isArray(data.assignedRooms) && data.assignedRooms.length > 0)
+                                  ? data.assignedRooms
+                                  : [];
+                                const displayRoomsStr = assignedRoomList.length > 0
+                                  ? assignedRoomList.map((r: any) => r.number).join(", ")
+                                  : (data.assignedRoomNumber || data.preAssignedRoom || "—");
+                                const totalRoomCount = assignedRoomList.length > 0
+                                  ? assignedRoomList.length
+                                  : (displayRoomsStr.includes(",") ? displayRoomsStr.split(",").map((s: string) => s.trim()).filter(Boolean).length : 1);
+
+                                return (
+                                  <>
+                                    <div className="font-bold text-zinc-800 dark:text-zinc-200 flex items-center gap-1.5 flex-wrap">
+                                      <span>{displayRoomsStr.startsWith("Room") ? displayRoomsStr : `Room ${displayRoomsStr}`}</span>
+                                      {totalRoomCount > 1 && (
+                                        <span className="px-1.5 py-0.2 rounded bg-blue-100 dark:bg-blue-900/60 text-blue-800 dark:text-blue-200 text-[9.5px] font-bold">
+                                          {totalRoomCount} Rooms
+                                        </span>
+                                      )}
+                                    </div>
+                                    <div className="text-[10px] text-zinc-400">
+                                      In: {data.arrivalDateTime?.slice(0, 16) || "—"} | Out: {data.expectedDepartureDate || "—"}
+                                    </div>
+                                  </>
+                                );
+                              })()}
+                            </td>
+                            <td className="py-3 px-3 font-mono text-[11px]">
+                              {(() => {
+                                const assignedRoomList = (data.assignedRooms && Array.isArray(data.assignedRooms) && data.assignedRooms.length > 0)
+                                  ? data.assignedRooms
+                                  : [];
+                                const displayRoomsStr = assignedRoomList.length > 0
+                                  ? assignedRoomList.map((r: any) => r.number).join(", ")
+                                  : (data.assignedRoomNumber || data.preAssignedRoom || "—");
+                                const totalRoomCount = assignedRoomList.length > 0
+                                  ? assignedRoomList.length
+                                  : (displayRoomsStr.includes(",") ? displayRoomsStr.split(",").map((s: string) => s.trim()).filter(Boolean).length : 1);
+                                const groupTotalTariff = assignedRoomList.length > 0
+                                  ? assignedRoomList.reduce((sum: number, r: any) => sum + (Number(r.rate) || 0), 0)
+                                  : (data.agreedRoomTariff !== undefined ? Number(data.agreedRoomTariff) : 3200);
+
+                                const isGroupAllComp = totalRoomCount > 1 && groupTotalTariff === 0;
+                                const isPrimaryOnlyComp = totalRoomCount > 1 && data.agreedRoomTariff === 0 && groupTotalTariff > 0;
+
+                                return (
+                                  <>
+                                    <div className="font-bold text-zinc-900 dark:text-white">
+                                      {isGroupAllComp || (totalRoomCount <= 1 && data.agreedRoomTariff === 0) ? (
+                                        <span className="text-emerald-600 font-bold">🎁 Complimentary (₹0)</span>
+                                      ) : isPrimaryOnlyComp ? (
+                                        <div>
+                                          <span className="text-blue-600 dark:text-blue-400 font-bold">₹{groupTotalTariff.toLocaleString()}/nt</span>
+                                          <span className="text-[9.5px] text-emerald-600 dark:text-emerald-400 ml-1 font-semibold">(Primary Comp)</span>
+                                        </div>
+                                      ) : totalRoomCount > 1 ? (
+                                        <div>
+                                          <span className="font-bold">₹{groupTotalTariff.toLocaleString()}/nt</span>
+                                          <span className="text-[9.5px] text-zinc-500 font-normal ml-1">({totalRoomCount} Rms)</span>
+                                        </div>
+                                      ) : (
+                                        `₹${(data.agreedRoomTariff ?? 3200).toLocaleString()}/nt`
+                                      )}
+                                    </div>
+                                    <div className="text-[10px]">
+                                      {Number(data.depositAmount || 0) > 0 ? (
+                                        <span className="text-emerald-700 dark:text-emerald-400 font-bold">
+                                          Adv: ₹{Number(data.depositAmount).toLocaleString()} ({data.advancePaymentMethod || "UPI"})
+                                        </span>
+                                      ) : (
+                                        <span className="text-zinc-400">No Advance Paid</span>
+                                      )}
+                                    </div>
+                                  </>
+                                );
+                              })()}
+                            </td>
+                            <td className="py-3 px-3 font-mono text-[11px]">
+                              <div>{data.mobilePhone}</div>
+                              <div className="text-[10px] text-zinc-400">
+                                {data.idDocumentType || "ID"}: {data.idDocumentNumber || "—"}
+                              </div>
+                            </td>
+                            <td className="py-3 px-3 text-[11px]">
+                              <div className="font-bold">{data.city || "Guwahati"}</div>
+                              <div className="text-[10px] text-zinc-400 truncate max-w-[150px]">
+                                {data.streetAddress || "—"}
+                              </div>
+                            </td>
+                            <td className="py-3 px-3">
+                              {isArchivedMode ? (
+                                <span
+                                  className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold ${
+                                    g.latestAction === "DELETED"
+                                      ? "bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300"
+                                      : "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300"
+                                  }`}
+                                >
+                                  {g.latestAction || "ARCHIVED"}
+                                </span>
+                              ) : data.status === "CHECKED_IN" ? (
+                                <span className="px-2.5 py-1 rounded-full text-[10px] font-mono font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700/60 inline-flex items-center gap-1.5 shadow-xs">
+                                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                  <span>IN_HOUSE</span>
+                                </span>
+                              ) : data.status === "CHECKED_OUT" ? (
+                                <span className="px-2.5 py-1 rounded-full text-[10px] font-mono font-bold bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700 inline-flex items-center gap-1.5">
+                                  <span className="h-1.5 w-1.5 rounded-full bg-zinc-400" />
+                                  <span>CHECKED_OUT</span>
                                 </span>
                               ) : (
-                                <span className="text-zinc-400">No Advance Paid</span>
+                                <span className="px-2.5 py-1 rounded-full text-[10px] font-mono font-bold bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-300 dark:border-amber-700/60 inline-flex items-center gap-1.5">
+                                  <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                                  <span>{data.status || "PENDING"}</span>
+                                </span>
                               )}
-                            </div>
-                          </td>
-                          <td className="py-3 px-3 font-mono text-[11px]">
-                            <div>{data.mobilePhone}</div>
-                            <div className="text-[10px] text-zinc-400">
-                              {data.idDocumentType || "ID"}: {data.idDocumentNumber || "—"}
-                            </div>
-                          </td>
-                          <td className="py-3 px-3 text-[11px]">
-                            <div className="font-bold">{data.city || "Guwahati"}</div>
-                            <div className="text-[10px] text-zinc-400 truncate max-w-[150px]">
-                              {data.streetAddress || "—"}
-                            </div>
-                          </td>
-                          <td className="py-3 px-3">
-                            {isArchivedMode ? (
-                              <span
-                                className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold ${
-                                  g.latestAction === "DELETED"
-                                    ? "bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300"
-                                    : "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300"
-                                }`}
-                              >
-                                {g.latestAction || "ARCHIVED"}
-                              </span>
-                            ) : (
-                              <span
-                                className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold ${
-                                  data.status === "CHECKED_IN"
-                                    ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300"
-                                    : "bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300"
-                                }`}
-                              >
-                                {data.status}
-                              </span>
-                            )}
-                          </td>
-                          <td className="py-3 px-4 text-right whitespace-nowrap space-x-1">
-                            {isArchivedMode ? (
-                              <button
-                                type="button"
-                                onClick={() => setSelectedArchiveSnapshot(data)}
-                                className="px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-600 text-emerald-700 hover:text-white dark:bg-emerald-950/60 dark:hover:bg-emerald-600 dark:text-emerald-300 font-bold text-[11px] transition cursor-pointer inline-flex items-center gap-1"
-                                title="View permanent backup snapshot"
-                              >
-                                <Eye className="h-3.5 w-3.5" />
-                                <span>Inspect Backup</span>
-                              </button>
-                            ) : (
-                              <>
+                            </td>
+                            <td className="py-3 px-4 text-right whitespace-nowrap space-x-1">
+                              {isArchivedMode ? (
                                 <button
                                   type="button"
-                                  onClick={() => handleOpenGrcEdit(data)}
-                                  className="p-1.5 rounded-lg bg-blue-50 hover:bg-blue-600 text-blue-700 hover:text-white dark:bg-blue-950/60 dark:hover:bg-blue-600 dark:text-blue-300 transition cursor-pointer"
-                                  title="Edit GRC record & synchronize everywhere"
+                                  onClick={() => setSelectedArchiveSnapshot(data)}
+                                  className="px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-600 text-emerald-700 hover:text-white dark:bg-emerald-950/60 dark:hover:bg-emerald-600 dark:text-emerald-300 font-bold text-[11px] transition cursor-pointer inline-flex items-center gap-1"
+                                  title="View permanent backup snapshot"
                                 >
-                                  <Edit3 className="h-3.5 w-3.5" />
+                                  <Eye className="h-3.5 w-3.5" />
+                                  <span>Inspect Backup</span>
                                 </button>
-                                <button
-                                  type="button"
-                                  onClick={() => deleteGrc(data.id, data.registrationNo)}
-                                  className="p-1.5 rounded-lg bg-rose-50 hover:bg-rose-600 text-rose-700 hover:text-white dark:bg-rose-950/60 dark:hover:bg-rose-600 dark:text-rose-300 transition cursor-pointer"
-                                  title="Delete active GRC (preserved in archive)"
-                                >
-                                  <Trash2 className="h-3.5 w-3.5" />
-                                </button>
-                              </>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
+                              ) : (
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenGrcEdit(data)}
+                                    className="p-1.5 rounded-lg bg-blue-50 hover:bg-blue-600 text-blue-700 hover:text-white dark:bg-blue-950/60 dark:hover:bg-blue-600 dark:text-blue-300 transition cursor-pointer"
+                                    title="Edit GRC record & synchronize everywhere"
+                                  >
+                                    <Edit3 className="h-3.5 w-3.5" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => deleteGrc(data.id, data.registrationNo)}
+                                    className="p-1.5 rounded-lg bg-rose-50 hover:bg-rose-600 text-rose-700 hover:text-white dark:bg-rose-950/60 dark:hover:bg-rose-600 dark:text-rose-300 transition cursor-pointer"
+                                    title="Delete active GRC (preserved in archive)"
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </button>
+                                </>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
-          </div>
 
           {/* COMPREHENSIVE CHECK-IN GRC EDIT WINDOW (MATCHING CHECK-IN MODAL) */}
           {editingGrc && (
@@ -2816,6 +2926,39 @@ export default function AdminPortalPage() {
                             onChange={(e) => setEditingGrc({ ...editingGrc, agreedRoomTariff: Number(e.target.value) })}
                             className="w-full h-10 pl-7 pr-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-blue-700 dark:text-blue-400 font-mono font-bold text-sm focus:border-blue-500 focus:outline-none disabled:opacity-60 disabled:bg-zinc-100 dark:disabled:bg-zinc-800"
                           />
+                        </div>
+                      </div>
+
+                      {/* GST Tax Treatment Toggle */}
+                      <div className="space-y-1">
+                        <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">
+                          GST Tax Treatment
+                        </label>
+                        <div className="flex items-center bg-zinc-200/80 dark:bg-zinc-800 p-1 rounded-xl border border-zinc-300 dark:border-zinc-700 h-10">
+                          <button
+                            type="button"
+                            onClick={() => setEditingGrc({ ...editingGrc, isRateInclusive: true })}
+                            className={`flex-1 h-full rounded-lg text-xs font-bold transition flex items-center justify-center gap-1 cursor-pointer ${
+                              editingGrc.isRateInclusive !== false
+                                ? "bg-white dark:bg-zinc-900 text-blue-700 dark:text-blue-400 shadow-xs border border-zinc-200 dark:border-zinc-700"
+                                : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900"
+                            }`}
+                            title="Rate includes GST"
+                          >
+                            <span>Incl. GST</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setEditingGrc({ ...editingGrc, isRateInclusive: false })}
+                            className={`flex-1 h-full rounded-lg text-xs font-bold transition flex items-center justify-center gap-1 cursor-pointer ${
+                              editingGrc.isRateInclusive === false
+                                ? "bg-white dark:bg-zinc-900 text-amber-700 dark:text-amber-400 shadow-xs border border-zinc-200 dark:border-zinc-700"
+                                : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900"
+                            }`}
+                            title="GST is added on top of base rate"
+                          >
+                            <span>+Tax Extra</span>
+                          </button>
                         </div>
                       </div>
 

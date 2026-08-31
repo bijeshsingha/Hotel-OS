@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { postManualFolioCharge } from "@/lib/domain/folio-service";
+import { postManualFolioCharge, deleteFolioCharge } from "@/lib/domain/folio-service";
 
 export async function POST(
   request: Request,
@@ -24,6 +24,35 @@ export async function POST(
     });
 
     return NextResponse.json(entry);
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 400 });
+  }
+}
+
+export async function DELETE(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id: folioId } = await params;
+    const { searchParams } = new URL(request.url);
+    const body = await request.json().catch(() => ({}));
+    const entryId = body.entryId || searchParams.get("entryId") || searchParams.get("chargeId");
+    const reason = body.reason || searchParams.get("reason") || undefined;
+    const actorId = body.actorId || searchParams.get("actorId") || undefined;
+
+    if (!entryId) {
+      return NextResponse.json({ error: "entryId or chargeId is required" }, { status: 400 });
+    }
+
+    const result = await deleteFolioCharge({
+      folioId,
+      entryId,
+      reason,
+      actorId,
+    });
+
+    return NextResponse.json(result);
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 400 });
   }

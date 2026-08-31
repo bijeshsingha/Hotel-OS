@@ -40,7 +40,7 @@ export interface GrcData {
   purposeOfVisit?: string;
   referralChannel?: string;
   phone?: string;
-  mobilePhone: string;
+  mobilePhone?: string;
   alternatePhone?: string;
   email?: string;
   driverName?: string;
@@ -96,8 +96,15 @@ export function PrintableGrcModal({
 
   if (!isOpen) return null;
 
-  const registrationNumber =
-    data.grcNo || data.registrationNo || "GRC-AMB-2627-0102";
+  // 1. Dynamic Hotel Particulars
+  const hotelName = property.displayName || "Hotel Property";
+  const hotelLegal = property.legalName || hotelName;
+  const hotelGstin = property.gstin || "—";
+  const hotelAddress = property.address || "—";
+  const hotelPhone = property.phone || "—";
+
+  // 2. Registration & Identification Numbers
+  const registrationNumber = data.grcNo || data.registrationNo || "—";
   const roomNum =
     data.roomNumber ||
     data.assignedRoomNumber ||
@@ -106,12 +113,17 @@ export function PrintableGrcModal({
   const arrivalTime =
     data.arrivalDateTime ||
     new Date().toISOString().replace("T", " ").slice(0, 16);
+  const departureDate = data.expectedDepartureDate || "—";
   const auditTimestamp = new Date().toISOString();
-  const policeRefNo = registrationNumber.startsWith("GRC-")
-    ? registrationNumber.replace("GRC-", "PV-")
-    : `PV-${registrationNumber}`;
+  const policeRefNo =
+    registrationNumber !== "—"
+      ? registrationNumber.startsWith("GRC-")
+        ? registrationNumber.replace("GRC-", "PV-")
+        : `PV-${registrationNumber}`
+      : "—";
+
   const shaHash = `SHA256:${Buffer.from(
-    `${registrationNumber}-${data.fullName}-${arrivalTime}`
+    `${registrationNumber}-${data.fullName || "Guest"}-${arrivalTime}`
   )
     .toString("hex")
     .slice(0, 32)}`;
@@ -123,10 +135,17 @@ export function PrintableGrcModal({
     return s.length > 0 ? s : "—";
   };
 
-  const formattedAddress =
-    [data.streetAddress, data.city, data.state, data.pinZipCode, data.country]
-      .filter((part) => part && String(part).trim().length > 0)
-      .join(", ") || "—";
+  // 3. Dynamic Address & Contact Formatting
+  const addressParts = [
+    data.streetAddress,
+    data.city,
+    data.state,
+    data.pinZipCode,
+    data.country,
+  ]
+    .map((p) => (p ? String(p).trim() : ""))
+    .filter((p) => p.length > 0);
+  const formattedAddress = addressParts.length > 0 ? addressParts.join(", ") : "—";
 
   const formattedAgeGender =
     [
@@ -137,18 +156,42 @@ export function PrintableGrcModal({
       .filter(Boolean)
       .join(" • ") || "—";
 
-  const formattedIdProof =
-    data.idType || data.idDocumentType
-      ? `${data.idType || data.idDocumentType} — ${
-          data.idLast4 || data.idDocumentNumber || "Verified at Desk"
-        }`
-      : "—";
+  const primaryPhone = data.mobilePhone || data.phone || "—";
+  const hasDistinctAltPhone = Boolean(
+    data.alternatePhone &&
+      data.alternatePhone.trim().length > 0 &&
+      data.alternatePhone.trim() !== primaryPhone.trim()
+  );
+
+  const emailStr = data.email && data.email.trim().length > 0 ? data.email.trim() : null;
+  const profStr = data.profession && data.profession.trim().length > 0 ? data.profession.trim() : null;
+  const formattedEmailProfession = [emailStr, profStr].filter(Boolean).join(" • ") || "—";
+
+  const docType = data.idDocumentType || data.idType;
+  const docNum = data.idDocumentNumber || data.idLast4;
+  const formattedIdProof = docType
+    ? `${docType}${docNum ? ` — ${docNum}` : " — Verified at Desk"}`
+    : docNum || "—";
+
+  // Dynamic Occupants
+  const m = Number(data.paxM);
+  const f = Number(data.paxF);
+  const c = Number(data.paxC);
+  let formattedOccupants = "";
+  if (!isNaN(m) || !isNaN(f)) {
+    formattedOccupants = `${isNaN(m) ? 1 : m} Male • ${isNaN(f) ? 0 : f} Female`;
+    if (!isNaN(c) && c > 0) formattedOccupants += ` • ${c} Child`;
+  } else if (data.coGuests && data.coGuests.length > 0) {
+    formattedOccupants = `${data.coGuests.length + 1} Occupants (${data.coGuests.length} Companions)`;
+  } else {
+    formattedOccupants = "1 Guest";
+  }
 
   const handleCopyLink = () => {
     const text = `ROVESTA Digital GRC: ${registrationNumber} | Guest: ${
-      data.fullName
+      data.fullName || "Guest"
     } | Room: ${roomNum} | Arrival: ${arrivalTime} | Verified ID: ${
-      data.idDocumentType || data.idType || "AADHAAR"
+      formattedIdProof
     } | Police Ref: ${policeRefNo}`;
     navigator.clipboard.writeText(text);
     setCopied(true);
@@ -389,9 +432,9 @@ export function PrintableGrcModal({
             <table class="header-table">
               <tr>
                 <td style="width: 65%;">
-                  <div class="hotel-name">${property.displayName || "Hotel Ambarish Grand Residency"}</div>
-                  <div class="hotel-sub">${property.legalName || "AMBARISH RESIDENCY"} • GSTIN: ${property.gstin || "18AACCB2447F1ZX"}</div>
-                  <div class="hotel-addr">${property.address || "MD Shah Road, Paltan Bazar, Guwahati, Assam - 781008"} • Ph: ${property.phone || "+91 9864341211"}</div>
+                  <div class="hotel-name">${hotelName}</div>
+                  <div class="hotel-sub">${hotelLegal} • GSTIN: ${hotelGstin}</div>
+                  <div class="hotel-addr">${hotelAddress} • Ph: ${hotelPhone}</div>
                 </td>
                 <td style="width: 35%; text-align: right;">
                   <div class="grc-badge">
@@ -416,11 +459,11 @@ export function PrintableGrcModal({
                 </td>
                 <td style="width: 25%;">
                   <span class="field-label">Expected Departure</span>
-                  <span class="field-value-mono">${sanitize(data.expectedDepartureDate)}</span>
+                  <span class="field-value-mono">${sanitize(departureDate)}</span>
                 </td>
                 <td style="width: 25%; background-color: #f8fafc;">
                   <span class="field-label">Total Occupants</span>
-                  <span class="field-value">${data.paxM || 1} Male • ${data.paxF || 0} Female ${Number(data.paxC || 0) > 0 ? `• ${data.paxC} Child` : ""}</span>
+                  <span class="field-value">${formattedOccupants}</span>
                 </td>
               </tr>
             </table>
@@ -428,7 +471,7 @@ export function PrintableGrcModal({
             <!-- SECTION 1: PRIMARY GUEST PARTICULARS -->
             <div class="border-box">
               <div class="section-header" style="display: flex; justify-content: space-between;">
-                <span>01. Primary Guest Profile & Police ID Verification</span>
+                <span>01. Primary Guest Profile & Identification</span>
                 <span style="font-family: monospace; font-size: 8px;">Mandatory Police Dossier</span>
               </div>
               <table class="data-table">
@@ -449,12 +492,12 @@ export function PrintableGrcModal({
                 <tr>
                   <td>
                     <span class="field-label">Mobile Contact:</span>
-                    <span class="field-value-mono">${sanitize(data.mobilePhone)}</span>
-                    ${data.alternatePhone && data.alternatePhone.trim().length > 0 ? `<div style="font-size: 8.5px; font-family: monospace; color: #444;">Alt: ${data.alternatePhone}</div>` : ""}
+                    <span class="field-value-mono">${sanitize(primaryPhone)}</span>
+                    ${hasDistinctAltPhone ? `<div style="font-size: 8.5px; font-family: monospace; color: #444;">Alt: ${data.alternatePhone}</div>` : ""}
                   </td>
                   <td>
                     <span class="field-label">Email / Profession:</span>
-                    <span class="field-value">${sanitize(data.email)} • ${sanitize(data.profession)}</span>
+                    <span class="field-value">${formattedEmailProfession}</span>
                   </td>
                   <td style="background-color: #f8fafc;">
                     <span class="field-label" style="color: #000;">★ Govt ID Proof Verified:</span>
@@ -572,7 +615,7 @@ export function PrintableGrcModal({
             <!-- TERMS & DECLARATION -->
             <div class="terms-box">
               <div class="terms-title">Guest Declaration & Hotel Regulations:</div>
-              <div>1. <strong>Check-Out Time:</strong> 11:00 AM. Late check-out is subject to prior room availability and tariff charges.</div>
+              <div>1. <strong>Check-Out Time:</strong> 12:00 PM (Noon). Late check-out is subject to prior approval and tariff charges.</div>
               <div>2. <strong>Valuables:</strong> Management is not liable for loss or damage to money, jewelry, or goods not stored in hotel safe.</div>
               <div>3. <strong>Payment:</strong> I agree to settle all room, dining, and incidental charges before departure.</div>
               <div style="margin-top: 3px; font-weight: bold;">
@@ -585,13 +628,13 @@ export function PrintableGrcModal({
               <tr>
                 <td>
                   <span class="field-label">Guest Signature:</span>
-                  <div class="sig-line">/${(data.fullName || "Guest").replace(/\\s+/g, "_")}/</div>
+                  <div class="sig-line">/ ${(formatGuestDisplayName(data.fullName) || "Guest").replace(/\s+/g, "_")} /</div>
                   <div class="sig-caption">(Signed & Verified during Desk Check-In)</div>
                 </td>
                 <td>
-                  <span class="field-label" style="text-align: right;">Front Office Signatory & Stamp:</span>
-                  <div class="sig-line" style="font-family: Arial, sans-serif; font-weight: bold;">${property.legalName || "AMBARISH RESIDENCY"}</div>
-                  <div class="sig-caption">Duty Manager • Front Desk Counter 01</div>
+                  <span class="field-label" style="text-align: right;">Front Office Signatory & Seal:</span>
+                  <div class="sig-line" style="font-family: Arial, sans-serif; font-weight: bold;">${hotelLegal}</div>
+                  <div class="sig-caption">Duty Manager • Front Desk Counter</div>
                 </td>
               </tr>
             </table>
@@ -621,13 +664,13 @@ export function PrintableGrcModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/80 backdrop-blur-sm flex justify-center items-start p-2 sm:p-4 md:py-6 animate-in fade-in">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/80 backdrop-blur-sm flex justify-center items-start p-2 sm:p-4 md:py-6 animate-in fade-in print:p-0 print:bg-white print:static">
       
       {/* Modal Container Card */}
-      <div className="relative w-full max-w-4xl rounded-2xl border border-zinc-300 dark:border-zinc-800 bg-zinc-100 dark:bg-[#121215] text-zinc-900 dark:text-zinc-100 shadow-2xl overflow-hidden my-auto sm:my-2">
+      <div className="relative w-full max-w-4xl rounded-2xl border border-zinc-300 dark:border-zinc-800 bg-zinc-100 dark:bg-[#121215] text-zinc-900 dark:text-zinc-100 shadow-2xl overflow-hidden my-auto sm:my-2 print:border-none print:shadow-none print:bg-white print:text-black print:max-w-full">
         
-        {/* STICKY TOP CONTROL TOOLBAR */}
-        <div className="sticky top-0 z-30 bg-white/95 dark:bg-[#16161a]/95 backdrop-blur-md px-4 sm:px-6 py-3 border-b border-zinc-200 dark:border-zinc-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+        {/* STICKY TOP CONTROL TOOLBAR (Hidden on Print) */}
+        <div className="sticky top-0 z-30 bg-white/95 dark:bg-[#16161a]/95 backdrop-blur-md px-4 sm:px-6 py-3 border-b border-zinc-200 dark:border-zinc-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs print:hidden">
           <div className="flex items-center gap-3">
             <div className="h-9 w-9 shrink-0 rounded-xl bg-blue-100 dark:bg-blue-900/40 border border-blue-200 dark:border-blue-700/50 flex items-center justify-center text-blue-700 dark:text-blue-400 shadow-xs">
               <FileText className="h-5 w-5" />
@@ -683,17 +726,17 @@ export function PrintableGrcModal({
         </div>
 
         {/* ========================================================================= */}
-        {/* DOCUMENT PREVIEW (High-Contrast White Paper Appearance on Screen)        */}
+        {/* DOCUMENT PREVIEW (High-Contrast White Paper Appearance on Screen & Print) */}
         {/* ========================================================================= */}
-        <div className="p-3 sm:p-6 overflow-y-auto max-h-[calc(88vh-60px)]">
-          <div className="bg-white text-black p-4 sm:p-6 rounded-xl border border-zinc-300 shadow-lg space-y-2.5 max-w-3xl mx-auto">
+        <div className="p-3 sm:p-6 overflow-y-auto max-h-[calc(88vh-60px)] print:max-h-none print:overflow-visible print:p-0">
+          <div className="bg-white text-black p-4 sm:p-6 rounded-xl border border-zinc-300 shadow-lg space-y-2.5 max-w-3xl mx-auto print:border-none print:shadow-none print:p-0 print:max-w-full">
             
             {/* 1. HOTEL LETTERHEAD & GRC HEADER */}
             <div className="border-2 border-black p-3 rounded-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-zinc-50">
               <div className="flex items-center gap-3">
                 <img
                   src="/images/ambarish-logo.png"
-                  alt="Hotel Ambarish Grand Residency Logo"
+                  alt="Hotel Logo"
                   className="h-10 sm:h-12 w-auto object-contain shrink-0"
                   onError={(e) => {
                     e.currentTarget.style.display = "none";
@@ -701,13 +744,13 @@ export function PrintableGrcModal({
                 />
                 <div className="space-y-0.5">
                   <h1 className="text-base sm:text-lg font-black tracking-tight text-black uppercase leading-tight font-serif">
-                    {property.displayName || "Hotel Ambarish Grand Residency"}
+                    {hotelName}
                   </h1>
                   <div className="text-[11px] font-bold text-zinc-800">
-                    {property.legalName || "AMBARISH RESIDENCY"} • <span className="font-mono">GSTIN: {property.gstin || "18AACCB2447F1ZX"}</span>
+                    {hotelLegal} • <span className="font-mono">GSTIN: {hotelGstin}</span>
                   </div>
                   <div className="text-[10px] text-zinc-700 max-w-lg leading-snug">
-                    {property.address || "MD Shah Road, Paltan Bazar, Guwahati, Assam - 781008"} • Ph: {property.phone || "+91 9864341211"}
+                    {hotelAddress} • Ph: {hotelPhone}
                   </div>
                 </div>
               </div>
@@ -739,13 +782,13 @@ export function PrintableGrcModal({
 
               <div className="p-2">
                 <span className="text-[9px] uppercase font-bold text-zinc-600 block">Expected Check-Out</span>
-                <span className="text-[11px] font-bold font-mono text-black block">{sanitize(data.expectedDepartureDate)}</span>
+                <span className="text-[11px] font-bold font-mono text-black block">{sanitize(departureDate)}</span>
               </div>
 
               <div className="p-2 bg-zinc-50">
                 <span className="text-[9px] uppercase font-bold text-zinc-600 block">Total Occupants</span>
                 <span className="text-[11px] font-bold font-mono text-black block">
-                  {data.paxM || 1} Male • {data.paxF || 0} Female {Number(data.paxC || 0) > 0 ? `• ${data.paxC} Child` : ""}
+                  {formattedOccupants}
                 </span>
               </div>
             </div>
@@ -779,8 +822,8 @@ export function PrintableGrcModal({
               <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-black border-b border-black text-xs">
                 <div className="p-2 space-y-0.5">
                   <span className="text-[9px] uppercase font-bold text-zinc-600 block">Mobile Contact:</span>
-                  <span className="text-xs font-bold font-mono text-black block">{sanitize(data.mobilePhone)}</span>
-                  {data.alternatePhone && data.alternatePhone.trim().length > 0 && (
+                  <span className="text-xs font-bold font-mono text-black block">{sanitize(primaryPhone)}</span>
+                  {hasDistinctAltPhone && (
                     <span className="text-[9px] font-mono text-zinc-700 block">Alt: {data.alternatePhone}</span>
                   )}
                 </div>
@@ -788,7 +831,7 @@ export function PrintableGrcModal({
                 <div className="p-2 space-y-0.5">
                   <span className="text-[9px] uppercase font-bold text-zinc-600 block">Email / Profession:</span>
                   <span className="text-xs font-bold text-black block truncate">
-                    {sanitize(data.email)} • {sanitize(data.profession)}
+                    {formattedEmailProfession}
                   </span>
                 </div>
 
@@ -911,7 +954,7 @@ export function PrintableGrcModal({
                 Guest Declaration & Hotel Regulations:
               </div>
               <p className="text-zinc-800">
-                1. <strong>Check-Out Time:</strong> 11:00 AM. Late check-out is subject to prior approval and tariff charges.
+                1. <strong>Check-Out Time:</strong> 12:00 PM (Noon). Late check-out is subject to prior approval and tariff charges.
               </p>
               <p className="text-zinc-800">
                 2. <strong>Valuables:</strong> Management is not liable for loss or damage to money, jewelry, or luggage not stored in hotel safe.
@@ -932,7 +975,7 @@ export function PrintableGrcModal({
                 </span>
                 <div className="border-b-2 border-black border-dashed pt-4 pb-0.5 text-center">
                   <span className="font-mono font-bold text-black text-[11px] tracking-wider uppercase">
-                    /{data.fullName.replace(/\s+/g, "_")}/
+                    / {(formatGuestDisplayName(data.fullName) || "Guest").replace(/\s+/g, "_")} /
                   </span>
                 </div>
                 <span className="text-[8px] font-mono text-zinc-600 block text-center">
@@ -946,11 +989,11 @@ export function PrintableGrcModal({
                 </span>
                 <div className="border-b-2 border-black border-dashed pt-4 pb-0.5 text-center">
                   <span className="font-bold text-black text-[11px]">
-                    {property.legalName || "AMBARISH RESIDENCY"}
+                    {hotelLegal}
                   </span>
                 </div>
                 <span className="text-[8px] font-mono text-zinc-600 block text-center">
-                  Duty Manager • Front Desk Counter 01
+                  Duty Manager • Front Desk Counter
                 </span>
               </div>
             </div>
@@ -969,8 +1012,8 @@ export function PrintableGrcModal({
           </div>
         </div>
 
-        {/* Bottom Footer Close */}
-        <div className="px-4 py-2.5 bg-zinc-200/60 dark:bg-zinc-900/60 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-between text-xs text-zinc-500 font-mono">
+        {/* Bottom Footer Close (Hidden on Print) */}
+        <div className="px-4 py-2.5 bg-zinc-200/60 dark:bg-zinc-900/60 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-between text-xs text-zinc-500 font-mono print:hidden">
           <span>ROVESTA GRC Engine • Single-Page A4 Ready</span>
           <button
             type="button"

@@ -98,14 +98,21 @@ export async function POST(
     const finalIdDocNum = idDocumentNumber || registration.idDocumentNumber;
     const finalCoGuestsJson = coGuests ? JSON.stringify(coGuests) : registration.coGuestsJson;
 
-    // 1. Find or create Guest
+    const { pureName: canonicalGuestName } = normalizeGuestName(registration.fullName);
+
+    // 1. Find or create Guest (matching by name and contact to prevent overwriting different family members)
     let guest = await prisma.guest.findFirst({
       where: {
         organizationId: registration.organizationId,
-        OR: [
-          { phone: registration.mobilePhone },
-          ...(registration.email ? [{ email: registration.email }] : []),
-        ],
+        name: canonicalGuestName,
+        ...(registration.mobilePhone || registration.email
+          ? {
+              OR: [
+                ...(registration.mobilePhone ? [{ phone: registration.mobilePhone }] : []),
+                ...(registration.email ? [{ email: registration.email }] : []),
+              ],
+            }
+          : {}),
       },
     });
 
@@ -116,8 +123,6 @@ export async function POST(
       postalCode: registration.pinZipCode,
       country: registration.country,
     });
-
-    const { pureName: canonicalGuestName } = normalizeGuestName(registration.fullName);
 
     if (!guest) {
       guest = await prisma.guest.create({
@@ -137,8 +142,9 @@ export async function POST(
       guest = await prisma.guest.update({
         where: { id: guest.id },
         data: {
-          name: canonicalGuestName || guest.name,
           addressJson,
+          phone: registration.mobilePhone || guest.phone,
+          email: registration.email || guest.email,
           companyName: companyName !== undefined ? (companyName || null) : guest.companyName,
           gstin: gstin !== undefined ? (gstin || null) : guest.gstin,
         },

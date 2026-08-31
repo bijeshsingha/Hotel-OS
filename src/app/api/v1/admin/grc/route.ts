@@ -77,32 +77,28 @@ export async function GET(request: Request) {
           .map((s) => s.trim())
           .filter(Boolean);
 
+        let effectiveStatus = rec.status;
+
         try {
-          const stay = await prisma.stay.findFirst({
-            where: {
-              propertyId: rec.propertyId,
-              OR: [
-                ...(rec.stayId ? [{ id: rec.stayId }] : []),
-                ...(recRoomNumbers.length > 0
-                  ? [{ roomAssignments: { some: { room: { number: { in: recRoomNumbers } } } } }]
-                  : [
-                      { primaryGuest: { phone: rec.mobilePhone } },
-                      { primaryGuest: { name: rec.fullName } },
-                    ]),
-              ],
-            },
-            include: {
-              roomAssignments: { include: { room: true } },
-              folio: { include: { payments: true } },
-            },
-          });
+          let stay: any = null;
+          if (rec.stayId) {
+            stay = await prisma.stay.findUnique({
+              where: { id: rec.stayId },
+              include: {
+                roomAssignments: { include: { room: true } },
+                folio: { include: { payments: true } },
+              },
+            });
+          }
 
           if (stay) {
+            effectiveStatus = stay.status === "CHECKED_OUT" ? "CHECKED_OUT" : (stay.status === "IN_HOUSE" ? "CHECKED_IN" : rec.status);
+
             if (stay.roomAssignments && stay.roomAssignments.length > 0) {
-              assignedRooms = stay.roomAssignments.map((ra) => {
+              assignedRooms = stay.roomAssignments.map((ra: any) => {
                 let rate = agreedRoomTariff;
                 if (ra.moveReason?.startsWith("AGREED_RATE:")) {
-                  const parsedRate = Number(ra.moveReason.replace("AGREED_RATE:", ""));
+                  const parsedRate = Number(ra.moveReason.replace("AGREED_RATE:", "").split(":")[0]);
                   if (!isNaN(parsedRate)) rate = parsedRate;
                 } else if (ra.rateHandling === "COMPLIMENTARY") {
                   rate = 0;
@@ -118,7 +114,7 @@ export async function GET(request: Request) {
 
               const firstAssignment = stay.roomAssignments[0];
               if (firstAssignment?.moveReason?.startsWith("AGREED_RATE:")) {
-                const parsedRate = Number(firstAssignment.moveReason.replace("AGREED_RATE:", ""));
+                const parsedRate = Number(firstAssignment.moveReason.replace("AGREED_RATE:", "").split(":")[0]);
                 if (!isNaN(parsedRate)) agreedRoomTariff = parsedRate;
               } else if (firstAssignment?.rateHandling === "COMPLIMENTARY") {
                 agreedRoomTariff = 0;
@@ -130,11 +126,14 @@ export async function GET(request: Request) {
               depositAmount = firstPayment.amount;
               advancePaymentMethod = firstPayment.method;
             }
+          } else if (rec.status === "CHECKED_IN") {
+            effectiveStatus = "CHECKED_OUT";
           }
         } catch {}
 
         return {
           ...rec,
+          status: effectiveStatus,
           agreedRoomTariff,
           depositAmount,
           advancePaymentMethod,

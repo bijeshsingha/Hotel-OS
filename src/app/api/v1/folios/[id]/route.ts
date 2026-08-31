@@ -49,8 +49,32 @@ export async function GET(
       return NextResponse.json({ error: "Folio not found" }, { status: 404 });
     }
 
+    let grc = null;
+    if (folio.stay?.id) {
+      grc = await prisma.guestRegistration.findFirst({
+        where: {
+          OR: [
+            { stayId: folio.stay.id },
+            { guestId: folio.stay.primaryGuestId, status: folio.stay.status === "IN_HOUSE" ? "CHECKED_IN" : "CHECKED_OUT" },
+          ],
+        },
+        select: {
+          id: true,
+          registrationNo: true,
+          signedAt: true,
+          preAssignedRoom: true,
+          arrivalDateTime: true,
+          expectedDepartureDate: true,
+          depositAmount: true,
+          status: true,
+        },
+        orderBy: { signedAt: "desc" },
+      });
+    }
+
     return NextResponse.json({
       ...folio,
+      stay: folio.stay ? { ...folio.stay, guestRegistration: grc } : null,
       cycleMetrics: cycleData,
     });
   } catch (error: any) {

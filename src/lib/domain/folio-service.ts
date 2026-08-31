@@ -71,14 +71,107 @@ export async function postManualFolioCharge({
     },
   });
 
+  // Recalculate exact live balance: Math.max(0, totalCharges - totalPayments)
+  const allEntries = await prisma.folioEntry.findMany({
+    where: { folioId: folio.id, status: "POSTED" },
+  });
+  const allPayments = await prisma.payment.findMany({
+    where: { folioId: folio.id, status: "SUCCEEDED" },
+  });
+  const totalCharges = allEntries.reduce((sum, e) => sum + e.totalAmount, 0);
+  const totalPayments = allPayments.reduce((sum, p) => sum + p.amount, 0);
+  const newBalance = Math.max(0, Math.round((totalCharges - totalPayments) * 100) / 100);
+
   await prisma.folio.update({
     where: { id: folio.id },
-    data: {
-      balance: { increment: gst.totalAmount },
-    },
+    data: { balance: newBalance },
   });
 
   return entry;
+}
+
+export async function deleteFolioCharge({
+  folioId,
+  entryId,
+  reason,
+  actorId,
+}: {
+  folioId: string;
+  entryId: string;
+  reason?: string;
+  actorId?: string;
+}) {
+  const folio = await prisma.folio.findUniqueOrThrow({
+    where: { id: folioId },
+    include: {
+      windows: {
+        include: { entries: true },
+      },
+      payments: true,
+    },
+  });
+
+  if (folio.status !== "OPEN") {
+    throw new Error(`Folio is ${folio.status}. Cannot delete charges from a closed or invoiced folio.`);
+  }
+
+  const targetEntry = await prisma.folioEntry.findUnique({
+    where: { id: entryId },
+  });
+
+  if (!targetEntry || targetEntry.folioId !== folioId) {
+    throw new Error("Folio entry not found on this folio.");
+  }
+
+  // Delete the entry
+  await prisma.folioEntry.delete({
+    where: { id: entryId },
+  });
+
+  // Recalculate true balance: sum of remaining POSTED charges - sum of SUCCEEDED payments
+  const remainingEntries = await prisma.folioEntry.findMany({
+    where: { folioId: folio.id, status: "POSTED" },
+  });
+  const payments = await prisma.payment.findMany({
+    where: { folioId: folio.id, status: "SUCCEEDED" },
+  });
+
+  const totalCharges = remainingEntries.reduce((sum, e) => sum + e.totalAmount, 0);
+  const totalPayments = payments.reduce((sum, p) => sum + p.amount, 0);
+  const newBalance = Math.max(0, Math.round((totalCharges - totalPayments) * 100) / 100);
+
+  await prisma.folio.update({
+    where: { id: folio.id },
+    data: { balance: newBalance },
+  });
+
+  // Audit log
+  await prisma.auditLog.create({
+    data: {
+      organizationId: folio.organizationId,
+      propertyId: folio.propertyId,
+      actorId: actorId || "usr_cashier",
+      action: "DELETE_FOLIO_CHARGE",
+      targetType: "FOLIO_ENTRY",
+      targetId: entryId,
+      reason: reason || "Voided mistaken folio charge",
+      afterJson: JSON.stringify({
+        deletedEntry: {
+          chargeCode: targetEntry.chargeCode,
+          description: targetEntry.description,
+          totalAmount: targetEntry.totalAmount,
+          serviceDate: targetEntry.serviceDate,
+        },
+        recalculatedBalance: newBalance,
+      }),
+    },
+  });
+
+  return {
+    success: true,
+    deletedEntryId: entryId,
+    recalculatedBalance: newBalance,
+  };
 }
 
 export async function recordPayment({
@@ -290,6 +383,20 @@ export async function checkoutAndIssueInvoice({
     },
   });
 
+  // 2.5 Update linked GRC registration status to CHECKED_OUT
+  await prisma.guestRegistration.updateMany({
+    where: {
+      propertyId: stay.propertyId,
+      OR: [
+        { stayId: stay.id },
+        { guestId: stay.primaryGuestId },
+      ],
+    },
+    data: {
+      status: "CHECKED_OUT",
+    },
+  }).catch((err) => console.error("Error updating GRC status on checkout:", err));
+
   // 3. Close room assignments and mark room VACANT + DIRTY
   for (const assignment of stay.roomAssignments) {
     await prisma.roomAssignment.update({
@@ -349,9 +456,12 @@ export async function checkoutAndIssueInvoice({
   return { success: true, invoice, balance };
 }
 
+import { calculate24HrBillableDays } from "./pms-service";
+
 /**
  * Automatically evaluates 24-hour cycles and posts the next night's room charge
- * once the stay crosses the 24-hour mark (unless protected by grace period).
+ * once the stay crosses the 24-hour mark (or 12 PM standard checkout for Early Bird),
+ * respecting the configured grace period or waiving next night.
  */
 export async function sync24HourFolioCharges({
   folioId,
@@ -367,7 +477,7 @@ export async function sync24HourFolioCharges({
       windows: {
         include: {
           entries: {
-            where: { chargeCode: "ROOM_TARIFF" },
+            where: { chargeCode: "ROOM_TARIFF", status: "POSTED" },
             orderBy: { createdAt: "asc" },
           },
         },
@@ -384,13 +494,27 @@ export async function sync24HourFolioCharges({
   });
 
   if (!folio || folio.status !== "OPEN" || !folio.stay) {
-    return { billableNights: 1, completedCycles: 0, elapsedHours: "0.0" };
+    return {
+      billableNights: 1,
+      completedCycles: 0,
+      elapsedHours: "0.0",
+      isEarlyBird: false,
+      gracePeriodApplied: false,
+      checkoutDeadlineText: "Standard Billing",
+    };
   }
 
   const stay = folio.stay;
   const primaryWindow = folio.windows[0];
   if (!primaryWindow) {
-    return { billableNights: 1, completedCycles: 0, elapsedHours: "0.0" };
+    return {
+      billableNights: 1,
+      completedCycles: 0,
+      elapsedHours: "0.0",
+      isEarlyBird: false,
+      gracePeriodApplied: false,
+      checkoutDeadlineText: "Standard Billing",
+    };
   }
 
   const activeAssignment = stay.roomAssignments[0];
@@ -399,19 +523,28 @@ export async function sync24HourFolioCharges({
   // Determine agreed rate
   let roomBasePrice = 3200;
   let isComp = false;
+  let isRateInclusive = true;
   if (activeAssignment?.rateHandling === "COMPLIMENTARY" || activeAssignment?.moveReason === "AGREED_RATE:0") {
     roomBasePrice = 0;
     isComp = true;
   } else if (activeAssignment?.moveReason?.startsWith("AGREED_RATE:")) {
-    roomBasePrice = Number(activeAssignment.moveReason.replace("AGREED_RATE:", "")) || 3200;
+    const parts = activeAssignment.moveReason.replace("AGREED_RATE:", "").split(":");
+    roomBasePrice = Number(parts[0]) || 3200;
+    if (parts[1] === "EXC") {
+      isRateInclusive = false;
+    }
   }
 
-  // Grace Period in minutes
+  // Checkout Type & Grace Period
+  let checkoutType: "24_HOURS" | "FIXED_TIME" = "24_HOURS";
   let graceMinutes = 60; // default 1 hour grace
+
   if (overrideGraceMinutes !== undefined) {
     graceMinutes = overrideGraceMinutes;
   } else if (activeAssignment?.rateHandling?.includes("24_HOURS:")) {
     graceMinutes = Number(activeAssignment.rateHandling.split(":")[1]) || 60;
+  } else if (activeAssignment?.rateHandling === "FIXED_TIME") {
+    checkoutType = "FIXED_TIME";
   }
 
   // Arrival timestamp
@@ -420,38 +553,36 @@ export async function sync24HourFolioCharges({
 
   // Elapsed duration
   const elapsedMs = Math.max(0, now.getTime() - arrivalTime.getTime());
-  const elapsedHours = elapsedMs / (1000 * 60 * 60);
+  const elapsedHours = (elapsedMs / (1000 * 60 * 60)).toFixed(1);
+  const completedCycles = Math.floor(elapsedMs / (24 * 60 * 60 * 1000));
+  const remainingMinutes = Math.round(((elapsedMs / (1000 * 60 * 60)) % 24) * 60);
 
-  const completedCycles = Math.floor(elapsedHours / 24);
-  const remainingMinutes = Math.round((elapsedHours % 24) * 60);
-
-  // Billable nights calculation:
-  // - Cycle 1 (0 to 24 hrs): exactly 1 night
-  // - Cycle 2+ (after 24 hrs): if remaining time <= graceMinutes, remain on completedCycles; otherwise completedCycles + 1
-  let billableNights = 1;
-  if (completedCycles >= 1) {
-    if (remainingMinutes <= graceMinutes) {
-      billableNights = completedCycles;
-    } else {
-      billableNights = completedCycles + 1;
-    }
-  }
+  // Compute billable nights using domain engine (Early Bird + 24h + Grace Period)
+  const billableCalc = calculate24HrBillableDays(arrivalTime, now, checkoutType, graceMinutes);
+  const billableNights = billableCalc.billableDays;
 
   const existingEntries = primaryWindow.entries || [];
   const currentChargedNights = existingEntries.length;
+  let folioMutated = false;
 
+  // 1. Post missing cycle room charges if billableNights > currentChargedNights
   if (currentChargedNights < billableNights) {
-    // Post missing cycle room charges
     for (let n = currentChargedNights + 1; n <= billableNights; n++) {
       const cycleDate = new Date(arrivalTime.getTime() + (n - 1) * 24 * 60 * 60 * 1000)
         .toISOString()
         .split("T")[0];
 
+      const desc = isComp || roomBasePrice === 0
+        ? `Room Tariff - Room ${room?.number || "Stay"} (Night ${n} - COMPLIMENTARY)`
+        : billableCalc.isEarlyBird
+        ? `Room Tariff - Room ${room?.number || "Stay"} (Night ${n} - 12 PM Rollover)`
+        : `Room Tariff - Room ${room?.number || "Stay"} (Night ${n} - 24hr Cycle Rollover)`;
+
       const gst = isComp || roomBasePrice === 0
         ? { taxableAmount: 0, taxAmount: 0, totalAmount: 0, components: [] }
         : calculateGST({
             grossOrBaseAmount: roomBasePrice,
-            isInclusive: true,
+            isInclusive: isRateInclusive,
             sacHsn: "996311",
             supplierStateCode: folio.property.stateCode || "18",
             customTaxRate: 5,
@@ -466,9 +597,7 @@ export async function sync24HourFolioCharges({
           serviceDate: cycleDate,
           type: "CHARGE",
           chargeCode: "ROOM_TARIFF",
-          description: isComp || roomBasePrice === 0
-            ? `Room Tariff - Room ${room?.number || "Stay"} (Night ${n} - 24hr Cycle - COMPLIMENTARY)`
-            : `Room Tariff - Room ${room?.number || "Stay"} (Night ${n} - 24hr Cycle Rollover)`,
+          description: desc,
           qty: 1,
           unitAmount: roomBasePrice,
           taxableAmount: gst.taxableAmount,
@@ -479,11 +608,50 @@ export async function sync24HourFolioCharges({
         },
       });
 
-      await prisma.folio.update({
-        where: { id: folio.id },
-        data: { balance: { increment: gst.totalAmount } },
-      });
+      folioMutated = true;
     }
+  }
+
+  // 2. Roll back excess charges if manager extended grace period or waived next night (billableNights < currentChargedNights)
+  if (currentChargedNights > billableNights) {
+    const excessCount = currentChargedNights - billableNights;
+    // Find auto-posted rollover charges ordered by most recent first
+    const autoEntries = await prisma.folioEntry.findMany({
+      where: {
+        folioId: folio.id,
+        chargeCode: "ROOM_TARIFF",
+        sourceType: "PMS_24HR_AUTO_CHARGE",
+        status: "POSTED",
+      },
+      orderBy: { createdAt: "desc" },
+      take: excessCount,
+    });
+
+    if (autoEntries.length > 0) {
+      const entryIdsToDelete = autoEntries.map((e) => e.id);
+      await prisma.folioEntry.deleteMany({
+        where: { id: { in: entryIdsToDelete } },
+      });
+      folioMutated = true;
+    }
+  }
+
+  // Recalculate true balance if folio entries changed
+  if (folioMutated) {
+    const allRemaining = await prisma.folioEntry.findMany({
+      where: { folioId: folio.id, status: "POSTED" },
+    });
+    const allPayments = await prisma.payment.findMany({
+      where: { folioId: folio.id, status: "SUCCEEDED" },
+    });
+    const totalCharges = allRemaining.reduce((sum, e) => sum + e.totalAmount, 0);
+    const totalPayments = allPayments.reduce((sum, p) => sum + p.amount, 0);
+    const newBalance = Math.max(0, Math.round((totalCharges - totalPayments) * 100) / 100);
+
+    await prisma.folio.update({
+      where: { id: folio.id },
+      data: { balance: newBalance },
+    });
   }
 
   return {
@@ -491,6 +659,71 @@ export async function sync24HourFolioCharges({
     completedCycles,
     remainingMinutes,
     graceMinutes,
-    elapsedHours: elapsedHours.toFixed(1),
+    elapsedHours,
+    isEarlyBird: billableCalc.isEarlyBird,
+    gracePeriodApplied: billableCalc.gracePeriodApplied,
+    checkoutDeadlineText: billableCalc.checkoutDeadlineText,
   };
 }
+
+export async function updateStayGracePeriod({
+  stayId,
+  gracePeriodMinutes,
+  actorId,
+}: {
+  stayId: string;
+  gracePeriodMinutes: number;
+  actorId?: string;
+}) {
+  const stay = await prisma.stay.findUniqueOrThrow({
+    where: { id: stayId },
+    include: {
+      roomAssignments: { where: { endsAt: null } },
+      folio: true,
+    },
+  });
+
+  const rateHandling = gracePeriodMinutes >= 1440
+    ? "24_HOURS:1440"
+    : `24_HOURS:${gracePeriodMinutes}`;
+
+  // Update active room assignments with new grace period
+  for (const ra of stay.roomAssignments) {
+    if (ra.rateHandling !== "COMPLIMENTARY") {
+      await prisma.roomAssignment.update({
+        where: { id: ra.id },
+        data: { rateHandling },
+      });
+    }
+  }
+
+  // Synchronize folio charges immediately with new grace period
+  let cycleMetrics: any = null;
+  if (stay.folio?.id) {
+    cycleMetrics = await sync24HourFolioCharges({
+      folioId: stay.folio.id,
+      overrideGraceMinutes: gracePeriodMinutes,
+    });
+  }
+
+  // Audit log
+  await prisma.auditLog.create({
+    data: {
+      organizationId: stay.organizationId,
+      propertyId: stay.propertyId,
+      actorId: actorId || "usr_cashier",
+      action: "UPDATE_GRACE_PERIOD",
+      targetType: "STAY",
+      targetId: stay.id,
+      reason: `Updated grace period to ${gracePeriodMinutes} minutes`,
+      afterJson: JSON.stringify({
+        gracePeriodMinutes,
+        rateHandling,
+        cycleMetrics,
+      }),
+    },
+  });
+
+  return { success: true, gracePeriodMinutes, cycleMetrics };
+}
+

@@ -126,6 +126,7 @@ export function GrcIntakeModal({
     // Billing & Advance
     agreedTariff: "",
     isComplimentary: false,
+    isRateInclusive: true,
     checkoutType: "24_HOURS" as "24_HOURS" | "FIXED_TIME",
     gracePeriodMinutes: "60",
     depositAmount: "0",
@@ -388,6 +389,7 @@ export function GrcIntakeModal({
           paxC: Number(formData.paxC) || 0,
           agreedTariff: formData.isComplimentary ? 0 : (formData.agreedTariff !== "" ? Number(formData.agreedTariff) : undefined),
           isComplimentary: formData.isComplimentary,
+          isRateInclusive: formData.isRateInclusive,
           checkoutType: formData.checkoutType,
           gracePeriodMinutes: Number(formData.gracePeriodMinutes) || 60,
           depositAmount: Number(formData.depositAmount) || 0,
@@ -586,6 +588,24 @@ export function GrcIntakeModal({
                     <option value="FIXED_TIME">☀️ Standard 11:00 AM / 12:00 PM Fixed Time</option>
                   </select>
                 </div>
+
+                {/* Early Bird Offer Banner */}
+                {(() => {
+                  const hour = parseInt(formData.arrivalTime?.split(":")[0] || "-1", 10);
+                  const isEarlyBird = hour >= 5 && hour < 11;
+                  if (!isEarlyBird) return null;
+                  return (
+                    <div className="sm:col-span-4 p-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-700/60 flex items-center gap-2 text-xs text-amber-900 dark:text-amber-200 animate-in fade-in">
+                      <span className="text-base">🌟</span>
+                      <div>
+                        <strong className="font-bold">Early Bird Offer:</strong>
+                        <span className="ml-1 text-[11.5px] text-amber-800 dark:text-amber-300">
+                          Early check-in (5:00 AM – 11:00 AM) included at no extra charge. Stay valid until Standard 12:00 PM Check-Out on departure date.
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 {/* Primary Room Extra Pax Stepper */}
                 <div className="space-y-1">
@@ -1740,11 +1760,13 @@ export function GrcIntakeModal({
 
               <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
                 <div className="space-y-1">
-                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">
-                    {formData.additionalRoomIds.length > 0
-                      ? `Primary Rate (Room ${primaryRoom?.number || ""}) (₹)`
-                      : "Agreed Room Rate (₹)"}
-                  </label>
+                  <div className="flex items-center justify-between">
+                    <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">
+                      {formData.additionalRoomIds.length > 0
+                        ? `Primary Rate (Room ${primaryRoom?.number || ""}) (₹)`
+                        : "Agreed Room Rate (₹)"}
+                    </label>
+                  </div>
                   <div className="relative flex items-center">
                     <span className="absolute left-3 text-zinc-400 font-bold font-mono text-xs">₹</span>
                     <input
@@ -1758,6 +1780,38 @@ export function GrcIntakeModal({
                   </div>
                 </div>
 
+                {/* GST Inclusion / Exclusion Toggle */}
+                <div className="space-y-1">
+                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">
+                    GST Tax Treatment
+                  </label>
+                  <div className="flex items-center bg-zinc-200/80 dark:bg-zinc-800 p-1 rounded-xl border border-zinc-300 dark:border-zinc-700 h-10">
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, isRateInclusive: true })}
+                      className={`flex-1 h-full rounded-lg text-xs font-bold transition flex items-center justify-center gap-1 cursor-pointer ${
+                        formData.isRateInclusive
+                          ? "bg-white dark:bg-zinc-900 text-blue-700 dark:text-blue-400 shadow-xs border border-zinc-200 dark:border-zinc-700"
+                          : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900"
+                      }`}
+                      title="Room rate already includes GST"
+                    >
+                      <span>Incl. GST</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, isRateInclusive: false })}
+                      className={`flex-1 h-full rounded-lg text-xs font-bold transition flex items-center justify-center gap-1 cursor-pointer ${
+                        !formData.isRateInclusive
+                          ? "bg-white dark:bg-zinc-900 text-amber-700 dark:text-amber-400 shadow-xs border border-zinc-200 dark:border-zinc-700"
+                          : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900"
+                      }`}
+                      title="GST tax is added on top of the base rate"
+                    >
+                      <span>+Tax Extra</span>
+                    </button>
+                  </div>
+                </div>
 
                 <div className="space-y-1">
                   <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">

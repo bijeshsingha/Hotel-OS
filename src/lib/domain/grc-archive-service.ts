@@ -124,39 +124,28 @@ export async function syncGrcEditsEverywhere(updatedGrc: any) {
     country: country || "India",
   });
 
-  // 1. Update Master Guest CRM record by mobilePhone or name
-  if (mobilePhone) {
-    await prisma.guest.updateMany({
-      where: { phone: mobilePhone },
-      data: {
-        name: fullName || undefined,
-        email: email !== undefined ? (email || null) : undefined,
-        addressJson,
-      },
-    });
+  // 1. Update the linked Stay & Guest profile for this specific registration only
+  let targetStayId = updatedGrc.stayId || updatedGrc.linkedStayId;
+  if (!targetStayId && id) {
+    const reg = await prisma.guestRegistration.findUnique({ where: { id } });
+    targetStayId = reg?.stayId;
   }
-
-  // 2. Update linked Stays & Folios
-  const linkedStays = await prisma.stay.findMany({
-    where: {
-      OR: [
-        { primaryGuest: { phone: mobilePhone } },
-        { primaryGuest: { name: fullName } },
-        ...(preAssignedRoom ? [{ roomAssignments: { some: { room: { number: preAssignedRoom } } } }] : []),
-      ],
-    },
-    include: {
-      property: true,
-      primaryGuest: true,
-      roomAssignments: { include: { room: { include: { roomType: true } } } },
-      folio: {
+  const linkedStays = targetStayId
+    ? await prisma.stay.findMany({
+        where: { id: targetStayId },
         include: {
-          windows: { include: { entries: true } },
-          payments: { include: { allocations: true } },
+          property: true,
+          primaryGuest: true,
+          roomAssignments: { include: { room: { include: { roomType: true } } } },
+          folio: {
+            include: {
+              windows: { include: { entries: true } },
+              payments: { include: { allocations: true } },
+            },
+          },
         },
-      },
-    },
-  });
+      })
+    : [];
 
   for (const stay of linkedStays) {
     // A. Update stay's expected departure if modified
@@ -198,6 +187,8 @@ export async function syncGrcEditsEverywhere(updatedGrc: any) {
         ? preAssignedRoom.replace(/^Room\s+/i, "").split(/[,;\s]+/)[0]
         : null;
 
+      const isRateInclusive = notesObj.isRateInclusive !== false && updatedGrc.isRateInclusive !== false;
+
       // Update each room assignment with its specific rate if defined
       if (stay.roomAssignments && stay.roomAssignments.length > 0) {
         for (const assignment of stay.roomAssignments) {
@@ -213,7 +204,7 @@ export async function syncGrcEditsEverywhere(updatedGrc: any) {
           } else if (customRoomRates[assignment.room.number] !== undefined) {
             specificRate = Number(customRoomRates[assignment.room.number]);
           } else if (assignment.moveReason?.startsWith("AGREED_RATE:")) {
-            const parsedMoveRate = Number(assignment.moveReason.replace("AGREED_RATE:", ""));
+            const parsedMoveRate = Number(assignment.moveReason.replace("AGREED_RATE:", "").split(":")[0]);
             if (!isNaN(parsedMoveRate)) specificRate = parsedMoveRate;
           } else {
             specificRate = 3200;
@@ -223,7 +214,7 @@ export async function syncGrcEditsEverywhere(updatedGrc: any) {
           await prisma.roomAssignment.update({
             where: { id: assignment.id },
             data: {
-              moveReason: isRoomComp ? "AGREED_RATE:0" : `AGREED_RATE:${specificRate}`,
+              moveReason: isRoomComp ? "AGREED_RATE:0" : `AGREED_RATE:${specificRate}:${isRateInclusive ? "INC" : "EXC"}`,
               rateHandling: isRoomComp ? "COMPLIMENTARY" : "RETAIN_RATE",
             },
           });
@@ -233,7 +224,7 @@ export async function syncGrcEditsEverywhere(updatedGrc: any) {
         await prisma.roomAssignment.updateMany({
           where: { stayId: stay.id },
           data: {
-            moveReason: isComp ? "AGREED_RATE:0" : `AGREED_RATE:${numTariff}`,
+            moveReason: isComp ? "AGREED_RATE:0" : `AGREED_RATE:${numTariff}:${isRateInclusive ? "INC" : "EXC"}`,
             rateHandling: isComp ? "COMPLIMENTARY" : "RETAIN_RATE",
           },
         });
@@ -255,49 +246,39 @@ export async function syncGrcEditsEverywhere(updatedGrc: any) {
           } else if (customRoomRates[a.room.number] !== undefined) {
             specificRate = Number(customRoomRates[a.room.number]);
           } else if (a.moveReason?.startsWith("AGREED_RATE:")) {
-            const parsedMoveRate = Number(a.moveReason.replace("AGREED_RATE:", ""));
+            const parsedMoveRate = Number(a.moveReason.replace("AGREED_RATE:", "").split(":")[0]);
             if (!isNaN(parsedMoveRate)) specificRate = parsedMoveRate;
           } else {
             specificRate = 3200;
           }
-          return sum + (isNaN(specificRate) ? 0 : specificRate);
+          return sum + (isNaN(specificRate) ? 3200 : specificRate);
         }, 0);
       }
 
-      // Update Folio Entry charges for room tariff with per-room rates
-      if (stay.folio) {
-        for (const w of stay.folio.windows) {
-          const tariffEntries = w.entries.filter(
-            (e) => e.chargeCode === "ROOM_TARIFF" || e.sourceType === "PMS_NIGHTLY_CHARGE"
+      // D. Update all posted room tariff folio entries to reflect the new rate and tax handling
+      if (stay.folio?.windows) {
+        for (const win of stay.folio.windows) {
+          const roomEntries = (win.entries || []).filter(
+            (e: any) => e.chargeCode === "ROOM_TARIFF" && e.status === "POSTED"
           );
-          for (const entry of tariffEntries) {
+          for (const entry of roomEntries) {
             let entryRate = numTariff;
 
-            // Extract room number from description (e.g. "Room Tariff - Room 302 (Night 1)")
-            const roomMatch = entry.description?.match(/-\s*Room\s+([A-Za-z0-9-]+)/i) || entry.description?.match(/Room\s+(\d+[\w-]*)/i);
-            const entryRoomNum = roomMatch ? roomMatch[1] : null;
+            // If entry description specifies a particular room number, extract that room's tariff
+            const matchRoom = entry.description?.match(/Room\s+([A-Za-z0-9_-]+)/i);
+            const entryRoomNum = matchRoom ? matchRoom[1] : null;
 
-            if (entryRoomNum) {
+            if (entryRoomNum && customRoomRates[entryRoomNum] !== undefined) {
+              entryRate = Number(customRoomRates[entryRoomNum]);
+            } else if (entryRoomNum && primaryRoomNumber && entryRoomNum === primaryRoomNumber) {
+              entryRate = numTariff;
+            } else if (entryRoomNum) {
               const matchedAssignment = stay.roomAssignments?.find(
-                (a) => a.room?.number === entryRoomNum || a.room?.id === entryRoomNum
+                (a: any) => a.room?.number === entryRoomNum || a.room?.id === entryRoomNum
               );
-              const isPrimaryEntry = primaryRoomNumber
-                ? (entryRoomNum === primaryRoomNumber || matchedAssignment?.room?.id === primaryRoomNumber)
-                : (stay.roomAssignments?.[0]?.room?.number === entryRoomNum);
-
-              let specificRate = 3200;
-              if (isPrimaryEntry) {
-                specificRate = numTariff;
-              } else if (customRoomRates[entryRoomNum] !== undefined) {
-                specificRate = Number(customRoomRates[entryRoomNum]);
-              } else if (matchedAssignment?.room?.id && customRoomRates[matchedAssignment.room.id] !== undefined) {
-                specificRate = Number(customRoomRates[matchedAssignment.room.id]);
-              } else if (matchedAssignment?.moveReason?.startsWith("AGREED_RATE:")) {
-                const parsedMoveRate = Number(matchedAssignment.moveReason.replace("AGREED_RATE:", ""));
-                if (!isNaN(parsedMoveRate)) specificRate = parsedMoveRate;
-              } else {
-                specificRate = 3200;
-              }
+              const specificRate = matchedAssignment?.moveReason?.startsWith("AGREED_RATE:")
+                ? Number(matchedAssignment.moveReason.replace("AGREED_RATE:", "").split(":")[0])
+                : ((matchedAssignment?.room?.roomType as any)?.basePrice || 3200);
               entryRate = isNaN(specificRate) ? numTariff : specificRate;
             } else if (stay.roomAssignments && stay.roomAssignments.length > 1) {
               // Lumped entry for all rooms together
@@ -309,7 +290,7 @@ export async function syncGrcEditsEverywhere(updatedGrc: any) {
               ? { taxableAmount: 0, taxAmount: 0, totalAmount: 0, components: [] }
               : calculateGST({
                   grossOrBaseAmount: entryRate,
-                  isInclusive: true,
+                  isInclusive: isRateInclusive,
                   sacHsn: "996311",
                   supplierStateCode: stay.property?.stateCode || "18",
                   customTaxRate: 5,

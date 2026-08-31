@@ -2,7 +2,7 @@
 
 import React, { Suspense } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useHotel } from "@/lib/context/hotel-context";
 import { NAV_ITEMS } from "@/data/navigation";
 import {
@@ -12,6 +12,7 @@ import {
 
 function SidebarNav({ isCollapsed }: { isCollapsed: boolean }) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const navItems = NAV_ITEMS;
 
   return (
@@ -29,41 +30,82 @@ function SidebarNav({ isCollapsed }: { isCollapsed: boolean }) {
         const Icon = item.icon;
 
         return (
-          <Link
-            key={item.href}
-            href={item.href}
-            title={isCollapsed ? item.label : undefined}
-            className={`flex items-center ${
-              isCollapsed ? "justify-center p-3" : "justify-between px-3.5 py-2.5"
-            } rounded-xl text-[13.5px] transition-all group relative ${
-              isActive
-                ? "bg-blue-50/90 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 font-bold border border-blue-200/80 dark:border-blue-800/60 shadow-xs"
-                : "text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100/90 dark:hover:bg-zinc-800/70 hover:text-zinc-900 dark:hover:text-white border border-transparent font-medium"
-            }`}
-          >
-            <div className="flex items-center gap-3 min-w-0">
-              <Icon
-                className={`h-[18px] w-[18px] shrink-0 transition-colors ${
-                  isActive ? "text-blue-600 dark:text-blue-400" : "text-zinc-400 dark:text-zinc-500 group-hover:text-zinc-800 dark:group-hover:text-zinc-200"
-                }`}
-              />
-              {!isCollapsed && <span className="truncate">{item.label}</span>}
-            </div>
+          <div key={item.href} className="space-y-0.5">
+            <Link
+              href={item.href}
+              title={isCollapsed ? item.label : undefined}
+              className={`flex items-center ${
+                isCollapsed ? "justify-center p-3" : "justify-between px-3.5 py-2.5"
+              } rounded-xl text-[13.5px] transition-all group relative ${
+                isActive
+                  ? "bg-blue-50/90 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 font-bold border border-blue-200/80 dark:border-blue-800/60 shadow-xs"
+                  : "text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100/90 dark:hover:bg-zinc-800/70 hover:text-zinc-900 dark:hover:text-white border border-transparent font-medium"
+              }`}
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <Icon
+                  className={`h-[18px] w-[18px] shrink-0 transition-colors ${
+                    isActive ? "text-blue-600 dark:text-blue-400" : "text-zinc-400 dark:text-zinc-500 group-hover:text-zinc-800 dark:group-hover:text-zinc-200"
+                  }`}
+                />
+                {!isCollapsed && <span className="truncate">{item.label}</span>}
+              </div>
 
-            {!isCollapsed && (
-              <span
-                className={`rounded-md px-2 py-0.5 text-[10.5px] font-bold transition-colors ${
-                  item.badge === "NEW"
-                    ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-300"
-                    : isActive
-                    ? "bg-blue-100 text-blue-700 dark:bg-blue-900/70 dark:text-blue-200"
-                    : "bg-zinc-100 text-zinc-500 dark:bg-zinc-800/90 dark:text-zinc-400 border border-zinc-200/60 dark:border-zinc-800"
-                }`}
-              >
-                {item.badge}
-              </span>
-            )}
-          </Link>
+              {!isCollapsed && (
+                <span
+                  className={`rounded-md px-2 py-0.5 text-[10.5px] font-bold transition-colors ${
+                    item.badge === "NEW"
+                      ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-300"
+                      : isActive
+                      ? "bg-blue-100 text-blue-700 dark:bg-blue-900/70 dark:text-blue-200"
+                      : "bg-zinc-100 text-zinc-500 dark:bg-zinc-800/90 dark:text-zinc-400 border border-zinc-200/60 dark:border-zinc-800"
+                  }`}
+                >
+                  {item.badge}
+                </span>
+              )}
+            </Link>
+
+            {item.href === "/billing" && isActive && !isCollapsed && (() => {
+              const currentTab = searchParams.get("tab") || "in-house";
+              const isInHouse = currentTab === "in-house";
+              const isSettled = currentTab === "settled";
+
+              return (
+                <div className="pl-7 pr-1 py-1 space-y-1 text-xs animate-in fade-in">
+                  <Link
+                    href="/billing?tab=in-house"
+                    className={`flex items-center justify-between py-1.5 px-2.5 rounded-lg font-semibold transition ${
+                      isInHouse
+                        ? "bg-emerald-50 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border border-emerald-200/80 dark:border-emerald-800/60 shadow-2xs"
+                        : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800/60"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className={`h-2 w-2 rounded-full ${isInHouse ? "bg-emerald-500 ring-2 ring-emerald-300 dark:ring-emerald-800" : "bg-zinc-400"} shrink-0`} />
+                      <span>In-House Active</span>
+                    </div>
+                    {isInHouse && <span className="text-[10px] font-mono font-bold text-emerald-600 dark:text-emerald-400">Live</span>}
+                  </Link>
+
+                  <Link
+                    href="/billing?tab=settled"
+                    className={`flex items-center justify-between py-1.5 px-2.5 rounded-lg font-semibold transition ${
+                      isSettled
+                        ? "bg-blue-50 dark:bg-blue-950/60 text-blue-800 dark:text-blue-300 border border-blue-200/80 dark:border-blue-800/60 shadow-2xs"
+                        : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800/60"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className={`h-2 w-2 rounded-full ${isSettled ? "bg-blue-500 ring-2 ring-blue-300 dark:ring-blue-800" : "bg-zinc-400"} shrink-0`} />
+                      <span>Settled Archive</span>
+                    </div>
+                    {isSettled && <span className="text-[10px] font-mono font-bold text-blue-600 dark:text-blue-400">Past</span>}
+                  </Link>
+                </div>
+              );
+            })()}
+          </div>
         );
       })}
     </div>

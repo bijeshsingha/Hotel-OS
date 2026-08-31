@@ -606,7 +606,6 @@ function PMSFrontDeskContent() {
 
   // RENDER TRADITIONAL HIGH-LEGIBILITY FRONT DESK ROOM CARD WITH BED CONFIGURATION
   const renderTraditionalRoomCard = (room: any) => {
-    const isOccupied = room.roomState?.occupancyStatus === "OCCUPIED";
     const hkStatus = room.roomState?.housekeepingStatus || "CLEAN";
     const activeIssue = room.maintenanceIssues?.[0];
     const isOutOfOrder =
@@ -617,10 +616,11 @@ function PMSFrontDeskContent() {
 
     // Find active in-house stay for this room
     const activeStay = stays.find(s => 
-      s.status === "IN_HOUSE" && s.roomAssignments?.some((ra: any) => ra.roomId === room.id)
-    ) || room.assignments?.[0]?.stay;
+      s.status === "IN_HOUSE" && s.roomAssignments?.some((ra: any) => ra.roomId === room.id && (!ra.endsAt || new Date(ra.endsAt) > new Date()))
+    ) || room.assignments?.find((a: any) => a.stay?.status === "IN_HOUSE" && (!a.endsAt || new Date(a.endsAt) > new Date()))?.stay;
 
     const inHouseGuest = activeStay?.primaryGuest;
+    const isOccupied = Boolean(activeStay);
     const baseTariff = room.roomType?.ratePlans?.[0]?.versions?.[0]?.pricingJson 
       ? JSON.parse(room.roomType.ratePlans[0].versions[0].pricingJson).basePrice 
       : (bedCat === "SUITE" ? 5000 : (room.roomType?.code?.includes("EXEC") ? 2500 : 2000));
@@ -2171,12 +2171,15 @@ function PMSFrontDeskContent() {
             gstin: activeProperty?.gstin || "18AACCB2447F1ZX",
           }}
           data={{
-            grcNo: selectedRegForPrint.registrationNo,
-            roomNumber: selectedRegForPrint.assignedRoomNumber || selectedRegForPrint.preAssignedRoom || "301",
+            grcNo: selectedRegForPrint.registrationNo || selectedRegForPrint.grcNo,
+            roomNumber: selectedRegForPrint.assignedRoomNumber || selectedRegForPrint.preAssignedRoom || selectedRegForPrint.roomNumber || "—",
             arrivalDateTime: selectedRegForPrint.arrivalDateTime,
             expectedDepartureDate: selectedRegForPrint.expectedDepartureDate,
-            fullName: selectedRegForPrint.fullName,
-            mobilePhone: selectedRegForPrint.mobilePhone || "N/A",
+            paxM: selectedRegForPrint.paxM,
+            paxF: selectedRegForPrint.paxF,
+            paxC: selectedRegForPrint.paxC,
+            fullName: selectedRegForPrint.fullName || "Guest",
+            mobilePhone: selectedRegForPrint.mobilePhone || selectedRegForPrint.phone || "—",
             alternatePhone: selectedRegForPrint.alternatePhone,
             email: selectedRegForPrint.email,
             city: selectedRegForPrint.city,
@@ -2194,8 +2197,8 @@ function PMSFrontDeskContent() {
             goingTo: selectedRegForPrint.goingTo,
             purposeOfVisit: selectedRegForPrint.purposeOfVisit,
             vehicleNumber: selectedRegForPrint.vehicleNumber,
-            idType: selectedRegForPrint.idType,
-            idLast4: selectedRegForPrint.idLast4,
+            idType: selectedRegForPrint.idType || selectedRegForPrint.idDocumentType,
+            idLast4: selectedRegForPrint.idLast4 || selectedRegForPrint.idDocumentNumber,
             idDocumentType: selectedRegForPrint.idDocumentType,
             idDocumentNumber: selectedRegForPrint.idDocumentNumber,
             foreignDetails: selectedRegForPrint.foreignDetails,
@@ -2509,16 +2512,16 @@ function PMSFrontDeskContent() {
       {/* 13. UNIFIED ROOM & GUEST INSPECTION MODAL */}
       {selectedRoomForInspect && (() => {
         const room = selectedRoomForInspect;
-        const isOccupied = room.roomState?.occupancyStatus === "OCCUPIED";
         const isDirty = room.roomState?.housekeepingStatus === "DIRTY";
         const isOutOfOrder = room.roomState?.sellabilityStatus === "OUT_OF_ORDER" || (room.maintenanceIssues && room.maintenanceIssues.length > 0);
         const bedCat = getBedCategory(room);
 
         // Find active in-house stay for this room
         const activeStay = stays.find(s => 
-          s.status === "IN_HOUSE" && s.roomAssignments?.some((ra: any) => ra.roomId === room.id || ra.room?.number === room.number)
-        ) || room.assignments?.[0]?.stay;
+          s.status === "IN_HOUSE" && s.roomAssignments?.some((ra: any) => (ra.roomId === room.id || ra.room?.number === room.number) && (!ra.endsAt || new Date(ra.endsAt) > new Date()))
+        ) || room.assignments?.find((a: any) => a.stay?.status === "IN_HOUSE" && (!a.endsAt || new Date(a.endsAt) > new Date()))?.stay;
 
+        const isOccupied = Boolean(activeStay);
         const assignedRoomObj = activeStay?.roomAssignments?.find((ra: any) => ra.roomId === room.id || ra.room?.number === room.number);
         const inHouseGuest = activeStay?.primaryGuest;
 

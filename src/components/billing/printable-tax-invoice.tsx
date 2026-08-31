@@ -164,8 +164,8 @@ export function PrintableTaxInvoiceModal({
   }
 
   // Invoice Numbers & Dates
-  const billNo = invoiceData?.invoiceNo || `HRP/25-26/${roomNumber}327`;
-  const grcNo = (stay?.reservationRoom?.reservation?.confirmationNo) || `59${roomNumber.slice(-2)}` || `5976`;
+  const billNo = invoiceData?.invoiceNo || (isLiveTaxBillView ? `LIVE-BILL/${roomNumber}` : `INV-2627-${roomNumber}`);
+  const grcNo = stay?.guestRegistration?.registrationNo || stay?.grcNo || (stay?.reservationRoom?.reservation?.confirmationNo) || `GRC-2627-${roomNumber}`;
   
   const invoiceDateStr = invoiceData?.issuedAt
     ? new Date(invoiceData.issuedAt).toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" })
@@ -174,8 +174,8 @@ export function PrintableTaxInvoiceModal({
   const arrivalDateStr = stay?.arrivalAt
     ? new Date(stay.arrivalAt).toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" }) +
       " " +
-      new Date(stay.arrivalAt).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false })
-    : "—";
+      new Date(stay.arrivalAt).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true })
+    : (stay?.guestRegistration?.arrivalDateTime || "—");
 
   // Room String
   const displayRoomNo = groupBillingMode === "YES" && isMultiRoomGroup && allRooms.length > 0

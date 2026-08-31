@@ -36,37 +36,140 @@ export interface QuoteResult {
   availableRoomsCount: number;
 }
 
+export function getLocalHourMinute(date: Date | string): { hour: number; minute: number } {
+  const d = new Date(date);
+  try {
+    const formatter = new Intl.DateTimeFormat("en-US", {
+      timeZone: "Asia/Kolkata",
+      hour: "numeric",
+      minute: "numeric",
+      hour12: false,
+    });
+    const parts = formatter.formatToParts(d);
+    const hourPart = parts.find((p) => p.type === "hour")?.value;
+    const minutePart = parts.find((p) => p.type === "minute")?.value;
+    return {
+      hour: hourPart ? parseInt(hourPart, 10) : d.getHours(),
+      minute: minutePart ? parseInt(minutePart, 10) : d.getMinutes(),
+    };
+  } catch {
+    return { hour: d.getHours(), minute: d.getMinutes() };
+  }
+}
+
 export function calculate24HrBillableDays(
   arrivalAt: Date | string,
   departureAt: Date | string,
   checkoutType: "24_HOURS" | "FIXED_TIME" = "24_HOURS",
   gracePeriodMinutes: number = 60
-): { billableDays: number; hoursElapsed: number; gracePeriodApplied: boolean } {
+): {
+  billableDays: number;
+  hoursElapsed: number;
+  gracePeriodApplied: boolean;
+  isEarlyBird: boolean;
+  checkoutDeadlineText: string;
+} {
   const start = new Date(arrivalAt).getTime();
   const end = new Date(departureAt).getTime();
   const elapsedMinutes = Math.max(0, Math.round((end - start) / (1000 * 60)));
   const hoursElapsed = Math.round((elapsedMinutes / 60) * 10) / 10;
 
+  // Check if check-in qualifies for Early Bird Offer (5:00 AM to 11:00 AM check-in)
+  const { hour: arrHour } = getLocalHourMinute(arrivalAt);
+  const isEarlyBird = arrHour >= 5 && arrHour < 11;
+
+  // Manager Waive Next Night (1440 mins = 24h waive)
+  if (gracePeriodMinutes >= 1440) {
+    return {
+      billableDays: 1,
+      hoursElapsed,
+      gracePeriodApplied: true,
+      isEarlyBird,
+      checkoutDeadlineText: isEarlyBird ? "Standard 12:00 PM (Next Night Waived)" : "24-Hr Cycle (Next Night Waived)",
+    };
+  }
+
+  // EARLY BIRD OFFER (5 AM - 11 AM):
+  // Check-in between 5 AM and 11 AM gets no extra early charge.
+  // Base stay validity extends until Standard Check-Out at 12:00 PM (Noon) next day.
+  if (isEarlyBird) {
+    const arrDate = new Date(arrivalAt);
+    // Base 12:00 PM Noon checkout on the next calendar day
+    const nextDayNoon = new Date(arrDate);
+    nextDayNoon.setDate(nextDayNoon.getDate() + 1);
+    nextDayNoon.setHours(12, 0, 0, 0);
+
+    const deadlineMs = nextDayNoon.getTime();
+    const graceMs = gracePeriodMinutes * 60 * 1000;
+    const deadlineWithGraceMs = deadlineMs + graceMs;
+
+    if (end <= deadlineWithGraceMs) {
+      const graceApplied = end > deadlineMs && end <= deadlineWithGraceMs;
+      return {
+        billableDays: 1,
+        hoursElapsed,
+        gracePeriodApplied: graceApplied,
+        isEarlyBird: true,
+        checkoutDeadlineText: "Standard 12:00 PM Check-Out (Early Bird Offer)",
+      };
+    } else {
+      // Past 12:00 PM + Grace Period -> bill for next day (+1 night per 24h cycle beyond noon)
+      const overtimeMinutes = Math.max(1, Math.round((end - deadlineMs) / (1000 * 60)));
+      const extraNights = Math.max(1, Math.ceil(overtimeMinutes / (24 * 60)));
+      return {
+        billableDays: 1 + extraNights,
+        hoursElapsed,
+        gracePeriodApplied: false,
+        isEarlyBird: true,
+        checkoutDeadlineText: "Standard 12:00 PM (Overtime Billed)",
+      };
+    }
+  }
+
   if (checkoutType === "FIXED_TIME") {
     const startDate = new Date(arrivalAt).toISOString().split("T")[0];
     const endDate = new Date(departureAt).toISOString().split("T")[0];
-    const diffDays = Math.round((new Date(endDate).getTime() - new Date(startDate).getTime()) / (1000 * 60 * 60 * 24));
-    return { billableDays: Math.max(1, diffDays), hoursElapsed, gracePeriodApplied: false };
+    const diffDays = Math.max(1, Math.round((new Date(endDate).getTime() - new Date(startDate).getTime()) / (1000 * 60 * 60 * 24)));
+    return {
+      billableDays: diffDays,
+      hoursElapsed,
+      gracePeriodApplied: false,
+      isEarlyBird: false,
+      checkoutDeadlineText: "Standard 12:00 PM Check-Out",
+    };
   }
 
-  // 24_HOURS cycle:
+  // STANDARD 24_HOURS CYCLE:
   const completedBlocks = Math.floor(elapsedMinutes / (24 * 60));
   const remainderMinutes = elapsedMinutes % (24 * 60);
 
   if (completedBlocks === 0) {
-    return { billableDays: 1, hoursElapsed, gracePeriodApplied: false };
+    return {
+      billableDays: 1,
+      hoursElapsed,
+      gracePeriodApplied: false,
+      isEarlyBird: false,
+      checkoutDeadlineText: "24-Hr Cycle Billing",
+    };
   }
 
   // Past 24 hours: check grace period
   if (remainderMinutes <= gracePeriodMinutes) {
-    return { billableDays: completedBlocks, hoursElapsed, gracePeriodApplied: true };
+    return {
+      billableDays: completedBlocks,
+      hoursElapsed,
+      gracePeriodApplied: true,
+      isEarlyBird: false,
+      checkoutDeadlineText: `24-Hr Cycle (${gracePeriodMinutes}m Grace Active)`,
+    };
   } else {
-    return { billableDays: completedBlocks + 1, hoursElapsed, gracePeriodApplied: false };
+    return {
+      billableDays: completedBlocks + 1,
+      hoursElapsed,
+      gracePeriodApplied: false,
+      isEarlyBird: false,
+      checkoutDeadlineText: "24-Hr Cycle (Rollover Billed)",
+    };
   }
 }
 
@@ -219,6 +322,7 @@ export async function checkInGuest({
   depositRef,
   agreedTariff,
   isComplimentary = false,
+  isRateInclusive = true,
   checkoutType = "24_HOURS",
   gracePeriodMinutes = 60,
   extraBeds = 0,
@@ -274,6 +378,7 @@ export async function checkInGuest({
   depositRef?: string;
   agreedTariff?: number;
   isComplimentary?: boolean;
+  isRateInclusive?: boolean;
   checkoutType?: "24_HOURS" | "FIXED_TIME";
   gracePeriodMinutes?: number;
   extraBeds?: number;
@@ -307,16 +412,23 @@ export async function checkInGuest({
     }
   }
 
-  // 1. Find or create Guest
-  let guest: any;
-  if (guestData.email || guestData.phone) {
+  const { pureName: canonicalGuestName } = normalizeGuestName(guestData.name, guestData.title);
+
+  // 1. Find or create Guest (matching by name and phone/email to prevent overwriting different family members/group members)
+  let guest: any = null;
+  if (canonicalGuestName) {
     guest = await prisma.guest.findFirst({
       where: {
         organizationId: property.organizationId,
-        OR: [
-          ...(guestData.email ? [{ email: guestData.email }] : []),
-          ...(guestData.phone ? [{ phone: guestData.phone }] : []),
-        ],
+        name: canonicalGuestName,
+        ...(guestData.phone || guestData.email
+          ? {
+              OR: [
+                ...(guestData.phone ? [{ phone: guestData.phone }] : []),
+                ...(guestData.email ? [{ email: guestData.email }] : []),
+              ],
+            }
+          : {}),
       },
     });
   }
@@ -329,8 +441,6 @@ export async function checkInGuest({
     pinZipCode: guestData.pinZipCode || "",
     country: guestData.country || "India",
   });
-
-  const { pureName: canonicalGuestName } = normalizeGuestName(guestData.name, guestData.title);
 
   if (!guest) {
     guest = await prisma.guest.create({
@@ -346,11 +456,13 @@ export async function checkInGuest({
       },
     });
   } else {
+    // Safely update details on the same guest profile without modifying other guests
     await prisma.guest.update({
       where: { id: guest.id },
       data: {
-        name: canonicalGuestName || guest.name,
         addressJson: fullAddressJson,
+        phone: guestData.phone || guest.phone,
+        email: guestData.email || guest.email,
         gstin: guestData.gstin !== undefined ? (guestData.gstin || null) : guest.gstin,
         companyName: guestData.companyName !== undefined ? (guestData.companyName || null) : guest.companyName,
       },
@@ -521,7 +633,7 @@ export async function checkInGuest({
           stayId: stay.id,
           roomId: room.id,
           startsAt: new Date(),
-          moveReason: isComp ? "AGREED_RATE:0" : `AGREED_RATE:${roomBasePrice}`,
+          moveReason: isComp ? "AGREED_RATE:0" : `AGREED_RATE:${roomBasePrice}:${isRateInclusive !== false ? "INC" : "EXC"}`,
           rateHandling: isComp ? "COMPLIMENTARY" : (checkoutType === "FIXED_TIME" ? "FIXED_TIME" : `24_HOURS:${gracePeriodMinutes}`),
         },
       });
@@ -539,7 +651,7 @@ export async function checkInGuest({
       const roomGst = isComp
         ? { taxableAmount: 0, taxAmount: 0, totalAmount: 0, components: [] }
         : calculateGST({
-            grossOrBaseAmount: initialNightPrice, isInclusive: true, sacHsn: "996311",
+            grossOrBaseAmount: initialNightPrice, isInclusive: isRateInclusive !== false, sacHsn: "996311",
             supplierStateCode: property.stateCode || "18", customTaxRate: 5,
           });
 

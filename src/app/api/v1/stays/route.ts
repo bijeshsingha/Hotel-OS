@@ -58,7 +58,12 @@ export async function GET(request: Request) {
         folio: {
           include: {
             windows: {
-              include: { entries: true },
+              include: {
+                entries: true,
+                invoices: {
+                  include: { lines: true },
+                },
+              },
             },
             payments: true,
           },
@@ -67,7 +72,36 @@ export async function GET(request: Request) {
       orderBy: { arrivalAt: "desc" },
     });
 
-    return NextResponse.json(stays);
+    const enrichedStays = await Promise.all(
+      stays.map(async (stay) => {
+        const grc = await prisma.guestRegistration.findFirst({
+          where: {
+            OR: [
+              { stayId: stay.id },
+              { guestId: stay.primaryGuestId, status: stay.status === "IN_HOUSE" ? "CHECKED_IN" : "CHECKED_OUT" },
+            ],
+          },
+          select: {
+            id: true,
+            registrationNo: true,
+            signedAt: true,
+            preAssignedRoom: true,
+            arrivalDateTime: true,
+            expectedDepartureDate: true,
+            depositAmount: true,
+            status: true,
+          },
+          orderBy: { signedAt: "desc" },
+        });
+
+        return {
+          ...stay,
+          guestRegistration: grc || null,
+        };
+      })
+    );
+
+    return NextResponse.json(enrichedStays);
   } catch (error: any) {
     console.error("Error in /api/v1/stays:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
