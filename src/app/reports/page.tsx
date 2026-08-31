@@ -653,10 +653,10 @@ export default function ReportsPage() {
                       </td>
                     </tr>
                   ) : (
-                    filteredCashierTransactions.map((tx: any) => {
+                    filteredCashierTransactions.map((tx: any, idx: number) => {
                       const isExpense = tx.flow === "OUTFLOW" || tx.type === "EXPENSE";
                       return (
-                        <tr key={tx.id} className="hover:bg-zinc-50/60 dark:hover:bg-zinc-900/40">
+                        <tr key={tx.id ? `tx-${tx.id}-${idx}` : `tx-${tx.recordId || idx}`} className="hover:bg-zinc-50/60 dark:hover:bg-zinc-900/40">
                           <td className="py-2.5 font-bold text-zinc-900 dark:text-zinc-100">{tx.recordId}</td>
                           <td className="py-2.5 text-zinc-500">{tx.time}</td>
                           <td className="py-2.5">
@@ -718,8 +718,8 @@ export default function ReportsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/60">
-                {data?.rows?.map((row: any) => (
-                  <tr key={row.stayId} className="hover:bg-zinc-50/60 dark:hover:bg-zinc-900/40">
+                {data?.rows?.map((row: any, idx: number) => (
+                  <tr key={row.stayId ? `stay-${row.stayId}-${row.roomNumber || idx}` : `ledger-${idx}`} className="hover:bg-zinc-50/60 dark:hover:bg-zinc-900/40">
                     <td className="py-2.5 font-bold text-zinc-900 dark:text-zinc-100">{row.roomNumber}</td>
                     <td className="py-2.5 font-sans font-medium text-zinc-800 dark:text-zinc-200">{row.guestName}</td>
                     <td className="py-2.5 text-zinc-500">{row.arrival}</td>
@@ -766,8 +766,8 @@ export default function ReportsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/60">
-                {data?.rows?.map((row: any) => (
-                  <tr key={row.id} className="hover:bg-zinc-50/60 dark:hover:bg-zinc-900/40">
+                {data?.rows?.map((row: any, idx: number) => (
+                  <tr key={row.id ? `rev-${row.id}-${idx}` : `rev-${idx}`} className="hover:bg-zinc-50/60 dark:hover:bg-zinc-900/40">
                     <td className="py-2.5 text-zinc-500">{row.serviceDate}</td>
                     <td className="py-2.5 font-bold text-zinc-900 dark:text-zinc-100">{row.chargeCode}</td>
                     <td className="py-2.5 font-sans text-zinc-600 dark:text-zinc-400">{row.description}</td>
@@ -807,8 +807,8 @@ export default function ReportsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/60">
-                {data?.rows?.map((row: any) => (
-                  <tr key={row.orderNo} className="hover:bg-zinc-50/60 dark:hover:bg-zinc-900/40">
+                {data?.rows?.map((row: any, idx: number) => (
+                  <tr key={row.orderNo ? `fnb-${row.orderNo}-${idx}` : `fnb-${idx}`} className="hover:bg-zinc-50/60 dark:hover:bg-zinc-900/40">
                     <td className="py-2.5 font-bold text-zinc-900 dark:text-zinc-100">{row.orderNo}</td>
                     <td className="py-2.5 font-sans font-medium text-zinc-800 dark:text-zinc-200">{row.outletName}</td>
                     <td className="py-2.5 text-zinc-500">{row.tableName} ({row.mode})</td>
