@@ -991,57 +991,30 @@ export default function AdminPortalPage() {
         </div>
       </div>
 
-      {/* 2. ADMIN NAVIGATION (Mobile & Tablet Top Bars) */}
-      {/* Mobile: 6 compact numbered controls (< 768px) */}
-      <div className="md:hidden grid grid-cols-6 gap-1 p-1 rounded-xl bg-zinc-100 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 text-xs font-bold">
-        {ADMIN_SECTIONS.map((sec, idx) => (
-          <button
-            key={sec.id}
-            type="button"
-            onClick={() => setActiveTab(sec.id)}
-            className={`py-2 px-0.5 rounded-lg text-center transition flex flex-col items-center justify-center gap-0.5 min-h-[44px] cursor-pointer ${
-              activeTab === sec.id
-                ? "bg-white dark:bg-[#18181b] text-blue-600 dark:text-blue-400 shadow-xs font-black border border-zinc-200 dark:border-zinc-700"
-                : "text-zinc-500 hover:text-zinc-900 dark:hover:text-white"
-            }`}
-            title={sec.label}
-          >
-            <span className="text-[12px] font-black">{idx + 1}</span>
-            <span className="text-[9px] truncate max-w-full font-medium">{sec.shortLabel}</span>
-          </button>
-        ))}
-      </div>
-
-      {/* Tablet: Horizontal scroll bar (768px - 1023px) */}
-      <div className="hidden md:flex lg:hidden items-center gap-1.5 p-1.5 rounded-2xl bg-zinc-100 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 overflow-x-auto shadow-xs text-xs font-bold scrollbar-none">
-        {ADMIN_SECTIONS.map((sec, idx) => {
-          const Icon = sec.icon;
-          return (
+      {/* 2. ADMIN TOP NAVIGATION BAR */}
+      <div className="w-full">
+        {/* Mobile View (< 640px): 6 numbered compact pill buttons */}
+        <div className="sm:hidden grid grid-cols-6 gap-1 p-1 rounded-2xl bg-zinc-100 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 text-xs font-bold shadow-xs">
+          {ADMIN_SECTIONS.map((sec, idx) => (
             <button
               key={sec.id}
               type="button"
               onClick={() => setActiveTab(sec.id)}
-              className={`h-10 px-3.5 rounded-xl transition flex items-center gap-2 whitespace-nowrap cursor-pointer shrink-0 ${
+              className={`py-2 px-0.5 rounded-xl text-center transition flex flex-col items-center justify-center gap-0.5 min-h-[44px] cursor-pointer ${
                 activeTab === sec.id
-                  ? "bg-white dark:bg-[#18181b] text-blue-600 dark:text-blue-400 shadow-xs font-bold border border-zinc-200 dark:border-zinc-700"
-                  : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
+                  ? "bg-white dark:bg-[#18181b] text-blue-600 dark:text-blue-400 shadow-xs font-black border border-zinc-200 dark:border-zinc-700"
+                  : "text-zinc-500 hover:text-zinc-900 dark:hover:text-white"
               }`}
+              title={sec.label}
             >
-              <Icon className="h-4 w-4" />
-              <span>{idx + 1}. {sec.label}</span>
+              <span className="text-[12px] font-black">{idx + 1}</span>
+              <span className="text-[9px] truncate max-w-full font-medium">{sec.shortLabel}</span>
             </button>
-          );
-        })}
-      </div>
+          ))}
+        </div>
 
-      {/* 3. MAIN WORKSPACE WITH DESKTOP 2-COLUMN LAYOUT */}
-      <div className="flex flex-col lg:flex-row items-start gap-4">
-        
-        {/* Desktop: 220–240px vertical panel on the left (>= 1024px) */}
-        <div className="hidden lg:flex flex-col w-56 xl:w-60 shrink-0 p-2 rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200/80 dark:border-zinc-800/80 shadow-xs space-y-1 sticky top-[70px]">
-          <div className="px-3 py-2 text-[11px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">
-            Admin Sections
-          </div>
+        {/* Desktop & Tablet View (>= 640px): Full horizontal segmented navigation pill strip */}
+        <div className="hidden sm:flex items-center gap-1.5 p-1.5 rounded-2xl bg-zinc-100 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 overflow-x-auto shadow-xs text-xs font-bold scrollbar-none">
           {ADMIN_SECTIONS.map((sec, idx) => {
             const Icon = sec.icon;
             const isSelected = activeTab === sec.id;
@@ -1050,24 +1023,22 @@ export default function AdminPortalPage() {
                 key={sec.id}
                 type="button"
                 onClick={() => setActiveTab(sec.id)}
-                className={`w-full min-h-[44px] px-3 py-2.5 rounded-xl transition flex items-center justify-between text-left text-xs cursor-pointer ${
+                className={`h-11 px-4.5 rounded-xl transition flex items-center gap-2.5 whitespace-nowrap cursor-pointer shrink-0 font-bold ${
                   isSelected
-                    ? "bg-blue-50 dark:bg-blue-600/10 text-blue-700 dark:text-blue-400 font-bold border-l-2 border-blue-600 shadow-xs"
-                    : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-50 dark:hover:bg-zinc-900/50 font-medium"
+                    ? "bg-white dark:bg-[#18181b] text-blue-600 dark:text-blue-400 shadow-xs border border-zinc-200/90 dark:border-zinc-700 font-extrabold"
+                    : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-white/50 dark:hover:bg-zinc-800/50 font-semibold"
                 }`}
               >
-                <div className="flex items-center gap-2.5 truncate">
-                  <Icon className={`h-4 w-4 shrink-0 ${isSelected ? "text-blue-600 dark:text-blue-400" : "text-zinc-400"}`} />
-                  <span className="truncate">{idx + 1}. {sec.label}</span>
-                </div>
-                {isSelected && <ChevronRight className="h-3.5 w-3.5 text-blue-600 shrink-0" />}
+                <Icon className={`h-4 w-4 shrink-0 ${isSelected ? "text-blue-600 dark:text-blue-400" : "text-zinc-400 dark:text-zinc-500"}`} />
+                <span>{idx + 1}. {sec.label}</span>
               </button>
             );
           })}
         </div>
+      </div>
 
-        {/* Tab Content Canvas */}
-        <div className="flex-1 min-w-0 w-full space-y-4">
+      {/* 3. MAIN WORKSPACE (FULL WIDTH CANVAS) */}
+      <div className="w-full space-y-4">
 
           {/* ====================================================
               TAB CONTENT 1: HOTEL & PROPERTY CONFIGURATION FORM
@@ -4246,7 +4217,6 @@ export default function AdminPortalPage() {
         </div>
       )}
 
-        </div>
       </div>
 
     </div>
