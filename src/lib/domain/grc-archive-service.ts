@@ -196,7 +196,7 @@ export async function syncGrcEditsEverywhere(updatedGrc: any) {
             ? (assignment.room.number === primaryRoomNumber || assignment.room.id === primaryRoomNumber)
             : assignment === stay.roomAssignments[0];
 
-          let specificRate = 3200;
+          let specificRate = numTariff;
           if (isPrimaryAssignment) {
             specificRate = numTariff;
           } else if (customRoomRates[assignment.room.id] !== undefined) {
@@ -207,7 +207,7 @@ export async function syncGrcEditsEverywhere(updatedGrc: any) {
             const parsedMoveRate = Number(assignment.moveReason.replace("AGREED_RATE:", "").split(":")[0]);
             if (!isNaN(parsedMoveRate)) specificRate = parsedMoveRate;
           } else {
-            specificRate = 3200;
+            specificRate = numTariff;
           }
           
           const isRoomComp = specificRate === 0;
@@ -238,7 +238,7 @@ export async function syncGrcEditsEverywhere(updatedGrc: any) {
             ? (a.room.number === primaryRoomNumber || a.room.id === primaryRoomNumber)
             : a === stay.roomAssignments[0];
 
-          let specificRate = 3200;
+          let specificRate = numTariff;
           if (isPrimaryAssignment) {
             specificRate = numTariff;
           } else if (customRoomRates[a.room.id] !== undefined) {
@@ -249,9 +249,9 @@ export async function syncGrcEditsEverywhere(updatedGrc: any) {
             const parsedMoveRate = Number(a.moveReason.replace("AGREED_RATE:", "").split(":")[0]);
             if (!isNaN(parsedMoveRate)) specificRate = parsedMoveRate;
           } else {
-            specificRate = 3200;
+            specificRate = numTariff;
           }
-          return sum + (isNaN(specificRate) ? 3200 : specificRate);
+          return sum + (isNaN(specificRate) ? numTariff : specificRate);
         }, 0);
       }
 
@@ -268,21 +268,31 @@ export async function syncGrcEditsEverywhere(updatedGrc: any) {
             const matchRoom = entry.description?.match(/Room\s+([A-Za-z0-9_-]+)/i);
             const entryRoomNum = matchRoom ? matchRoom[1] : null;
 
-            if (entryRoomNum && customRoomRates[entryRoomNum] !== undefined) {
-              entryRate = Number(customRoomRates[entryRoomNum]);
-            } else if (entryRoomNum && primaryRoomNumber && entryRoomNum === primaryRoomNumber) {
+            if (entryRoomNum && primaryRoomNumber && entryRoomNum === primaryRoomNumber) {
               entryRate = numTariff;
+            } else if (entryRoomNum && customRoomRates[entryRoomNum] !== undefined) {
+              entryRate = Number(customRoomRates[entryRoomNum]);
             } else if (entryRoomNum) {
               const matchedAssignment = stay.roomAssignments?.find(
                 (a: any) => a.room?.number === entryRoomNum || a.room?.id === entryRoomNum
               );
-              const specificRate = matchedAssignment?.moveReason?.startsWith("AGREED_RATE:")
-                ? Number(matchedAssignment.moveReason.replace("AGREED_RATE:", "").split(":")[0])
-                : ((matchedAssignment?.room?.roomType as any)?.basePrice || 3200);
-              entryRate = isNaN(specificRate) ? numTariff : specificRate;
+              const isMatchedPrimary = primaryRoomNumber
+                ? (matchedAssignment?.room?.number === primaryRoomNumber || matchedAssignment?.room?.id === primaryRoomNumber)
+                : matchedAssignment === stay.roomAssignments?.[0];
+
+              if (isMatchedPrimary) {
+                entryRate = numTariff;
+              } else {
+                const specificRate = matchedAssignment?.moveReason?.startsWith("AGREED_RATE:")
+                  ? Number(matchedAssignment.moveReason.replace("AGREED_RATE:", "").split(":")[0])
+                  : ((matchedAssignment?.room?.roomType as any)?.basePrice || numTariff);
+                entryRate = isNaN(specificRate) ? numTariff : specificRate;
+              }
             } else if (stay.roomAssignments && stay.roomAssignments.length > 1) {
               // Lumped entry for all rooms together
               entryRate = totalDailyTariff;
+            } else {
+              entryRate = numTariff;
             }
 
             const isEntryComp = entryRate === 0;

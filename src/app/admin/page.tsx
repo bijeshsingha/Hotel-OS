@@ -2922,8 +2922,21 @@ export default function AdminPortalPage() {
                             type="number"
                             placeholder={editingGrc.isComplimentary ? "0 (Complimentary)" : "Enter custom rate"}
                             disabled={editingGrc.isComplimentary}
-                            value={editingGrc.isComplimentary ? 0 : (editingGrc.agreedRoomTariff !== undefined ? editingGrc.agreedRoomTariff : 3200)}
-                            onChange={(e) => setEditingGrc({ ...editingGrc, agreedRoomTariff: Number(e.target.value) })}
+                            value={editingGrc.isComplimentary ? 0 : (editingGrc.agreedRoomTariff !== undefined ? editingGrc.agreedRoomTariff : "")}
+                            onChange={(e) => {
+                              const val = Number(e.target.value);
+                              const pRoom = editingGrc.preAssignedRoom;
+                              const pRoomObj = roomsList.find((r) => r.number === pRoom || r.id === pRoom);
+                              setEditingGrc((prev: any) => ({
+                                ...prev,
+                                agreedRoomTariff: val,
+                                roomRates: {
+                                  ...(prev.roomRates || {}),
+                                  ...(pRoom ? { [pRoom]: val } : {}),
+                                  ...(pRoomObj?.id ? { [pRoomObj.id]: val } : {}),
+                                },
+                              }));
+                            }}
                             className="w-full h-10 pl-7 pr-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-blue-700 dark:text-blue-400 font-mono font-bold text-sm focus:border-blue-500 focus:outline-none disabled:opacity-60 disabled:bg-zinc-100 dark:disabled:bg-zinc-800"
                           />
                         </div>

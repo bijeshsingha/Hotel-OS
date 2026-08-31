@@ -564,12 +564,42 @@ export async function sync24HourFolioCharges({
   // Compute billable nights using domain engine (Early Bird + 24h + Grace Period)
   const billableCalc = calculate24HrBillableDays(arrivalTime, now, checkoutType, graceMinutes);
   const billableNights = billableCalc.billableDays;
-
   const existingEntries = primaryWindow.entries || [];
   const currentChargedNights = existingEntries.length;
   let folioMutated = false;
 
-  // 1. Post missing cycle room charges if billableNights > currentChargedNights
+  // 1. Synchronize any existing room tariff charges if the rate was adjusted
+  for (const entry of existingEntries) {
+    const isEntryComp = roomBasePrice === 0 || isComp;
+    const isPriceMismatched = isEntryComp
+      ? entry.totalAmount !== 0 || entry.unitAmount !== 0
+      : Math.abs(entry.unitAmount - roomBasePrice) > 0.01;
+
+    if (isPriceMismatched) {
+      const gst = isEntryComp
+        ? { taxableAmount: 0, taxAmount: 0, totalAmount: 0, components: [] }
+        : calculateGST({
+            grossOrBaseAmount: roomBasePrice,
+            isInclusive: isRateInclusive,
+            sacHsn: "996311",
+            supplierStateCode: folio.property.stateCode || "18",
+            customTaxRate: 5,
+          });
+
+      await prisma.folioEntry.update({
+        where: { id: entry.id },
+        data: {
+          unitAmount: roomBasePrice,
+          taxableAmount: gst.taxableAmount,
+          taxComponentsJson: JSON.stringify(gst.components),
+          totalAmount: gst.totalAmount,
+        },
+      });
+      folioMutated = true;
+    }
+  }
+
+  // 2. Post missing cycle room charges if billableNights > currentChargedNights
   if (currentChargedNights < billableNights) {
     for (let n = currentChargedNights + 1; n <= billableNights; n++) {
       const cycleDate = new Date(arrivalTime.getTime() + (n - 1) * 24 * 60 * 60 * 1000)
@@ -616,7 +646,7 @@ export async function sync24HourFolioCharges({
     }
   }
 
-  // 2. Roll back excess charges if manager extended grace period or waived next night (billableNights < currentChargedNights)
+  // 3. Roll back excess charges if manager extended grace period or waived next night (billableNights < currentChargedNights)
   if (currentChargedNights > billableNights) {
     const excessCount = currentChargedNights - billableNights;
     // Find auto-posted rollover charges ordered by most recent first
@@ -624,32 +654,29 @@ export async function sync24HourFolioCharges({
       where: {
         folioId: folio.id,
         chargeCode: "ROOM_TARIFF",
-        sourceType: "PMS_24HR_AUTO_CHARGE",
         status: "POSTED",
       },
       orderBy: { createdAt: "desc" },
       take: excessCount,
     });
 
-    if (autoEntries.length > 0) {
-      const entryIdsToDelete = autoEntries.map((e) => e.id);
-      await prisma.folioEntry.deleteMany({
-        where: { id: { in: entryIdsToDelete } },
-      });
+    for (const e of autoEntries) {
+      await prisma.folioEntry.delete({ where: { id: e.id } });
       folioMutated = true;
     }
   }
 
-  // Recalculate true balance if folio entries changed
+  // 4. Recalculate true balance if folio was mutated
   if (folioMutated) {
-    const allRemaining = await prisma.folioEntry.findMany({
+    const allEntries = await prisma.folioEntry.findMany({
       where: { folioId: folio.id, status: "POSTED" },
     });
+    const totalCharges = allEntries.reduce((sum, e) => sum + (e.totalAmount || 0), 0);
+
     const allPayments = await prisma.payment.findMany({
       where: { folioId: folio.id, status: "SUCCEEDED" },
     });
-    const totalCharges = allRemaining.reduce((sum, e) => sum + e.totalAmount, 0);
-    const totalPayments = allPayments.reduce((sum, p) => sum + p.amount, 0);
+    const totalPayments = allPayments.reduce((sum, p) => sum + (p.amount || 0), 0);
     const newBalance = Math.max(0, Math.round((totalCharges - totalPayments) * 100) / 100);
 
     await prisma.folio.update({
