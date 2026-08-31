@@ -862,7 +862,8 @@ function BillingContent() {
       }
 
       const invoiceData = await res.json();
-      alert(`Check-out successful! Tax Invoice #${invoiceData.invoiceNo} generated.`);
+      const invoiceNo = invoiceData.invoice?.invoiceNo || invoiceData.invoiceNo || "";
+      alert(`Check-out successful! Tax Invoice #${invoiceNo} generated.`);
       await loadStays();
       await loadFolio(folioData.id);
       await refreshData();

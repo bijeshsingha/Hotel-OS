@@ -16,7 +16,10 @@ export async function POST(
       actorId,
     });
 
-    return NextResponse.json(result);
+    return NextResponse.json({
+      ...result,
+      invoiceNo: result.invoice?.invoiceNo,
+    });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
