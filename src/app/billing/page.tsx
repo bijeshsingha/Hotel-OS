@@ -1809,7 +1809,7 @@ function BillingContent() {
                       {entries.map((e: any) => {
                         const taxAmt = (e.totalAmount || 0) - (e.taxableAmount || 0);
                         const isFood = e.chargeCode?.includes("FOOD") || e.chargeCode?.includes("RESTAURANT") || e.chargeCode?.includes("FB");
-                        const isRoom = e.chargeCode?.includes("ROOM_TARIFF");
+                        const isRoom = e.chargeCode?.includes("ROOM_TARIFF") || e.sourceType === "PMS_NIGHTLY_CHARGE" || e.chargeCode === "EXTRA_PAX";
                         const isDiscount = (e.amount || 0) < 0 || (e.totalAmount || 0) < 0;
 
                         return (
@@ -1848,17 +1848,19 @@ function BillingContent() {
                               {formatINR(e.totalAmount || 0)}
                             </td>
                             <td className="py-2 px-3 text-right">
-                              {activeStay?.status === "IN_HOUSE" && folioData?.status === "OPEN" && (
+                              {!isRoom && activeStay?.status === "IN_HOUSE" && folioData?.status === "OPEN" ? (
                                 <button
                                   type="button"
                                   onClick={() => handleDeleteCharge(e.id, e.description, e.totalAmount || 0)}
                                   disabled={actionLoading}
                                   className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-bold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/60 border border-rose-200/60 dark:border-rose-800/60 hover:border-rose-300 dark:hover:border-rose-700 transition cursor-pointer disabled:opacity-50"
-                                  title="Delete mistaken charge from folio"
+                                  title="Delete posted charge from folio"
                                 >
                                   <Trash2 className="h-3.5 w-3.5" />
                                   <span className="hidden sm:inline">Delete</span>
                                 </button>
+                              ) : (
+                                <span className="text-zinc-300 dark:text-zinc-700 select-none text-[11px] font-mono pr-2">—</span>
                               )}
                             </td>
                           </tr>

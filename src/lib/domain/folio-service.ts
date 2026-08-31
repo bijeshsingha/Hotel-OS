@@ -123,6 +123,10 @@ export async function deleteFolioCharge({
     throw new Error("Folio entry not found on this folio.");
   }
 
+  if (targetEntry.chargeCode?.includes("ROOM_TARIFF") || targetEntry.sourceType === "PMS_NIGHTLY_CHARGE") {
+    throw new Error("System-generated room tariff charges cannot be deleted. To adjust room tariff, edit the GRC rate or post a Discount/Rebate.");
+  }
+
   // Delete the entry
   await prisma.folioEntry.delete({
     where: { id: entryId },
