@@ -191,12 +191,12 @@ export function ReservationVoucherModal({
               <div className="font-mono text-[10px] font-bold text-zinc-500 uppercase tracking-wider">
                 Primary Guest Information
               </div>
-              <div className="font-bold text-sm text-zinc-950">{guestName}</div>
+              <div className="font-bold text-sm text-zinc-950 uppercase">{guestName}</div>
               <div className="text-zinc-600 font-mono">Phone: {guestPhone}</div>
               {guestEmail && <div className="text-zinc-600">Email: {guestEmail}</div>}
-              {guestCity && <div className="text-zinc-600">City: {guestCity}{guestState ? `, ${guestState}` : ""}</div>}
-              {guestGstin && <div className="text-zinc-800 font-mono text-[11px]">GSTIN: <strong>{guestGstin}</strong></div>}
-              {companyOrAgency && <div className="text-indigo-700 font-medium text-[11px]">Org: {companyOrAgency}</div>}
+              {guestCity && <div className="text-zinc-600 uppercase">City: {guestCity}{guestState ? `, ${guestState}` : ""}</div>}
+              {guestGstin && <div className="text-zinc-800 font-mono text-[11px] uppercase">GSTIN: <strong>{guestGstin}</strong></div>}
+              {companyOrAgency && <div className="text-indigo-700 font-medium text-[11px] uppercase">Org: {companyOrAgency}</div>}
             </div>
 
             {/* Stay & Room Details Box */}

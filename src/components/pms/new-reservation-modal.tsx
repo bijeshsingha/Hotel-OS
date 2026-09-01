@@ -437,10 +437,10 @@ export function NewReservationModal({
                 <input
                   type="text"
                   required
-                  placeholder="e.g. Bijesh Singha"
+                  placeholder="e.g. BIJESH SINGHA"
                   value={form.guestName}
-                  onChange={(e) => setForm({ ...form, guestName: e.target.value })}
-                  className="w-full h-9 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs text-zinc-900 dark:text-white focus:border-indigo-500 focus:outline-none transition shadow-xs font-semibold"
+                  onChange={(e) => setForm({ ...form, guestName: e.target.value.toUpperCase() })}
+                  className="w-full h-9 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs text-zinc-900 dark:text-white focus:border-indigo-500 focus:outline-none transition shadow-xs font-semibold uppercase"
                 />
               </div>
 
@@ -477,10 +477,10 @@ export function NewReservationModal({
                 </label>
                 <input
                   type="text"
-                  placeholder="e.g. Guwahati / Kolkata"
+                  placeholder="e.g. GUWAHATI / KOLKATA"
                   value={form.guestCity}
-                  onChange={(e) => setForm({ ...form, guestCity: e.target.value })}
-                  className="w-full h-9 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs text-zinc-900 dark:text-white focus:border-indigo-500 focus:outline-none transition shadow-xs"
+                  onChange={(e) => setForm({ ...form, guestCity: e.target.value.toUpperCase() })}
+                  className="w-full h-9 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs text-zinc-900 dark:text-white focus:border-indigo-500 focus:outline-none transition shadow-xs uppercase"
                 />
               </div>
 
@@ -490,10 +490,10 @@ export function NewReservationModal({
                 </label>
                 <input
                   type="text"
-                  placeholder="e.g. Assam, India"
+                  placeholder="e.g. ASSAM, INDIA"
                   value={form.guestState}
-                  onChange={(e) => setForm({ ...form, guestState: e.target.value })}
-                  className="w-full h-9 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs text-zinc-900 dark:text-white focus:border-indigo-500 focus:outline-none transition shadow-xs"
+                  onChange={(e) => setForm({ ...form, guestState: e.target.value.toUpperCase() })}
+                  className="w-full h-9 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs text-zinc-900 dark:text-white focus:border-indigo-500 focus:outline-none transition shadow-xs uppercase"
                 />
               </div>
 
@@ -504,8 +504,8 @@ export function NewReservationModal({
                 <input
                   type="text"
                   value={form.guestNationality}
-                  onChange={(e) => setForm({ ...form, guestNationality: e.target.value })}
-                  className="w-full h-9 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs text-zinc-900 dark:text-white focus:border-indigo-500 focus:outline-none transition shadow-xs"
+                  onChange={(e) => setForm({ ...form, guestNationality: e.target.value.toUpperCase() })}
+                  className="w-full h-9 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs text-zinc-900 dark:text-white focus:border-indigo-500 focus:outline-none transition shadow-xs uppercase"
                 />
               </div>
             </div>

@@ -112,19 +112,25 @@ export async function POST(request: Request) {
         })
       : null;
 
+    const upperName = canonicalGuestName.toUpperCase();
+    const upperCity = (guestCity || "").trim().toUpperCase();
+    const upperState = (guestState || "").trim().toUpperCase();
+    const upperNationality = (guestNationality || "Indian").trim().toUpperCase();
+    const upperCompany = companyName ? companyName.trim().toUpperCase() : agencyName ? agencyName.trim().toUpperCase() : null;
+
     if (!guest) {
       guest = await prisma.guest.create({
         data: {
           organizationId: property.organizationId,
-          name: canonicalGuestName,
+          name: upperName,
           email: guestEmail || null,
           phone: guestPhone || null,
-          gstin: guestGstin || null,
-          companyName: companyName || agencyName || null,
-          nationality: guestNationality,
+          gstin: guestGstin ? guestGstin.trim().toUpperCase() : null,
+          companyName: upperCompany,
+          nationality: upperNationality,
           addressJson: JSON.stringify({
-            city: guestCity || "",
-            state: guestState || "",
+            city: upperCity,
+            state: upperState,
             country: "India",
           }),
         },
@@ -134,14 +140,15 @@ export async function POST(request: Request) {
       guest = await prisma.guest.update({
         where: { id: guest.id },
         data: {
-          name: canonicalGuestName || guest.name,
+          name: upperName || guest.name,
           email: guestEmail || guest.email,
-          gstin: guestGstin || guest.gstin,
-          companyName: companyName || agencyName || guest.companyName,
-          addressJson: (guestCity || guestState)
+          gstin: guestGstin ? guestGstin.trim().toUpperCase() : guest.gstin,
+          companyName: upperCompany || guest.companyName,
+          nationality: upperNationality || guest.nationality,
+          addressJson: (upperCity || upperState)
             ? JSON.stringify({
-                city: guestCity || "",
-                state: guestState || "",
+                city: upperCity,
+                state: upperState,
                 country: "India",
               })
             : guest.addressJson,

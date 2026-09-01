@@ -1938,8 +1938,8 @@ function PMSFrontDeskContent() {
 
                         {/* Guest Information */}
                         <td className="px-3.5 py-2.5 text-zinc-900 dark:text-white whitespace-nowrap">
-                          <div className="font-bold">{formatGuestDisplayName(res.primaryGuest?.name || res.guestName) || "Valued Guest"}</div>
-                          <div className="text-[11px] text-zinc-500 font-mono flex items-center gap-1.5">
+                          <div className="font-bold uppercase">{formatGuestDisplayName(res.primaryGuest?.name || res.guestName) || "VALUED GUEST"}</div>
+                          <div className="text-[11px] text-zinc-500 font-mono flex items-center gap-1.5 uppercase">
                             <span>{res.primaryGuest?.phone || res.phone || "No Phone"}</span>
                             {res.primaryGuest?.city && <span>• {res.primaryGuest.city}</span>}
                             {res.primaryGuest?.companyName && (
