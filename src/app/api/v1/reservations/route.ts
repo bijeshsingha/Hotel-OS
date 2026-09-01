@@ -102,21 +102,15 @@ export async function POST(request: Request) {
 
     const { pureName: canonicalGuestName } = normalizeGuestName(guestName);
 
-    // 1. Find or create Guest (matching by name and contact to prevent assigning different guests sharing phone/agent number)
-    let guest = await prisma.guest.findFirst({
-      where: {
-        organizationId: property.organizationId,
-        name: canonicalGuestName,
-        ...(guestEmail || guestPhone
-          ? {
-              OR: [
-                ...(guestEmail ? [{ email: guestEmail }] : []),
-                ...(guestPhone ? [{ phone: guestPhone }] : []),
-              ],
-            }
-          : {}),
-      },
-    });
+    // 1. Find or create Guest strictly by phone number
+    let guest = guestPhone
+      ? await prisma.guest.findFirst({
+          where: {
+            organizationId: property.organizationId,
+            phone: guestPhone,
+          },
+        })
+      : null;
 
     if (!guest) {
       guest = await prisma.guest.create({
@@ -136,14 +130,21 @@ export async function POST(request: Request) {
         },
       });
     } else {
-      // If guest profile exists with same name, refresh contact/address details if new ones provided
-      await prisma.guest.update({
+      // If guest profile found by phone number, update with latest entered guest name and details
+      guest = await prisma.guest.update({
         where: { id: guest.id },
         data: {
-          ...(guestEmail && !guest.email ? { email: guestEmail } : {}),
-          ...(guestPhone && !guest.phone ? { phone: guestPhone } : {}),
-          ...(guestGstin ? { gstin: guestGstin } : {}),
-          ...(companyName || agencyName ? { companyName: companyName || agencyName } : {}),
+          name: canonicalGuestName || guest.name,
+          email: guestEmail || guest.email,
+          gstin: guestGstin || guest.gstin,
+          companyName: companyName || agencyName || guest.companyName,
+          addressJson: (guestCity || guestState)
+            ? JSON.stringify({
+                city: guestCity || "",
+                state: guestState || "",
+                country: "India",
+              })
+            : guest.addressJson,
         },
       });
     }

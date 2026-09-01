@@ -2143,8 +2143,9 @@ function PMSFrontDeskContent() {
             setShowNewResModal(false);
             await loadData();
             await refreshData();
-            if (result?.reservation) {
-              setSelectedResForVoucher(result.reservation);
+            const resObj = result?.reservation || result;
+            if (resObj) {
+              setSelectedResForVoucher(resObj);
               setShowResVoucherModal(true);
             }
           }}
@@ -3168,42 +3169,6 @@ function PMSFrontDeskContent() {
           onClose={() => setShowCompanyDirectoryModal(false)}
           onSelectForBooking={() => {
             setShowNewResModal(true);
-          }}
-        />
-      )}
-
-      {/* 11. NEW ADVANCE RESERVATION CREATION MODAL */}
-      {showNewResModal && (
-        <NewReservationModal
-          isOpen={showNewResModal}
-          onClose={() => setShowNewResModal(false)}
-          onSuccess={async (result) => {
-            setShowNewResModal(false);
-            await loadData();
-            await refreshData();
-            if (result) {
-              setSelectedResForVoucher(result);
-              setShowResVoucherModal(true);
-            }
-          }}
-          rooms={rooms}
-          activeProperty={activeProperty}
-        />
-      )}
-
-      {/* 12. ADVANCE RESERVATION CONFIRMATION VOUCHER MODAL */}
-      {showResVoucherModal && selectedResForVoucher && (
-        <ReservationVoucherModal
-          isOpen={showResVoucherModal}
-          onClose={() => {
-            setShowResVoucherModal(false);
-            setSelectedResForVoucher(null);
-          }}
-          reservation={selectedResForVoucher}
-          activeProperty={activeProperty}
-          onCheckInNow={(res) => {
-            setShowResVoucherModal(false);
-            handleFulfillReservation(res);
           }}
         />
       )}

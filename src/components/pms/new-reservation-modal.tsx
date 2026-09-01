@@ -199,7 +199,7 @@ export function NewReservationModal({
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to create reservation");
 
-      onSuccess(data);
+      onSuccess(data?.reservation || data);
     } catch (err: any) {
       setError(err.message || "Failed to book reservation.");
     } finally {

@@ -37,8 +37,10 @@ export function ReservationVoucherModal({
 
   if (!isOpen || !reservation) return null;
 
+  const activeRes = reservation?.reservation ? { ...reservation.reservation, ...reservation } : reservation;
+
   // 1. Guest Information
-  const guest = reservation.primaryGuest || {};
+  const guest = activeRes.primaryGuest || {};
   let guestAddress: any = {};
   try {
     if (guest.addressJson) {
@@ -46,20 +48,20 @@ export function ReservationVoucherModal({
     }
   } catch {}
 
-  const guestName = guest.name || reservation.guestName || "Valued Guest";
-  const guestPhone = guest.phone || reservation.guestPhone || "N/A";
-  const guestEmail = guest.email || reservation.guestEmail;
-  const guestCity = guestAddress.city || guest.city || reservation.guestCity;
-  const guestState = guestAddress.state || guest.state || reservation.guestState;
-  const guestGstin = guest.gstin || reservation.guestGstin;
-  const companyOrAgency = guest.companyName || reservation.companyName || reservation.agencyName || reservation.channelRef;
+  const guestName = guest.name || activeRes.guestName || "Valued Guest";
+  const guestPhone = guest.phone || activeRes.guestPhone || "N/A";
+  const guestEmail = guest.email || activeRes.guestEmail;
+  const guestCity = guestAddress.city || guest.city || activeRes.guestCity;
+  const guestState = guestAddress.state || guest.state || activeRes.guestState;
+  const guestGstin = guest.gstin || activeRes.guestGstin;
+  const companyOrAgency = guest.companyName || activeRes.companyName || activeRes.agencyName || activeRes.channelRef;
 
   // 2. Room & Occupancy
-  const roomsList = Array.isArray(reservation.rooms) ? reservation.rooms : [];
-  const totalRooms = roomsList.length > 0 ? roomsList.length : (Number(reservation.roomCount) || 1);
-  const totalAdults = Number(reservation.adults) || (roomsList.length > 0 ? roomsList[0]?.adults || 2 : 2);
-  const totalChildren = Number(reservation.children) || (roomsList.length > 0 ? roomsList[0]?.children || 0 : 0);
-  const roomTypeName = reservation.roomTypeName || reservation.roomType?.name || (roomsList[0]?.roomType?.name) || "Standard Deluxe Room";
+  const roomsList = Array.isArray(activeRes.rooms) ? activeRes.rooms : [];
+  const totalRooms = roomsList.length > 0 ? roomsList.length : (Number(activeRes.roomCount) || 1);
+  const totalAdults = Number(activeRes.adults) || (roomsList.length > 0 ? roomsList[0]?.adults || 2 : 2);
+  const totalChildren = Number(activeRes.children) || (roomsList.length > 0 ? roomsList[0]?.children || 0 : 0);
+  const roomTypeName = activeRes.roomTypeName || activeRes.roomType?.name || (roomsList[0]?.roomType?.name) || "Standard Deluxe Room";
   const roomCategoryDisplay = totalRooms > 1
     ? `${totalRooms} × ${roomTypeName} (${totalRooms} Rooms Group)`
     : roomTypeName;
@@ -81,15 +83,15 @@ export function ReservationVoucherModal({
     }
   };
 
-  const checkInRaw = reservation.arrivalDate || reservation.checkInDate || reservation.arrivalDateTime;
-  const checkOutRaw = reservation.departureDate || reservation.checkOutDate || reservation.expectedDepartureDate;
+  const checkInRaw = activeRes.arrivalDate || activeRes.checkInDate || activeRes.arrivalDateTime;
+  const checkOutRaw = activeRes.departureDate || activeRes.checkOutDate || activeRes.expectedDepartureDate;
   const checkInStr = formatVoucherDate(checkInRaw);
   const checkOutStr = formatVoucherDate(checkOutRaw);
 
   // 4. Financial Breakdown
-  const totalAmount = Number(reservation.totalSnapshot || reservation.totalAmount) || (roomsList.reduce((sum: number, r: any) => sum + (r.nights?.reduce((nSum: number, n: any) => nSum + (n.totalAmount || 0), 0) || 0), 0)) || 0;
-  const deposit = Number(reservation.deposits?.[0]?.originalAmount || reservation.deposits?.[0]?.amount || reservation.deposits?.[0]?.payment?.amount || reservation.depositAmount || 0);
-  const depositMethod = reservation.deposits?.[0]?.payment?.method || reservation.depositMethod || "UPI";
+  const totalAmount = Number(activeRes.totalSnapshot || activeRes.totalAmount) || (roomsList.reduce((sum: number, r: any) => sum + (r.nights?.reduce((nSum: number, n: any) => nSum + (n.totalAmount || 0), 0) || 0), 0)) || 0;
+  const deposit = Number(activeRes.deposits?.[0]?.originalAmount || activeRes.deposits?.[0]?.amount || activeRes.deposits?.[0]?.payment?.amount || activeRes.depositAmount || 0);
+  const depositMethod = activeRes.deposits?.[0]?.payment?.method || activeRes.depositMethod || "UPI";
   const balanceDue = Math.max(0, totalAmount - deposit);
 
   const handlePrint = () => {
@@ -104,7 +106,7 @@ export function ReservationVoucherModal({
         <div className="p-4 sm:p-5 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between bg-zinc-50/70 dark:bg-zinc-900/60 shrink-0 print:hidden">
           <div className="flex items-center gap-2">
             <span className="text-xs font-mono font-bold px-2.5 py-1 rounded-lg bg-indigo-100 dark:bg-indigo-500/20 text-indigo-800 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-500/30">
-              {reservation.confirmationNo || "RES-CONFIRMATION"}
+              {activeRes.confirmationNo || "RES-CONFIRMATION"}
             </span>
             <span className="text-xs font-bold text-zinc-900 dark:text-white">
               Booking Confirmation Voucher
