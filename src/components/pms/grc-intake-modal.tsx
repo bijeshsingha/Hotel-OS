@@ -238,8 +238,8 @@ export function GrcIntakeModal({
             return {
               ...prev,
               mobilePhone: val,
-              fullName: pureName,
-              title,
+              fullName: prev.fullName.trim() ? prev.fullName : pureName,
+              title: prev.fullName.trim() ? prev.title : title,
               fatherSpouseName: g.fatherSpouseName || prev.fatherSpouseName,
               age: g.age ? String(g.age) : prev.age,
               gender: g.gender || prev.gender,

@@ -100,18 +100,23 @@ export async function POST(request: Request) {
       where: { id: propertyId },
     });
 
-    // 1. Find or create Guest
+    const { pureName: canonicalGuestName } = normalizeGuestName(guestName);
+
+    // 1. Find or create Guest (matching by name and contact to prevent assigning different guests sharing phone/agent number)
     let guest = await prisma.guest.findFirst({
       where: {
         organizationId: property.organizationId,
-        OR: [
-          ...(guestEmail ? [{ email: guestEmail }] : []),
-          ...(guestPhone ? [{ phone: guestPhone }] : []),
-        ],
+        name: canonicalGuestName,
+        ...(guestEmail || guestPhone
+          ? {
+              OR: [
+                ...(guestEmail ? [{ email: guestEmail }] : []),
+                ...(guestPhone ? [{ phone: guestPhone }] : []),
+              ],
+            }
+          : {}),
       },
     });
-
-    const { pureName: canonicalGuestName } = normalizeGuestName(guestName);
 
     if (!guest) {
       guest = await prisma.guest.create({
@@ -128,6 +133,17 @@ export async function POST(request: Request) {
             state: guestState || "",
             country: "India",
           }),
+        },
+      });
+    } else {
+      // If guest profile exists with same name, refresh contact/address details if new ones provided
+      await prisma.guest.update({
+        where: { id: guest.id },
+        data: {
+          ...(guestEmail && !guest.email ? { email: guestEmail } : {}),
+          ...(guestPhone && !guest.phone ? { phone: guestPhone } : {}),
+          ...(guestGstin ? { gstin: guestGstin } : {}),
+          ...(companyName || agencyName ? { companyName: companyName || agencyName } : {}),
         },
       });
     }
