@@ -2164,7 +2164,8 @@ function PMSFrontDeskContent() {
           }}
           onCheckInNow={(res) => {
             setShowResVoucherModal(false);
-            handleFulfillReservation(res);
+            setResForCheckIn(res);
+            setShowCheckInModal(true);
           }}
         />
       )}
