@@ -59,10 +59,38 @@ export async function GET(request: Request) {
   }
 }
 
+function resolveRoomTypeId(item: any, fallbackId?: string): string {
+  if (item?.roomTypeId) return item.roomTypeId;
+  const code = (item?.categoryCode || item?.code || "").toUpperCase();
+  const name = (item?.roomName || item?.name || "").toLowerCase();
+  const bedType = (item?.bedType || "").toLowerCase();
+  const slug = (item?.roomSlug || item?.slug || "").toLowerCase();
+
+  if (code === "DELUXE_KING" || (bedType.includes("king") && (name.includes("deluxe") || slug.includes("deluxe")))) {
+    return "rt_deluxe_king";
+  }
+  if (code === "DELUXE_TWIN" || (bedType.includes("twin") && (name.includes("deluxe") || slug.includes("deluxe")))) {
+    return "rt_deluxe_twin";
+  }
+  if (code === "EXEC_KING" || (bedType.includes("king") && (name.includes("exec") || slug.includes("exec")))) {
+    return "rt_exec_king";
+  }
+  if (code === "EXEC_TWIN" || (bedType.includes("twin") && (name.includes("exec") || slug.includes("exec")))) {
+    return "rt_exec_twin";
+  }
+  if (code === "SUITE" || name.includes("suite") || slug.includes("suite")) {
+    return "rt_suite";
+  }
+  if (name.includes("deluxe") || slug.includes("deluxe")) {
+    return "rt_deluxe_king";
+  }
+  return fallbackId || "rt_deluxe_king";
+}
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const {
+    let {
       propertyId,
       guestName,
       guestPhone,
@@ -73,25 +101,47 @@ export async function POST(request: Request) {
       guestNationality = "Indian",
       roomTypeId,
       roomCount = 1,
+      bookedRooms,
       assignedRoomId,
       arrivalDate,
       departureDate,
+      checkIn,
+      checkOut,
       adults = 2,
       children = 0,
       source = "DIRECT",
+      bookingType,
+      b2b,
       agencyName,
       agencyPhone,
       companyName,
       channelRef,
       ratePerNight,
-      depositAmount = 0,
-      depositMethod = "UPI",
+      depositAmount,
+      depositMethod,
+      paymentMethod,
       notes,
+      specialRequests,
+      promoCode,
+      discountAmount = 0,
+      baseAmount,
+      taxAmount,
+      totalAmount,
     } = body;
 
-    if (!propertyId || !guestName || !roomTypeId || !arrivalDate || !departureDate) {
+    // 1. Resolve Aliased Fields
+    const effectiveArrival = arrivalDate || checkIn;
+    const effectiveDeparture = departureDate || checkOut;
+    const effectiveNotes = notes || specialRequests || "";
+
+    if (!propertyId) {
+      const prop = await prisma.property.findFirst();
+      propertyId = prop?.id || "prop_ambarish";
+    }
+
+    if (!effectiveArrival || !effectiveDeparture || !guestName) {
       return NextResponse.json(
-        { error: "Property, Guest Name, Room Category, Check-In Date, and Check-Out Date are required." },
+        { error: "Guest Name, Check-In Date, and Check-Out Date are required." },
         { status: 400 }
       );
     }
@@ -100,9 +150,22 @@ export async function POST(request: Request) {
       where: { id: propertyId },
     });
 
+    // 2. Extract B2B Metadata if present
+    const b2bCompany = b2b?.companyName || companyName;
+    const b2bAgent = b2b?.agentName || agencyName;
+    const b2bAgentPhone = b2b?.agentPhone || agencyPhone;
+    const b2bGstin = b2b?.companyGstin || guestGstin;
+    const b2bPo = b2b?.poNumber;
+    const b2bBillingInstruction = b2b?.billingInstruction;
+    const effectiveSource = b2b?.accountType === "TRAVEL_AGENT"
+      ? "TRAVEL_AGENT"
+      : b2b?.accountType === "CORPORATE" || b2bCompany
+      ? "CORPORATE"
+      : source;
+
     const { pureName: canonicalGuestName } = normalizeGuestName(guestName);
 
-    // 1. Find or create Guest strictly by phone number
+    // 3. Find or create Guest strictly by phone number
     let guest = guestPhone
       ? await prisma.guest.findFirst({
           where: {
@@ -116,16 +179,16 @@ export async function POST(request: Request) {
     const upperCity = (guestCity || "").trim().toUpperCase();
     const upperState = (guestState || "").trim().toUpperCase();
     const upperNationality = (guestNationality || "Indian").trim().toUpperCase();
-    const upperCompany = companyName ? companyName.trim().toUpperCase() : agencyName ? agencyName.trim().toUpperCase() : null;
+    const upperCompany = b2bCompany ? b2bCompany.trim().toUpperCase() : b2bAgent ? b2bAgent.trim().toUpperCase() : null;
 
     if (!guest) {
       guest = await prisma.guest.create({
         data: {
           organizationId: property.organizationId,
           name: upperName,
-          email: guestEmail || null,
+          email: guestEmail || b2b?.corporateEmail || null,
           phone: guestPhone || null,
-          gstin: guestGstin ? guestGstin.trim().toUpperCase() : null,
+          gstin: b2bGstin ? b2bGstin.trim().toUpperCase() : null,
           companyName: upperCompany,
           nationality: upperNationality,
           addressJson: JSON.stringify({
@@ -142,7 +205,7 @@ export async function POST(request: Request) {
         data: {
           name: upperName || guest.name,
           email: guestEmail || guest.email,
-          gstin: guestGstin ? guestGstin.trim().toUpperCase() : guest.gstin,
+          gstin: b2bGstin ? b2bGstin.trim().toUpperCase() : guest.gstin,
           companyName: upperCompany || guest.companyName,
           nationality: upperNationality || guest.nationality,
           addressJson: (upperCity || upperState)
@@ -156,87 +219,136 @@ export async function POST(request: Request) {
       });
     }
 
-    // Calculate nights count and room count
-    const start = new Date(arrivalDate);
-    const end = new Date(departureDate);
+    // 4. Calculate Nights Count
+    const start = new Date(effectiveArrival);
+    const end = new Date(effectiveDeparture);
     const diffTime = Math.abs(end.getTime() - start.getTime());
     const nightsCount = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
-    const numRooms = Math.max(1, Number(roomCount) || 1);
 
-    // Calculate per-night rates & total per room
-    const effectiveBaseRate = Number(ratePerNight) >= 0 ? Number(ratePerNight) : 3500;
-    const nightsData = [];
-    let singleRoomTotal = 0;
+    // 5. Multi-Room Breakdown Handling
+    interface NormalizedRoomItem {
+      roomTypeId: string;
+      adults: number;
+      children: number;
+      ratePerNight: number;
+      bedType?: string;
+    }
 
-    for (let i = 0; i < nightsCount; i++) {
-      const current = new Date(start);
-      current.setDate(current.getDate() + i);
-      const serviceDate = current.toISOString().split("T")[0];
+    let roomsToCreate: NormalizedRoomItem[] = [];
 
-      const gst = effectiveBaseRate === 0
-        ? { taxableAmount: 0, taxAmount: 0, totalAmount: 0 }
-        : calculateGST({
-            grossOrBaseAmount: effectiveBaseRate,
-            isInclusive: false,
-            sacHsn: "996311",
-            supplierStateCode: property.stateCode || "18",
+    if (Array.isArray(bookedRooms) && bookedRooms.length > 0) {
+      for (const item of bookedRooms) {
+        const resolvedRtId = resolveRoomTypeId(item, roomTypeId);
+        const qty = Math.max(1, Number(item.quantity) || 1);
+        const rate = Number(item.pricePerNight) >= 0 ? Number(item.pricePerNight) : Number(ratePerNight) >= 0 ? Number(ratePerNight) : 3500;
+        for (let q = 0; q < qty; q++) {
+          roomsToCreate.push({
+            roomTypeId: resolvedRtId,
+            adults: Math.max(1, Math.floor((Number(adults) || 2) / Math.max(1, bookedRooms.length))),
+            children: Number(children) || 0,
+            ratePerNight: rate,
+            bedType: item.bedType,
           });
+        }
+      }
+    } else {
+      const resolvedRtId = resolveRoomTypeId({ roomTypeId }, roomTypeId);
+      const numRooms = Math.max(1, Number(roomCount) || 1);
+      const rate = Number(ratePerNight) >= 0 ? Number(ratePerNight) : 3500;
+      for (let r = 0; r < numRooms; r++) {
+        roomsToCreate.push({
+          roomTypeId: resolvedRtId,
+          adults: Number(adults) || 2,
+          children: Number(children) || 0,
+          ratePerNight: rate,
+        });
+      }
+    }
 
-      singleRoomTotal += gst.totalAmount;
+    // 6. Calculate per-night rates & total per room
+    let totalCalculatedGross = 0;
+    const roomNightSchedules: { roomTypeId: string; adults: number; children: number; nightsData: any[] }[] = [];
 
-      nightsData.push({
-        serviceDate,
-        baseAmount: effectiveBaseRate,
-        discountAmount: 0,
-        taxableAmount: gst.taxableAmount,
-        taxAmount: gst.taxAmount,
-        totalAmount: gst.totalAmount,
+    for (const rm of roomsToCreate) {
+      const nightsData = [];
+      for (let i = 0; i < nightsCount; i++) {
+        const current = new Date(start);
+        current.setDate(current.getDate() + i);
+        const serviceDate = current.toISOString().split("T")[0];
+
+        const gst = rm.ratePerNight === 0
+          ? { taxableAmount: 0, taxAmount: 0, totalAmount: 0 }
+          : calculateGST({
+              grossOrBaseAmount: rm.ratePerNight,
+              isInclusive: false,
+              sacHsn: "996311",
+              supplierStateCode: property.stateCode || "18",
+            });
+
+        totalCalculatedGross += gst.totalAmount;
+
+        nightsData.push({
+          serviceDate,
+          baseAmount: rm.ratePerNight,
+          discountAmount: 0,
+          taxableAmount: gst.taxableAmount,
+          taxAmount: gst.taxAmount,
+          totalAmount: gst.totalAmount,
+        });
+      }
+
+      roomNightSchedules.push({
+        roomTypeId: rm.roomTypeId,
+        adults: rm.adults,
+        children: rm.children,
+        nightsData,
       });
     }
 
-    const calculatedTotal = singleRoomTotal * numRooms;
+    const finalTotal = totalAmount ? Number(totalAmount) : totalCalculatedGross;
 
-    // 3. Document sequence for confirmation number
+    // 7. Document sequence for confirmation number
     const seq = await getNextDocumentNumber(propertyId, "RESERVATION");
 
     // Format channel and agency reference text
-    const formattedChannelRef = agencyName
-      ? `${agencyName}${agencyPhone ? ` (${agencyPhone})` : ""}${channelRef ? ` - Ref: ${channelRef}` : ""}`
-      : companyName
-      ? `Corporate: ${companyName}${channelRef ? ` - Ref: ${channelRef}` : ""}`
+    const formattedChannelRef = b2bAgent
+      ? `Agent: ${b2bAgent}${b2bAgentPhone ? ` (${b2bAgentPhone})` : ""}${channelRef ? ` - Ref: ${channelRef}` : ""}${b2b?.agentVoucherNo ? ` - Vch: ${b2b.agentVoucherNo}` : ""}`
+      : b2bCompany
+      ? `Corporate: ${b2bCompany}${b2bPo ? ` (PO: ${b2bPo})` : ""}${channelRef ? ` - Ref: ${channelRef}` : ""}`
       : channelRef || null;
 
-    // 4. Create Reservation & Allocation
+    // 8. Create Reservation & Room Allocations
     const reservation = await prisma.reservation.create({
       data: {
         organizationId: property.organizationId,
         propertyId,
         confirmationNo: seq.formattedNumber,
         primaryGuestId: guest.id,
-        arrivalDate,
-        departureDate,
+        arrivalDate: effectiveArrival,
+        departureDate: effectiveDeparture,
         status: "CONFIRMED",
-        source,
+        source: effectiveSource,
         channelRef: formattedChannelRef,
-        notes: notes || null,
-        totalSnapshot: calculatedTotal,
+        notes: effectiveNotes || null,
+        totalSnapshot: finalTotal,
       },
     });
 
     // Create ReservationRoom for each booked room in the reservation
-    for (let r = 0; r < numRooms; r++) {
+    for (let r = 0; r < roomNightSchedules.length; r++) {
+      const schedule = roomNightSchedules[r];
       const resRoom = await prisma.reservationRoom.create({
         data: {
           reservationId: reservation.id,
-          roomTypeId,
+          roomTypeId: schedule.roomTypeId,
           assignedRoomId: r === 0 ? (assignedRoomId || null) : null,
-          adults: Number(adults) || 2,
-          children: Number(children) || 0,
+          adults: schedule.adults,
+          children: schedule.children,
           status: "CONFIRMED",
         },
       });
 
-      for (const night of nightsData) {
+      for (const night of schedule.nightsData) {
         await prisma.reservationNight.create({
           data: {
             reservationRoomId: resRoom.id,
@@ -250,12 +362,14 @@ export async function POST(request: Request) {
       }
     }
 
-    // Add note history if provided or if agency details exist
+    // Add note history if provided or if B2B details exist
     const fullNotes = [
-      agencyName ? `Tour Agency: ${agencyName} (${agencyPhone || "No direct phone"})` : "",
-      companyName ? `Corporate Client: ${companyName}` : "",
-      numRooms > 1 ? `Group Booking: ${numRooms} Rooms x ${nightsCount} Nights` : "",
-      notes ? `Special Requests: ${notes}` : "",
+      b2bAgent ? `Tour Agency: ${b2bAgent} (${b2bAgentPhone || "No direct phone"})` : "",
+      b2bCompany ? `Corporate Client: ${b2bCompany}${b2bPo ? ` | PO: ${b2bPo}` : ""}` : "",
+      b2bBillingInstruction ? `Billing: ${b2bBillingInstruction}` : "",
+      roomNightSchedules.length > 1 ? `Group Booking: ${roomNightSchedules.length} Rooms x ${nightsCount} Nights` : "",
+      promoCode ? `Promo Applied: ${promoCode} (Discount: ₹${discountAmount})` : "",
+      effectiveNotes ? `Special Requests: ${effectiveNotes}` : "",
     ].filter(Boolean).join(" | ");
 
     if (fullNotes) {
@@ -269,8 +383,16 @@ export async function POST(request: Request) {
       });
     }
 
-    // Record Deposit if provided
-    if (Number(depositAmount) > 0) {
+    // 9. Deposit / Payment Resolution
+    let effectiveDepositAmount = Number(depositAmount) || 0;
+    let effectiveDepositMethod = depositMethod || (paymentMethod === "RAZORPAY" ? "RAZORPAY" : "UPI");
+
+    if (paymentMethod === "RAZORPAY" && effectiveDepositAmount === 0 && finalTotal > 0) {
+      effectiveDepositAmount = finalTotal;
+      effectiveDepositMethod = "RAZORPAY";
+    }
+
+    if (effectiveDepositAmount > 0) {
       const recSeq = await getNextDocumentNumber(propertyId, "RECEIPT");
       const payment = await prisma.payment.create({
         data: {
@@ -278,8 +400,8 @@ export async function POST(request: Request) {
           propertyId,
           receiptNo: recSeq.formattedNumber,
           reservationId: reservation.id,
-          amount: Number(depositAmount),
-          method: depositMethod || "UPI",
+          amount: effectiveDepositAmount,
+          method: effectiveDepositMethod,
           status: "SUCCEEDED",
         },
       });
@@ -290,14 +412,14 @@ export async function POST(request: Request) {
           propertyId,
           reservationId: reservation.id,
           paymentId: payment.id,
-          originalAmount: Number(depositAmount),
-          availableAmount: Number(depositAmount),
+          originalAmount: effectiveDepositAmount,
+          availableAmount: effectiveDepositAmount,
           status: "AVAILABLE",
         },
       });
     }
 
-    // 5. Query fully enriched reservation for client voucher & state
+    // 10. Query fully enriched reservation for client voucher & state
     const fullReservation = await prisma.reservation.findUnique({
       where: { id: reservation.id },
       include: {
@@ -312,25 +434,27 @@ export async function POST(request: Request) {
       },
     });
 
-    const roomType = await prisma.roomType.findUnique({
-      where: { id: roomTypeId },
-    });
+    const firstRoomType = fullReservation?.rooms?.[0]?.roomTypeId
+      ? await prisma.roomType.findUnique({
+          where: { id: fullReservation.rooms[0].roomTypeId },
+        })
+      : null;
 
     const enrichedReservation = {
       ...fullReservation,
-      roomType,
-      roomTypeName: roomType?.name || "Standard Room",
-      roomTypeCode: roomType?.code || "STD",
+      roomType: firstRoomType,
+      roomTypeName: firstRoomType?.name || "Standard Room",
+      roomTypeCode: firstRoomType?.code || "STD",
       adults: Number(adults) || 2,
       children: Number(children) || 0,
-      roomCount: numRooms,
+      roomCount: fullReservation?.rooms?.length || 1,
     };
 
     return NextResponse.json({
       success: true,
       reservation: enrichedReservation,
       confirmationNo: reservation.confirmationNo,
-      totalAmount: calculatedTotal,
+      totalAmount: finalTotal,
     });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });

@@ -70,10 +70,13 @@ export function AppHeader() {
   // Poll for new guest registrations
   useEffect(() => {
     if (!activeProperty?.id) return;
+    const controller = new AbortController();
 
     const fetchCheckIns = async () => {
       try {
-        const res = await fetch(`/api/v1/registrations?propertyId=${activeProperty.id}`);
+        const res = await fetch(`/api/v1/registrations?propertyId=${activeProperty.id}`, {
+          signal: controller.signal,
+        });
         if (!res.ok) return;
         const data = await res.json();
         if (Array.isArray(data)) {
@@ -93,14 +96,18 @@ export function AppHeader() {
           data.forEach((r: any) => knownRegIdsRef.current.add(r.id));
           isFirstLoadRef.current = false;
         }
-      } catch (err) {
-        console.error("Failed to poll check-ins:", err);
+      } catch (err: any) {
+        if (err?.name === "AbortError") return;
+        // Suppress transient dev reloads/network dropouts from triggering error overlay
       }
     };
 
     fetchCheckIns();
-    const interval = setInterval(fetchCheckIns, 4000);
-    return () => clearInterval(interval);
+    const interval = setInterval(fetchCheckIns, 5000);
+    return () => {
+      controller.abort();
+      clearInterval(interval);
+    };
   }, [activeProperty?.id]);
 
   // Handle outside click for menus
