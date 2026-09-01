@@ -37,29 +37,60 @@ export function ReservationVoucherModal({
 
   if (!isOpen || !reservation) return null;
 
+  // 1. Guest Information
   const guest = reservation.primaryGuest || {};
-  const firstRoom = reservation.rooms?.[0] || {};
-  const roomTypeName = reservation.roomTypeName || reservation.roomType?.name || "Standard Deluxe Room";
-  const deposit = reservation.deposits?.[0]?.originalAmount || reservation.deposits?.[0]?.payment?.amount || 0;
-  const depositMethod = reservation.deposits?.[0]?.payment?.method || "UPI";
-  const totalAmount = reservation.totalSnapshot || 0;
+  let guestAddress: any = {};
+  try {
+    if (guest.addressJson) {
+      guestAddress = typeof guest.addressJson === "string" ? JSON.parse(guest.addressJson) : guest.addressJson;
+    }
+  } catch {}
+
+  const guestName = guest.name || reservation.guestName || "Valued Guest";
+  const guestPhone = guest.phone || reservation.guestPhone || "N/A";
+  const guestEmail = guest.email || reservation.guestEmail;
+  const guestCity = guestAddress.city || guest.city || reservation.guestCity;
+  const guestState = guestAddress.state || guest.state || reservation.guestState;
+  const guestGstin = guest.gstin || reservation.guestGstin;
+  const companyOrAgency = guest.companyName || reservation.companyName || reservation.agencyName || reservation.channelRef;
+
+  // 2. Room & Occupancy
+  const roomsList = Array.isArray(reservation.rooms) ? reservation.rooms : [];
+  const totalRooms = roomsList.length > 0 ? roomsList.length : (Number(reservation.roomCount) || 1);
+  const totalAdults = Number(reservation.adults) || (roomsList.length > 0 ? roomsList[0]?.adults || 2 : 2);
+  const totalChildren = Number(reservation.children) || (roomsList.length > 0 ? roomsList[0]?.children || 0 : 0);
+  const roomTypeName = reservation.roomTypeName || reservation.roomType?.name || (roomsList[0]?.roomType?.name) || "Standard Deluxe Room";
+  const roomCategoryDisplay = totalRooms > 1
+    ? `${totalRooms} × ${roomTypeName} (${totalRooms} Rooms Group)`
+    : roomTypeName;
+  const occupancyDisplay = `${totalAdults} Adults${totalChildren > 0 ? `, ${totalChildren} Children` : ""}${totalRooms > 1 ? ` (${totalRooms} Rooms)` : ""}`;
+
+  // 3. Dates
+  const formatVoucherDate = (dateVal: any) => {
+    if (!dateVal) return "N/A";
+    try {
+      const d = new Date(typeof dateVal === "string" && dateVal.includes("T") ? dateVal : `${dateVal}T00:00:00`);
+      if (isNaN(d.getTime())) return String(dateVal);
+      return d.toLocaleDateString("en-IN", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      });
+    } catch {
+      return String(dateVal);
+    }
+  };
+
+  const checkInRaw = reservation.arrivalDate || reservation.checkInDate || reservation.arrivalDateTime;
+  const checkOutRaw = reservation.departureDate || reservation.checkOutDate || reservation.expectedDepartureDate;
+  const checkInStr = formatVoucherDate(checkInRaw);
+  const checkOutStr = formatVoucherDate(checkOutRaw);
+
+  // 4. Financial Breakdown
+  const totalAmount = Number(reservation.totalSnapshot || reservation.totalAmount) || (roomsList.reduce((sum: number, r: any) => sum + (r.nights?.reduce((nSum: number, n: any) => nSum + (n.totalAmount || 0), 0) || 0), 0)) || 0;
+  const deposit = Number(reservation.deposits?.[0]?.originalAmount || reservation.deposits?.[0]?.amount || reservation.deposits?.[0]?.payment?.amount || reservation.depositAmount || 0);
+  const depositMethod = reservation.deposits?.[0]?.payment?.method || reservation.depositMethod || "UPI";
   const balanceDue = Math.max(0, totalAmount - deposit);
-
-  const checkInStr = reservation.arrivalDate
-    ? new Date(reservation.arrivalDate).toLocaleDateString("en-IN", {
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-      })
-    : "N/A";
-
-  const checkOutStr = reservation.departureDate
-    ? new Date(reservation.departureDate).toLocaleDateString("en-IN", {
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-      })
-    : "N/A";
 
   const handlePrint = () => {
     window.print();
@@ -83,7 +114,7 @@ export function ReservationVoucherModal({
           <div className="flex items-center gap-2">
             <button
               onClick={handlePrint}
-              className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center gap-1.5 transition shadow-sm active:scale-95"
+              className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center gap-1.5 transition shadow-sm active:scale-95 cursor-pointer"
             >
               <Printer className="h-3.5 w-3.5" />
               <span>Print Slip</span>
@@ -95,7 +126,7 @@ export function ReservationVoucherModal({
                   onClose();
                   onCheckInNow(reservation);
                 }}
-                className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1.5 transition shadow-sm active:scale-95"
+                className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1.5 transition shadow-sm active:scale-95 cursor-pointer"
               >
                 <UserPlus className="h-3.5 w-3.5" />
                 <span>Check-In Now</span>
@@ -104,7 +135,7 @@ export function ReservationVoucherModal({
 
             <button
               onClick={onClose}
-              className="p-1.5 rounded-xl text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition"
+              className="p-1.5 rounded-xl text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition cursor-pointer"
             >
               <X className="h-4 w-4" />
             </button>
@@ -158,11 +189,12 @@ export function ReservationVoucherModal({
               <div className="font-mono text-[10px] font-bold text-zinc-500 uppercase tracking-wider">
                 Primary Guest Information
               </div>
-              <div className="font-bold text-sm text-zinc-950">{guest.name || "Valued Guest"}</div>
-              <div className="text-zinc-600 font-mono">Phone: {guest.phone || "N/A"}</div>
-              {guest.email && <div className="text-zinc-600">Email: {guest.email}</div>}
-              {guest.city && <div className="text-zinc-600">City: {guest.city}, {guest.state || "India"}</div>}
-              {guest.gstin && <div className="text-zinc-800 font-mono text-[11px]">GSTIN: <strong>{guest.gstin}</strong></div>}
+              <div className="font-bold text-sm text-zinc-950">{guestName}</div>
+              <div className="text-zinc-600 font-mono">Phone: {guestPhone}</div>
+              {guestEmail && <div className="text-zinc-600">Email: {guestEmail}</div>}
+              {guestCity && <div className="text-zinc-600">City: {guestCity}{guestState ? `, ${guestState}` : ""}</div>}
+              {guestGstin && <div className="text-zinc-800 font-mono text-[11px]">GSTIN: <strong>{guestGstin}</strong></div>}
+              {companyOrAgency && <div className="text-indigo-700 font-medium text-[11px]">Org: {companyOrAgency}</div>}
             </div>
 
             {/* Stay & Room Details Box */}
@@ -180,11 +212,11 @@ export function ReservationVoucherModal({
               </div>
               <div className="flex justify-between">
                 <span className="text-zinc-500">Room Category:</span>
-                <strong className="text-zinc-900">{roomTypeName}</strong>
+                <strong className="text-zinc-900">{roomCategoryDisplay}</strong>
               </div>
               <div className="flex justify-between">
                 <span className="text-zinc-500">Occupancy:</span>
-                <span className="font-mono">{firstRoom.adults || 2} Adults, {firstRoom.children || 0} Children</span>
+                <span className="font-mono font-bold text-zinc-900">{occupancyDisplay}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-zinc-500">Booking Channel:</span>
@@ -200,7 +232,7 @@ export function ReservationVoucherModal({
             </div>
             <div className="p-4 space-y-2">
               <div className="flex justify-between text-zinc-600">
-                <span>Room Tariff Total (Inclusive of Applicable GST):</span>
+                <span>Room Tariff Total ({totalRooms} {totalRooms > 1 ? "Rooms" : "Room"} - Inclusive of Applicable GST):</span>
                 <span className="font-mono font-bold text-zinc-950">{formatINR(totalAmount)}</span>
               </div>
               <div className="flex justify-between text-emerald-700 font-medium">

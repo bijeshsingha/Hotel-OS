@@ -169,24 +169,35 @@ export function GrcIntakeModal({
 
       if (initialReservation) {
         const guest = initialReservation.primaryGuest || {};
-        const firstRoom = initialReservation.rooms?.[0] || {};
-        const firstDeposit = initialReservation.deposits?.[0]?.payment?.amount || 0;
+        let guestAddress: any = {};
+        try {
+          if (guest.addressJson) {
+            guestAddress = typeof guest.addressJson === "string" ? JSON.parse(guest.addressJson) : guest.addressJson;
+          }
+        } catch {}
+
+        const roomsList = Array.isArray(initialReservation.rooms) ? initialReservation.rooms : [];
+        const totalAdults = Number(initialReservation.adults) || (roomsList[0]?.adults ?? 2);
+        const totalChildren = Number(initialReservation.children) || (roomsList[0]?.children ?? 0);
+        const firstRoom = roomsList[0] || {};
+        const totalDeposit = initialReservation.deposits?.reduce((s: number, d: any) => s + (d.originalAmount || d.payment?.amount || 0), 0) || (initialReservation.deposits?.[0]?.payment?.amount || 0);
         const assigned = firstRoom.assignedRoomId || initialRoomId;
 
         setFormData((prev) => ({
           ...prev,
-          fullName: guest.name || "",
-          mobilePhone: guest.phone || "",
-          email: guest.email || "",
-          city: guest.city || "",
-          state: guest.state || "",
-          guestGstin: guest.gstin || "",
+          fullName: guest.name || initialReservation.guestName || "",
+          mobilePhone: guest.phone || initialReservation.guestPhone || "",
+          email: guest.email || initialReservation.guestEmail || "",
+          city: guestAddress.city || guest.city || initialReservation.guestCity || "",
+          state: guestAddress.state || guest.state || initialReservation.guestState || "",
+          guestGstin: guest.gstin || initialReservation.guestGstin || "",
+          companyName: guest.companyName || initialReservation.companyName || initialReservation.agencyName || "",
           arrivalDateTime: currentDateTime,
           departureDate: initialReservation.departureDate || defaultDepDate,
-          adults: String(firstRoom.adults || 2),
-          children: String(firstRoom.children || 0),
+          adults: String(totalAdults),
+          children: String(totalChildren),
           referralChannel: initialReservation.source || "DIRECT",
-          depositAmount: String(firstDeposit),
+          depositAmount: String(totalDeposit),
           roomId: assigned || prev.roomId || (rooms.find((r) => r.roomState?.occupancyStatus === "VACANT" && (!firstRoom.roomTypeId || r.roomTypeId === firstRoom.roomTypeId))?.id || ""),
           additionalRoomIds: [],
           roomRates: {},

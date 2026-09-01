@@ -47,6 +47,9 @@ export async function GET(request: Request) {
         roomType: rt,
         roomTypeName: rt?.name || "Standard Room",
         roomTypeCode: rt?.code || "STD",
+        roomCount: res.rooms.length || 1,
+        adults: firstRoom?.adults ?? 2,
+        children: firstRoom?.children ?? 0,
       };
     });
 
@@ -270,9 +273,38 @@ export async function POST(request: Request) {
       });
     }
 
+    // 5. Query fully enriched reservation for client voucher & state
+    const fullReservation = await prisma.reservation.findUnique({
+      where: { id: reservation.id },
+      include: {
+        primaryGuest: true,
+        rooms: {
+          include: {
+            nights: true,
+          },
+        },
+        deposits: true,
+        notesHistory: true,
+      },
+    });
+
+    const roomType = await prisma.roomType.findUnique({
+      where: { id: roomTypeId },
+    });
+
+    const enrichedReservation = {
+      ...fullReservation,
+      roomType,
+      roomTypeName: roomType?.name || "Standard Room",
+      roomTypeCode: roomType?.code || "STD",
+      adults: Number(adults) || 2,
+      children: Number(children) || 0,
+      roomCount: numRooms,
+    };
+
     return NextResponse.json({
       success: true,
-      reservation,
+      reservation: enrichedReservation,
       confirmationNo: reservation.confirmationNo,
       totalAmount: calculatedTotal,
     });

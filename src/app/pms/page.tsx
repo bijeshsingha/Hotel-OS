@@ -523,7 +523,7 @@ function PMSFrontDeskContent() {
 
     const totalUpcomingRevenue = upcomingList.reduce((acc, r) => acc + (r.totalSnapshot || 0), 0);
     const totalDepositsCollected = upcomingList.reduce((acc, r) => acc + (r.deposits?.[0]?.payment?.amount || r.deposits?.[0]?.originalAmount || 0), 0);
-    const totalUpcomingPax = upcomingList.reduce((acc, r) => acc + (r.rooms?.[0]?.adults || 2) + (r.rooms?.[0]?.children || 0), 0);
+    const totalUpcomingPax = upcomingList.reduce((acc, r) => acc + (r.adults || r.rooms?.[0]?.adults || 2) + (r.children || r.rooms?.[0]?.children || 0), 0);
 
     return {
       upcomingCount: upcomingList.length,
@@ -1956,21 +1956,31 @@ function PMSFrontDeskContent() {
                             <span className="font-bold text-zinc-900 dark:text-white">{checkOutFormatted}</span>
                           </div>
                           <div className="text-[10.5px] text-zinc-500 flex items-center gap-1.5 mt-0.5">
-                            <span>{nightsCount} Night{nightsCount > 1 ? "s" : ""} • {res.rooms?.[0]?.adults || 2} Pax</span>
+                            <span>
+                              {nightsCount} Night{nightsCount > 1 ? "s" : ""} • {res.adults || res.rooms?.[0]?.adults || 2} Adults
+                              {(res.rooms?.length > 1 || res.roomCount > 1) && ` (${res.rooms?.length || res.roomCount} Rooms)`}
+                            </span>
                             {relativeBadge}
                           </div>
                         </td>
 
                         {/* Room Category & Allocation */}
                         <td className="px-3.5 py-2.5 text-zinc-800 dark:text-zinc-200 whitespace-nowrap">
-                          <div className="font-bold">{res.roomTypeName || res.roomType?.name || "Standard Room"}</div>
+                          <div className="font-bold">
+                            {(res.rooms?.length > 1 || res.roomCount > 1) && `${res.rooms?.length || res.roomCount} × `}
+                            {res.roomTypeName || res.roomType?.name || "Standard Room"}
+                          </div>
                           <div className="text-[10.5px] text-zinc-500 font-mono">
                             {res.rooms?.[0]?.assignedRoomId ? (
                               <span className="text-emerald-600 dark:text-emerald-400 font-bold">
                                 Assigned Room {rooms.find((r) => r.id === res.rooms[0].assignedRoomId)?.number || ""}
                               </span>
                             ) : (
-                              <span className="text-zinc-400 italic">Auto-Assign at Check-In</span>
+                              <span className="text-zinc-400 italic">
+                                {(res.rooms?.length > 1 || res.roomCount > 1)
+                                  ? `${res.rooms?.length || res.roomCount} Rooms Auto-Assigned at Check-In`
+                                  : "Auto-Assign at Check-In"}
+                              </span>
                             )}
                           </div>
                         </td>
