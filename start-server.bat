@@ -7,11 +7,9 @@ echo               Starting Hotel OS Server
 echo ===================================================
 echo.
 
-echo [INFO] Local URL:       http://localhost:3000
-echo [INFO] Admin Portal:    http://localhost:3000/admin
-echo.
-echo [INFO] Launching server on port 3000 (0.0.0.0)...
-echo Press Ctrl+C in this window or run stop-server.bat to stop.
+echo [INFO] Launching Hotel OS server (0.0.0.0)...
+echo [INFO] Next.js will auto-bind to port 3000 (or next free port if 3000 is occupied).
+echo Press Ctrl+C in this window to stop.
 echo ===================================================
 echo.
 

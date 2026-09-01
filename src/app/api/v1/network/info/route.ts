@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import os from "os";
 
-export async function GET() {
+export async function GET(request: Request) {
   const interfaces = os.networkInterfaces();
   const addresses: string[] = [];
 
@@ -15,12 +15,15 @@ export async function GET() {
   }
 
   const primaryIp = addresses.find((ip) => ip.startsWith("192.168.")) || addresses[0] || "127.0.0.1";
+  const host = request.headers.get("host") || "localhost:3000";
+  const port = host.includes(":") ? host.split(":")[1] : (process.env.PORT || "3000");
 
   return NextResponse.json({
     primaryIp,
     addresses,
-    localUrl: "http://localhost:3000",
-    networkUrl: `http://${primaryIp}:3000`,
-    checkinNetworkUrl: `http://${primaryIp}:3000/checkin`,
+    port,
+    localUrl: `http://localhost:${port}`,
+    networkUrl: `http://${primaryIp}:${port}`,
+    checkinNetworkUrl: `http://${primaryIp}:${port}/checkin`,
   });
 }
