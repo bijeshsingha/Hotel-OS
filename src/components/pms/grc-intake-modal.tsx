@@ -133,6 +133,8 @@ export function GrcIntakeModal({
     depositAmount: "0",
     paymentMethod: "UPI",
     transactionRef: "",
+    kitchenDining: "NO" as "NO" | "YES",
+    diningFixedRate: "",
 
     // Co-Guests
     coGuests: [] as Array<{
@@ -411,6 +413,8 @@ export function GrcIntakeModal({
           extraBedRate: Number(formData.extraBedRate) || 500,
           coGuests: formData.coGuests.filter((cg) => cg.name.trim() !== ""),
           foreignDetails: formData.nationality !== "Indian" ? formData.foreignDetails : undefined,
+          kitchenDining: formData.kitchenDining || "NO",
+          diningFixedRate: formData.diningFixedRate ? Number(formData.diningFixedRate) : 0,
         }),
       });
 
@@ -630,16 +634,45 @@ export function GrcIntakeModal({
                     onChange={(e: any) => setFormData({ ...formData, gracePeriodMinutes: e.target.value })}
                     className="w-full h-10 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white text-xs font-semibold focus:border-blue-500 focus:outline-none cursor-pointer"
                   >
-                    <option value="0">0 Hours (None / Strict 11–12 PM)</option>
-                    <option value="60">1 Hour Grace (Till 1:00 PM)</option>
-                    <option value="120">2 Hours Grace (Till 2:00 PM)</option>
-                    <option value="180">3 Hours Grace (Till 3:00 PM)</option>
-                    <option value="240">4 Hours Grace (Till 4:00 PM)</option>
-                    <option value="300">5 Hours Grace (Till 5:00 PM)</option>
-                    <option value="360">6 Hours Grace (Till 6:00 PM)</option>
-                    <option value="420">7 Hours Grace (Till 7:00 PM)</option>
+                    <option value="0">0 Hours / None</option>
+                    <option value="60">1 Hour Grace</option>
+                    <option value="120">2 Hours Grace</option>
+                    <option value="180">3 Hours Grace</option>
+                    <option value="240">4 Hours Grace</option>
+                    <option value="300">5 Hours Grace</option>
+                    <option value="360">6 Hours Grace</option>
+                    <option value="420">7 Hours Grace</option>
                     <option value="1440">Waive Next Night</option>
                   </select>
+                </div>
+
+                {/* Kitchen Dining Yes/No & Fixed Rate */}
+                <div className="space-y-1 sm:col-span-1">
+                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">
+                    Kitchen Dining
+                  </label>
+                  <div className="flex items-center gap-1.5">
+                    <select
+                      value={formData.kitchenDining || "NO"}
+                      onChange={(e: any) => setFormData({ ...formData, kitchenDining: e.target.value })}
+                      className="w-full h-10 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white text-xs font-semibold focus:border-blue-500 focus:outline-none cursor-pointer"
+                    >
+                      <option value="NO">No</option>
+                      <option value="YES">Yes</option>
+                    </select>
+                    {formData.kitchenDining === "YES" && (
+                      <div className="relative w-28 shrink-0">
+                        <span className="absolute left-2.5 top-2.5 text-xs text-zinc-400 font-bold font-mono">₹</span>
+                        <input
+                          type="number"
+                          placeholder="Rate"
+                          value={formData.diningFixedRate || ""}
+                          onChange={(e) => setFormData({ ...formData, diningFixedRate: e.target.value })}
+                          className="w-full h-10 pl-6 pr-2 rounded-xl bg-white dark:bg-zinc-900 border border-amber-400 dark:border-amber-600 text-zinc-900 dark:text-white font-mono text-xs font-bold focus:border-blue-500 focus:outline-none"
+                        />
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 {/* Early Bird Offer Banner */}

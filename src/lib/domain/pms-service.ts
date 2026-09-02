@@ -89,80 +89,65 @@ export function calculate24HrBillableDays(
     };
   }
 
-  // EARLY BIRD OFFER (5 AM - 11 AM):
-  // Check-in between 5 AM and 11 AM gets no extra early charge.
-  // Base stay validity extends until Standard Check-Out at 12:00 PM (Noon) next day.
-  if (isEarlyBird) {
-    const arrDate = new Date(arrivalAt);
-    // Base 12:00 PM Noon checkout on the next calendar day
-    const nextDayNoon = new Date(arrDate);
-    nextDayNoon.setDate(nextDayNoon.getDate() + 1);
-    nextDayNoon.setHours(12, 0, 0, 0);
-
-    const deadlineMs = nextDayNoon.getTime();
-    const graceMs = gracePeriodMinutes * 60 * 1000;
-    const deadlineWithGraceMs = deadlineMs + graceMs;
-
-    if (end <= deadlineWithGraceMs) {
-      const graceApplied = gracePeriodMinutes > 0 && end > deadlineMs && end <= deadlineWithGraceMs;
-      return {
-        billableDays: 1,
-        hoursElapsed,
-        gracePeriodApplied: graceApplied,
-        isEarlyBird: true,
-        checkoutDeadlineText: "Standard 11 AM–12 PM Check-Out (Early Bird Offer)",
-      };
-    } else {
-      // Past 12:00 PM + Grace Period -> bill for next day (+1 night per 24h cycle beyond noon)
-      const overtimeMinutes = Math.max(1, Math.round((end - deadlineMs) / (1000 * 60)));
-      const extraNights = Math.max(1, Math.ceil(overtimeMinutes / (24 * 60)));
-      return {
-        billableDays: 1 + extraNights,
-        hoursElapsed,
-        gracePeriodApplied: false,
-        isEarlyBird: true,
-        checkoutDeadlineText: "Standard 11 AM–12 PM (Overtime Billed)",
-      };
-    }
-  }
-
-  // STANDARD 11:00 AM – 12:00 PM FIXED TIME BILLING (DEFAULT):
+  // STANDARD 11:00 AM – 12:00 PM FIXED TIME BILLING (DEFAULT - TWO-WAY GRACE: EARLY CHECK-IN & LATE CHECKOUT):
   if (checkoutType === "FIXED_TIME" || !checkoutType) {
     const arrDate = new Date(arrivalAt);
     const endDate = new Date(departureAt);
 
-    // Standard hotel checkout: Check-in before 5 AM gives base noon of current day; check-in at/after 5 AM gives noon of next day
-    const baseCheckoutDay = new Date(arrDate);
-    if (arrHour >= 5) {
-      baseCheckoutDay.setDate(baseCheckoutDay.getDate() + 1);
-    }
-    baseCheckoutDay.setHours(12, 0, 0, 0);
+    // Standard base noon on arrival day
+    const arrNoon = new Date(arrDate);
+    arrNoon.setHours(12, 0, 0, 0);
 
     const graceMs = gracePeriodMinutes * 60 * 1000;
-    let currentDeadlineMs = baseCheckoutDay.getTime();
-    let nights = 1;
+    const earlyCheckInCutoffMs = arrNoon.getTime() - graceMs;
+
+    let earlyNights = 0;
+    let earlyGraceApplied = false;
+
+    if (start < arrNoon.getTime()) {
+      // Arrived before 12:00 PM Noon on arrival date
+      if (start >= earlyCheckInCutoffMs) {
+        // Within early check-in grace window (e.g., 1-7h before 12 PM)
+        earlyGraceApplied = gracePeriodMinutes > 0;
+      } else {
+        // Arrived before early check-in grace cutoff (counts as prior night occupation)
+        const earlyDiffMs = earlyCheckInCutoffMs - start;
+        earlyNights = Math.max(1, Math.ceil(earlyDiffMs / (24 * 60 * 60 * 1000)));
+      }
+    }
+
+    // Base checkout noon on the day following arrival
+    const baseCheckoutNoon = new Date(arrDate);
+    baseCheckoutNoon.setDate(baseCheckoutNoon.getDate() + 1);
+    baseCheckoutNoon.setHours(12, 0, 0, 0);
+
+    let currentDeadlineMs = baseCheckoutNoon.getTime();
+    let regularNights = 1;
 
     while (endDate.getTime() > currentDeadlineMs + graceMs) {
-      nights++;
+      regularNights++;
       currentDeadlineMs += 24 * 60 * 60 * 1000;
     }
 
-    const graceApplied =
+    const lateGraceApplied =
       gracePeriodMinutes > 0 &&
       endDate.getTime() > currentDeadlineMs &&
       endDate.getTime() <= currentDeadlineMs + graceMs;
 
+    const totalNights = Math.max(1, regularNights + earlyNights);
+    const graceApplied = earlyGraceApplied || lateGraceApplied;
+
     const graceText =
       gracePeriodMinutes === 0
-        ? "0h Grace (Strict 11 AM–12 PM)"
-        : `${Math.round(gracePeriodMinutes / 60)}h Grace (Till ${(12 + Math.floor(gracePeriodMinutes / 60)) % 12 || 12}:00 ${(12 + Math.floor(gracePeriodMinutes / 60)) >= 12 ? "PM" : "AM"})`;
+        ? ""
+        : ` • ${Math.round(gracePeriodMinutes / 60)}h Grace`;
 
     return {
-      billableDays: nights,
+      billableDays: totalNights,
       hoursElapsed,
       gracePeriodApplied: graceApplied,
-      isEarlyBird: false,
-      checkoutDeadlineText: `Standard 11 AM–12 PM Check-Out (${graceText})`,
+      isEarlyBird: isEarlyBird,
+      checkoutDeadlineText: `Standard 11–12 PM Check-Out${graceText}`,
     };
   }
 
@@ -187,7 +172,7 @@ export function calculate24HrBillableDays(
       hoursElapsed,
       gracePeriodApplied: gracePeriodMinutes > 0,
       isEarlyBird: false,
-      checkoutDeadlineText: `24-Hr Cycle (${gracePeriodMinutes}m Grace Active)`,
+      checkoutDeadlineText: gracePeriodMinutes > 0 ? `24-Hr Cycle • ${Math.round(gracePeriodMinutes / 60)}h Grace` : "24-Hr Cycle Billing",
     };
   } else {
     return {
@@ -358,6 +343,8 @@ export async function checkInGuest({
   overrideReason,
   coGuests,
   foreignDetails,
+  kitchenDining = "NO",
+  diningFixedRate = 0,
 }: {
   propertyId: string;
   reservationId?: string;
@@ -414,6 +401,8 @@ export async function checkInGuest({
   overrideReason?: string;
   coGuests?: any[];
   foreignDetails?: any;
+  kitchenDining?: string;
+  diningFixedRate?: number;
 }) {
   const property = await prisma.property.findUniqueOrThrow({
     where: { id: propertyId },
@@ -732,6 +721,39 @@ export async function checkInGuest({
       totalBalanceAdded += extraBedGst.totalAmount;
     }
 
+    // 3. Post Fixed Kitchen Dining Charge if selected
+    if (kitchenDining === "YES" && diningFixedRate && diningFixedRate > 0) {
+      const diningGst = calculateGST({
+        grossOrBaseAmount: diningFixedRate,
+        isInclusive: true,
+        sacHsn: "996331",
+        supplierStateCode: property.stateCode || "18",
+        customTaxRate: 5,
+      });
+
+      await prisma.folioEntry.create({
+        data: {
+          organizationId: property.organizationId,
+          propertyId,
+          folioId: folio.id,
+          folioWindowId: guestWindow.id,
+          serviceDate: serviceDateStr,
+          type: "CHARGE",
+          chargeCode: "RESTAURANT_FOOD",
+          description: `Kitchen Dining Plan (Fixed @ ₹${diningFixedRate}/Day)`,
+          qty: 1,
+          unitAmount: diningFixedRate,
+          taxableAmount: diningGst.taxableAmount,
+          taxComponentsJson: JSON.stringify(diningGst.components),
+          totalAmount: diningGst.totalAmount,
+          sourceType: "POS_ROOM_POST",
+          status: "POSTED",
+        },
+      });
+
+      totalBalanceAdded += diningGst.totalAmount;
+    }
+
     await prisma.folio.update({
       where: { id: folio.id },
       data: { balance: totalBalanceAdded },
@@ -957,6 +979,21 @@ export async function checkInGuest({
       guestId: guest.id,
       depositAmount: depositAmount,
       processedByUserId: actorId,
+      internalNotes: JSON.stringify({
+        adults: adults || 2,
+        children: children || 0,
+        paxM,
+        paxF,
+        paxC,
+        agreedTariff,
+        isRateInclusive,
+        checkoutType,
+        gracePeriodMinutes,
+        depositAmount,
+        advancePaymentMethod: depositMethod,
+        kitchenDining: kitchenDining || "NO",
+        diningFixedRate: diningFixedRate || 0,
+      }),
     },
   });
 

@@ -29,6 +29,7 @@ import {
   UserCheck,
   RotateCcw,
   Trash2,
+  Pencil,
   Archive,
   FolderArchive,
   History,
@@ -59,12 +60,31 @@ function isEntryForRoom(entry: any, roomNumber: string, allOtherRoomNumbers: str
     return true;
   }
 
-  // If it's a general charge (doesn't mention any room), assign to primary room (first in list)
-  if (allOtherRoomNumbers.length > 0 && allOtherRoomNumbers[0] === roomNumber) {
-    return true;
-  }
-
   return false;
+}
+
+function formatShortDate(dateStr?: string | null): string {
+  if (!dateStr) return "—";
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr.slice(0, 10);
+    return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short" });
+  } catch {
+    return dateStr.slice(0, 10);
+  }
+}
+
+function formatDateTimeShort(dateStr?: string | null): string {
+  if (!dateStr) return "—";
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    const datePart = d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+    const timePart = d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
+    return `${datePart}, ${timePart}`;
+  } catch {
+    return dateStr;
+  }
 }
 
 export interface DirectoryRoomItem {
@@ -173,6 +193,19 @@ function BillingContent() {
     notes: "Advance surplus return at checkout",
   });
 
+  const [showEditPaymentModal, setShowEditPaymentModal] = useState(false);
+  const [editingPayment, setEditingPayment] = useState<{
+    id: string;
+    receiptNo: string;
+    amount: string;
+    method: string;
+    reference: string;
+    payerName: string;
+    companyName?: string;
+    gstin?: string;
+  } | null>(null);
+  const [editPaymentLoading, setEditPaymentLoading] = useState(false);
+
   // Grace Period control state (in minutes) - Default: 0 mins (Strict 11 AM - 12 PM Checkout)
   const [gracePeriodMinutes, setGracePeriodMinutes] = useState<number>(0);
 
@@ -181,6 +214,7 @@ function BillingContent() {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         setShowPaymentModal(false);
+        setShowEditPaymentModal(false);
         setShowRefundModal(false);
         setShowManualChargeModal(false);
         setShowDiscountModal(false);
@@ -828,6 +862,66 @@ function BillingContent() {
     }
   };
 
+  // Update Collected Payment
+  const handleUpdatePayment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingPayment || !folioData?.id) return;
+    setEditPaymentLoading(true);
+
+    try {
+      const res = await fetch(`/api/v1/folios/${folioData.id}/payments`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          paymentId: editingPayment.id,
+          amount: Number(editingPayment.amount),
+          method: editingPayment.method,
+          reference: editingPayment.reference,
+          payerName: editingPayment.payerName,
+          companyName: editingPayment.companyName,
+          gstin: editingPayment.gstin,
+        }),
+      });
+
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || "Failed to update payment");
+
+      await loadFolio(folioData.id);
+      await loadStays(true);
+      setShowEditPaymentModal(false);
+      setEditingPayment(null);
+    } catch (err: any) {
+      alert(`Payment Update Error: ${err.message}`);
+    } finally {
+      setEditPaymentLoading(false);
+    }
+  };
+
+  // Delete / Void Payment
+  const handleDeletePayment = async (paymentId: string) => {
+    if (!confirm("Are you sure you want to delete this payment record? The folio balance will be recalculated.")) return;
+    if (!folioData?.id) return;
+    setEditPaymentLoading(true);
+
+    try {
+      const res = await fetch(`/api/v1/folios/${folioData.id}/payments?paymentId=${paymentId}`, {
+        method: "DELETE",
+      });
+
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || "Failed to delete payment");
+
+      await loadFolio(folioData.id);
+      await loadStays(true);
+      setShowEditPaymentModal(false);
+      setEditingPayment(null);
+    } catch (err: any) {
+      alert(`Error deleting payment: ${err.message}`);
+    } finally {
+      setEditPaymentLoading(false);
+    }
+  };
+
   // Open Refund Payout Modal
   const handleOpenRefundModal = (customAmount?: number) => {
     const amt = customAmount !== undefined ? customAmount : surplusCredit;
@@ -1455,8 +1549,8 @@ function BillingContent() {
 
                     {/* Bottom Row: Dates & Phone */}
                     <div className="flex items-center justify-between text-[10.5px] text-zinc-400 dark:text-zinc-500">
-                      <span>
-                        {item.arrivalAt?.slice(0, 10)} → {item.expectedDepartureAt?.slice(0, 10)}
+                      <span className="font-mono">
+                        {formatShortDate(item.arrivalAt)} → {formatShortDate(item.expectedDepartureAt)}
                       </span>
                       {item.phone && <span className="truncate font-mono">{item.phone}</span>}
                     </div>
@@ -1488,22 +1582,22 @@ function BillingContent() {
                     </div>
                     <div>
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-lg sm:text-xl font-bold text-zinc-900 dark:text-white tracking-tight">
+                        <span className="text-lg sm:text-xl font-bold text-zinc-900 dark:text-white tracking-tight shrink-0">
                           {groupBillingMode === "YES" && isMultiRoomGroup
                             ? `Rooms ${allGroupRooms.join(" + ")}`
                             : `Room ${activeRoomNumber}`}
                         </span>
-                        <span className="rounded-lg bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 px-2 py-0.5 text-[11px] font-semibold text-zinc-700 dark:text-zinc-300">
+                        <span className="rounded-lg bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 px-2 py-0.5 text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 whitespace-nowrap shrink-0">
                           {groupBillingMode === "YES" && isMultiRoomGroup
                             ? "Combined Group Folio"
-                            : activeDirectoryItem?.roomType?.name || activeStay?.roomAssignments?.[0]?.room?.roomType?.name || "Deluxe AC"}
+                            : activeDirectoryItem?.roomType?.name || activeStay?.roomAssignments?.[0]?.room?.roomType?.name || "Deluxe Room"}
                         </span>
-                        <span className="rounded-lg bg-emerald-50 dark:bg-emerald-500/10 text-emerald-800 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20 px-2 py-0.5 text-[11px] font-bold">
-                          {activeStay?.status}
+                        <span className="rounded-lg bg-emerald-50 dark:bg-emerald-500/10 text-emerald-800 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20 px-2 py-0.5 text-[11px] font-bold whitespace-nowrap shrink-0">
+                          {activeStay?.status === "IN_HOUSE" ? "In-House" : activeStay?.status}
                         </span>
                       </div>
 
-                      <div className="text-xs font-medium text-zinc-600 dark:text-zinc-300 mt-0.5 flex items-center gap-2 flex-wrap">
+                      <div className="text-xs font-medium text-zinc-600 dark:text-zinc-300 mt-1 flex items-center gap-2 flex-wrap">
                         <span>Guest: <strong className="text-zinc-950 dark:text-white font-bold">{formatGuestDisplayName(activeStay?.primaryGuest?.name)}</strong></span>
                         {activeStay?.primaryGuest?.phone && (
                           <span className="text-xs text-zinc-400 font-mono font-normal">({activeStay.primaryGuest.phone})</span>
@@ -1523,41 +1617,41 @@ function BillingContent() {
                     </div>
                   </div>
 
-                  {/* 24-Hr Cycle Metric & Primary Action Button */}
+                  {/* Stay Cycle Metric & Primary Action Button */}
                   <div className="flex items-center gap-3 shrink-0">
                     
-                    {/* 24-Hour & Early Bird Cycle Metric Indicator */}
-                    <div className="text-xs text-zinc-700 dark:text-zinc-300 bg-zinc-50 dark:bg-zinc-900 px-3.5 py-2 rounded-xl border border-zinc-200/80 dark:border-zinc-800 flex items-center gap-2.5 shadow-2xs">
+                    {/* Stay Cycle Metric Indicator */}
+                    <div className="text-xs text-zinc-700 dark:text-zinc-300 bg-zinc-50 dark:bg-zinc-900 px-3 py-1.5 rounded-xl border border-zinc-200/80 dark:border-zinc-800 flex items-center gap-2.5 shadow-2xs">
                       <Clock className="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
                       <div>
                         <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="font-bold text-xs sm:text-sm text-zinc-900 dark:text-white block">
+                          <span className="font-bold text-xs sm:text-sm text-zinc-900 dark:text-white block whitespace-nowrap">
                             {stayCalculations.nights} Night{stayCalculations.nights > 1 ? "s" : ""} Billed
                           </span>
+                          <span className="text-[9.5px] px-1.5 py-0.2 rounded bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 font-mono font-bold whitespace-nowrap">
+                            {stayCalculations.elapsedHours}h Stay
+                          </span>
                           {stayCalculations.isEarlyBird && (
-                            <span className="text-[9.5px] px-1.5 py-0.2 rounded bg-amber-50 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 font-bold border border-amber-300 dark:border-amber-700">
-                              🌟 Early Bird (5–11 AM)
+                            <span className="text-[9.5px] px-1.5 py-0.2 rounded bg-amber-50 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 font-bold border border-amber-300 dark:border-amber-700 whitespace-nowrap">
+                              Early Bird (5–11 AM)
                             </span>
                           )}
                           {stayCalculations.isWithinGrace && (
-                            <span className="text-[9.5px] px-1.5 py-0.2 rounded bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 font-bold border border-emerald-300 dark:border-emerald-700">
-                              ⏳ In Grace Window
+                            <span className="text-[9.5px] px-1.5 py-0.2 rounded bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 font-bold border border-emerald-300 dark:border-emerald-700 whitespace-nowrap">
+                              ⏳ In Grace
                             </span>
                           )}
                           {stayCalculations.waivedNextNight && (
-                            <span className="text-[9.5px] px-1.5 py-0.2 rounded bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 font-bold border border-purple-300 dark:border-purple-700">
-                              ✓ Next Night Waived
+                            <span className="text-[9.5px] px-1.5 py-0.2 rounded bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 font-bold border border-purple-300 dark:border-purple-700 whitespace-nowrap">
+                              ✓ Waived
                             </span>
                           )}
-                          <span className="text-[9.5px] px-1.5 py-0.2 rounded bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 font-mono font-bold">
-                            {stayCalculations.elapsedHours}h Elapsed
-                          </span>
                         </div>
-                        <span className="text-[10.5px] text-zinc-500 block font-mono mt-0.5">
+                        <span className="text-[10.5px] text-zinc-500 block font-mono mt-0.5 whitespace-nowrap">
                           {stayCalculations.isComplimentary ? (
                             <strong className="text-emerald-600 dark:text-emerald-400 font-bold">🎁 Complimentary (₹0/nt)</strong>
                           ) : (
-                            `${formatINR(stayCalculations.roomRatePerNight)}/nt (${stayCalculations.isRateInclusive ? "Incl. GST" : "+Tax Extra"}) • ${stayCalculations.checkoutDeadlineText}`
+                            `₹${stayCalculations.roomRatePerNight.toLocaleString("en-IN")}/nt (${stayCalculations.isRateInclusive ? "Incl. GST" : "+Tax"}) • ${stayCalculations.checkoutDeadlineText}`
                           )}
                         </span>
                       </div>
@@ -1623,9 +1717,9 @@ function BillingContent() {
                   </div>
 
                   <div className="p-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-900/80 border border-zinc-200/80 dark:border-zinc-800 flex flex-col justify-center shadow-2xs">
-                    <span className="text-[10px] uppercase font-bold text-zinc-500 dark:text-zinc-400">Check-In Date & Time</span>
+                    <span className="text-[10px] uppercase font-bold text-zinc-500 dark:text-zinc-400">Check-In</span>
                     <span className="font-mono font-bold text-zinc-800 dark:text-zinc-200 text-xs mt-0.5 truncate">
-                      {activeStay?.arrivalAt ? new Date(activeStay.arrivalAt).toLocaleDateString("en-GB") + ", " + new Date(activeStay.arrivalAt).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true }) : (activeStay?.guestRegistration?.arrivalDateTime || "—")}
+                      {formatDateTimeShort(activeStay?.arrivalAt || activeStay?.guestRegistration?.arrivalDateTime)}
                     </span>
                   </div>
 
@@ -1634,11 +1728,7 @@ function BillingContent() {
                       {activeStay?.actualDepartureAt ? "Checked Out At" : "Expected Departure"}
                     </span>
                     <span className="font-mono font-bold text-zinc-800 dark:text-zinc-200 text-xs mt-0.5 truncate">
-                      {activeStay?.actualDepartureAt
-                        ? new Date(activeStay.actualDepartureAt).toLocaleDateString("en-GB") + ", " + new Date(activeStay.actualDepartureAt).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true })
-                        : activeStay?.expectedDepartureAt
-                        ? new Date(activeStay.expectedDepartureAt).toLocaleDateString("en-GB") + " (12:00 PM)"
-                        : "—"}
+                      {formatDateTimeShort(activeStay?.actualDepartureAt || activeStay?.expectedDepartureAt)}
                     </span>
                   </div>
                 </div>
@@ -1658,14 +1748,14 @@ function BillingContent() {
                         onChange={(e) => handleGracePeriodChange(Number(e.target.value))}
                         className="h-8.5 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 px-3 text-xs font-bold text-zinc-900 dark:text-white focus:outline-none focus:border-amber-500 cursor-pointer shadow-2xs"
                       >
-                        <option value={0}>0 Hours (None / Strict 11 AM–12 PM)</option>
-                        <option value={60}>1 Hour Grace (Till 1:00 PM)</option>
-                        <option value={120}>2 Hours Grace (Till 2:00 PM)</option>
-                        <option value={180}>3 Hours Grace (Till 3:00 PM)</option>
-                        <option value={240}>4 Hours Grace (Till 4:00 PM)</option>
-                        <option value={300}>5 Hours Grace (Till 5:00 PM)</option>
-                        <option value={360}>6 Hours Grace (Till 6:00 PM)</option>
-                        <option value={420}>7 Hours Grace (Till 7:00 PM)</option>
+                        <option value={0}>0 Hours / None</option>
+                        <option value={60}>1 Hour Grace</option>
+                        <option value={120}>2 Hours Grace</option>
+                        <option value={180}>3 Hours Grace</option>
+                        <option value={240}>4 Hours Grace</option>
+                        <option value={300}>5 Hours Grace</option>
+                        <option value={360}>6 Hours Grace</option>
+                        <option value={420}>7 Hours Grace</option>
                         <option value={1440}>Waive Next Night</option>
                       </select>
                     </div>
@@ -1767,10 +1857,10 @@ function BillingContent() {
                   </div>
                   <div className="text-[10.5px] text-zinc-400">
                     {surplusCredit > 0
-                      ? "Refund Due at Checkout or Retain as Advance"
+                      ? "Refund Due at Checkout"
                       : currentBalance > 0
-                      ? "Pending Guest / Corporate Settlement"
-                      : "✓ Folio is Exactly Settled & Cleared"}
+                      ? "Pending Settlement"
+                      : "✓ Settled & Cleared"}
                   </div>
                 </div>
               </div>
@@ -1778,18 +1868,16 @@ function BillingContent() {
               {/* 3. FOLIO CHARGES LEDGER TABLE */}
               <div className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-[#121215] overflow-hidden shadow-xs p-4 sm:p-5 space-y-3.5">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-zinc-200/80 dark:border-zinc-800">
-                  <div>
+                  <div className="flex items-center gap-2.5">
                     <h2 className="text-xs sm:text-sm font-bold text-zinc-900 dark:text-white uppercase tracking-wider flex items-center gap-2">
                       <FileText className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                       {groupBillingMode === "YES" && isMultiRoomGroup
-                        ? `Group Folio Charges Ledger (Rooms ${allGroupRooms.join(", ")})`
-                        : `Room ${activeRoomNumber} Itemized Charges Ledger`}
+                        ? `Group Folio Ledger (${allGroupRooms.join(", ")})`
+                        : `Room ${activeRoomNumber} Itemized Charges`}
                     </h2>
-                    <p className="text-xs text-zinc-500 mt-0.5">
-                      {groupBillingMode === "YES" && isMultiRoomGroup
-                        ? `Combined billing for ${allGroupRooms.length} rooms + restaurant food & services`
-                        : `Separate individual billing for Room ${activeRoomNumber} (Default)`}
-                    </p>
+                    <span className="text-[10.5px] font-mono text-zinc-500 font-medium px-2 py-0.5 rounded-md bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700">
+                      {entries.length} Item{entries.length === 1 ? "" : "s"}
+                    </span>
                   </div>
 
                   {/* Filter Controls */}
@@ -1938,6 +2026,7 @@ function BillingContent() {
                         <th className="py-2 px-3">Payment Method</th>
                         <th className="py-2 px-3">Reference / Notes</th>
                         <th className="py-2 px-3 text-right">Amount</th>
+                        <th className="py-2 px-3 text-right">Action</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-zinc-200/60 dark:divide-zinc-800/60">
@@ -2008,13 +2097,40 @@ function BillingContent() {
                             }`}>
                               {isRefund ? `- ${formatINR(Math.abs(p.amount))}` : formatINR(p.amount || 0)}
                             </td>
+                            <td className="py-2 px-3 text-right shrink-0">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  let parsedSnap: any = {};
+                                  try {
+                                    if (p.payerSnapshot) parsedSnap = typeof p.payerSnapshot === "string" ? JSON.parse(p.payerSnapshot) : p.payerSnapshot;
+                                  } catch {}
+                                  setEditingPayment({
+                                    id: p.id,
+                                    receiptNo: p.receiptNo || "Payment",
+                                    amount: String(Math.abs(p.amount || 0)),
+                                    method: p.method || "CASH",
+                                    reference: p.reference || "",
+                                    payerName: parsedSnap.name || p.payerName || "",
+                                    companyName: parsedSnap.companyName || "",
+                                    gstin: parsedSnap.gstin || "",
+                                  });
+                                  setShowEditPaymentModal(true);
+                                }}
+                                className="px-2 py-1 rounded-lg bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 font-bold text-[10.5px] transition shadow-2xs inline-flex items-center gap-1 cursor-pointer"
+                                title="Edit collected amount and payment details"
+                              >
+                                <Pencil className="h-3 w-3" />
+                                <span>Edit</span>
+                              </button>
+                            </td>
                           </tr>
                         );
                       })}
 
                       {payments.length === 0 && (
                         <tr>
-                          <td colSpan={5} className="p-5 text-center text-zinc-400 italic text-xs">
+                          <td colSpan={6} className="p-5 text-center text-zinc-400 italic text-xs">
                             No payments recorded yet for this stay.
                           </td>
                         </tr>
@@ -2535,6 +2651,130 @@ function BillingContent() {
                   <CreditCard className="h-4 w-4" />
                   {actionLoading ? "Recording..." : paymentForm.method === "DIRECT_BILL" ? "Bill to Company Ledger" : "Record Payment & Settle"}
                 </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* ✏️ EDIT COLLECTED PAYMENT MODAL                                            */}
+      {/* ========================================================================= */}
+      {showEditPaymentModal && editingPayment && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in">
+          <div className="w-full max-w-lg rounded-3xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-[#121215] p-6 shadow-2xl space-y-5 text-zinc-900 dark:text-white">
+            <div className="flex items-center justify-between pb-3 border-b border-zinc-200 dark:border-zinc-800">
+              <div className="flex items-center gap-2.5">
+                <div className="h-9 w-9 rounded-xl bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800 flex items-center justify-center text-blue-600 dark:text-blue-400 font-bold">
+                  <Pencil className="h-4 w-4" />
+                </div>
+                <div>
+                  <h2 className="text-base font-bold text-zinc-900 dark:text-white">
+                    Edit Payment Record
+                  </h2>
+                  <p className="text-xs text-zinc-500 font-mono">
+                    Receipt: {editingPayment.receiptNo}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setShowEditPaymentModal(false);
+                  setEditingPayment(null);
+                }}
+                className="h-8 w-8 rounded-full bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-600 dark:text-zinc-300 flex items-center justify-center transition cursor-pointer"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdatePayment} className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-bold text-zinc-700 dark:text-zinc-300 block mb-1.5">Payment Method *</label>
+                  <select
+                    value={editingPayment.method}
+                    onChange={(e) => setEditingPayment({ ...editingPayment, method: e.target.value })}
+                    className="w-full h-11 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 px-3 text-xs text-zinc-900 dark:text-white font-bold focus:outline-none focus:border-blue-500 cursor-pointer"
+                  >
+                    <option value="UPI">📱 UPI / QR Code</option>
+                    <option value="CARD">💳 Debit / Credit Card</option>
+                    <option value="CASH">💵 Cash Drawer</option>
+                    <option value="DIRECT_BILL">🏢 Bill to Company (BTC)</option>
+                    <option value="BANK_TRANSFER">🏦 Bank Transfer / NEFT</option>
+                    <option value="OTA_VCC">🌐 OTA Virtual Card</option>
+                    <option value="CHEQUE">📝 Cheque</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-zinc-700 dark:text-zinc-300 block mb-1.5">Amount (₹) *</label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-3 text-xs text-zinc-400 font-mono font-bold">₹</span>
+                    <input
+                      type="number"
+                      required
+                      step="0.01"
+                      value={editingPayment.amount}
+                      onChange={(e) => setEditingPayment({ ...editingPayment, amount: e.target.value })}
+                      className="w-full h-11 pl-7 pr-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white focus:outline-none focus:border-blue-500 font-mono font-black text-sm"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-zinc-700 dark:text-zinc-300 block mb-1">Payer Name</label>
+                <input
+                  type="text"
+                  placeholder="Guest / Payer Name"
+                  value={editingPayment.payerName}
+                  onChange={(e) => setEditingPayment({ ...editingPayment, payerName: e.target.value })}
+                  className="w-full h-10 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 px-3 text-xs text-zinc-900 dark:text-white focus:outline-none focus:border-blue-500 font-medium"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-zinc-700 dark:text-zinc-300 block mb-1">Reference / Transaction Note</label>
+                <input
+                  type="text"
+                  placeholder="e.g. UTR / Auth Code / Advance Deposit"
+                  value={editingPayment.reference}
+                  onChange={(e) => setEditingPayment({ ...editingPayment, reference: e.target.value })}
+                  className="w-full h-10 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 px-3 text-xs text-zinc-900 dark:text-white font-mono focus:outline-none focus:border-blue-500"
+                />
+              </div>
+
+              <div className="flex items-center justify-between pt-3 border-t border-zinc-200 dark:border-zinc-800">
+                <button
+                  type="button"
+                  onClick={() => handleDeletePayment(editingPayment.id)}
+                  className="h-10 px-3 rounded-xl bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 text-rose-600 dark:text-rose-400 font-bold text-xs border border-rose-200 dark:border-rose-800 transition flex items-center gap-1.5 cursor-pointer"
+                  title="Permanently remove this payment record and rebalance folio"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  <span>Void / Delete</span>
+                </button>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowEditPaymentModal(false);
+                      setEditingPayment(null);
+                    }}
+                    className="h-10 px-4 rounded-xl text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white font-bold text-xs cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={editPaymentLoading}
+                    className="h-10 px-5 rounded-xl bg-blue-600 text-white hover:bg-blue-700 font-black text-xs transition disabled:opacity-50 shadow-md flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                    <span>{editPaymentLoading ? "Updating..." : "Save Changes"}</span>
+                  </button>
+                </div>
               </div>
             </form>
           </div>

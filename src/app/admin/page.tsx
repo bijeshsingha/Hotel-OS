@@ -1772,14 +1772,14 @@ export default function AdminPortalPage() {
                           onChange={(e: any) => setEditingGrc({ ...editingGrc, gracePeriodMinutes: e.target.value })}
                           className="w-full h-10 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white text-xs font-semibold focus:border-blue-500 focus:outline-none cursor-pointer"
                         >
-                          <option value="0">0 Hours (None / Strict 11–12 PM)</option>
-                          <option value="60">1 Hour Grace (Till 1:00 PM)</option>
-                          <option value="120">2 Hours Grace (Till 2:00 PM)</option>
-                          <option value="180">3 Hours Grace (Till 3:00 PM)</option>
-                          <option value="240">4 Hours Grace (Till 4:00 PM)</option>
-                          <option value="300">5 Hours Grace (Till 5:00 PM)</option>
-                          <option value="360">6 Hours Grace (Till 6:00 PM)</option>
-                          <option value="420">7 Hours Grace (Till 7:00 PM)</option>
+                          <option value="0">0 Hours / None</option>
+                          <option value="60">1 Hour Grace</option>
+                          <option value="120">2 Hours Grace</option>
+                          <option value="180">3 Hours Grace</option>
+                          <option value="240">4 Hours Grace</option>
+                          <option value="300">5 Hours Grace</option>
+                          <option value="360">6 Hours Grace</option>
+                          <option value="420">7 Hours Grace</option>
                           <option value="1440">Waive Next Night</option>
                         </select>
                       </div>

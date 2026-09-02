@@ -85,6 +85,8 @@ export function NewReservationModal({
     isComplimentary: false,
     depositAmount: 0,
     depositMethod: "UPI",
+    kitchenDining: "NO" as "NO" | "YES",
+    diningFixedRate: "",
     notes: "",
   });
 
@@ -193,7 +195,12 @@ export function NewReservationModal({
           ratePerNight: form.isComplimentary ? 0 : (Number(form.ratePerNight) || 3200),
           depositAmount: Number(form.depositAmount) || 0,
           depositMethod: form.depositMethod,
-          notes: form.notes.trim() || undefined,
+          kitchenDining: form.kitchenDining || "NO",
+          diningFixedRate: form.diningFixedRate ? Number(form.diningFixedRate) : undefined,
+          notes: [
+            form.notes.trim() || null,
+            form.kitchenDining === "YES" ? `Kitchen Dining Plan: Fixed @ ₹${form.diningFixedRate || 0}/Day` : null,
+          ].filter(Boolean).join(" • ") || undefined,
         }),
       });
 
@@ -676,10 +683,10 @@ export function NewReservationModal({
               </label>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
               <div className="space-y-1">
                 <label className="text-[11px] font-bold text-zinc-700 dark:text-zinc-300">
-                  Agreed Rate / Room / Night (₹) *
+                  Agreed Rate / Room (₹) *
                 </label>
                 <div className="relative">
                   <span className="absolute left-3 top-2.5 text-zinc-400 font-bold font-mono text-xs">₹</span>
@@ -687,11 +694,40 @@ export function NewReservationModal({
                     type="number"
                     required={!form.isComplimentary}
                     disabled={form.isComplimentary}
-                    placeholder={form.isComplimentary ? "0 (Complimentary)" : "Enter custom rate"}
+                    placeholder={form.isComplimentary ? "0 (Complimentary)" : "Rate"}
                     value={form.isComplimentary ? 0 : form.ratePerNight}
                     onChange={(e) => setForm({ ...form, ratePerNight: Number(e.target.value) })}
                     className="w-full h-9 pl-7 pr-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs text-zinc-900 dark:text-white font-mono font-bold focus:border-indigo-500 focus:outline-none transition shadow-xs disabled:opacity-60 disabled:bg-zinc-100 dark:disabled:bg-zinc-800"
                   />
+                </div>
+              </div>
+
+              {/* Kitchen Dining Yes/No & Fixed Rate */}
+              <div className="space-y-1">
+                <label className="text-[11px] font-bold text-zinc-700 dark:text-zinc-300">
+                  Kitchen Dining
+                </label>
+                <div className="flex items-center gap-1.5">
+                  <select
+                    value={form.kitchenDining || "NO"}
+                    onChange={(e: any) => setForm({ ...form, kitchenDining: e.target.value })}
+                    className="h-9 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs text-zinc-900 dark:text-white font-bold focus:border-indigo-500 focus:outline-none transition shadow-xs cursor-pointer flex-1"
+                  >
+                    <option value="NO">No</option>
+                    <option value="YES">Yes</option>
+                  </select>
+                  {form.kitchenDining === "YES" && (
+                    <div className="relative w-24 shrink-0">
+                      <span className="absolute left-2.5 top-2 text-zinc-400 font-bold font-mono text-xs">₹</span>
+                      <input
+                        type="number"
+                        placeholder="Rate"
+                        value={form.diningFixedRate || ""}
+                        onChange={(e) => setForm({ ...form, diningFixedRate: e.target.value })}
+                        className="w-full h-9 pl-6 pr-2 rounded-xl bg-white dark:bg-zinc-900 border border-amber-400 dark:border-amber-600 text-xs text-zinc-900 dark:text-white font-mono font-bold focus:border-indigo-500 focus:outline-none transition shadow-xs"
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -713,19 +749,19 @@ export function NewReservationModal({
 
               <div className="space-y-1">
                 <label className="text-[11px] font-bold text-zinc-700 dark:text-zinc-300">
-                  Deposit Payment Channel
+                  Deposit Channel
                 </label>
                 <select
                   value={form.depositMethod}
                   onChange={(e) => setForm({ ...form, depositMethod: e.target.value })}
                   className="w-full h-9 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs text-zinc-900 dark:text-white font-bold focus:border-indigo-500 focus:outline-none transition shadow-xs cursor-pointer"
                 >
-                  <option value="UPI">UPI (Google Pay / PhonePe / QR)</option>
+                  <option value="UPI">UPI / QR</option>
                   <option value="CASH">CASH</option>
-                  <option value="CARD">CREDIT / DEBIT CARD</option>
-                  <option value="BANK_TRANSFER">NEFT / RTGS (Bank Transfer)</option>
-                  <option value="DIRECT_BILL">BTC (Direct Bill to Company/Agency)</option>
-                  <option value="OTA_VCC">OTA VIRTUAL CARD</option>
+                  <option value="CARD">CARD</option>
+                  <option value="BANK_TRANSFER">BANK TRANSFER</option>
+                  <option value="DIRECT_BILL">BTC (Company)</option>
+                  <option value="OTA_VCC">OTA VCC</option>
                 </select>
               </div>
             </div>

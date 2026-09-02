@@ -33,6 +33,8 @@ export async function POST(request: Request) {
       overrideReason,
       coGuests,
       foreignDetails,
+      kitchenDining,
+      diningFixedRate,
     } = body;
 
     const finalRoomIds = roomIds || (roomId ? [roomId] : []);
@@ -68,6 +70,8 @@ export async function POST(request: Request) {
       overrideReason,
       coGuests,
       foreignDetails,
+      kitchenDining,
+      diningFixedRate: diningFixedRate !== undefined ? Number(diningFixedRate) : undefined,
     });
 
     return NextResponse.json({ ...result });

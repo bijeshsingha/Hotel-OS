@@ -20,6 +20,8 @@ export interface GrcData {
   preAssignedRoom?: string;
   arrivalDateTime?: string;
   expectedDepartureDate?: string;
+  adults?: number | string;
+  children?: number | string;
   paxM?: number | string;
   paxF?: number | string;
   paxC?: number | string;
@@ -173,18 +175,36 @@ export function PrintableGrcModal({
     ? `${docType}${docNum ? ` — ${docNum}` : " — Verified at Desk"}`
     : docNum || "—";
 
-  // Dynamic Occupants
+  // Dynamic Occupants (Adults & Children)
+  const explicitAdults = data.adults !== undefined && data.adults !== null && String(data.adults).trim() !== "" ? Number(data.adults) : NaN;
+  const explicitChildren = data.children !== undefined && data.children !== null && String(data.children).trim() !== "" ? Number(data.children) : NaN;
   const m = Number(data.paxM);
   const f = Number(data.paxF);
   const c = Number(data.paxC);
-  let formattedOccupants = "";
-  if (!isNaN(m) || !isNaN(f)) {
-    formattedOccupants = `${isNaN(m) ? 1 : m} Male • ${isNaN(f) ? 0 : f} Female`;
-    if (!isNaN(c) && c > 0) formattedOccupants += ` • ${c} Child`;
+
+  let totalAdults = 2;
+  if (!isNaN(explicitAdults) && explicitAdults > 0) {
+    totalAdults = explicitAdults;
+  } else if (!isNaN(m) && m > 0 && !isNaN(f) && f > 0) {
+    totalAdults = m + f;
+  } else if (!isNaN(m) && m > 0) {
+    totalAdults = m;
   } else if (data.coGuests && data.coGuests.length > 0) {
-    formattedOccupants = `${data.coGuests.length + 1} Occupants (${data.coGuests.length} Companions)`;
+    totalAdults = data.coGuests.length + 1;
   } else {
-    formattedOccupants = "1 Guest";
+    totalAdults = 2; // Default standard 2 adults
+  }
+
+  let totalChildren = 0;
+  if (!isNaN(explicitChildren) && explicitChildren >= 0) {
+    totalChildren = explicitChildren;
+  } else if (!isNaN(c) && c >= 0) {
+    totalChildren = c;
+  }
+
+  let formattedOccupants = `${totalAdults} Adult${totalAdults > 1 ? "s" : ""}`;
+  if (totalChildren > 0) {
+    formattedOccupants += ` • ${totalChildren} Child${totalChildren > 1 ? "ren" : ""}`;
   }
 
   const handleCopyLink = () => {

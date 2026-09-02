@@ -2195,6 +2195,24 @@ function PMSFrontDeskContent() {
             roomNumber: selectedRegForPrint.assignedRoomNumber || selectedRegForPrint.preAssignedRoom || selectedRegForPrint.roomNumber || "—",
             arrivalDateTime: selectedRegForPrint.arrivalDateTime,
             expectedDepartureDate: selectedRegForPrint.expectedDepartureDate,
+            adults: selectedRegForPrint.adults ?? (() => {
+              try {
+                if (selectedRegForPrint.internalNotes) {
+                  const n = typeof selectedRegForPrint.internalNotes === "string" ? JSON.parse(selectedRegForPrint.internalNotes) : selectedRegForPrint.internalNotes;
+                  return n.adults || (n.paxM ? (Number(n.paxM) + Number(n.paxF || 0)) : undefined);
+                }
+              } catch {}
+              return undefined;
+            })() ?? selectedRegForPrint.paxM ?? 2,
+            children: selectedRegForPrint.children ?? (() => {
+              try {
+                if (selectedRegForPrint.internalNotes) {
+                  const n = typeof selectedRegForPrint.internalNotes === "string" ? JSON.parse(selectedRegForPrint.internalNotes) : selectedRegForPrint.internalNotes;
+                  return n.children || n.paxC;
+                }
+              } catch {}
+              return undefined;
+            })() ?? selectedRegForPrint.paxC ?? 0,
             paxM: selectedRegForPrint.paxM,
             paxF: selectedRegForPrint.paxF,
             paxC: selectedRegForPrint.paxC,
