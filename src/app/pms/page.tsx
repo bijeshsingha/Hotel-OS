@@ -2203,7 +2203,7 @@ function PMSFrontDeskContent() {
                 }
               } catch {}
               return undefined;
-            })() ?? selectedRegForPrint.paxM ?? 2,
+            })() ?? selectedRegForPrint.paxM,
             children: selectedRegForPrint.children ?? (() => {
               try {
                 if (selectedRegForPrint.internalNotes) {
@@ -2212,7 +2212,7 @@ function PMSFrontDeskContent() {
                 }
               } catch {}
               return undefined;
-            })() ?? selectedRegForPrint.paxC ?? 0,
+            })() ?? selectedRegForPrint.paxC,
             paxM: selectedRegForPrint.paxM,
             paxF: selectedRegForPrint.paxF,
             paxC: selectedRegForPrint.paxC,

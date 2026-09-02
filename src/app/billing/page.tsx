@@ -33,6 +33,7 @@ import {
   Archive,
   FolderArchive,
   History,
+  UtensilsCrossed,
 } from "lucide-react";
 import { DISCOUNT_REASONS, PAYMENT_METHODS } from "@/data";
 import { PrintableTaxInvoiceModal } from "@/components/billing/printable-tax-invoice";
@@ -164,9 +165,10 @@ function BillingContent() {
   // Form states for modals
   const [chargeForm, setChargeForm] = useState({
     chargeCode: "RESTAURANT_FOOD",
-    description: "Dinner Service Bill",
+    description: "Kitchen Order (KOT)",
     amount: "0",
     sacHsn: "996331",
+    kotNumber: "",
   });
 
   const [discountForm, setDiscountForm] = useState({
@@ -752,13 +754,21 @@ function BillingContent() {
         return;
       }
 
+      let finalDesc = chargeForm.description.trim() || "Kitchen Order (KOT)";
+      if (chargeForm.kotNumber?.trim()) {
+        const kotTag = `KOT #${chargeForm.kotNumber.trim().toUpperCase()}`;
+        if (!finalDesc.includes(kotTag)) {
+          finalDesc = `${kotTag} — ${finalDesc}`;
+        }
+      }
+
       const res = await fetch(`/api/v1/folios/${folioData.id}/charges`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           folioWindowId: folioData.windows[0].id,
           chargeCode: chargeForm.chargeCode || "RESTAURANT_FOOD",
-          description: chargeForm.description || "Dinner Service Bill",
+          description: finalDesc,
           qty: 1,
           amount: numAmt,
           isInclusive: true,
@@ -777,9 +787,10 @@ function BillingContent() {
       setShowManualChargeModal(false);
       setChargeForm({
         chargeCode: "RESTAURANT_FOOD",
-        description: "Dinner Service Bill",
+        description: "Kitchen Order (KOT)",
         amount: "0",
         sacHsn: "996331",
+        kotNumber: "",
       });
     } catch (err: any) {
       alert(`Error posting charge: ${err.message}`);
@@ -1266,9 +1277,27 @@ function BillingContent() {
                     onClick={() => {
                       setChargeForm({
                         chargeCode: "RESTAURANT_FOOD",
-                        description: "Dinner Service Bill",
-                        amount: "0",
+                        description: "Kitchen Order (KOT)",
+                        amount: "",
                         sacHsn: "996331",
+                        kotNumber: "",
+                      });
+                      setShowManualChargeModal(true);
+                    }}
+                    className="h-8.5 px-3.5 rounded-xl bg-orange-50/80 dark:bg-orange-500/10 hover:bg-orange-100/80 dark:hover:bg-orange-500/20 border border-orange-200 dark:border-orange-500/30 text-orange-900 dark:text-orange-300 font-semibold text-xs flex items-center gap-1.5 transition shadow-xs cursor-pointer"
+                  >
+                    <UtensilsCrossed className="h-3.5 w-3.5 text-orange-600 dark:text-orange-400" />
+                    <span>+ Add KOT Bill</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setChargeForm({
+                        chargeCode: "MISC",
+                        description: "Guest Service Charge",
+                        amount: "",
+                        sacHsn: "9999",
+                        kotNumber: "",
                       });
                       setShowManualChargeModal(true);
                     }}
@@ -2232,23 +2261,25 @@ function BillingContent() {
                   onChange={(e) => {
                     const val = e.target.value;
                     const presets: Record<string, { desc: string; sac: string }> = {
-                      RESTAURANT_FOOD: { desc: "Dinner Service Bill", sac: "996331" },
+                      RESTAURANT_FOOD: { desc: "Kitchen Order (KOT)", sac: "996331" },
                       ROOM_TARIFF: { desc: "Extra Bed / Stay Extension", sac: "996311" },
                       LAUNDRY: { desc: "Laundry & Pressing Service", sac: "9997" },
                       TRANSPORT: { desc: "Cab / Airport Pick & Drop", sac: "9964" },
-                      MISC: { desc: "Miscellaneous Guest Service", sac: "9999" },
+                      MISC: { desc: "Guest Service Charge", sac: "9999" },
                     };
                     const selected = presets[val] || { desc: "Guest Service Charge", sac: "996331" };
-                    setChargeForm({
-                      ...chargeForm,
+                    setChargeForm((prev) => ({
+                      ...prev,
                       chargeCode: val,
                       sacHsn: selected.sac,
-                      description: selected.desc,
-                    });
+                      description: prev.kotNumber?.trim()
+                        ? `KOT #${prev.kotNumber.trim().toUpperCase()} — ${selected.desc}`
+                        : selected.desc,
+                    }));
                   }}
                   className="w-full h-11 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 px-3.5 text-xs sm:text-sm text-zinc-900 dark:text-white font-semibold focus:outline-none focus:border-blue-500 transition cursor-pointer"
                 >
-                  <option value="RESTAURANT_FOOD">🍽️ Restaurant & In-Room Dining (5% GST)</option>
+                  <option value="RESTAURANT_FOOD">🍽️ Food & Beverage / Kitchen Order (KOT) (5% GST)</option>
                   <option value="ROOM_TARIFF">🛏️ Room Tariff / Extension (5% GST)</option>
                   <option value="LAUNDRY">🧺 Laundry & Valet Service (5% GST)</option>
                   <option value="TRANSPORT">🚗 Travel / Cab / Transfer (5% GST)</option>
@@ -2256,7 +2287,34 @@ function BillingContent() {
                 </select>
               </div>
 
-              {/* 2. Editable Description */}
+              {/* 2. Optional KOT Slip Number */}
+              <div>
+                <label className="text-xs uppercase font-bold font-mono text-zinc-500 tracking-wider block mb-1.5 flex items-center justify-between">
+                  <span>KOT Slip Number (Optional / Deliveries)</span>
+                  <span className="text-[10px] text-zinc-400 font-sans">e.g. KOT-1042 / KOT-55</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. KOT-1042"
+                  value={chargeForm.kotNumber || ""}
+                  onChange={(e) => {
+                    const kotVal = e.target.value;
+                    setChargeForm((prev) => {
+                      const baseName = prev.description.replace(/^KOT\s*#?\w+\s*[—–-]\s*/i, "");
+                      return {
+                        ...prev,
+                        kotNumber: kotVal,
+                        description: kotVal.trim()
+                          ? `KOT #${kotVal.trim().toUpperCase()} — ${baseName || "Kitchen Order"}`
+                          : baseName || "Kitchen Order (KOT)",
+                      };
+                    });
+                  }}
+                  className="w-full h-11 rounded-xl bg-orange-50/50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-800/60 px-3.5 text-xs sm:text-sm text-zinc-900 dark:text-white placeholder-zinc-400 font-mono font-bold focus:outline-none focus:border-orange-500 transition"
+                />
+              </div>
+
+              {/* 3. Editable Description */}
               <div>
                 <label className="text-xs uppercase font-bold font-mono text-zinc-500 tracking-wider block mb-1.5">
                   Description / Item Details *
@@ -2264,7 +2322,7 @@ function BillingContent() {
                 <input
                   type="text"
                   required
-                  placeholder="e.g. Dinner Service Bill #1042 / KOT #55"
+                  placeholder="e.g. Dinner Service / Breakfast / Delivery"
                   value={chargeForm.description}
                   onChange={(e) => setChargeForm({ ...chargeForm, description: e.target.value })}
                   className="w-full h-11 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 px-3.5 text-xs sm:text-sm text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:border-blue-500 font-medium transition"

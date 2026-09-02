@@ -182,7 +182,10 @@ export function PrintableGrcModal({
   const f = Number(data.paxF);
   const c = Number(data.paxC);
 
-  let totalAdults = 2;
+  // Count assigned rooms in case of multi-room group stay
+  const roomCount = roomNum && roomNum !== "—" ? roomNum.split(",").filter((r: string) => r.trim().length > 0).length : 1;
+
+  let totalAdults = 1;
   if (!isNaN(explicitAdults) && explicitAdults > 0) {
     totalAdults = explicitAdults;
   } else if (!isNaN(m) && m > 0 && !isNaN(f) && f > 0) {
@@ -191,8 +194,10 @@ export function PrintableGrcModal({
     totalAdults = m;
   } else if (data.coGuests && data.coGuests.length > 0) {
     totalAdults = data.coGuests.length + 1;
+  } else if (roomCount > 1) {
+    totalAdults = roomCount * 2; // Estimate for multi-room group when pax not specified
   } else {
-    totalAdults = 2; // Default standard 2 adults
+    totalAdults = 1;
   }
 
   let totalChildren = 0;

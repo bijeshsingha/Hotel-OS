@@ -10,6 +10,7 @@ import {
   ScrollText,
   Building2,
   SlidersHorizontal,
+  UtensilsCrossed,
   LucideIcon,
 } from "lucide-react";
 

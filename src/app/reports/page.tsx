@@ -88,6 +88,11 @@ export default function ReportsPage() {
   const [billStatusFilter, setBillStatusFilter] = useState<"ALL" | "SETTLED" | "IN_HOUSE" | "OPEN">("ALL");
   const [billMethodFilter, setBillMethodFilter] = useState<string>("ALL");
 
+  // Filters for Kitchen & Dining Orders Tab
+  const [kotSearch, setKotSearch] = useState("");
+  const [kotDestinationFilter, setKotDestinationFilter] = useState("ALL");
+  const [kotSettlementFilter, setKotSettlementFilter] = useState("ALL");
+
   // Modals & Printable Sheets
   const [snapshotLoading, setSnapshotLoading] = useState(false);
   const [snapshotMsg, setSnapshotMsg] = useState<string | null>(null);
@@ -95,6 +100,7 @@ export default function ReportsPage() {
   const [showPrintModal, setShowPrintModal] = useState(false);
   const [showTransfersPrintModal, setShowTransfersPrintModal] = useState(false);
   const [showFinalBillsPrintModal, setShowFinalBillsPrintModal] = useState(false);
+  const [showKotPrintModal, setShowKotPrintModal] = useState(false);
 
   // Countdown to next 12 AM Midnight
   const [timeUntilMidnight, setTimeUntilMidnight] = useState("");
@@ -496,6 +502,40 @@ export default function ReportsPage() {
     });
   }, [data, billStatusFilter, billMethodFilter, billDateRange, billCustomStart, billCustomEnd, billSearch, activeProperty?.businessDate]);
 
+  // Filtered Kitchen Orders & Dining Sales
+  const filteredKitchenOrders = useMemo(() => {
+    const list: any[] = data?.rows || [];
+    if (reportType !== "FNB") return list;
+    return list.filter((o) => {
+      if (kotDestinationFilter !== "ALL" && o.destinationCategory !== kotDestinationFilter) {
+        return false;
+      }
+      if (kotSettlementFilter !== "ALL" && o.settlementType !== kotSettlementFilter) {
+        return false;
+      }
+      if (kotSearch.trim()) {
+        const q = kotSearch.toLowerCase().trim();
+        const ord = (o.orderNo || "").toLowerCase();
+        const kot = (o.kotNumbers || "").toLowerCase();
+        const dest = (o.destinationLabel || "").toLowerCase();
+        const guest = (o.guestName || "").toLowerCase();
+        const room = (o.roomNo || "").toLowerCase();
+        const items = (o.itemsSummary || "").toLowerCase();
+        if (
+          !ord.includes(q) &&
+          !kot.includes(q) &&
+          !dest.includes(q) &&
+          !guest.includes(q) &&
+          !room.includes(q) &&
+          !items.includes(q)
+        ) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }, [data, reportType, kotDestinationFilter, kotSettlementFilter, kotSearch]);
+
   // Distinct room numbers for filter dropdown
   const allDistinctRooms = useMemo(() => {
     const set = new Set<string>();
@@ -662,6 +702,60 @@ export default function ReportsPage() {
     a.click();
   };
 
+  const exportKitchenOrdersCSV = () => {
+    if (!filteredKitchenOrders.length) {
+      alert("No kitchen order records to export.");
+      return;
+    }
+    const headers = [
+      "Order No",
+      "KOT Numbers",
+      "Date",
+      "Time",
+      "Destination Category",
+      "Destination Detail",
+      "Room Number",
+      "Guest / Receiver",
+      "Dishes Ordered",
+      "Item Count",
+      "Taxable Value (INR)",
+      "CGST 2.5% (INR)",
+      "SGST 2.5% (INR)",
+      "Total GST 5% (INR)",
+      "Gross Total (INR)",
+      "Settlement Channel",
+      "Order Status",
+    ];
+
+    const rows = filteredKitchenOrders.map((o: any) => [
+      o.orderNo,
+      JSON.stringify(o.kotNumbers || ""),
+      o.dateFormatted,
+      o.timeFormatted,
+      o.destinationCategory,
+      JSON.stringify(o.destinationLabel || ""),
+      o.roomNo,
+      JSON.stringify(o.guestName || ""),
+      JSON.stringify(o.itemsSummary || ""),
+      o.itemCount,
+      o.taxableAmount,
+      o.cgst,
+      o.sgst,
+      o.totalTax,
+      o.totalAmount,
+      o.settlementType,
+      o.status,
+    ]);
+
+    const csvContent = [headers.join(","), ...rows.map((r: any[]) => r.join(","))].join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${activeProperty?.code || "HOTEL"}_Kitchen_Orders_Report_${selectedDate || new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+  };
+
   const summary = data?.summary;
   const isToday = (selectedDate || activeProperty?.businessDate) === activeProperty?.businessDate;
 
@@ -734,6 +828,23 @@ export default function ReportsPage() {
               </>
             )}
 
+            {reportType === "FNB" && (
+              <>
+                <button
+                  onClick={() => setShowKotPrintModal(true)}
+                  className="flex items-center gap-1.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 border border-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 dark:border-zinc-700 px-3.5 py-2 text-xs font-semibold text-zinc-800 dark:text-zinc-200 transition shadow-xs cursor-pointer"
+                >
+                  <Printer className="h-4 w-4 text-zinc-500 dark:text-zinc-400" /> Print Kitchen Log
+                </button>
+                <button
+                  onClick={exportKitchenOrdersCSV}
+                  className="flex items-center gap-1.5 rounded-xl bg-emerald-700 hover:bg-emerald-600 text-white px-4 py-2 text-xs font-semibold transition shadow-xs cursor-pointer"
+                >
+                  <FileSpreadsheet className="h-4 w-4" /> Export Kitchen CSV
+                </button>
+              </>
+            )}
+
             <button
               onClick={() => loadReportData(true)}
               className="p-2 rounded-xl bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 transition cursor-pointer"
@@ -763,7 +874,7 @@ export default function ReportsPage() {
             { value: "CASHIER_COLLECTIONS_EXPENSES", label: "Cashier Shift Sheet", icon: Wallet },
             { value: "FRONT_OFFICE", label: "Front Desk Room Rack", icon: BedDouble },
             { value: "REVENUE", label: "Revenue & Tax Ledger", icon: TrendingUp },
-            { value: "FNB", label: "F&B / Restaurant Dining", icon: UtensilsCrossed },
+            { value: "FNB", label: "Kitchen & Dining Collections", icon: UtensilsCrossed },
           ]}
         />
       </div>
@@ -1648,14 +1759,118 @@ export default function ReportsPage() {
       )}
 
       {/* ========================================================================= */}
-      {/* TAB 6: F&B RESTAURANT DINING */}
+      {/* TAB 6: KITCHEN ORDERS & DINING COLLECTIONS */}
       {/* ========================================================================= */}
       {reportType === "FNB" && (
         <div className="space-y-4 animate-in fade-in">
-          <div className="p-4 rounded-xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-3">
+          {/* Summary Stat Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="p-4 rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">Total Kitchen Orders</span>
+                <UtensilsCrossed className="h-4 w-4 text-orange-500" />
+              </div>
+              <div className="text-2xl font-black font-mono text-zinc-900 dark:text-zinc-100">
+                {data?.summary?.totalOrdersCount ?? filteredKitchenOrders.length}
+              </div>
+              <div className="text-[11px] text-zinc-500 font-mono">
+                {data?.summary?.totalKotsFired ?? 0} KOTs • {data?.summary?.totalItemsPrepared ?? 0} Dishes Prepared
+              </div>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800/50 shadow-xs space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-emerald-800 dark:text-emerald-300 uppercase tracking-wider">
+                  Gross F&B Collections
+                </span>
+                <DollarSign className="h-4 w-4 text-emerald-600" />
+              </div>
+              <div className="text-2xl font-black font-mono text-emerald-800 dark:text-emerald-300">
+                {formatINR(data?.summary?.grossCollection ?? 0)}
+              </div>
+              <div className="text-[11px] text-emerald-700/80 dark:text-emerald-400 font-mono">
+                Base: {formatINR(data?.summary?.taxableSales ?? 0)} • GST 5%: {formatINR(data?.summary?.gstCollected ?? 0)}
+              </div>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-blue-50/50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800/50 shadow-xs space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-blue-800 dark:text-blue-300 uppercase tracking-wider">
+                  Room Folio Transferred
+                </span>
+                <BedDouble className="h-4 w-4 text-blue-600" />
+              </div>
+              <div className="text-2xl font-black font-mono text-blue-800 dark:text-blue-300">
+                {formatINR(data?.summary?.folioPostedAmount ?? 0)}
+              </div>
+              <div className="text-[11px] text-blue-700/80 dark:text-blue-400 font-mono">
+                Billed to in-house guest rooms
+              </div>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-purple-50/50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-800/50 shadow-xs space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-purple-800 dark:text-purple-300 uppercase tracking-wider">
+                  Direct Counter Settle
+                </span>
+                <Wallet className="h-4 w-4 text-purple-600" />
+              </div>
+              <div className="text-2xl font-black font-mono text-purple-800 dark:text-purple-300">
+                {formatINR(data?.summary?.directSettledAmount ?? 0)}
+              </div>
+              <div className="text-[11px] text-purple-700/80 dark:text-purple-400 font-mono">
+                Cash, UPI & Card collections
+              </div>
+            </div>
+          </div>
+
+          {/* Search & Filter Bar */}
+          <div className="flex flex-col md:flex-row items-center gap-2 p-3 rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs">
+            <div className="relative flex-1 w-full">
+              <Search className="h-3.5 w-3.5 absolute left-3 top-3 text-zinc-400" />
+              <input
+                type="text"
+                placeholder="Search by Order #, KOT #, destination, room, guest, dish..."
+                value={kotSearch}
+                onChange={(e) => setKotSearch(e.target.value)}
+                className="w-full pl-9 pr-3 py-2 text-xs rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 focus:outline-none focus:ring-1 focus:ring-emerald-500 text-zinc-900 dark:text-white"
+              />
+            </div>
+
+            <div className="flex items-center gap-2 w-full md:w-auto flex-wrap">
+              <select
+                value={kotDestinationFilter}
+                onChange={(e) => setKotDestinationFilter(e.target.value)}
+                className="text-xs rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-3 py-2 font-medium text-zinc-900 dark:text-white"
+              >
+                <option value="ALL">All Destinations</option>
+                <option value="ROOM_SERVICE">🏨 Room Service</option>
+                <option value="TABLE_DINE_IN">🍽️ Dine-In Tables</option>
+                <option value="BAR_LOUNGE">🍸 Bar Lounge</option>
+                <option value="TAKEAWAY">📦 Takeaways / Other</option>
+              </select>
+
+              <select
+                value={kotSettlementFilter}
+                onChange={(e) => setKotSettlementFilter(e.target.value)}
+                className="text-xs rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-3 py-2 font-medium text-zinc-900 dark:text-white"
+              >
+                <option value="ALL">All Settlements</option>
+                <option value="POSTED_TO_ROOM">🏨 Posted to Room Folio</option>
+                <option value="DIRECT_PAID">💵 Direct Paid / Settled</option>
+                <option value="UNSETTLED">🕒 Unsettled / Open</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Kitchen Orders Table */}
+          <div className="p-4 rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-3">
             <div className="flex items-center justify-between pb-2 border-b border-zinc-200 dark:border-zinc-800">
               <span className="font-bold text-xs uppercase font-mono text-zinc-500">
-                Restaurant POS Orders & Dining Sales
+                Kitchen Orders & Collections Register ({filteredKitchenOrders.length} Records)
+              </span>
+              <span className="text-xs font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                GST SAC 996331 (5% Composite Food & Beverage Supply)
               </span>
             </div>
 
@@ -1663,29 +1878,74 @@ export default function ReportsPage() {
               <table className="w-full text-left text-xs">
                 <thead>
                   <tr className="border-b border-zinc-200 dark:border-zinc-800 text-[11px] font-bold text-zinc-400 uppercase font-mono">
-                    <th className="pb-2">Order No</th>
-                    <th className="pb-2">Outlet</th>
-                    <th className="pb-2">Mode</th>
-                    <th className="pb-2">Table / Room</th>
-                    <th className="pb-2">Items</th>
-                    <th className="pb-2">Status</th>
+                    <th className="pb-2">Order / KOT #</th>
+                    <th className="pb-2">Time</th>
+                    <th className="pb-2">Destination</th>
+                    <th className="pb-2">Guest / Payee</th>
+                    <th className="pb-2">Dishes Ordered</th>
+                    <th className="pb-2 text-right">Taxable</th>
+                    <th className="pb-2 text-right">GST (5%)</th>
+                    <th className="pb-2 text-right">Total Bill</th>
+                    <th className="pb-2 text-center">Settlement</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/60 font-mono">
-                  {(data?.rows || []).map((o: any) => (
-                    <tr key={o.orderNo} className="hover:bg-zinc-50 dark:hover:bg-zinc-900/50">
-                      <td className="py-2.5 font-bold text-zinc-900 dark:text-zinc-100">{o.orderNo}</td>
-                      <td className="py-2.5 text-zinc-500 font-sans">{o.outletName}</td>
-                      <td className="py-2.5 text-zinc-500 font-sans">{o.mode}</td>
-                      <td className="py-2.5 font-sans font-medium text-zinc-900 dark:text-zinc-200">{o.tableName}</td>
-                      <td className="py-2.5">{o.itemCount} Items</td>
-                      <td className="py-2.5">
-                        <span className="px-2 py-0.5 rounded font-bold text-[10px] bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400">
-                          {o.status}
-                        </span>
+                  {filteredKitchenOrders.length === 0 ? (
+                    <tr>
+                      <td colSpan={9} className="py-8 text-center text-zinc-500 font-sans">
+                        No kitchen orders or dining sales recorded for this date.
                       </td>
                     </tr>
-                  ))}
+                  ) : (
+                    filteredKitchenOrders.map((o: any) => (
+                      <tr key={o.id} className="hover:bg-zinc-50 dark:hover:bg-zinc-900/50">
+                        <td className="py-2.5 font-bold text-zinc-900 dark:text-zinc-100">
+                          <div>{o.orderNo}</div>
+                          <div className="text-[10px] font-normal text-orange-600 dark:text-orange-400">{o.kotNumbers}</div>
+                        </td>
+                        <td className="py-2.5 text-zinc-500">{o.timeFormatted}</td>
+                        <td className="py-2.5 font-sans">
+                          <span
+                            className={`px-2 py-0.5 rounded-md font-bold text-[10.5px] inline-flex items-center gap-1 ${
+                              o.destinationCategory === "ROOM_SERVICE"
+                                ? "bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-200 dark:border-blue-800/60"
+                                : o.destinationCategory === "BAR_LOUNGE"
+                                ? "bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-200 dark:border-purple-800/60"
+                                : o.destinationCategory === "TAKEAWAY"
+                                ? "bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-200 dark:border-amber-800/60"
+                                : "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60"
+                            }`}
+                          >
+                            {o.destinationLabel}
+                          </span>
+                        </td>
+                        <td className="py-2.5 font-sans font-medium text-zinc-900 dark:text-zinc-200">
+                          {o.guestName}
+                        </td>
+                        <td className="py-2.5 font-sans text-zinc-700 dark:text-zinc-300 max-w-xs truncate" title={o.itemsSummary}>
+                          {o.itemsSummary}
+                        </td>
+                        <td className="py-2.5 text-right font-medium">{formatINR(o.taxableAmount)}</td>
+                        <td className="py-2.5 text-right font-medium text-indigo-600 dark:text-indigo-400">{formatINR(o.totalTax)}</td>
+                        <td className="py-2.5 text-right font-bold text-emerald-600 dark:text-emerald-400">{formatINR(o.totalAmount)}</td>
+                        <td className="py-2.5 text-center font-sans">
+                          {o.settlementType === "POSTED_TO_ROOM" ? (
+                            <span className="px-2 py-0.5 rounded bg-blue-100 dark:bg-blue-950/80 text-blue-800 dark:text-blue-300 border border-blue-300 dark:border-blue-700 text-[10px] font-bold">
+                              🏨 Room Folio
+                            </span>
+                          ) : o.settlementType === "DIRECT_PAID" ? (
+                            <span className="px-2 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700 text-[10px] font-bold">
+                              ✓ Paid Settle
+                            </span>
+                          ) : (
+                            <span className="px-2 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-300 dark:border-zinc-700 text-[10px] font-bold">
+                              🕒 Open Ticket
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
@@ -2094,6 +2354,104 @@ export default function ReportsPage() {
                 <div className="text-center">
                   <div className="w-40 border-b border-zinc-400 pb-6 text-zinc-400 italic">General Manager / Auditor</div>
                   <span className="font-bold">Verified & Received By</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL 5: PRINTABLE KITCHEN ORDERS & DINING REGISTER */}
+      {/* ========================================================================= */}
+      {showKotPrintModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4 overflow-y-auto">
+          <div className="w-full max-w-4xl rounded-2xl border border-zinc-700 bg-white text-zinc-950 p-6 shadow-2xl space-y-4 font-sans text-xs">
+            <div className="flex items-center justify-between pb-3 border-b border-zinc-200">
+              <span className="text-xs font-bold uppercase font-mono text-zinc-600">
+                Official Kitchen & Dining Collections Register
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => window.print()}
+                  className="flex items-center gap-1.5 rounded-lg bg-zinc-950 px-3 py-1.5 text-xs font-bold text-white hover:bg-zinc-800 transition shadow-sm cursor-pointer"
+                >
+                  <Printer className="h-3.5 w-3.5" /> Print Sheet
+                </button>
+                <button onClick={() => setShowKotPrintModal(false)} className="text-zinc-500 hover:text-zinc-900 cursor-pointer">
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Document Body */}
+            <div className="space-y-4">
+              <div className="flex justify-between items-start border-b border-zinc-300 pb-3">
+                <div>
+                  <h1 className="text-base font-black uppercase text-zinc-950">{activeProperty?.displayName || "Hotel Ambarish Grand Residency"}</h1>
+                  <p className="text-[11px] text-zinc-600">{activeProperty?.legalName}</p>
+                  <p className="font-mono text-[11px] text-zinc-700">
+                    GSTIN: {activeProperty?.gstin || "N/A"} | State: {activeProperty?.stateCode || "18"}
+                  </p>
+                </div>
+                <div className="text-right font-mono">
+                  <div className="font-bold text-zinc-950">KITCHEN & RESTAURANT REGISTER</div>
+                  <div className="text-zinc-600 text-[11px]">Business Date: {selectedDate || activeProperty?.businessDate}</div>
+                  <div className="text-zinc-600 text-[11px]">Printed: {new Date().toLocaleString()}</div>
+                </div>
+              </div>
+
+              {/* Summary Numbers */}
+              <div className="grid grid-cols-4 gap-2 bg-zinc-100 p-2.5 rounded font-mono text-xs">
+                <div>Total Orders: <strong>{data?.summary?.totalOrdersCount ?? filteredKitchenOrders.length}</strong></div>
+                <div>Dishes Prepared: <strong>{data?.summary?.totalItemsPrepared ?? 0}</strong></div>
+                <div>Gross Sales: <strong>{formatINR(data?.summary?.grossCollection ?? 0)}</strong></div>
+                <div>GST 5%: <strong>{formatINR(data?.summary?.gstCollected ?? 0)}</strong></div>
+              </div>
+
+              <table className="w-full text-left text-[11px] border border-zinc-200">
+                <thead>
+                  <tr className="bg-zinc-100 border-b border-zinc-200 text-[10px] font-bold text-zinc-600 uppercase font-mono">
+                    <th className="p-2">Order #</th>
+                    <th className="p-2">KOT #</th>
+                    <th className="p-2">Time</th>
+                    <th className="p-2">Destination</th>
+                    <th className="p-2">Guest / Payee</th>
+                    <th className="p-2">Dishes Ordered</th>
+                    <th className="p-2 text-right">Taxable</th>
+                    <th className="p-2 text-right">GST (5%)</th>
+                    <th className="p-2 text-right">Gross Total</th>
+                    <th className="p-2 text-center">Settlement</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-zinc-200 font-mono">
+                  {filteredKitchenOrders.map((o: any) => (
+                    <tr key={o.id}>
+                      <td className="p-2 font-bold">{o.orderNo}</td>
+                      <td className="p-2 text-orange-700">{o.kotNumbers}</td>
+                      <td className="p-2 text-zinc-600">{o.timeFormatted}</td>
+                      <td className="p-2 font-sans font-medium">{o.destinationLabel}</td>
+                      <td className="p-2 font-sans">{o.guestName}</td>
+                      <td className="p-2 font-sans max-w-xs truncate">{o.itemsSummary}</td>
+                      <td className="p-2 text-right">{formatINR(o.taxableAmount)}</td>
+                      <td className="p-2 text-right text-indigo-700">{formatINR(o.totalTax)}</td>
+                      <td className="p-2 text-right font-bold text-emerald-800">{formatINR(o.totalAmount)}</td>
+                      <td className="p-2 text-center font-sans text-[10px]">
+                        {o.settlementType === "POSTED_TO_ROOM" ? "Room Folio" : o.settlementType === "DIRECT_PAID" ? "Paid" : "Open"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+
+              <div className="pt-8 flex justify-between items-end text-[11px]">
+                <div className="text-center">
+                  <div className="w-40 border-b border-zinc-400 pb-6 text-zinc-400 italic">Chef / F&B Captain</div>
+                  <span className="font-bold">Prepared By</span>
+                </div>
+                <div className="text-center">
+                  <div className="w-40 border-b border-zinc-400 pb-6 text-zinc-400 italic">Front Desk / Auditor</div>
+                  <span className="font-bold">Audited By</span>
                 </div>
               </div>
             </div>

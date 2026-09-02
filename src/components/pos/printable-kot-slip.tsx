@@ -1,14 +1,14 @@
 "use client";
 
 import React from "react";
-import { Printer, X, ChefHat, CheckCircle2, Clock, BedDouble, UtensilsCrossed } from "lucide-react";
+import { Printer, X, ChefHat } from "lucide-react";
 
 export interface KotPrintData {
   kotNo: string;
   orderNo?: string;
   outletName?: string;
   stationName?: string;
-  mode: "DINE_IN" | "ROOM_SERVICE" | "TAKEAWAY";
+  mode: "DINE_IN" | "ROOM_SERVICE" | "TAKEAWAY" | "BAR" | string;
   roomNumber?: string;
   tableName?: string;
   guestName?: string;
@@ -49,8 +49,192 @@ export function PrintableKotSlipModal({
     year: "numeric",
   });
 
+  // Destination Text
+  let destinationText = "";
+  if (kot.mode === "ROOM_SERVICE" || kot.roomNumber) {
+    destinationText = `ROOM: ${kot.roomNumber || "IN-ROOM"}${kot.guestName ? ` (${kot.guestName})` : ""}`;
+  } else if (kot.mode === "BAR" || kot.tableName?.toLowerCase().includes("bar")) {
+    destinationText = `BAR: ${kot.tableName || "BAR COUNTER"}${kot.guestName ? ` (${kot.guestName})` : ""}`;
+  } else if (kot.mode === "TAKEAWAY" || kot.tableName?.toLowerCase().includes("takeaway") || kot.tableName?.toLowerCase().includes("parcel")) {
+    destinationText = `PARCEL: ${kot.tableName || "TAKEAWAY"}${kot.guestName ? ` (${kot.guestName})` : ""}`;
+  } else {
+    destinationText = `TABLE: ${kot.tableName || "DINE-IN"}${kot.guestName ? ` (${kot.guestName})` : ""}`;
+  }
+
+  // Bulletproof Thermal Print Handler (Dedicated Popup Window for 80mm/58mm Thermal Printers)
   const handlePrint = () => {
-    window.print();
+    const printWindow = window.open("", "_blank", "width=400,height=600");
+    if (!printWindow) {
+      window.print();
+      return;
+    }
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8" />
+          <title>KOT - ${kot.kotNo}</title>
+          <style>
+            @page {
+              size: 80mm auto;
+              margin: 0;
+            }
+            * {
+              box-sizing: border-box;
+              margin: 0;
+              padding: 0;
+            }
+            body {
+              font-family: 'Courier New', Courier, monospace, sans-serif;
+              width: 76mm;
+              margin: 0 auto;
+              padding: 6px 4px;
+              color: #000;
+              background: #fff;
+              font-size: 12px;
+              line-height: 1.25;
+            }
+            .center { text-align: center; }
+            .bold { font-weight: bold; }
+            .hotel-name {
+              font-size: 13px;
+              font-weight: 900;
+              text-transform: uppercase;
+              text-align: center;
+              margin-bottom: 2px;
+            }
+            .kot-banner {
+              font-size: 11px;
+              font-weight: 900;
+              text-align: center;
+              border: 1.5px solid #000;
+              padding: 2px 4px;
+              margin: 3px 0;
+              display: inline-block;
+              width: 100%;
+            }
+            .dashed-line {
+              border-top: 1.5px dashed #000;
+              margin: 5px 0;
+            }
+            .meta-row {
+              display: flex;
+              justify-content: space-between;
+              margin: 2px 0;
+              font-size: 11px;
+            }
+            .dest-box {
+              border: 1.5px solid #000;
+              background-color: #f4f4f4;
+              padding: 4px 6px;
+              margin: 4px 0;
+              font-size: 13px;
+              font-weight: 900;
+              text-transform: uppercase;
+            }
+            .items-header {
+              display: flex;
+              justify-content: space-between;
+              font-weight: 900;
+              border-bottom: 1.5px solid #000;
+              padding-bottom: 2px;
+              margin-top: 4px;
+              font-size: 11px;
+            }
+            .item-row {
+              display: flex;
+              justify-content: space-between;
+              align-items: flex-start;
+              margin: 5px 0;
+              font-size: 12px;
+            }
+            .item-name {
+              font-weight: bold;
+              padding-right: 8px;
+              text-transform: uppercase;
+              flex: 1;
+            }
+            .item-qty {
+              font-size: 14px;
+              font-weight: 900;
+              white-space: nowrap;
+            }
+            .item-notes {
+              font-size: 10px;
+              font-style: italic;
+              font-weight: bold;
+              padding-left: 6px;
+              border-left: 2px solid #000;
+              margin-top: 1px;
+            }
+            .footer-note {
+              font-size: 10px;
+              text-align: center;
+              margin-top: 6px;
+              font-weight: bold;
+              text-transform: uppercase;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="hotel-name">${hotelName}</div>
+          <div class="kot-banner">*** KITCHEN ORDER TICKET (KOT) ***</div>
+
+          <div class="dashed-line"></div>
+
+          <div class="meta-row">
+            <div><span class="bold">KOT NO:</span> <strong style="font-size: 14px;">${kot.kotNo}</strong></div>
+            <div><span class="bold">TIME:</span> ${formattedTime}</div>
+          </div>
+          <div class="meta-row">
+            <div><span class="bold">ORDER NO:</span> <strong>${kot.orderNo || "N/A"}</strong></div>
+            <div><span class="bold">DATE:</span> ${formattedDate}</div>
+          </div>
+
+          <div class="dest-box">${destinationText}</div>
+
+          <div class="dashed-line"></div>
+
+          <div class="items-header">
+            <span>ITEM PARTICULARS</span>
+            <span>QTY</span>
+          </div>
+
+          ${kot.lines
+            .map(
+              (line) => `
+            <div class="item-row">
+              <div class="item-name">${line.name}</div>
+              <div class="item-qty">×${line.qty}</div>
+            </div>
+            ${line.notes ? `<div class="item-notes">* NOTE: ${line.notes}</div>` : ""}
+          `
+            )
+            .join("")}
+
+          <div class="dashed-line"></div>
+
+          <div class="footer-note">PLEASE PREPARE & SERVE FRESH</div>
+          <div style="font-size: 9px; text-align: center; color: #444; margin-top: 2px;">
+            Date: ${formattedDate} • Generated by ROVESTA POS
+          </div>
+
+          <script>
+            window.onload = function() {
+              setTimeout(function() {
+                window.focus();
+                window.print();
+              }, 150);
+            };
+          </script>
+        </body>
+      </html>
+    `;
+
+    printWindow.document.open();
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
   };
 
   return (
@@ -60,30 +244,29 @@ export function PrintableKotSlipModal({
         {/* Modal Controls (Hidden in Print) */}
         <div className="flex items-center justify-between pb-3 border-b border-zinc-200 dark:border-zinc-800 print:hidden">
           <div className="flex items-center gap-2">
-            <ChefHat className="h-5 w-5 text-zinc-500 dark:text-zinc-400" />
-            <h3 className="text-sm font-bold text-zinc-900 dark:text-white">Kitchen Order Ticket (KOT) Preview</h3>
+            <ChefHat className="h-5 w-5 text-orange-500" />
+            <h3 className="text-sm font-bold text-zinc-900 dark:text-white">Kitchen Order Ticket (KOT)</h3>
           </div>
           <div className="flex items-center gap-2">
             <button
               onClick={handlePrint}
-              className="px-3.5 py-1.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-100 dark:hover:bg-white text-white dark:text-zinc-950 font-bold text-xs flex items-center gap-1.5 transition shadow-xs cursor-pointer"
+              className="px-3.5 py-1.5 rounded-xl bg-orange-600 hover:bg-orange-500 text-white font-bold text-xs flex items-center gap-1.5 transition shadow-sm cursor-pointer active:scale-95"
             >
               <Printer className="h-4 w-4" />
               <span>Print KOT Slip</span>
             </button>
-            <button onClick={onClose} className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-700 dark:hover:text-white transition">
+            <button onClick={onClose} className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-700 dark:hover:text-white transition cursor-pointer">
               <X className="h-4 w-4" />
             </button>
           </div>
         </div>
 
-        {/* 3-Inch / 80mm Thermal Receipt Slip Layout */}
+        {/* 3-Inch / 80mm Thermal Receipt Slip Screen Preview */}
         <div className="bg-white text-black font-mono p-5 rounded-xl border border-zinc-300 shadow-inner max-w-[340px] mx-auto text-xs space-y-3 print:border-none print:shadow-none print:p-2 print:max-w-[300px]">
           
           {/* Header */}
           <div className="text-center space-y-0.5 border-b border-dashed border-black pb-2">
             <div className="text-sm font-black tracking-tight uppercase">{hotelName}</div>
-            <div className="text-[11px] font-bold">{kot.outletName || "Restaurant & In-Room Dining"}</div>
             <div className="text-xs font-black tracking-wider bg-black text-white px-2 py-0.5 mt-1 inline-block">
               *** KITCHEN ORDER TICKET (KOT) ***
             </div>
@@ -96,8 +279,8 @@ export function PrintableKotSlipModal({
               <strong className="font-black text-sm">{kot.kotNo}</strong>
             </div>
             <div className="text-right">
-              <span className="text-zinc-600">STATION: </span>
-              <strong className="font-bold">{kot.stationName || "HOT KITCHEN"}</strong>
+              <span className="text-zinc-600">TIME: </span>
+              <strong className="font-bold">{formattedTime}</strong>
             </div>
 
             <div>
@@ -105,22 +288,14 @@ export function PrintableKotSlipModal({
               <strong className="font-bold">{kot.orderNo || "N/A"}</strong>
             </div>
             <div className="text-right">
-              <span className="text-zinc-600">TIME: </span>
-              <strong className="font-bold">{formattedTime}</strong>
+              <span className="text-zinc-600">DATE: </span>
+              <strong className="font-bold">{formattedDate}</strong>
             </div>
 
             <div className="col-span-2 pt-1">
-              {kot.mode === "ROOM_SERVICE" ? (
-                <div className="bg-zinc-100 p-1.5 rounded border border-black flex items-center justify-between">
-                  <span className="font-black text-sm">ROOM: {kot.roomNumber || "IN-ROOM"}</span>
-                  <span className="text-[10px] font-bold text-zinc-700 truncate max-w-[140px]">{kot.guestName || "In-House Guest"}</span>
-                </div>
-              ) : (
-                <div className="bg-zinc-100 p-1.5 rounded border border-black flex items-center justify-between">
-                  <span className="font-black text-sm">{kot.tableName || "TABLE #"}</span>
-                  <span className="text-[10px] font-bold text-zinc-700">DINE-IN</span>
-                </div>
-              )}
+              <div className="bg-zinc-100 p-1.5 rounded border border-black font-black text-xs uppercase">
+                {destinationText}
+              </div>
             </div>
           </div>
 
@@ -134,7 +309,7 @@ export function PrintableKotSlipModal({
             {kot.lines.map((line, idx) => (
               <div key={idx} className="space-y-0.5">
                 <div className="flex justify-between items-start font-bold text-xs">
-                  <span className="pr-2 leading-tight">{line.name}</span>
+                  <span className="pr-2 leading-tight uppercase">{line.name}</span>
                   <span className="font-black text-sm shrink-0">×{line.qty}</span>
                 </div>
                 {line.notes && (

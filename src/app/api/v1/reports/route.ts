@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { getMidnightDayBoundaries } from "@/lib/domain/daily-report-service";
+import { calculateGST } from "@/lib/gst/calculator";
 
 export async function GET(request: Request) {
   try {
@@ -359,36 +360,170 @@ export async function GET(request: Request) {
       });
     }
 
-    // 4. F&B SALES REPORT
-    if (reportType === "FNB") {
+    // 4. KITCHEN ORDERS & F&B COLLECTIONS REPORT
+    if (reportType === "FNB" || reportType === "KITCHEN_ORDERS") {
       const orderWhere: any = { propertyId };
       if (dateFilter) {
         orderWhere.createdAt = dateFilter;
       }
 
-      const orders = await prisma.order.findMany({
-        where: orderWhere,
-        include: {
-          outlet: true,
-          table: true,
-          items: true,
-        },
-        orderBy: { createdAt: "desc" },
+      const [orders, property] = await Promise.all([
+        prisma.order.findMany({
+          where: orderWhere,
+          include: {
+            outlet: true,
+            table: true,
+            stay: {
+              include: {
+                primaryGuest: true,
+                roomAssignments: { include: { room: true } },
+              },
+            },
+            items: true,
+            kots: {
+              include: {
+                station: true,
+                lines: true,
+              },
+            },
+          },
+          orderBy: { createdAt: "desc" },
+        }),
+        prisma.property.findUnique({
+          where: { id: propertyId },
+          select: { displayName: true, code: true, gstin: true, stateCode: true },
+        }),
+      ]);
+
+      let totalGross = 0;
+      let totalTaxable = 0;
+      let totalGst = 0;
+      let totalItemsPrepared = 0;
+      let totalKotsCount = 0;
+      let folioPostedAmount = 0;
+      let directSettledAmount = 0;
+
+      const destinationsBreakdown = {
+        ROOM_SERVICE: { count: 0, amount: 0 },
+        TABLE_DINE_IN: { count: 0, amount: 0 },
+        BAR_LOUNGE: { count: 0, amount: 0 },
+        TAKEAWAY: { count: 0, amount: 0 },
+      };
+
+      const rows = orders.map((o) => {
+        const subtotal = o.items.reduce((sum, i) => sum + (i.total || i.unitPrice * i.qty), 0);
+        const gst = calculateGST({
+          grossOrBaseAmount: subtotal,
+          sacHsn: "996331",
+          supplierStateCode: property?.stateCode || "18",
+        });
+
+        const orderItemCount = o.items.reduce((sum, i) => sum + i.qty, 0);
+        totalItemsPrepared += orderItemCount;
+        totalGross += gst.totalAmount;
+        totalTaxable += gst.taxableAmount;
+        totalGst += gst.taxAmount;
+        totalKotsCount += o.kots.length;
+
+        // Destination Classification
+        let destinationCategory: "ROOM_SERVICE" | "TABLE_DINE_IN" | "BAR_LOUNGE" | "TAKEAWAY" = "TABLE_DINE_IN";
+        let destinationLabel = "Dine-In";
+        let roomNo = "—";
+        let guestName = o.customerName || "Walk-in Guest";
+
+        if (o.mode === "ROOM_SERVICE" || o.customerName?.toLowerCase().includes("room")) {
+          destinationCategory = "ROOM_SERVICE";
+          roomNo = o.stay?.roomAssignments?.[0]?.room?.number || o.customerName?.replace(/[^0-9]/g, "") || "—";
+          destinationLabel = `Room ${roomNo}`;
+          if (o.stay?.primaryGuest?.name) {
+            guestName = o.stay.primaryGuest.name;
+          }
+        } else if (o.customerName?.toLowerCase().includes("bar") || o.customerName?.toLowerCase().includes("lounge")) {
+          destinationCategory = "BAR_LOUNGE";
+          destinationLabel = o.customerName || "Bar Counter";
+        } else if (o.mode === "TAKEAWAY" || o.customerName?.toLowerCase().includes("takeaway") || o.customerName?.toLowerCase().includes("parcel")) {
+          destinationCategory = "TAKEAWAY";
+          destinationLabel = o.customerName || "Takeaway / Parcel";
+        } else if (o.table?.name) {
+          destinationCategory = "TABLE_DINE_IN";
+          destinationLabel = `${o.table.name}`;
+        } else {
+          destinationCategory = "TABLE_DINE_IN";
+          destinationLabel = o.customerName || "Dine-In Table";
+        }
+
+        // Settlement Status
+        let settlementType: "POSTED_TO_ROOM" | "DIRECT_PAID" | "UNSETTLED" = "UNSETTLED";
+        if (o.stayId || o.status === "POSTED_TO_ROOM" || destinationCategory === "ROOM_SERVICE") {
+          settlementType = "POSTED_TO_ROOM";
+          folioPostedAmount += gst.totalAmount;
+        } else if (o.status === "PAID" || o.status === "BILLED") {
+          settlementType = "DIRECT_PAID";
+          directSettledAmount += gst.totalAmount;
+        } else {
+          settlementType = "UNSETTLED";
+          directSettledAmount += gst.totalAmount;
+        }
+
+        destinationsBreakdown[destinationCategory].count += 1;
+        destinationsBreakdown[destinationCategory].amount += gst.totalAmount;
+
+        const kotNumbers = o.kots.map((k) => k.kotNo).join(", ") || `KOT-${o.orderNo.replace("ORD-", "")}`;
+        const itemsSummary = o.items.map((i) => `${i.nameSnapshot} (×${i.qty})`).join(", ");
+
+        return {
+          id: o.id,
+          orderNo: o.orderNo,
+          kotNumbers,
+          kotsCount: o.kots.length,
+          outletName: o.outlet.name,
+          mode: o.mode,
+          destinationCategory,
+          destinationLabel,
+          roomNo,
+          guestName,
+          covers: o.covers || 2,
+          waiterName: o.waiterId || "Steward",
+          itemCount: orderItemCount,
+          items: o.items.map((i) => ({
+            id: i.id,
+            name: i.nameSnapshot,
+            qty: i.qty,
+            unitPrice: i.unitPrice,
+            total: i.total,
+            notes: i.notes,
+          })),
+          itemsSummary,
+          subtotal,
+          taxableAmount: gst.taxableAmount,
+          cgst: gst.components.cgstAmount,
+          sgst: gst.components.sgstAmount,
+          totalTax: gst.taxAmount,
+          totalAmount: gst.totalAmount,
+          settlementType,
+          status: o.status,
+          createdAt: o.createdAt.toISOString(),
+          timeFormatted: new Date(o.createdAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }),
+          dateFormatted: new Date(o.createdAt).toISOString().split("T")[0],
+        };
       });
 
       return NextResponse.json({
-        reportType,
+        reportType: "FNB",
         dayCycle: "12:00 AM – 12:00 AM Midnight",
         generatedAt: new Date().toISOString(),
-        rows: orders.map((o) => ({
-          orderNo: o.orderNo,
-          outletName: o.outlet.name,
-          mode: o.mode,
-          tableName: o.table?.name || "Room Service / Takeaway",
-          itemCount: o.items.length,
-          status: o.status,
-          createdAt: o.createdAt.toISOString(),
-        })),
+        summary: {
+          totalOrdersCount: orders.length,
+          totalKotsFired: totalKotsCount,
+          totalItemsPrepared,
+          grossCollection: totalGross,
+          taxableSales: totalTaxable,
+          gstCollected: totalGst,
+          folioPostedAmount,
+          directSettledAmount,
+          destinationsBreakdown,
+        },
+        rows,
       });
     }
 
