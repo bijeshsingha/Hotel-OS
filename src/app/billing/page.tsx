@@ -2047,15 +2047,15 @@ function BillingContent() {
                 </div>
 
                 <div className="overflow-x-auto rounded-xl border border-zinc-200/80 dark:border-zinc-800">
-                  <table className="w-full text-left text-xs">
-                    <thead className="bg-zinc-50/80 dark:bg-zinc-900/80 text-zinc-500 dark:text-zinc-400 text-[11px] uppercase border-b border-zinc-200/80 dark:border-zinc-800 font-semibold">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead className="bg-zinc-50/80 dark:bg-zinc-900/80 text-zinc-500 dark:text-zinc-400 text-[11px] uppercase border-b border-zinc-200/80 dark:border-zinc-800 font-semibold tracking-wider">
                       <tr>
-                        <th className="py-2 px-3">Receipt #</th>
-                        <th className="py-2 px-3">Date & Time</th>
-                        <th className="py-2 px-3">Payment Method</th>
-                        <th className="py-2 px-3">Reference / Notes</th>
-                        <th className="py-2 px-3 text-right">Amount</th>
-                        <th className="py-2 px-3 text-right">Action</th>
+                        <th className="py-2.5 px-3 whitespace-nowrap">Receipt #</th>
+                        <th className="py-2.5 px-3 whitespace-nowrap">Date & Time</th>
+                        <th className="py-2.5 px-3 whitespace-nowrap">Payment Method</th>
+                        <th className="py-2.5 px-3 whitespace-nowrap">Reference / Notes</th>
+                        <th className="py-2.5 px-3 text-right whitespace-nowrap">Amount</th>
+                        <th className="py-2.5 px-3 text-right whitespace-nowrap">Action</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-zinc-200/60 dark:divide-zinc-800/60">
@@ -2066,25 +2066,27 @@ function BillingContent() {
 
                         return (
                           <tr key={p.id} className="hover:bg-zinc-50/70 dark:hover:bg-zinc-900/50 transition">
-                            <td className="py-2 px-3 font-mono text-blue-600 dark:text-blue-400 font-semibold flex items-center gap-1.5">
-                              <span className={isRefund ? "text-amber-600 dark:text-amber-400 font-bold" : ""}>
-                                {p.receiptNo}
-                              </span>
-                              {isGroup && (
-                                <span className="text-[9.5px] bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 px-1.5 py-0.2 rounded font-bold">
-                                  Group
+                            <td className="py-2.5 px-3 font-mono text-blue-600 dark:text-blue-400 font-semibold whitespace-nowrap align-middle">
+                              <div className="inline-flex items-center gap-1.5">
+                                <span className={isRefund ? "text-amber-600 dark:text-amber-400 font-bold" : ""}>
+                                  {p.receiptNo}
                                 </span>
-                              )}
-                              {isRefund && (
-                                <span className="text-[9.5px] bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800 px-1.5 py-0.2 rounded font-black uppercase">
-                                  Refund
-                                </span>
-                              )}
+                                {isGroup && (
+                                  <span className="text-[9.5px] bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 px-1.5 py-0.2 rounded font-bold">
+                                    Group
+                                  </span>
+                                )}
+                                {isRefund && (
+                                  <span className="text-[9.5px] bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800 px-1.5 py-0.2 rounded font-black uppercase">
+                                    Refund
+                                  </span>
+                                )}
+                              </div>
                             </td>
-                            <td className="py-2 px-3 text-zinc-500 dark:text-zinc-400 text-xs">
+                            <td className="py-2.5 px-3 text-zinc-500 dark:text-zinc-400 text-xs whitespace-nowrap align-middle font-mono">
                               {p.receivedAt ? new Date(p.receivedAt).toLocaleString("en-GB") : "—"}
                             </td>
-                            <td className="py-2 px-3 font-medium text-zinc-800 dark:text-zinc-200">
+                            <td className="py-2.5 px-3 font-medium text-zinc-800 dark:text-zinc-200 whitespace-nowrap align-middle">
                               <span
                                 className={`rounded-md border px-2 py-0.5 text-xs font-semibold inline-flex items-center gap-1.5 ${
                                   isRefund
@@ -2118,15 +2120,15 @@ function BillingContent() {
                                 )}
                               </span>
                             </td>
-                            <td className="py-2 px-3 font-mono text-zinc-600 dark:text-zinc-400 text-xs">
+                            <td className="py-2.5 px-3 font-mono text-zinc-600 dark:text-zinc-400 text-xs whitespace-nowrap align-middle">
                               {p.reference && !p.reference.startsWith("GRC-DEPOSIT-") ? p.reference : "—"}
                             </td>
-                            <td className={`py-2 px-3 font-mono font-bold text-right tabular-nums text-sm ${
+                            <td className={`py-2.5 px-3 font-mono font-bold text-right tabular-nums text-sm whitespace-nowrap align-middle ${
                               isRefund ? "text-rose-600 dark:text-rose-400 font-black" : "text-emerald-600 dark:text-emerald-400"
                             }`}>
                               {isRefund ? `- ${formatINR(Math.abs(p.amount))}` : formatINR(p.amount || 0)}
                             </td>
-                            <td className="py-2 px-3 text-right shrink-0">
+                            <td className="py-2.5 px-3 text-right whitespace-nowrap align-middle">
                               <button
                                 type="button"
                                 onClick={() => {
@@ -2146,7 +2148,7 @@ function BillingContent() {
                                   });
                                   setShowEditPaymentModal(true);
                                 }}
-                                className="px-2 py-1 rounded-lg bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 font-bold text-[10.5px] transition shadow-2xs inline-flex items-center gap-1 cursor-pointer"
+                                className="px-2.5 py-1 rounded-lg bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 font-bold text-[10.5px] transition shadow-2xs inline-flex items-center gap-1 cursor-pointer"
                                 title="Edit collected amount and payment details"
                               >
                                 <Pencil className="h-3 w-3" />
