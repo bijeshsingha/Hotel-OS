@@ -614,10 +614,10 @@ function PMSFrontDeskContent() {
       Boolean(activeIssue);
     const bedCat = getBedCategory(room);
 
-    // Find active in-house stay for this room
+    // Find active in-house stay for this room (strictly active assignment where endsAt is null)
     const activeStay = stays.find(s => 
-      s.status === "IN_HOUSE" && s.roomAssignments?.some((ra: any) => ra.roomId === room.id && (!ra.endsAt || new Date(ra.endsAt) > new Date()))
-    ) || room.assignments?.find((a: any) => a.stay?.status === "IN_HOUSE" && (!a.endsAt || new Date(a.endsAt) > new Date()))?.stay;
+      s.status === "IN_HOUSE" && s.roomAssignments?.some((ra: any) => ra.roomId === room.id && !ra.endsAt)
+    ) || room.assignments?.find((a: any) => a.stay?.status === "IN_HOUSE" && !a.endsAt)?.stay;
 
     const inHouseGuest = activeStay?.primaryGuest;
     const isOccupied = Boolean(activeStay);
@@ -834,6 +834,57 @@ function PMSFrontDeskContent() {
       </div>
     );
   };
+
+  if (showCheckInModal) {
+    return (
+      <div className="w-full max-w-[1600px] mx-auto text-zinc-900 dark:text-zinc-100">
+        <GrcIntakeModal
+          isOpen={showCheckInModal}
+          initialRoomId={checkInRoomId}
+          initialReservation={resForCheckIn}
+          rooms={rooms}
+          activeProperty={activeProperty}
+          onClose={() => {
+            setShowCheckInModal(false);
+            setResForCheckIn(null);
+          }}
+          onSuccess={async (result) => {
+            setShowCheckInModal(false);
+            setResForCheckIn(null);
+            await loadData();
+            await refreshData();
+            if (result?.registration) {
+              setSelectedRegForPrint(result.registration);
+              setShowGrcModal(true);
+            }
+          }}
+        />
+      </div>
+    );
+  }
+
+  if (showNewResModal) {
+    return (
+      <div className="w-full max-w-[1600px] mx-auto text-zinc-900 dark:text-zinc-100">
+        <NewReservationModal
+          isOpen={showNewResModal}
+          rooms={rooms}
+          activeProperty={activeProperty}
+          onClose={() => setShowNewResModal(false)}
+          onSuccess={async (result) => {
+            setShowNewResModal(false);
+            await loadData();
+            await refreshData();
+            const resObj = result?.reservation || result;
+            if (resObj) {
+              setSelectedResForVoucher(resObj);
+              setShowResVoucherModal(true);
+            }
+          }}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4 max-w-[1600px] mx-auto w-full text-zinc-900 dark:text-zinc-100">
@@ -2108,49 +2159,6 @@ function PMSFrontDeskContent() {
         </div>
       )}
 
-      {showCheckInModal && (
-        <GrcIntakeModal
-          isOpen={showCheckInModal}
-          initialRoomId={checkInRoomId}
-          initialReservation={resForCheckIn}
-          rooms={rooms}
-          activeProperty={activeProperty}
-          onClose={() => {
-            setShowCheckInModal(false);
-            setResForCheckIn(null);
-          }}
-          onSuccess={async (result) => {
-            setShowCheckInModal(false);
-            setResForCheckIn(null);
-            await loadData();
-            await refreshData();
-            if (result?.registration) {
-              setSelectedRegForPrint(result.registration);
-              setShowGrcModal(true);
-            }
-          }}
-        />
-      )}
-
-      {/* 8.1 NEW FUTURE RESERVATION INTAKE MODAL */}
-      {showNewResModal && (
-        <NewReservationModal
-          isOpen={showNewResModal}
-          rooms={rooms}
-          activeProperty={activeProperty}
-          onClose={() => setShowNewResModal(false)}
-          onSuccess={async (result) => {
-            setShowNewResModal(false);
-            await loadData();
-            await refreshData();
-            const resObj = result?.reservation || result;
-            if (resObj) {
-              setSelectedResForVoucher(resObj);
-              setShowResVoucherModal(true);
-            }
-          }}
-        />
-      )}
 
       {/* 8.2 RESERVATION CONFIRMATION VOUCHER MODAL */}
       {showResVoucherModal && selectedResForVoucher && (

@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import {
   X,
+  ArrowLeft,
   FileText,
   QrCode,
   UserPlus,
@@ -127,8 +128,8 @@ export function GrcIntakeModal({
     agreedTariff: "",
     isComplimentary: false,
     isRateInclusive: true,
-    checkoutType: "24_HOURS" as "24_HOURS" | "FIXED_TIME",
-    gracePeriodMinutes: "60",
+    checkoutType: "FIXED_TIME" as "24_HOURS" | "FIXED_TIME",
+    gracePeriodMinutes: "0",
     depositAmount: "0",
     paymentMethod: "UPI",
     transactionRef: "",
@@ -402,7 +403,7 @@ export function GrcIntakeModal({
           isComplimentary: formData.isComplimentary,
           isRateInclusive: formData.isRateInclusive,
           checkoutType: formData.checkoutType,
-          gracePeriodMinutes: Number(formData.gracePeriodMinutes) || 60,
+          gracePeriodMinutes: formData.gracePeriodMinutes !== undefined ? Number(formData.gracePeriodMinutes) : 0,
           depositAmount: Number(formData.depositAmount) || 0,
           depositMethod: formData.paymentMethod || "CASH",
           depositRef: formData.transactionRef?.trim() || undefined,
@@ -435,18 +436,28 @@ export function GrcIntakeModal({
   const primaryRoom = selectedRoom;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-2 sm:p-4 overflow-y-auto animate-in fade-in">
-      <div className="w-full max-w-4xl max-h-[92vh] rounded-2xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-[#121215] text-zinc-900 dark:text-zinc-100 p-5 sm:p-7 shadow-2xl flex flex-col overflow-hidden">
+    <div className="w-full space-y-4 animate-in fade-in duration-150">
+      <div className="rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200/80 dark:border-zinc-800/80 shadow-xs overflow-hidden">
         
-        {/* Modal Top Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-zinc-200 dark:border-zinc-800 shrink-0">
+        {/* Top Header */}
+        <div className="p-4 sm:p-5 border-b border-zinc-200 dark:border-zinc-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-zinc-50/70 dark:bg-zinc-900/40">
           <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={onClose}
+              className="h-10 px-3.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-bold text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5 transition cursor-pointer shadow-xs"
+              title="Return to Front Desk"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              <span>Back to Room Rack</span>
+            </button>
+
             <div className="h-10 w-10 rounded-xl bg-blue-50 dark:bg-blue-600/20 border border-blue-200 dark:border-blue-500/30 flex items-center justify-center text-blue-600 dark:text-blue-400">
               <UserPlus className="h-5 w-5" />
             </div>
             <div>
-              <h2 className="text-lg font-black text-zinc-900 dark:text-white tracking-tight flex items-center gap-2">
-                Guest Check-In & GRC Intake
+              <h2 className="text-lg sm:text-xl font-black text-zinc-900 dark:text-white tracking-tight flex items-center gap-2">
+                <span>Guest Check-In & GRC Intake</span>
               </h2>
               <p className="text-xs text-zinc-500 dark:text-zinc-400 font-mono">
                 {activeProperty?.displayName || "Hotel Ambarish Grand Residency"} • {activeProperty?.code || "GUW-01"}
@@ -485,8 +496,17 @@ export function GrcIntakeModal({
             </div>
 
             <button
+              type="button"
               onClick={onClose}
-              className="p-2 rounded-xl text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition"
+              className="px-4 py-2 rounded-xl text-xs font-bold text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-2 rounded-xl text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition cursor-pointer"
+              title="Close (Esc)"
             >
               <X className="h-5 w-5" />
             </button>
@@ -495,7 +515,7 @@ export function GrcIntakeModal({
 
         {/* METHOD 1: PHYSICAL GRC DATA ENTRY FORM (KEYED IN BY RECEPTIONIST) */}
         {activeMethod === "PHYSICAL_ENTRY" && (
-          <form onSubmit={handleSubmit} className="overflow-y-auto space-y-6 pt-4 pr-1 text-xs">
+          <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-6 text-xs">
             
             {/* 1. ROOM & STAY PERIOD SECTION */}
             <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-[#09090b] p-4 space-y-3.5 shadow-xs">
@@ -586,17 +606,39 @@ export function GrcIntakeModal({
                 </div>
 
                 {/* Checkout Billing Model */}
-                <div className="space-y-1 sm:col-span-2">
+                <div className="space-y-1 sm:col-span-1">
                   <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">
-                    Checkout Billing Cycle *
+                    Checkout Billing *
                   </label>
                   <select
                     value={formData.checkoutType}
                     onChange={(e: any) => setFormData({ ...formData, checkoutType: e.target.value })}
                     className="w-full h-10 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white text-xs font-semibold focus:border-blue-500 focus:outline-none cursor-pointer"
                   >
-                    <option value="24_HOURS">⏱️ 24-Hour Cycle from Check-In (Default)</option>
-                    <option value="FIXED_TIME">☀️ Standard 11:00 AM / 12:00 PM Fixed Time</option>
+                    <option value="FIXED_TIME">☀️ Standard 11:00 AM – 12:00 PM (Default)</option>
+                    <option value="24_HOURS">⏱️ 24-Hour Cycle from Check-In</option>
+                  </select>
+                </div>
+
+                {/* Grace Period Window (0 to 7 hr range) */}
+                <div className="space-y-1 sm:col-span-1">
+                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">
+                    Grace Period *
+                  </label>
+                  <select
+                    value={formData.gracePeriodMinutes}
+                    onChange={(e: any) => setFormData({ ...formData, gracePeriodMinutes: e.target.value })}
+                    className="w-full h-10 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white text-xs font-semibold focus:border-blue-500 focus:outline-none cursor-pointer"
+                  >
+                    <option value="0">0 Hours (None / Strict 11–12 PM)</option>
+                    <option value="60">1 Hour Grace (Till 1:00 PM)</option>
+                    <option value="120">2 Hours Grace (Till 2:00 PM)</option>
+                    <option value="180">3 Hours Grace (Till 3:00 PM)</option>
+                    <option value="240">4 Hours Grace (Till 4:00 PM)</option>
+                    <option value="300">5 Hours Grace (Till 5:00 PM)</option>
+                    <option value="360">6 Hours Grace (Till 6:00 PM)</option>
+                    <option value="420">7 Hours Grace (Till 7:00 PM)</option>
+                    <option value="1440">Waive Next Night</option>
                   </select>
                 </div>
 
@@ -925,7 +967,10 @@ export function GrcIntakeModal({
                 </div>
 
                 <div className="space-y-1">
-                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">Children</label>
+                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap flex items-center justify-between">
+                    <span>Children</span>
+                    <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold">Free (₹0)</span>
+                  </label>
                   <input
                     type="number"
                     placeholder="e.g. 0"
@@ -960,8 +1005,9 @@ export function GrcIntakeModal({
                 const totalGuests = totalAdultsCount + totalChildrenCount;
 
                 const hasGuestsEntered = totalGuests > 0;
-                const isOverCapacity = hasGuestsEntered && totalGuests > totalCapacity;
-                const isBeyondMaxPhysicalLimit = hasGuestsEntered && totalGuests > absoluteMaxRoomCapacity;
+                // Children stay free: overcapacity applies if adult count exceeds bed capacity
+                const isOverCapacity = hasGuestsEntered && totalAdultsCount > totalCapacity;
+                const isBeyondMaxPhysicalLimit = hasGuestsEntered && (totalAdultsCount > absoluteMaxRoomCapacity || totalGuests > absoluteMaxRoomCapacity + totalRoomsCount * 2);
 
                 return (
                   <div className="pt-2 border-t border-zinc-200 dark:border-zinc-800/80 space-y-3">
@@ -987,19 +1033,19 @@ export function GrcIntakeModal({
                               {isBeyondMaxPhysicalLimit
                                 ? "Room Capacity Exceeded (Additional Room Required)!"
                                 : isOverCapacity
-                                ? "Room Overcapacity Warning!"
+                                ? "Adult Overcapacity Warning!"
                                 : hasGuestsEntered
-                                ? "Capacity Verification Passed"
+                                ? "Capacity Verification Passed (Children Free)"
                                 : "Accommodation Capacity Math"}
                             </span>
                             <p className="text-[11px] opacity-90 mt-0.5">
                               {isBeyondMaxPhysicalLimit
-                                ? `${totalGuests} Guests entered, but ${totalRoomsCount} selected room(s) can only hold max ${absoluteMaxRoomCapacity} Pax. You MUST add another room.`
+                                ? `${totalAdultsCount} Adults entered, exceeding maximum physical capacity of ${absoluteMaxRoomCapacity} for ${totalRoomsCount} room(s). You MUST add another room.`
                                 : isOverCapacity
-                                ? `${totalGuests} Guests entered, but standard capacity is ${totalCapacity} Pax. Increment Extra Pax (+₹500/Pax) or add an extra room.`
+                                ? `${totalAdultsCount} Adults entered, but standard capacity is ${totalCapacity} Pax. Increment Extra Pax (+₹500/Adult) or add another room.`
                                 : hasGuestsEntered
-                                ? `${totalGuests} Guests fit across ${totalRoomsCount} Room(s) (Base: ${baseStandardCapacity} + ${currentExtraPax} Extra Pax = ${totalCapacity} Pax capacity).`
-                                : `Base capacity: ${baseStandardCapacity} Pax (${totalRoomsCount} Room${totalRoomsCount > 1 ? "s" : ""}). Increment Extra Pax if adding extra guests.`}
+                                ? `${totalAdultsCount} Adult${totalAdultsCount > 1 ? "s" : ""}${totalChildrenCount > 0 ? ` + ${totalChildrenCount} Child${totalChildrenCount > 1 ? "ren" : ""} (Complimentary)` : ""} across ${totalRoomsCount} Room(s). Children stay free.`
+                                : `Base capacity: ${baseStandardCapacity} Adults (${totalRoomsCount} Room${totalRoomsCount > 1 ? "s" : ""}). Children stay free.`}
                             </p>
                           </div>
                         </div>
@@ -1011,7 +1057,7 @@ export function GrcIntakeModal({
                               ? "bg-rose-100 dark:bg-rose-900/60 border-rose-300 dark:border-rose-500 text-rose-900 dark:text-white"
                               : "bg-zinc-200 dark:bg-black/40 border-zinc-300 dark:border-white/10 text-zinc-900 dark:text-white"
                           }`}>
-                            Pax: {totalGuests || "—"} / {totalCapacity} (Max {absoluteMaxRoomCapacity})
+                            Adults: {totalAdultsCount || "—"}/{totalCapacity} | Children: {totalChildrenCount || 0} (Free)
                           </span>
                         </div>
                       </div>

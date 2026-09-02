@@ -539,16 +539,21 @@ export async function sync24HourFolioCharges({
     }
   }
 
-  // Checkout Type & Grace Period
-  let checkoutType: "24_HOURS" | "FIXED_TIME" = "24_HOURS";
-  let graceMinutes = 60; // default 1 hour grace
+  // Checkout Type & Grace Period (Default: Standard 11:00 AM - 12:00 PM Fixed Time, 0 grace)
+  let checkoutType: "24_HOURS" | "FIXED_TIME" = "FIXED_TIME";
+  let graceMinutes = 0;
 
   if (overrideGraceMinutes !== undefined) {
     graceMinutes = overrideGraceMinutes;
   } else if (activeAssignment?.rateHandling?.includes("24_HOURS:")) {
-    graceMinutes = Number(activeAssignment.rateHandling.split(":")[1]) || 60;
+    checkoutType = "24_HOURS";
+    graceMinutes = Number(activeAssignment.rateHandling.split(":")[1]) || 0;
+  } else if (activeAssignment?.rateHandling?.includes("FIXED_TIME:")) {
+    checkoutType = "FIXED_TIME";
+    graceMinutes = Number(activeAssignment.rateHandling.split(":")[1]) || 0;
   } else if (activeAssignment?.rateHandling === "FIXED_TIME") {
     checkoutType = "FIXED_TIME";
+    graceMinutes = 0;
   }
 
   // Arrival timestamp
@@ -714,9 +719,10 @@ export async function updateStayGracePeriod({
     },
   });
 
+  const is24Hr = stay.roomAssignments.some((ra) => ra.rateHandling?.includes("24_HOURS"));
   const rateHandling = gracePeriodMinutes >= 1440
-    ? "24_HOURS:1440"
-    : `24_HOURS:${gracePeriodMinutes}`;
+    ? (is24Hr ? "24_HOURS:1440" : "FIXED_TIME:1440")
+    : (is24Hr ? `24_HOURS:${gracePeriodMinutes}` : `FIXED_TIME:${gracePeriodMinutes}`);
 
   // Update active room assignments with new grace period
   for (const ra of stay.roomAssignments) {

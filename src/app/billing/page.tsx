@@ -173,8 +173,8 @@ function BillingContent() {
     notes: "Advance surplus return at checkout",
   });
 
-  // Grace Period control state (in minutes)
-  const [gracePeriodMinutes, setGracePeriodMinutes] = useState<number>(60);
+  // Grace Period control state (in minutes) - Default: 0 mins (Strict 11 AM - 12 PM Checkout)
+  const [gracePeriodMinutes, setGracePeriodMinutes] = useState<number>(0);
 
   // Global Escape key listener to close billing modals
   useEffect(() => {
@@ -207,7 +207,8 @@ function BillingContent() {
           const inHouse = cached.find((s: any) => s.status === "IN_HOUSE");
           const targetStay = inHouse || cached[0];
           setSelectedStayId(targetStay.id);
-          const firstRoom = targetStay.roomAssignments?.[0]?.room?.number || "";
+          const activeAssign = targetStay.roomAssignments?.find((a: any) => !a.endsAt) || targetStay.roomAssignments?.[0];
+          const firstRoom = activeAssign?.room?.number || "";
           setSelectedRoomNumber(firstRoom);
         }
       } else {
@@ -226,7 +227,8 @@ function BillingContent() {
           const inHouse = data.find((s: any) => s.status === "IN_HOUSE");
           const targetStay = inHouse || data[0];
           setSelectedStayId(targetStay.id);
-          const firstRoom = targetStay.roomAssignments?.[0]?.room?.number || "";
+          const activeAssign = targetStay.roomAssignments?.find((a: any) => !a.endsAt) || targetStay.roomAssignments?.[0];
+          const firstRoom = activeAssign?.room?.number || "";
           setSelectedRoomNumber(firstRoom);
         }
       }
@@ -281,10 +283,12 @@ function BillingContent() {
   useEffect(() => {
     if (selectedStayId && stays.length > 0) {
       const activeStay = stays.find((s) => s.id === selectedStayId);
-      let stayGrace = 60;
+      let stayGrace = 0;
       const rh = activeStay?.roomAssignments?.[0]?.rateHandling;
       if (rh?.includes("24_HOURS:")) {
-        stayGrace = Number(rh.split(":")[1]) || 60;
+        stayGrace = Number(rh.split(":")[1]) || 0;
+      } else if (rh?.includes("FIXED_TIME:")) {
+        stayGrace = Number(rh.split(":")[1]) || 0;
       }
       setGracePeriodMinutes(stayGrace);
 
@@ -324,10 +328,37 @@ function BillingContent() {
 
     stays.forEach((s) => {
       const assignments = s.roomAssignments || [];
+      let targetAssignments: any[] = [];
+
+      if (s.status === "IN_HOUSE") {
+        // For IN_HOUSE stays: ONLY include active room assignments where endsAt is null!
+        // Ended assignments are historical transferred rooms and must NOT appear as separate in-house rooms.
+        const activeOnly = assignments.filter((a: any) => !a.endsAt);
+        targetAssignments = activeOnly.length > 0 ? activeOnly : [assignments[0] || { room: { number: "Unassigned", roomType: null } }];
+      } else {
+        // For CHECKED_OUT / COMPLETED stays:
+        // Filter out transferred predecessor rooms where endsAt is set and another assignment started after
+        const endedTransfers = new Set<string>();
+        for (const a of assignments) {
+          if (a.endsAt) {
+            const successor = assignments.find(
+              (o: any) => o.id !== a.id && o.roomId !== a.roomId && new Date(o.startsAt).getTime() >= new Date(a.startsAt).getTime() + 10000
+            );
+            if (successor) {
+              endedTransfers.add(a.room?.number || a.id);
+            }
+          }
+        }
+        targetAssignments = assignments.filter((a: any) => !endedTransfers.has(a.room?.number || a.id));
+        if (targetAssignments.length === 0) {
+          targetAssignments = [assignments[assignments.length - 1] || { room: { number: "Unassigned", roomType: null } }];
+        }
+      }
+
       const distinctRooms: any[] = [];
       const seen = new Set<string>();
 
-      assignments.forEach((a: any) => {
+      targetAssignments.forEach((a: any) => {
         const num = a.room?.number || "Unassigned";
         if (!seen.has(num)) {
           seen.add(num);
@@ -580,14 +611,14 @@ function BillingContent() {
     const billableCalc = calculate24HrBillableDays(
       arr,
       now,
-      assignment?.rateHandling === "FIXED_TIME" ? "FIXED_TIME" : "24_HOURS",
+      assignment?.rateHandling?.startsWith("24_HOURS") ? "24_HOURS" : "FIXED_TIME",
       gracePeriodMinutes
     );
 
     const items = folioData?.windows?.[0]?.entries || folioData?.windows?.[0]?.lineItems || [];
     const allRoomEntries = items.filter((i: any) => i.chargeCode?.includes("ROOM_TARIFF") && i.status === "POSTED");
     const chargedRoomEntries = allRoomEntries.filter((i: any) => {
-      if (groupBillingMode === "YES") return true;
+      if (groupBillingMode === "YES" || !isMultiRoomGroup) return true;
       if (allRoomEntries.length <= 1) return true;
       return i.description?.includes(activeRoomNumber);
     });
@@ -1627,11 +1658,14 @@ function BillingContent() {
                         onChange={(e) => handleGracePeriodChange(Number(e.target.value))}
                         className="h-8.5 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 px-3 text-xs font-bold text-zinc-900 dark:text-white focus:outline-none focus:border-amber-500 cursor-pointer shadow-2xs"
                       >
-                        <option value={0}>0 Hours (Strict 24h)</option>
-                        <option value={60}>1 Hour Grace (Default)</option>
-                        <option value={120}>2 Hours Grace</option>
-                        <option value={180}>3 Hours Grace</option>
-                        <option value={240}>4 Hours Grace</option>
+                        <option value={0}>0 Hours (None / Strict 11 AM–12 PM)</option>
+                        <option value={60}>1 Hour Grace (Till 1:00 PM)</option>
+                        <option value={120}>2 Hours Grace (Till 2:00 PM)</option>
+                        <option value={180}>3 Hours Grace (Till 3:00 PM)</option>
+                        <option value={240}>4 Hours Grace (Till 4:00 PM)</option>
+                        <option value={300}>5 Hours Grace (Till 5:00 PM)</option>
+                        <option value={360}>6 Hours Grace (Till 6:00 PM)</option>
+                        <option value={420}>7 Hours Grace (Till 7:00 PM)</option>
                         <option value={1440}>Waive Next Night</option>
                       </select>
                     </div>

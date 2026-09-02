@@ -71,6 +71,9 @@ The website and booking engine must respect the exact 35 physical room allocatio
 
 Used for direct guest reservations, corporate company bookers, and travel agent bookings.
 
+> [!NOTE]
+> **Children Policy**: Children stay complimentary (₹0 / Free of charge). The booking engine must NOT add extra person or extra bed charges for children.
+
 #### Request Payload Schema (B2C & B2B):
 ```json
 {

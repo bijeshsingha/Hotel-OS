@@ -279,8 +279,8 @@ export default function AdminPortalPage() {
     } catch {}
 
     let extraPaxCount = 0;
-    let checkoutType: "24_HOURS" | "FIXED_TIME" = "24_HOURS";
-    let gracePeriodMinutes = "60";
+    let checkoutType: "24_HOURS" | "FIXED_TIME" = "FIXED_TIME";
+    let gracePeriodMinutes = "0";
     let mealPlan = "EP";
     let adults = "2";
     let paxM = "";
@@ -1748,17 +1748,39 @@ export default function AdminPortalPage() {
                       </div>
 
                       {/* Checkout Billing Model */}
-                      <div className="space-y-1 sm:col-span-4">
+                      <div className="space-y-1 sm:col-span-2">
                         <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">
                           Checkout Billing Cycle *
                         </label>
                         <select
-                          value={editingGrc.checkoutType || "24_HOURS"}
+                          value={editingGrc.checkoutType || "FIXED_TIME"}
                           onChange={(e: any) => setEditingGrc({ ...editingGrc, checkoutType: e.target.value })}
                           className="w-full h-10 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white text-xs font-semibold focus:border-blue-500 focus:outline-none cursor-pointer"
                         >
-                          <option value="24_HOURS">⏱️ 24-Hour Cycle from Check-In (Default)</option>
-                          <option value="FIXED_TIME">☀️ Standard 11:00 AM / 12:00 PM Fixed Time</option>
+                          <option value="FIXED_TIME">☀️ Standard 11:00 AM / 12:00 PM (Default)</option>
+                          <option value="24_HOURS">⏱️ 24-Hour Cycle from Check-In</option>
+                        </select>
+                      </div>
+
+                      {/* Grace Period Window (0 to 7 hr range) */}
+                      <div className="space-y-1 sm:col-span-2">
+                        <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">
+                          Grace Period Window *
+                        </label>
+                        <select
+                          value={editingGrc.gracePeriodMinutes || "0"}
+                          onChange={(e: any) => setEditingGrc({ ...editingGrc, gracePeriodMinutes: e.target.value })}
+                          className="w-full h-10 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white text-xs font-semibold focus:border-blue-500 focus:outline-none cursor-pointer"
+                        >
+                          <option value="0">0 Hours (None / Strict 11–12 PM)</option>
+                          <option value="60">1 Hour Grace (Till 1:00 PM)</option>
+                          <option value="120">2 Hours Grace (Till 2:00 PM)</option>
+                          <option value="180">3 Hours Grace (Till 3:00 PM)</option>
+                          <option value="240">4 Hours Grace (Till 4:00 PM)</option>
+                          <option value="300">5 Hours Grace (Till 5:00 PM)</option>
+                          <option value="360">6 Hours Grace (Till 6:00 PM)</option>
+                          <option value="420">7 Hours Grace (Till 7:00 PM)</option>
+                          <option value="1440">Waive Next Night</option>
                         </select>
                       </div>
                     </div>

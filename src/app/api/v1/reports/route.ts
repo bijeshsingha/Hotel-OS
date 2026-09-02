@@ -392,6 +392,344 @@ export async function GET(request: Request) {
       });
     }
 
+    // 5. ROOM TRANSFERS & ROOM MOVES AUDIT REPORT
+    if (reportType === "ROOM_TRANSFERS") {
+      const stayWhere: any = {
+        propertyId,
+        roomAssignments: {
+          some: {
+            endsAt: { not: null },
+          },
+        },
+      };
+
+      const staysWithTransfers = await prisma.stay.findMany({
+        where: stayWhere,
+        include: {
+          primaryGuest: true,
+          roomAssignments: {
+            include: {
+              room: {
+                include: { roomType: true },
+              },
+            },
+            orderBy: { startsAt: "asc" },
+          },
+          folio: {
+            include: {
+              entries: true,
+              payments: true,
+            },
+          },
+        },
+        orderBy: { arrivalAt: "desc" },
+      });
+
+      const grcs = await prisma.guestRegistration.findMany({
+        where: {
+          propertyId,
+          stayId: { in: staysWithTransfers.map((s) => s.id) },
+        },
+      });
+      const grcMap = new Map(grcs.map((g) => [g.stayId, g]));
+
+      const rawTransfers: any[] = [];
+      for (const stay of staysWithTransfers) {
+        const grc = grcMap.get(stay.id);
+        const assignments = stay.roomAssignments;
+
+        for (const endedAssign of assignments.filter((a) => a.endsAt)) {
+          const succeedingAssign = assignments.find(
+            (a) =>
+              a.id !== endedAssign.id &&
+              a.roomId !== endedAssign.roomId &&
+              new Date(a.startsAt).getTime() >= new Date(endedAssign.startsAt).getTime() + 10000
+          );
+
+          if (succeedingAssign) {
+            const transferTime = endedAssign.endsAt;
+            const durMs =
+              new Date(endedAssign.endsAt!).getTime() - new Date(endedAssign.startsAt).getTime();
+            const durHours = Math.round((durMs / (1000 * 60 * 60)) * 10) / 10;
+            const durDays = Math.floor(durHours / 24);
+            const remHours = Math.round(durHours % 24);
+            const durationText =
+              durDays > 0
+                ? `${durDays}d ${remHours}h (${Math.max(1, durDays)} nt${durDays > 1 ? "s" : ""})`
+                : `${durHours} hrs`;
+
+            let agreedRate = 0;
+            if (succeedingAssign.moveReason?.includes("AGREED_RATE:")) {
+              const parts = succeedingAssign.moveReason.split(":");
+              agreedRate = Number(parts[1]) || 0;
+            }
+
+            rawTransfers.push({
+              transferId: `${endedAssign.id}_to_${succeedingAssign.id}`,
+              stayId: stay.id,
+              folioId: stay.folio?.id || null,
+              stayStatus: stay.status,
+              grcNo: grc?.registrationNo || "—",
+              guestName: stay.primaryGuest?.name || grc?.fullName || "—",
+              phone: stay.primaryGuest?.phone || grc?.mobilePhone || "—",
+              transferDate: transferTime?.toISOString(),
+              formattedDate: transferTime
+                ? new Date(transferTime).toLocaleString("en-IN", {
+                    timeZone: "Asia/Kolkata",
+                    dateStyle: "medium",
+                    timeStyle: "short",
+                  })
+                : "—",
+              fromRoomId: endedAssign.roomId,
+              fromRoomNumber: endedAssign.room?.number || "—",
+              fromRoomType: endedAssign.room?.roomType?.name || endedAssign.room?.name || "—",
+              fromRoomFloor: endedAssign.room?.floor || 1,
+              toRoomId: succeedingAssign.roomId,
+              toRoomNumber: succeedingAssign.room?.number || "—",
+              toRoomType: succeedingAssign.room?.roomType?.name || succeedingAssign.room?.name || "—",
+              toRoomFloor: succeedingAssign.room?.floor || 1,
+              moveReason: endedAssign.moveReason || succeedingAssign.moveReason || "Room Change / Upgrade",
+              rateHandling: succeedingAssign.rateHandling || "RETAIN_RATE",
+              agreedRate,
+              durationHours: durHours,
+              durationText,
+              startedAt: endedAssign.startsAt.toISOString(),
+              endedAt: endedAssign.endsAt!.toISOString(),
+              currentRoomStatus: succeedingAssign.endsAt
+                ? "HISTORICAL_TRANSFER"
+                : stay.status === "IN_HOUSE"
+                ? "CURRENTLY_OCCUPIED"
+                : "CHECKED_OUT",
+            });
+          }
+        }
+      }
+
+      rawTransfers.sort(
+        (a, b) => new Date(b.transferDate).getTime() - new Date(a.transferDate).getTime()
+      );
+
+      return NextResponse.json({
+        reportType,
+        generatedAt: new Date().toISOString(),
+        totalCount: rawTransfers.length,
+        inHouseCount: rawTransfers.filter((t) => t.currentRoomStatus === "CURRENTLY_OCCUPIED").length,
+        transfers: rawTransfers,
+      });
+    }
+
+    // 6. FINAL BILLS & TAX INVOICES MASTER LIST REPORT
+    if (reportType === "FINAL_BILLS") {
+      const stayWhere: any = { propertyId };
+
+      const stays = await prisma.stay.findMany({
+        where: stayWhere,
+        include: {
+          primaryGuest: true,
+          roomAssignments: {
+            include: { room: { include: { roomType: true } } },
+            orderBy: { startsAt: "asc" },
+          },
+          folio: {
+            include: {
+              entries: true,
+              payments: true,
+            },
+          },
+        },
+        orderBy: { arrivalAt: "desc" },
+      });
+
+      const grcs = await prisma.guestRegistration.findMany({
+        where: {
+          propertyId,
+          stayId: { in: stays.map((s) => s.id) },
+        },
+      });
+      const grcMap = new Map(grcs.map((g) => [g.stayId, g]));
+
+      const bills = stays.map((stay) => {
+        const grc = grcMap.get(stay.id);
+        const folio = stay.folio;
+        const entries = folio?.entries || [];
+        const payments = folio?.payments || [];
+
+        const roomTariff = entries
+          .filter((e) => e.chargeCode === "ROOM_TARIFF" && e.type === "CHARGE")
+          .reduce((sum, e) => sum + e.totalAmount, 0);
+
+        const extraPax = entries
+          .filter((e) => e.chargeCode === "EXTRA_PAX" && e.type === "CHARGE")
+          .reduce((sum, e) => sum + e.totalAmount, 0);
+
+        const fnbCharges = entries
+          .filter(
+            (e) =>
+              ["FOOD", "RESTAURANT", "ROOM_SERVICE", "DINNER", "BREAKFAST"].some(
+                (k) =>
+                  e.chargeCode.includes(k) ||
+                  e.description.toLowerCase().includes("dinner") ||
+                  e.description.toLowerCase().includes("food")
+              ) && e.type === "CHARGE"
+          )
+          .reduce((sum, e) => sum + e.totalAmount, 0);
+
+        const otherCharges = entries
+          .filter(
+            (e) =>
+              e.chargeCode !== "ROOM_TARIFF" &&
+              e.chargeCode !== "EXTRA_PAX" &&
+              !["FOOD", "RESTAURANT", "ROOM_SERVICE", "DINNER", "BREAKFAST"].some(
+                (k) =>
+                  e.chargeCode.includes(k) ||
+                  e.description.toLowerCase().includes("dinner") ||
+                  e.description.toLowerCase().includes("food")
+              ) &&
+              e.type === "CHARGE"
+          )
+          .reduce((sum, e) => sum + e.totalAmount, 0);
+
+        const taxableAmount = entries
+          .filter((e) => e.type === "CHARGE")
+          .reduce((sum, e) => sum + (e.taxableAmount || 0), 0);
+
+        let totalCgst = 0;
+        let totalSgst = 0;
+        for (const e of entries.filter((x) => x.type === "CHARGE")) {
+          if (e.taxComponentsJson) {
+            try {
+              const comp = JSON.parse(e.taxComponentsJson);
+              totalCgst += Number(comp.cgstAmount || 0);
+              totalSgst += Number(comp.sgstAmount || 0);
+            } catch {}
+          }
+        }
+
+        const grossTotal = entries
+          .filter((e) => e.type === "CHARGE")
+          .reduce((sum, e) => sum + e.totalAmount, 0);
+
+        const totalPaid = payments
+          .filter((p) => p.status === "SUCCEEDED")
+          .reduce((sum, p) => sum + p.amount, 0);
+
+        const sortedAssignments = [...stay.roomAssignments].sort(
+          (a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime()
+        );
+
+        const uniqueRooms: string[] = [];
+        sortedAssignments.forEach((ra) => {
+          const num = ra.room?.number;
+          if (num && !uniqueRooms.includes(num)) {
+            uniqueRooms.push(num);
+          }
+        });
+
+        let isSequentialTransfer = false;
+        if (uniqueRooms.length > 1) {
+          // Check if assignments were sequential moves (started >10 mins apart or explicit move reason)
+          for (let i = 0; i < sortedAssignments.length - 1; i++) {
+            const current = sortedAssignments[i];
+            const next = sortedAssignments[i + 1];
+            const timeDiff = new Date(next.startsAt).getTime() - new Date(current.startsAt).getTime();
+            if (
+              (current.endsAt && timeDiff > 10 * 60 * 1000) ||
+              current.moveReason?.toLowerCase().includes("moved") ||
+              current.moveReason?.toLowerCase().includes("transfer")
+            ) {
+              isSequentialTransfer = true;
+              break;
+            }
+          }
+        }
+
+        const roomDisplay =
+          uniqueRooms.length <= 1
+            ? (uniqueRooms[0] || "—")
+            : isSequentialTransfer
+            ? uniqueRooms.join(" ➔ ")
+            : `${uniqueRooms.join(", ")} (${uniqueRooms.length} Rooms)`;
+
+        const nights = Math.max(
+          1,
+          Math.round(
+            (new Date(stay.actualDepartureAt || stay.expectedDepartureAt).getTime() -
+              new Date(stay.arrivalAt).getTime()) /
+              (1000 * 60 * 60 * 24)
+          )
+        );
+
+        const methods = Array.from(new Set(payments.map((p) => p.method).filter(Boolean)));
+        const methodDisplay =
+          methods.length === 0
+            ? "UNPAID"
+            : methods.length === 1
+            ? methods[0]
+            : `SPLIT (${methods.join(", ")})`;
+
+        const balance = folio?.balance ?? (grossTotal - totalPaid);
+        const settlementStatus =
+          stay.status === "CHECKED_OUT" || (balance === 0 && totalPaid > 0)
+            ? "SETTLED"
+            : stay.status === "IN_HOUSE"
+            ? "IN_HOUSE"
+            : "OPEN";
+
+        return {
+          stayId: stay.id,
+          folioId: folio?.id || "—",
+          invoiceNo: `INV-2627-${stay.id.slice(-4).toUpperCase()}`,
+          grcNo: grc?.registrationNo || "—",
+          guestName: stay.primaryGuest?.name || grc?.fullName || "—",
+          phone: stay.primaryGuest?.phone || grc?.mobilePhone || "—",
+          companyName: stay.primaryGuest?.companyName || "—",
+          gstin: stay.primaryGuest?.gstin || "—",
+          roomDisplay,
+          roomsCount: uniqueRooms.length,
+          checkInDate: stay.arrivalAt.toISOString(),
+          checkOutDate: (stay.actualDepartureAt || stay.expectedDepartureAt).toISOString(),
+          nights,
+          stayStatus: stay.status,
+          roomTariff,
+          extraPax,
+          fnbCharges,
+          otherCharges,
+          taxableAmount: Math.round(taxableAmount * 100) / 100,
+          totalCgst: Math.round(totalCgst * 100) / 100,
+          totalSgst: Math.round(totalSgst * 100) / 100,
+          totalTax: Math.round((totalCgst + totalSgst) * 100) / 100,
+          grossTotal,
+          totalPaid,
+          balance,
+          settlementStatus,
+          paymentMethod: methodDisplay,
+          paymentsList: payments.map((p) => ({
+            method: p.method,
+            amount: p.amount,
+            receiptNo: p.receiptNo,
+            receivedAt: p.receivedAt,
+          })),
+        };
+      });
+
+      const summary = {
+        totalBills: bills.length,
+        settledCount: bills.filter((b) => b.settlementStatus === "SETTLED").length,
+        inHouseCount: bills.filter((b) => b.stayStatus === "IN_HOUSE").length,
+        totalGrossRevenue: bills.reduce((sum, b) => sum + b.grossTotal, 0),
+        totalCollected: bills.reduce((sum, b) => sum + b.totalPaid, 0),
+        totalOutstandingBalance: bills.reduce((sum, b) => sum + Math.max(0, b.balance), 0),
+        totalTaxCollected: bills.reduce((sum, b) => sum + b.totalTax, 0),
+      };
+
+      return NextResponse.json({
+        reportType,
+        generatedAt: new Date().toISOString(),
+        summary,
+        bills,
+      });
+    }
+
     return NextResponse.json({ error: "Invalid report type" }, { status: 400 });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });

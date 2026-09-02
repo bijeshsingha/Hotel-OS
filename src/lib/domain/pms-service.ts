@@ -60,8 +60,8 @@ export function getLocalHourMinute(date: Date | string): { hour: number; minute:
 export function calculate24HrBillableDays(
   arrivalAt: Date | string,
   departureAt: Date | string,
-  checkoutType: "24_HOURS" | "FIXED_TIME" = "24_HOURS",
-  gracePeriodMinutes: number = 60
+  checkoutType: "24_HOURS" | "FIXED_TIME" = "FIXED_TIME",
+  gracePeriodMinutes: number = 0
 ): {
   billableDays: number;
   hoursElapsed: number;
@@ -85,7 +85,7 @@ export function calculate24HrBillableDays(
       hoursElapsed,
       gracePeriodApplied: true,
       isEarlyBird,
-      checkoutDeadlineText: isEarlyBird ? "Standard 12:00 PM (Next Night Waived)" : "24-Hr Cycle (Next Night Waived)",
+      checkoutDeadlineText: "Standard 11 AM–12 PM (Next Night Waived)",
     };
   }
 
@@ -104,13 +104,13 @@ export function calculate24HrBillableDays(
     const deadlineWithGraceMs = deadlineMs + graceMs;
 
     if (end <= deadlineWithGraceMs) {
-      const graceApplied = end > deadlineMs && end <= deadlineWithGraceMs;
+      const graceApplied = gracePeriodMinutes > 0 && end > deadlineMs && end <= deadlineWithGraceMs;
       return {
         billableDays: 1,
         hoursElapsed,
         gracePeriodApplied: graceApplied,
         isEarlyBird: true,
-        checkoutDeadlineText: "Standard 12:00 PM Check-Out (Early Bird Offer)",
+        checkoutDeadlineText: "Standard 11 AM–12 PM Check-Out (Early Bird Offer)",
       };
     } else {
       // Past 12:00 PM + Grace Period -> bill for next day (+1 night per 24h cycle beyond noon)
@@ -121,25 +121,52 @@ export function calculate24HrBillableDays(
         hoursElapsed,
         gracePeriodApplied: false,
         isEarlyBird: true,
-        checkoutDeadlineText: "Standard 12:00 PM (Overtime Billed)",
+        checkoutDeadlineText: "Standard 11 AM–12 PM (Overtime Billed)",
       };
     }
   }
 
-  if (checkoutType === "FIXED_TIME") {
-    const startDate = new Date(arrivalAt).toISOString().split("T")[0];
-    const endDate = new Date(departureAt).toISOString().split("T")[0];
-    const diffDays = Math.max(1, Math.round((new Date(endDate).getTime() - new Date(startDate).getTime()) / (1000 * 60 * 60 * 24)));
+  // STANDARD 11:00 AM – 12:00 PM FIXED TIME BILLING (DEFAULT):
+  if (checkoutType === "FIXED_TIME" || !checkoutType) {
+    const arrDate = new Date(arrivalAt);
+    const endDate = new Date(departureAt);
+
+    // Standard hotel checkout: Check-in before 5 AM gives base noon of current day; check-in at/after 5 AM gives noon of next day
+    const baseCheckoutDay = new Date(arrDate);
+    if (arrHour >= 5) {
+      baseCheckoutDay.setDate(baseCheckoutDay.getDate() + 1);
+    }
+    baseCheckoutDay.setHours(12, 0, 0, 0);
+
+    const graceMs = gracePeriodMinutes * 60 * 1000;
+    let currentDeadlineMs = baseCheckoutDay.getTime();
+    let nights = 1;
+
+    while (endDate.getTime() > currentDeadlineMs + graceMs) {
+      nights++;
+      currentDeadlineMs += 24 * 60 * 60 * 1000;
+    }
+
+    const graceApplied =
+      gracePeriodMinutes > 0 &&
+      endDate.getTime() > currentDeadlineMs &&
+      endDate.getTime() <= currentDeadlineMs + graceMs;
+
+    const graceText =
+      gracePeriodMinutes === 0
+        ? "0h Grace (Strict 11 AM–12 PM)"
+        : `${Math.round(gracePeriodMinutes / 60)}h Grace (Till ${(12 + Math.floor(gracePeriodMinutes / 60)) % 12 || 12}:00 ${(12 + Math.floor(gracePeriodMinutes / 60)) >= 12 ? "PM" : "AM"})`;
+
     return {
-      billableDays: diffDays,
+      billableDays: nights,
       hoursElapsed,
-      gracePeriodApplied: false,
+      gracePeriodApplied: graceApplied,
       isEarlyBird: false,
-      checkoutDeadlineText: "Standard 12:00 PM Check-Out",
+      checkoutDeadlineText: `Standard 11 AM–12 PM Check-Out (${graceText})`,
     };
   }
 
-  // STANDARD 24_HOURS CYCLE:
+  // OPTIONAL 24_HOURS CYCLE:
   const completedBlocks = Math.floor(elapsedMinutes / (24 * 60));
   const remainderMinutes = elapsedMinutes % (24 * 60);
 
@@ -158,7 +185,7 @@ export function calculate24HrBillableDays(
     return {
       billableDays: completedBlocks,
       hoursElapsed,
-      gracePeriodApplied: true,
+      gracePeriodApplied: gracePeriodMinutes > 0,
       isEarlyBird: false,
       checkoutDeadlineText: `24-Hr Cycle (${gracePeriodMinutes}m Grace Active)`,
     };
@@ -323,8 +350,8 @@ export async function checkInGuest({
   agreedTariff,
   isComplimentary = false,
   isRateInclusive = true,
-  checkoutType = "24_HOURS",
-  gracePeriodMinutes = 60,
+  checkoutType = "FIXED_TIME",
+  gracePeriodMinutes = 0,
   extraBeds = 0,
   extraBedRate = 500,
   actorId,
@@ -634,7 +661,7 @@ export async function checkInGuest({
           roomId: room.id,
           startsAt: new Date(),
           moveReason: isComp ? "AGREED_RATE:0" : `AGREED_RATE:${roomBasePrice}:${isRateInclusive !== false ? "INC" : "EXC"}`,
-          rateHandling: isComp ? "COMPLIMENTARY" : (checkoutType === "FIXED_TIME" ? "FIXED_TIME" : `24_HOURS:${gracePeriodMinutes}`),
+          rateHandling: isComp ? "COMPLIMENTARY" : (checkoutType === "24_HOURS" ? `24_HOURS:${gracePeriodMinutes}` : `FIXED_TIME:${gracePeriodMinutes}`),
         },
       });
 
@@ -788,7 +815,7 @@ export async function checkInGuest({
           roomId: room.id,
           startsAt: new Date(),
           moveReason: isComp ? "AGREED_RATE:0" : `AGREED_RATE:${roomBasePrice}`,
-          rateHandling: isComp ? "COMPLIMENTARY" : (checkoutType === "FIXED_TIME" ? "FIXED_TIME" : `24_HOURS:${gracePeriodMinutes}`),
+          rateHandling: isComp ? "COMPLIMENTARY" : (checkoutType === "24_HOURS" ? `24_HOURS:${gracePeriodMinutes}` : `FIXED_TIME:${gracePeriodMinutes}`),
         },
       });
 

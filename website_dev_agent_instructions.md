@@ -216,6 +216,7 @@ await fetch(`${process.env.PMS_API_URL}/events/enquiry`, {
 
 ## 📋 Pre-Launch Developer Verification Checklist
 
+- [ ] **Children Policy**: Children stay complimentary (₹0 / Free of charge). Ensure no extra bed or extra person surcharge is added for children.
 - [ ] **Bed Types**: Guest can pick King Bed vs Twin Bed on Deluxe and Executive rooms.
 - [ ] **B2B Toggle**: Checkout has a checkbox/tab: *"Booking on behalf of Company / Travel Agency"*.
 - [ ] **Uppercase Normalization**: Guest names, cities, states, and company names are auto-capitalized (`.toUpperCase()`).
