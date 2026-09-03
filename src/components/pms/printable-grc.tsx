@@ -112,9 +112,38 @@ export function PrintableGrcModal({
     data.assignedRoomNumber ||
     data.preAssignedRoom ||
     "—";
-  const arrivalTime =
-    data.arrivalDateTime ||
-    new Date().toISOString().replace("T", " ").slice(0, 16);
+  const formatGrcArrival = (raw?: string | null): string => {
+    if (!raw || raw === "—") return "—";
+    try {
+      let d: Date;
+      if (raw.endsWith("Z") || raw.includes("+")) {
+        d = new Date(raw);
+      } else if (raw.includes("T")) {
+        d = new Date(raw.endsWith("Z") ? raw : `${raw}Z`);
+      } else if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}/.test(raw)) {
+        // Handled saved UTC string (e.g. "2026-09-02 02:20") by parsing as UTC instant
+        d = new Date(`${raw.replace(" ", "T")}Z`);
+      } else {
+        d = new Date(raw);
+      }
+
+      if (isNaN(d.getTime())) return raw;
+
+      return new Intl.DateTimeFormat("en-IN", {
+        timeZone: "Asia/Kolkata",
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: true,
+      }).format(d);
+    } catch {
+      return raw;
+    }
+  };
+
+  const arrivalTime = formatGrcArrival(data.arrivalDateTime);
   const departureDate = data.expectedDepartureDate || "—";
   const auditTimestamp = new Date().toISOString();
   const policeRefNo =

@@ -106,7 +106,12 @@ export function calculate24HrBillableDays(
 
     if (start < arrNoon.getTime()) {
       // Arrived before 12:00 PM Noon on arrival date
-      if (start >= earlyCheckInCutoffMs) {
+      if (isEarlyBird) {
+        // Early Bird Offer (5:00 AM – 11:00 AM): Complimentary early check-in for TODAY's cycle!
+        // Does NOT count as a prior night occupation.
+        earlyNights = 0;
+        earlyGraceApplied = true;
+      } else if (start >= earlyCheckInCutoffMs) {
         // Within early check-in grace window (e.g., 1-7h before 12 PM)
         earlyGraceApplied = gracePeriodMinutes > 0;
       } else {
@@ -121,26 +126,33 @@ export function calculate24HrBillableDays(
     baseCheckoutNoon.setDate(baseCheckoutNoon.getDate() + 1);
     baseCheckoutNoon.setHours(12, 0, 0, 0);
 
+    // Operational Checkout Grace Buffer:
+    // Hotels provide a standard 60-minute buffer (until 1:00 PM) for guests packing/settling bill at desk,
+    // or the manager-selected grace period if greater.
+    const operationalGraceMinutes = Math.max(gracePeriodMinutes, 60);
+    const checkoutGraceMs = operationalGraceMinutes * 60 * 1000;
+
     let currentDeadlineMs = baseCheckoutNoon.getTime();
     let regularNights = 1;
 
-    while (endDate.getTime() > currentDeadlineMs + graceMs) {
+    while (endDate.getTime() > currentDeadlineMs + checkoutGraceMs) {
       regularNights++;
       currentDeadlineMs += 24 * 60 * 60 * 1000;
     }
 
     const lateGraceApplied =
-      gracePeriodMinutes > 0 &&
       endDate.getTime() > currentDeadlineMs &&
-      endDate.getTime() <= currentDeadlineMs + graceMs;
+      endDate.getTime() <= currentDeadlineMs + checkoutGraceMs;
 
     const totalNights = Math.max(1, regularNights + earlyNights);
     const graceApplied = earlyGraceApplied || lateGraceApplied;
 
     const graceText =
-      gracePeriodMinutes === 0
-        ? ""
-        : ` • ${Math.round(gracePeriodMinutes / 60)}h Grace`;
+      gracePeriodMinutes > 0
+        ? ` • ${Math.round(gracePeriodMinutes / 60)}h Grace`
+        : lateGraceApplied
+        ? " • 1h Grace (Until 1:00 PM)"
+        : "";
 
     return {
       billableDays: totalNights,
@@ -939,7 +951,7 @@ export async function checkInGuest({
 
   // 9. Generate GRC Registration Record
   const grcSeq = await getNextDocumentNumber(propertyId, "GRC");
-  const formattedArrival = (arrivalAt || new Date()).toISOString().replace("T", " ").slice(0, 16);
+  const formattedArrival = (arrivalAt || new Date()).toISOString();
 
   const registration = await prisma.guestRegistration.create({
     data: {
