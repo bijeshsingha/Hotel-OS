@@ -1,5 +1,6 @@
 import { prisma } from "../db/prisma";
 import { calculateGST } from "../gst/calculator";
+import { sync24HourFolioCharges } from "./folio-service";
 
 export interface NightAuditChecklist {
   businessDate: string;
@@ -81,29 +82,13 @@ export async function runNightAuditChecks(propertyId: string): Promise<NightAudi
 }
 
 export async function postNightlyRoomCharges(propertyId: string) {
-  const property = await prisma.property.findUniqueOrThrow({
-    where: { id: propertyId },
-  });
-
-  const currentDate = property.businessDate;
-
   const inHouseStays = await prisma.stay.findMany({
     where: {
       propertyId,
       status: "IN_HOUSE",
     },
     include: {
-      folio: {
-        include: {
-          windows: true,
-          entries: {
-            where: {
-              serviceDate: currentDate,
-              chargeCode: "ROOM_TARIFF",
-            },
-          },
-        },
-      },
+      folio: true,
       roomAssignments: {
         where: { endsAt: null },
         include: {
@@ -118,83 +103,24 @@ export async function postNightlyRoomCharges(propertyId: string) {
   for (const stay of inHouseStays) {
     if (!stay.folio || stay.folio.status !== "OPEN") continue;
 
-    // Idempotency: skip if already posted for this date
-    if (stay.folio.entries.length > 0) {
-      postedResults.push({
-        stayId: stay.id,
-        status: "ALREADY_POSTED",
-      });
-      continue;
-    }
+    const beforeCount = await prisma.folioEntry.count({
+      where: { folioId: stay.folio.id, chargeCode: "ROOM_TARIFF", status: "POSTED" },
+    });
+
+    await sync24HourFolioCharges({ folioId: stay.folio.id });
+
+    const afterCount = await prisma.folioEntry.count({
+      where: { folioId: stay.folio.id, chargeCode: "ROOM_TARIFF", status: "POSTED" },
+    });
 
     const activeAssignment = stay.roomAssignments[0];
     const room = activeAssignment?.room;
-    
-    // Determine exact agreed rate for this stay/room
-    let baseTariff = 3200;
-    const isComp = activeAssignment?.rateHandling === "COMPLIMENTARY" || activeAssignment?.moveReason === "AGREED_RATE:0";
-    
-    if (isComp) {
-      baseTariff = 0;
-    } else if (activeAssignment?.moveReason?.startsWith("AGREED_RATE:")) {
-      baseTariff = Number(activeAssignment.moveReason.replace("AGREED_RATE:", "")) || 3200;
-    } else {
-      // Look up initial posted room charge on this folio to maintain exact tariff consistency
-      const prevEntry = await prisma.folioEntry.findFirst({
-        where: { folioId: stay.folio.id, chargeCode: "ROOM_TARIFF" },
-        orderBy: { createdAt: "asc" },
-      });
-      if (prevEntry && prevEntry.unitAmount !== undefined) {
-        baseTariff = prevEntry.unitAmount;
-      }
-    }
-
-    const gst = isComp || baseTariff === 0
-      ? { taxableAmount: 0, taxAmount: 0, totalAmount: 0, components: [] }
-      : calculateGST({
-          grossOrBaseAmount: baseTariff,
-          isInclusive: true,
-          sacHsn: "996311",
-          supplierStateCode: property.stateCode || "18",
-          customTaxRate: 5,
-        });
-
-    const primaryWindow = stay.folio.windows[0];
-
-    const entry = await prisma.folioEntry.create({
-      data: {
-        organizationId: property.organizationId,
-        propertyId: property.id,
-        folioId: stay.folio.id,
-        folioWindowId: primaryWindow.id,
-        serviceDate: currentDate,
-        type: "CHARGE",
-        chargeCode: "ROOM_TARIFF",
-        description: isComp || baseTariff === 0
-          ? `Room Tariff - Room ${room?.number || "Stay"} (${currentDate} - COMPLIMENTARY)`
-          : `Room Tariff - Room ${room?.number || "Stay"} (${currentDate})`,
-        qty: 1,
-        unitAmount: baseTariff,
-        taxableAmount: gst.taxableAmount,
-        taxComponentsJson: JSON.stringify(gst.components),
-        totalAmount: gst.totalAmount,
-        sourceType: "PMS_NIGHTLY_CHARGE",
-        status: "POSTED",
-      },
-    });
-
-    await prisma.folio.update({
-      where: { id: stay.folio.id },
-      data: {
-        balance: { increment: gst.totalAmount },
-      },
-    });
 
     postedResults.push({
       stayId: stay.id,
       roomNumber: room?.number,
-      totalPosted: gst.totalAmount,
-      status: "POSTED",
+      totalPosted: afterCount > beforeCount ? afterCount - beforeCount : 0,
+      status: afterCount > beforeCount ? "POSTED" : "ALREADY_POSTED",
     });
   }
 
