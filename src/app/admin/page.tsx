@@ -1403,19 +1403,19 @@ export default function AdminPortalPage() {
             </div>
 
             {/* GRC Table */}
-            <div className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-[#111114] overflow-hidden shadow-xs">
+            <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#111114] overflow-hidden shadow-xs">
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse text-xs">
-                  <thead>
-                    <tr className="bg-zinc-50 dark:bg-zinc-900/60 text-zinc-500 uppercase font-mono text-[10px] border-b border-zinc-200 dark:border-zinc-800">
-                      <th className="py-3 px-4 font-bold">GRC No.</th>
-                      <th className="py-3 px-3 font-bold">Primary Guest</th>
-                      <th className="py-3 px-3 font-bold">Room & Dates</th>
-                      <th className="py-3 px-3 font-bold">Agreed Rent & Deposit</th>
-                      <th className="py-3 px-3 font-bold">Contact & ID</th>
-                      <th className="py-3 px-3 font-bold">City / Address</th>
-                      <th className="py-3 px-3 font-bold">{grcViewMode === "ARCHIVED" ? "Backup Action" : "Status"}</th>
-                      <th className="py-3 px-4 font-bold text-right">Actions</th>
+                  <thead className="bg-zinc-50/90 dark:bg-zinc-900/90 text-zinc-500 dark:text-zinc-400 text-[11px] uppercase tracking-wider font-semibold border-b border-zinc-200 dark:border-zinc-800 sticky top-0 z-10 backdrop-blur-xs">
+                    <tr>
+                      <th className="px-4 py-3 font-semibold whitespace-nowrap">GRC No.</th>
+                      <th className="px-4 py-3 font-semibold whitespace-nowrap">Primary Guest</th>
+                      <th className="px-4 py-3 font-semibold whitespace-nowrap">Room & Dates</th>
+                      <th className="px-4 py-3 font-semibold whitespace-nowrap">Agreed Rent & Deposit</th>
+                      <th className="px-4 py-3 font-semibold whitespace-nowrap">Contact & ID</th>
+                      <th className="px-4 py-3 font-semibold whitespace-nowrap">City / Address</th>
+                      <th className="px-4 py-3 font-semibold whitespace-nowrap">{grcViewMode === "ARCHIVED" ? "Backup Action" : "Status"}</th>
+                      <th className="px-4 py-3 font-semibold text-right whitespace-nowrap">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/60">
@@ -1689,7 +1689,7 @@ export default function AdminPortalPage() {
                             )?.number || editingGrc.preAssignedRoom || ""
                           }
                           onChange={(e) => setEditingGrc({ ...editingGrc, preAssignedRoom: e.target.value })}
-                          className="w-full h-10 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white text-xs font-mono font-bold focus:border-blue-500 focus:outline-none"
+                          className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs font-mono font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                         >
                           <option value="">-- Choose Room --</option>
                           {roomsList.map((r) => {
@@ -1714,7 +1714,7 @@ export default function AdminPortalPage() {
                           required
                           value={editingGrc.arrivalDate || ""}
                           onChange={(e) => setEditingGrc({ ...editingGrc, arrivalDate: e.target.value })}
-                          className="w-full h-10 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white font-mono text-xs font-bold focus:border-blue-500 focus:outline-none cursor-pointer"
+                          className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer"
                         />
                       </div>
 
@@ -1729,7 +1729,7 @@ export default function AdminPortalPage() {
                           required
                           value={editingGrc.arrivalTime || "14:00"}
                           onChange={(e) => setEditingGrc({ ...editingGrc, arrivalTime: e.target.value })}
-                          className="w-full h-10 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white font-mono text-xs font-bold focus:border-blue-500 focus:outline-none cursor-pointer shadow-xs"
+                          className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer shadow-xs"
                         />
                       </div>
 
@@ -1743,7 +1743,7 @@ export default function AdminPortalPage() {
                           required
                           value={editingGrc.expectedDepartureDate || ""}
                           onChange={(e) => setEditingGrc({ ...editingGrc, expectedDepartureDate: e.target.value })}
-                          className="w-full h-10 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white font-mono text-xs focus:border-blue-500 focus:outline-none cursor-pointer"
+                          className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer"
                         />
                       </div>
 
@@ -1755,7 +1755,7 @@ export default function AdminPortalPage() {
                         <select
                           value={editingGrc.checkoutType || "FIXED_TIME"}
                           onChange={(e: any) => setEditingGrc({ ...editingGrc, checkoutType: e.target.value })}
-                          className="w-full h-10 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white text-xs font-semibold focus:border-blue-500 focus:outline-none cursor-pointer"
+                          className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer"
                         >
                           <option value="FIXED_TIME">☀️ Standard 11:00 AM / 12:00 PM (Default)</option>
                           <option value="24_HOURS">⏱️ 24-Hour Cycle from Check-In</option>
@@ -1770,7 +1770,7 @@ export default function AdminPortalPage() {
                         <select
                           value={editingGrc.gracePeriodMinutes || "0"}
                           onChange={(e: any) => setEditingGrc({ ...editingGrc, gracePeriodMinutes: e.target.value })}
-                          className="w-full h-10 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white text-xs font-semibold focus:border-blue-500 focus:outline-none cursor-pointer"
+                          className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer"
                         >
                           <option value="0">0 Hours / None</option>
                           <option value="60">1 Hour Grace</option>
@@ -1843,7 +1843,7 @@ export default function AdminPortalPage() {
                                           },
                                         }));
                                       }}
-                                      className="w-28 h-8 pl-6 pr-2 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-blue-700 dark:text-blue-400 font-mono text-xs font-bold focus:border-blue-500 focus:outline-none"
+                                      className="w-28 h-8 pl-6 pr-2 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-blue-700 dark:text-blue-400 font-mono text-xs font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                                     />
                                   </div>
                                 </div>
@@ -1934,7 +1934,7 @@ export default function AdminPortalPage() {
                                           },
                                         }));
                                       }}
-                                      className="w-28 h-8 pl-6 pr-2 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white font-mono text-xs font-bold focus:border-blue-500 focus:outline-none"
+                                      className="w-28 h-8 pl-6 pr-2 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white font-mono text-xs font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                                     />
                                   </div>
                                   <button
@@ -2053,7 +2053,7 @@ export default function AdminPortalPage() {
                               }));
                             }
                           }}
-                          className="flex-1 h-9 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white text-xs font-mono focus:border-blue-500 focus:outline-none cursor-pointer"
+                          className="flex-1 h-9 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs font-mono focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer"
                         >
                           <option value="">-- Select Vacant Room to Add --</option>
                           {roomsList
@@ -2095,7 +2095,7 @@ export default function AdminPortalPage() {
                         <select
                           value={editingGrc.mealPlan || "EP"}
                           onChange={(e) => setEditingGrc({ ...editingGrc, mealPlan: e.target.value })}
-                          className="w-full h-10 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white text-xs font-semibold focus:border-blue-500 focus:outline-none"
+                          className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                         >
                           <option value="EP">EP (Room Only)</option>
                           <option value="CP">CP (Breakfast)</option>
@@ -2113,7 +2113,7 @@ export default function AdminPortalPage() {
                           placeholder="e.g. 2"
                           value={editingGrc.adults || "2"}
                           onChange={(e) => setEditingGrc({ ...editingGrc, adults: e.target.value })}
-                          className="w-full h-10 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white font-mono text-xs focus:border-blue-500 focus:outline-none font-bold"
+                          className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-bold"
                         />
                       </div>
 
@@ -2125,7 +2125,7 @@ export default function AdminPortalPage() {
                           min="0"
                           value={editingGrc.paxM || ""}
                           onChange={(e) => setEditingGrc({ ...editingGrc, paxM: e.target.value })}
-                          className="w-full h-10 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white font-mono text-xs focus:border-blue-500 focus:outline-none"
+                          className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                         />
                       </div>
 
@@ -2137,7 +2137,7 @@ export default function AdminPortalPage() {
                           min="0"
                           value={editingGrc.paxF || ""}
                           onChange={(e) => setEditingGrc({ ...editingGrc, paxF: e.target.value })}
-                          className="w-full h-10 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white font-mono text-xs focus:border-blue-500 focus:outline-none"
+                          className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                         />
                       </div>
 
@@ -2149,7 +2149,7 @@ export default function AdminPortalPage() {
                           min="0"
                           value={editingGrc.children || "0"}
                           onChange={(e) => setEditingGrc({ ...editingGrc, children: e.target.value })}
-                          className="w-full h-10 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white font-mono text-xs focus:border-blue-500 focus:outline-none"
+                          className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                         />
                       </div>
                     </div>
@@ -2243,7 +2243,7 @@ export default function AdminPortalPage() {
                           placeholder="e.g. 9864341211"
                           value={editingGrc.mobilePhone || ""}
                           onChange={(e) => setEditingGrc({ ...editingGrc, mobilePhone: e.target.value })}
-                          className="w-full h-10 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white font-mono text-xs font-bold focus:border-blue-500 focus:outline-none"
+                          className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                         />
                       </div>
 
@@ -2252,7 +2252,7 @@ export default function AdminPortalPage() {
                         <select
                           value={editingGrc.title || "Mr."}
                           onChange={(e) => setEditingGrc({ ...editingGrc, title: e.target.value })}
-                          className="w-full h-10 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white text-xs font-semibold focus:border-blue-500 focus:outline-none"
+                          className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                         >
                           <option value="Mr.">Mr.</option>
                           <option value="Mrs.">Mrs.</option>
@@ -2270,7 +2270,7 @@ export default function AdminPortalPage() {
                           placeholder="e.g. Suman Roy, Vikash Kumar"
                           value={editingGrc.fullName || ""}
                           onChange={(e) => setEditingGrc({ ...editingGrc, fullName: e.target.value.toUpperCase() })}
-                          className="w-full h-10 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white font-bold text-xs focus:border-blue-500 focus:outline-none"
+                          className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-bold text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                         />
                       </div>
 
@@ -2281,7 +2281,7 @@ export default function AdminPortalPage() {
                           placeholder="S/O, D/O, W/O"
                           value={editingGrc.fatherSpouseName || ""}
                           onChange={(e) => setEditingGrc({ ...editingGrc, fatherSpouseName: e.target.value.toUpperCase() })}
-                          className="w-full h-10 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white text-xs focus:border-blue-500 focus:outline-none"
+                          className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                         />
                       </div>
 
@@ -2292,7 +2292,7 @@ export default function AdminPortalPage() {
                           placeholder="Optional phone"
                           value={editingGrc.alternatePhone || ""}
                           onChange={(e) => setEditingGrc({ ...editingGrc, alternatePhone: e.target.value })}
-                          className="w-full h-10 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white font-mono text-xs focus:border-blue-500 focus:outline-none"
+                          className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                         />
                       </div>
 
@@ -2305,7 +2305,7 @@ export default function AdminPortalPage() {
                           placeholder="Age"
                           value={editingGrc.age || ""}
                           onChange={(e) => setEditingGrc({ ...editingGrc, age: e.target.value })}
-                          className="w-full h-10 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white font-mono text-xs focus:border-blue-500 focus:outline-none"
+                          className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                         />
                       </div>
 
@@ -2314,7 +2314,7 @@ export default function AdminPortalPage() {
                         <select
                           value={editingGrc.gender || "Male"}
                           onChange={(e) => setEditingGrc({ ...editingGrc, gender: e.target.value })}
-                          className="w-full h-10 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white text-xs focus:border-blue-500 focus:outline-none"
+                          className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                         >
                           <option value="Male">Male</option>
                           <option value="Female">Female</option>
@@ -2336,7 +2336,7 @@ export default function AdminPortalPage() {
                               idDocumentType: val === "Indian" ? "AADHAAR" : "PASSPORT",
                             });
                           }}
-                          className="w-full h-10 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white text-xs font-semibold focus:border-blue-500 focus:outline-none"
+                          className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                         >
                           <option value="Indian">Indian</option>
                           <option value="Foreign">Foreign</option>
@@ -2350,7 +2350,7 @@ export default function AdminPortalPage() {
                           placeholder="guest@example.com"
                           value={editingGrc.email || ""}
                           onChange={(e) => setEditingGrc({ ...editingGrc, email: e.target.value })}
-                          className="w-full h-10 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white text-xs focus:border-blue-500 focus:outline-none"
+                          className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                         />
                       </div>
 
@@ -2361,7 +2361,7 @@ export default function AdminPortalPage() {
                           placeholder="e.g. Business Executive"
                           value={editingGrc.profession || ""}
                           onChange={(e) => setEditingGrc({ ...editingGrc, profession: e.target.value })}
-                          className="w-full h-10 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white text-xs focus:border-blue-500 focus:outline-none"
+                          className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                         />
                       </div>
                     </div>
@@ -2400,7 +2400,7 @@ export default function AdminPortalPage() {
                                 foreignDetails: { ...(editingGrc.foreignDetails || {}), countryOfCitizenship: val },
                               });
                             }}
-                            className="w-full h-10 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white text-xs focus:border-blue-500 focus:outline-none"
+                            className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                           />
                         </div>
 
@@ -2419,7 +2419,7 @@ export default function AdminPortalPage() {
                                 foreignDetails: { ...(editingGrc.foreignDetails || {}), passportNo: e.target.value },
                               })
                             }
-                            className="w-full h-10 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white font-mono font-bold text-xs focus:border-blue-500 focus:outline-none"
+                            className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono font-bold text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                           />
                         </div>
 
@@ -2438,7 +2438,7 @@ export default function AdminPortalPage() {
                                 foreignDetails: { ...(editingGrc.foreignDetails || {}), datePlaceOfIssue: e.target.value },
                               })
                             }
-                            className="w-full h-10 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white text-xs focus:border-blue-500 focus:outline-none"
+                            className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                           />
                         </div>
 
@@ -2457,7 +2457,7 @@ export default function AdminPortalPage() {
                                 foreignDetails: { ...(editingGrc.foreignDetails || {}), restrictedPermitNo: e.target.value },
                               })
                             }
-                            className="w-full h-10 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white font-mono text-xs focus:border-blue-500 focus:outline-none"
+                            className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                           />
                         </div>
 
@@ -2475,7 +2475,7 @@ export default function AdminPortalPage() {
                                 foreignDetails: { ...(editingGrc.foreignDetails || {}), dateOfArrivalInIndia: e.target.value },
                               })
                             }
-                            className="w-full h-10 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white font-mono text-xs focus:border-blue-500 focus:outline-none"
+                            className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                           />
                         </div>
 
@@ -2493,7 +2493,7 @@ export default function AdminPortalPage() {
                                 foreignDetails: { ...(editingGrc.foreignDetails || {}), portOfEntry: e.target.value },
                               })
                             }
-                            className="w-full h-10 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white text-xs focus:border-blue-500 focus:outline-none"
+                            className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                           />
                         </div>
 
@@ -2512,7 +2512,7 @@ export default function AdminPortalPage() {
                                 foreignDetails: { ...(editingGrc.foreignDetails || {}), proposedDurationOfStay: e.target.value },
                               })
                             }
-                            className="w-full h-10 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white font-mono text-xs focus:border-blue-500 focus:outline-none"
+                            className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                           />
                         </div>
 
@@ -2528,7 +2528,7 @@ export default function AdminPortalPage() {
                                 foreignDetails: { ...(editingGrc.foreignDetails || {}), employedInIndia: e.target.value },
                               })
                             }
-                            className="w-full h-10 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white text-xs font-semibold focus:border-blue-500 focus:outline-none"
+                            className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                           >
                             <option value="No">No</option>
                             <option value="Yes">Yes</option>
@@ -2549,7 +2549,7 @@ export default function AdminPortalPage() {
                                 foreignDetails: { ...(editingGrc.foreignDetails || {}), nextDestination: e.target.value },
                               })
                             }
-                            className="w-full h-10 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white text-xs focus:border-blue-500 focus:outline-none"
+                            className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                           />
                         </div>
                       </div>
@@ -2573,7 +2573,7 @@ export default function AdminPortalPage() {
                           placeholder="Flat / Building / Road / Locality"
                           value={editingGrc.streetAddress || ""}
                           onChange={(e) => setEditingGrc({ ...editingGrc, streetAddress: e.target.value.toUpperCase() })}
-                          className="w-full h-10 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white text-xs focus:border-blue-500 focus:outline-none"
+                          className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                         />
                       </div>
 
@@ -2584,7 +2584,7 @@ export default function AdminPortalPage() {
                           placeholder="Local P.S."
                           value={editingGrc.policeStation || ""}
                           onChange={(e) => setEditingGrc({ ...editingGrc, policeStation: e.target.value.toUpperCase() })}
-                          className="w-full h-10 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white text-xs focus:border-blue-500 focus:outline-none"
+                          className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                         />
                       </div>
 
@@ -2595,7 +2595,7 @@ export default function AdminPortalPage() {
                           placeholder="e.g. Guwahati / Kolkata"
                           value={editingGrc.city || ""}
                           onChange={(e) => setEditingGrc({ ...editingGrc, city: e.target.value.toUpperCase() })}
-                          className="w-full h-10 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white text-xs focus:border-blue-500 focus:outline-none"
+                          className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                         />
                       </div>
 
@@ -2606,7 +2606,7 @@ export default function AdminPortalPage() {
                           placeholder="e.g. Assam"
                           value={editingGrc.state || ""}
                           onChange={(e) => setEditingGrc({ ...editingGrc, state: e.target.value.toUpperCase() })}
-                          className="w-full h-10 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white text-xs focus:border-blue-500 focus:outline-none"
+                          className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                         />
                       </div>
 
@@ -2617,7 +2617,7 @@ export default function AdminPortalPage() {
                           placeholder="e.g. 781008"
                           value={editingGrc.pinZipCode || ""}
                           onChange={(e) => setEditingGrc({ ...editingGrc, pinZipCode: e.target.value })}
-                          className="w-full h-10 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white font-mono text-xs focus:border-blue-500 focus:outline-none"
+                          className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                         />
                       </div>
 
@@ -2628,7 +2628,7 @@ export default function AdminPortalPage() {
                           placeholder="e.g. India"
                           value={editingGrc.country || "India"}
                           onChange={(e) => setEditingGrc({ ...editingGrc, country: e.target.value })}
-                          className="w-full h-10 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white text-xs focus:border-blue-500 focus:outline-none"
+                          className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                         />
                       </div>
                     </div>
@@ -2651,7 +2651,7 @@ export default function AdminPortalPage() {
                           placeholder="e.g. Kolkata, Delhi"
                           value={editingGrc.arrivedFrom || ""}
                           onChange={(e) => setEditingGrc({ ...editingGrc, arrivedFrom: e.target.value.toUpperCase() })}
-                          className="w-full h-10 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white text-xs focus:border-blue-500 focus:outline-none"
+                          className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                         />
                       </div>
 
@@ -2662,7 +2662,7 @@ export default function AdminPortalPage() {
                           placeholder="e.g. Shillong, Home"
                           value={editingGrc.goingTo || ""}
                           onChange={(e) => setEditingGrc({ ...editingGrc, goingTo: e.target.value.toUpperCase() })}
-                          className="w-full h-10 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white text-xs focus:border-blue-500 focus:outline-none"
+                          className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                         />
                       </div>
 
@@ -2671,7 +2671,7 @@ export default function AdminPortalPage() {
                         <select
                           value={editingGrc.purposeOfVisit || "Tourism / Holiday"}
                           onChange={(e) => setEditingGrc({ ...editingGrc, purposeOfVisit: e.target.value })}
-                          className="w-full h-10 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white text-xs focus:border-blue-500 focus:outline-none cursor-pointer font-medium"
+                          className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer font-medium"
                         >
                           {PURPOSE_OF_VISIT_OPTIONS.map((opt) => (
                             <option key={opt.id} value={opt.label}>
@@ -2688,7 +2688,7 @@ export default function AdminPortalPage() {
                           placeholder="e.g. AS 01 EX 1234"
                           value={editingGrc.vehicleNumber || ""}
                           onChange={(e) => setEditingGrc({ ...editingGrc, vehicleNumber: e.target.value.toUpperCase() })}
-                          className="w-full h-10 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white font-mono text-xs focus:border-blue-500 focus:outline-none"
+                          className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                         />
                       </div>
 
@@ -2697,7 +2697,7 @@ export default function AdminPortalPage() {
                         <select
                           value={editingGrc.idDocumentType || "AADHAAR"}
                           onChange={(e) => setEditingGrc({ ...editingGrc, idDocumentType: e.target.value })}
-                          className="w-full h-10 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white text-xs font-semibold focus:border-blue-500 focus:outline-none cursor-pointer"
+                          className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer"
                         >
                           {ID_PROOF_TYPES.map((id) => (
                             <option key={id.id} value={id.id}>
@@ -2714,7 +2714,7 @@ export default function AdminPortalPage() {
                           placeholder="e.g. 4521 or full ID"
                           value={editingGrc.idDocumentNumber || ""}
                           onChange={(e) => setEditingGrc({ ...editingGrc, idDocumentNumber: e.target.value.toUpperCase() })}
-                          className="w-full h-10 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white font-mono text-xs focus:border-blue-500 focus:outline-none"
+                          className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                         />
                       </div>
 
@@ -2757,7 +2757,7 @@ export default function AdminPortalPage() {
                           placeholder="e.g. 18AAAAA0000A1Z5"
                           value={editingGrc.guestGstin || ""}
                           onChange={(e) => setEditingGrc({ ...editingGrc, guestGstin: e.target.value.toUpperCase() })}
-                          className="w-full h-10 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white font-mono text-xs focus:border-blue-500 focus:outline-none font-semibold"
+                          className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-semibold"
                         />
                       </div>
                     </div>
@@ -2799,7 +2799,7 @@ export default function AdminPortalPage() {
                                   updated[idx] = { ...updated[idx], name: e.target.value.toUpperCase() };
                                   setEditingGrc({ ...editingGrc, coGuests: updated });
                                 }}
-                                className="w-full h-9 px-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white text-xs font-semibold focus:border-blue-500 focus:outline-none"
+                                className="w-full h-9 px-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                               />
                             </div>
                             <div className="sm:col-span-2">
@@ -2812,7 +2812,7 @@ export default function AdminPortalPage() {
                                   updated[idx] = { ...updated[idx], age: e.target.value };
                                   setEditingGrc({ ...editingGrc, coGuests: updated });
                                 }}
-                                className="w-full h-9 px-2 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white font-mono text-xs focus:border-blue-500 focus:outline-none"
+                                className="w-full h-9 px-2 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                               />
                             </div>
                             <div className="sm:col-span-2">
@@ -2823,7 +2823,7 @@ export default function AdminPortalPage() {
                                   updated[idx] = { ...updated[idx], gender: e.target.value };
                                   setEditingGrc({ ...editingGrc, coGuests: updated });
                                 }}
-                                className="w-full h-9 px-2 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white text-xs focus:border-blue-500 focus:outline-none"
+                                className="w-full h-9 px-2 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                               >
                                 <option value="Male">Male</option>
                                 <option value="Female">Female</option>
@@ -2837,7 +2837,7 @@ export default function AdminPortalPage() {
                                   updated[idx] = { ...updated[idx], relation: e.target.value };
                                   setEditingGrc({ ...editingGrc, coGuests: updated });
                                 }}
-                                className="w-full h-9 px-2 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white text-xs focus:border-blue-500 focus:outline-none"
+                                className="w-full h-9 px-2 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                               >
                                 <option value="Spouse">Spouse</option>
                                 <option value="Child">Child</option>
@@ -2930,7 +2930,7 @@ export default function AdminPortalPage() {
                                 },
                               }));
                             }}
-                            className="w-full h-10 pl-7 pr-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-blue-700 dark:text-blue-400 font-mono font-bold text-sm focus:border-blue-500 focus:outline-none disabled:opacity-60 disabled:bg-zinc-100 dark:disabled:bg-zinc-800"
+                            className="w-full h-10 pl-7 pr-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-blue-700 dark:text-blue-400 font-mono font-bold text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all disabled:opacity-60 disabled:bg-zinc-100 dark:disabled:bg-zinc-800"
                           />
                         </div>
                       </div>
@@ -2986,7 +2986,7 @@ export default function AdminPortalPage() {
                                 advancePaymentMethod: val > 0 ? (editingGrc.advancePaymentMethod || "UPI") : "",
                               });
                             }}
-                            className="w-full h-10 pl-7 pr-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-emerald-700 dark:text-emerald-400 font-mono font-bold text-sm focus:border-emerald-500 focus:outline-none"
+                            className="w-full h-10 pl-7 pr-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-emerald-700 dark:text-emerald-400 font-mono font-bold text-sm focus:border-emerald-500 focus:outline-none"
                           />
                         </div>
                       </div>
@@ -2998,7 +2998,7 @@ export default function AdminPortalPage() {
                         <select
                           value={editingGrc.advancePaymentMethod || "UPI"}
                           onChange={(e) => setEditingGrc({ ...editingGrc, advancePaymentMethod: e.target.value })}
-                          className="w-full h-10 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white font-bold text-xs focus:border-blue-500 focus:outline-none"
+                          className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-bold text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                         >
                           <option value="UPI">UPI / QR Code</option>
                           <option value="CASH">Cash Drawer</option>
@@ -3018,7 +3018,7 @@ export default function AdminPortalPage() {
                           placeholder="e.g. UTR/98127391 or PO-2026"
                           value={editingGrc.transactionRef || ""}
                           onChange={(e) => setEditingGrc({ ...editingGrc, transactionRef: e.target.value.toUpperCase() })}
-                          className="w-full h-10 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white font-mono text-xs focus:border-blue-500 focus:outline-none"
+                          className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                         />
                       </div>
                     </div>
@@ -3112,7 +3112,7 @@ export default function AdminPortalPage() {
                         <select
                           value={editingGrc.status || "CHECKED_IN"}
                           onChange={(e) => setEditingGrc({ ...editingGrc, status: e.target.value })}
-                          className="w-full h-10 px-3.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs font-bold focus:border-blue-500 focus:outline-none"
+                          className="w-full h-10 px-3.5 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                         >
                           <option value="CHECKED_IN">CHECKED_IN (In-House / Active Stay)</option>
                           <option value="PENDING_REVIEW">PENDING_REVIEW (Digital Kiosk Submission)</option>
@@ -3321,7 +3321,7 @@ export default function AdminPortalPage() {
                                 prev.map((item) => (item.id === rt.id ? { ...item, basePrice: val } : item))
                               );
                             }}
-                            className="w-full h-9 pl-7 pr-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 font-mono font-black text-xs text-zinc-900 dark:text-white focus:border-blue-600 focus:outline-none"
+                            className="w-full h-9 pl-7 pr-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 font-mono font-black text-xs text-zinc-900 dark:text-white focus:border-blue-600 focus:outline-none"
                           />
                         </div>
                       </div>
@@ -3420,18 +3420,18 @@ export default function AdminPortalPage() {
           </div>
 
           {/* Rooms Table */}
-          <div className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-[#111114] overflow-hidden shadow-xs">
+          <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#111114] overflow-hidden shadow-xs">
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse text-xs">
-                <thead>
-                  <tr className="border-b border-zinc-200 dark:border-zinc-800 text-[10.5px] font-mono uppercase tracking-wider text-zinc-500 dark:text-zinc-400 bg-slate-50 dark:bg-zinc-900/80">
-                    <th className="py-3 px-4 font-bold">Room No</th>
-                    <th className="py-3 px-3 font-bold">Floor</th>
-                    <th className="py-3 px-3 font-bold">Category & Room Type</th>
-                    <th className="py-3 px-3 font-bold">Bedding</th>
-                    <th className="py-3 px-3 font-bold">Wing</th>
-                    <th className="py-3 px-3 font-bold">Live Status</th>
-                    <th className="py-3 px-4 font-bold text-right">Quick Edit</th>
+                <thead className="bg-zinc-50/90 dark:bg-zinc-900/90 text-zinc-500 dark:text-zinc-400 text-[11px] uppercase tracking-wider font-semibold border-b border-zinc-200 dark:border-zinc-800 sticky top-0 z-10 backdrop-blur-xs">
+                  <tr>
+                    <th className="px-4 py-3 font-semibold whitespace-nowrap">Room No</th>
+                    <th className="px-4 py-3 font-semibold whitespace-nowrap">Floor</th>
+                    <th className="px-4 py-3 font-semibold whitespace-nowrap">Category & Room Type</th>
+                    <th className="px-4 py-3 font-semibold whitespace-nowrap">Bedding</th>
+                    <th className="px-4 py-3 font-semibold whitespace-nowrap">Wing</th>
+                    <th className="px-4 py-3 font-semibold whitespace-nowrap">Live Status</th>
+                    <th className="px-4 py-3 font-semibold text-right whitespace-nowrap">Quick Edit</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/60 font-mono">
@@ -3844,29 +3844,29 @@ export default function AdminPortalPage() {
                   className="h-9 px-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 font-bold text-zinc-700 dark:text-zinc-300 focus:outline-none focus:border-blue-500 cursor-pointer"
                 >
                   <option value="ALL">All Payment Methods</option>
-                  <option value="CASH">💵 Cash Drawer</option>
-                  <option value="UPI">📱 UPI / QR</option>
-                  <option value="BANK_TRANSFER">🏦 Bank Transfer</option>
-                  <option value="CARD">💳 Card</option>
-                  <option value="CHEQUE">📝 Cheque</option>
+                  <option value="CASH">Cash Drawer</option>
+                  <option value="UPI">UPI / QR</option>
+                  <option value="BANK_TRANSFER">Bank Transfer</option>
+                  <option value="CARD">Card</option>
+                  <option value="CHEQUE">Cheque</option>
                 </select>
               </div>
             </div>
 
             {/* Expenses Table */}
-            <div className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-[#111114] overflow-hidden shadow-xs">
+            <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#111114] overflow-hidden shadow-xs">
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse text-xs">
-                  <thead>
-                    <tr className="border-b border-zinc-200 dark:border-zinc-800 text-[10.5px] font-mono uppercase tracking-wider text-zinc-500 dark:text-zinc-400 bg-slate-50 dark:bg-zinc-900/80">
-                      <th className="py-3 px-4 font-bold">Voucher No</th>
-                      <th className="py-3 px-3 font-bold">Date & Time</th>
-                      <th className="py-3 px-3 font-bold">Category</th>
-                      <th className="py-3 px-3 font-bold">Payee / Vendor</th>
-                      <th className="py-3 px-3 font-bold">Description & Reference</th>
-                      <th className="py-3 px-3 font-bold">Payment Method</th>
-                      <th className="py-3 px-3 font-bold text-right">Amount (₹)</th>
-                      <th className="py-3 px-4 font-bold text-right">Admin Actions</th>
+                  <thead className="bg-zinc-50/90 dark:bg-zinc-900/90 text-zinc-500 dark:text-zinc-400 text-[11px] uppercase tracking-wider font-semibold border-b border-zinc-200 dark:border-zinc-800 sticky top-0 z-10 backdrop-blur-xs">
+                    <tr>
+                      <th className="px-4 py-3 font-semibold whitespace-nowrap">Voucher No</th>
+                      <th className="px-4 py-3 font-semibold whitespace-nowrap">Date & Time</th>
+                      <th className="px-4 py-3 font-semibold whitespace-nowrap">Category</th>
+                      <th className="px-4 py-3 font-semibold whitespace-nowrap">Payee / Vendor</th>
+                      <th className="px-4 py-3 font-semibold whitespace-nowrap">Description & Reference</th>
+                      <th className="px-4 py-3 font-semibold whitespace-nowrap">Payment Method</th>
+                      <th className="px-4 py-3 font-semibold text-right whitespace-nowrap">Amount (₹)</th>
+                      <th className="px-4 py-3 font-semibold text-right whitespace-nowrap">Admin Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-zinc-200/60 dark:divide-zinc-800/60">

@@ -202,26 +202,26 @@ export default function DailyManagerAuditPage() {
           </div>
 
           {/* Quick Date Selector */}
-          <div className="flex items-center gap-1 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-1 shadow-xs">
+          <div className="flex items-center gap-1 bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-lg p-0.5 shadow-xs">
             <button
               onClick={() => handleDateShift(-1)}
-              className="p-1.5 rounded-xl hover:bg-zinc-200 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-400 transition cursor-pointer"
+              className="p-1.5 rounded-md hover:bg-zinc-200 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-400 transition cursor-pointer"
               title="Previous Day"
             >
-              <ChevronLeft className="h-4 w-4" />
+              <ChevronLeft className="h-3.5 w-3.5" />
             </button>
             <input
               type="date"
               value={selectedDate}
               onChange={(e) => setSelectedDate(e.target.value)}
-              className="bg-transparent text-xs font-mono font-bold px-2 py-1 text-zinc-900 dark:text-white focus:outline-none cursor-pointer"
+              className="bg-transparent text-xs font-mono font-medium px-2 py-1 text-zinc-900 dark:text-white focus:outline-none cursor-pointer"
             />
             <button
               onClick={() => handleDateShift(1)}
-              className="p-1.5 rounded-xl hover:bg-zinc-200 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-400 transition cursor-pointer"
+              className="p-1.5 rounded-md hover:bg-zinc-200 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-400 transition cursor-pointer"
               title="Next Day"
             >
-              <ChevronRight className="h-4 w-4" />
+              <ChevronRight className="h-3.5 w-3.5" />
             </button>
           </div>
 
@@ -627,9 +627,9 @@ export default function DailyManagerAuditPage() {
           </div>
 
           {/* 5. FULL DAY TRANSACTION AUDIT LEDGER */}
-          <div className="p-5 rounded-3xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-3.5">
+          <div className="p-5 rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-3.5">
             <div className="flex items-center justify-between">
-              <h3 className="text-xs font-bold text-zinc-900 dark:text-zinc-100 uppercase tracking-wider">
+              <h3 className="text-[11px] font-semibold text-zinc-900 dark:text-zinc-100 uppercase tracking-wider">
                 Full Audit Trail for {data.reportDate} (00:00 – 23:59)
               </h3>
               <span className="text-xs font-mono text-zinc-500">
@@ -637,21 +637,21 @@ export default function DailyManagerAuditPage() {
               </span>
             </div>
 
-            <div className="overflow-x-auto rounded-2xl border border-zinc-200 dark:border-zinc-800">
-              <table className="w-full text-left text-xs whitespace-nowrap">
-                <thead className="bg-zinc-50 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 uppercase font-mono text-[10.5px]">
+            <div className="overflow-x-auto rounded-xl border border-zinc-200 dark:border-zinc-800">
+              <table className="w-full text-left text-xs whitespace-nowrap border-collapse">
+                <thead className="bg-zinc-50/90 dark:bg-zinc-900/90 text-zinc-500 dark:text-zinc-400 text-[11px] uppercase tracking-wider font-semibold border-b border-zinc-200 dark:border-zinc-800 sticky top-0 z-10 backdrop-blur-xs">
                   <tr>
-                    <th className="px-3.5 py-2.5 font-bold">Time</th>
-                    <th className="px-3.5 py-2.5 font-bold">Type</th>
-                    <th className="px-3.5 py-2.5 font-bold">Description / Ref</th>
-                    <th className="px-3.5 py-2.5 font-bold">Method</th>
-                    <th className="px-3.5 py-2.5 font-bold text-right">Amount</th>
+                    <th className="px-4 py-3 font-semibold">Time</th>
+                    <th className="px-4 py-3 font-semibold">Type</th>
+                    <th className="px-4 py-3 font-semibold">Description / Ref</th>
+                    <th className="px-4 py-3 font-semibold">Method</th>
+                    <th className="px-4 py-3 font-semibold text-right">Amount</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800 font-mono">
+                <tbody className="divide-y divide-zinc-200/60 dark:divide-zinc-800/60">
                   {data.recentTransactions?.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="px-4 py-8 text-center text-zinc-400 font-sans">
+                      <td colSpan={5} className="px-4 py-12 text-center text-zinc-400 dark:text-zinc-500 font-sans">
                         No transactions recorded during this 12 AM – 12 AM cycle.
                       </td>
                     </tr>
@@ -659,25 +659,30 @@ export default function DailyManagerAuditPage() {
                     data.recentTransactions?.map((t: any, idx: number) => {
                       const isExpense = t.type === "EXPENSE";
                       return (
-                        <tr key={idx} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/40">
-                          <td className="px-3.5 py-2 text-zinc-500">{t.time}</td>
-                          <td className="px-3.5 py-2">
+                        <tr key={idx} className="hover:bg-zinc-50/80 dark:hover:bg-zinc-900/40 transition-colors">
+                          <td className="px-4 py-3 text-zinc-500 dark:text-zinc-400 font-mono text-[11px]">{t.time}</td>
+                          <td className="px-4 py-3">
                             <span
-                              className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${
+                              className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium border ${
                                 isExpense
-                                  ? "bg-rose-50 dark:bg-rose-950/50 text-rose-700 dark:text-rose-400 border border-rose-200 dark:border-rose-800"
-                                  : "bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-800"
+                                  ? "bg-rose-50/80 text-rose-700 border-rose-200/80 dark:bg-rose-950/40 dark:text-rose-400 dark:border-rose-900/50"
+                                  : "bg-blue-50/80 text-blue-700 border-blue-200/80 dark:bg-blue-950/40 dark:text-blue-400 dark:border-blue-900/50"
                               }`}
                             >
+                              <span
+                                className={`h-1.5 w-1.5 rounded-full ${
+                                  isExpense ? "bg-rose-500" : "bg-blue-500"
+                                }`}
+                              />
                               {t.type}
                             </span>
                           </td>
-                          <td className="px-3.5 py-2 text-zinc-900 dark:text-zinc-100 font-sans font-medium">
+                          <td className="px-4 py-3 text-zinc-900 dark:text-zinc-100 font-medium">
                             {t.description}
                           </td>
-                          <td className="px-3.5 py-2 text-zinc-600 dark:text-zinc-400">{t.method}</td>
+                          <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400 font-mono text-[11px]">{t.method}</td>
                           <td
-                            className={`px-3.5 py-2 text-right font-bold ${
+                            className={`px-4 py-3 text-right font-mono tabular-nums font-semibold ${
                               isExpense ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400"
                             }`}
                           >

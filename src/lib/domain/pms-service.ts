@@ -78,16 +78,9 @@ export function calculate24HrBillableDays(
   const { hour: arrHour } = getLocalHourMinute(arrivalAt);
   const isEarlyBird = arrHour >= 5 && arrHour < 11;
 
-  // Manager Waive Next Night (1440 mins = 24h waive)
-  if (gracePeriodMinutes >= 1440) {
-    return {
-      billableDays: 1,
-      hoursElapsed,
-      gracePeriodApplied: true,
-      isEarlyBird,
-      checkoutDeadlineText: "Standard 11 AM–12 PM (Next Night Waived)",
-    };
-  }
+  const isWaiveNextNight = gracePeriodMinutes >= 1440;
+  // If waiving next night, compute baseline nights without the 1440m grace
+  const effectiveGraceMinutes = isWaiveNextNight ? 0 : gracePeriodMinutes;
 
   // STANDARD 11:00 AM – 12:00 PM FIXED TIME BILLING (DEFAULT - TWO-WAY GRACE: EARLY CHECK-IN & LATE CHECKOUT):
   if (checkoutType === "FIXED_TIME" || !checkoutType) {
@@ -98,7 +91,7 @@ export function calculate24HrBillableDays(
     const arrNoon = new Date(arrDate);
     arrNoon.setHours(12, 0, 0, 0);
 
-    const graceMs = gracePeriodMinutes * 60 * 1000;
+    const graceMs = effectiveGraceMinutes * 60 * 1000;
     const earlyCheckInCutoffMs = arrNoon.getTime() - graceMs;
 
     let earlyNights = 0;
@@ -113,7 +106,7 @@ export function calculate24HrBillableDays(
         earlyGraceApplied = true;
       } else if (start >= earlyCheckInCutoffMs) {
         // Within early check-in grace window (e.g., 1-7h before 12 PM)
-        earlyGraceApplied = gracePeriodMinutes > 0;
+        earlyGraceApplied = effectiveGraceMinutes > 0;
       } else {
         // Arrived before early check-in grace cutoff (counts as prior night occupation)
         const earlyDiffMs = earlyCheckInCutoffMs - start;
@@ -129,7 +122,7 @@ export function calculate24HrBillableDays(
     // Operational Checkout Grace Buffer:
     // Hotels provide a standard 60-minute buffer (until 1:00 PM) for guests packing/settling bill at desk,
     // or the manager-selected grace period if greater.
-    const operationalGraceMinutes = Math.max(gracePeriodMinutes, 60);
+    const operationalGraceMinutes = Math.max(effectiveGraceMinutes, 60);
     const checkoutGraceMs = operationalGraceMinutes * 60 * 1000;
 
     let currentDeadlineMs = baseCheckoutNoon.getTime();
@@ -144,22 +137,40 @@ export function calculate24HrBillableDays(
       endDate.getTime() > currentDeadlineMs &&
       endDate.getTime() <= currentDeadlineMs + checkoutGraceMs;
 
-    const totalNights = Math.max(1, regularNights + earlyNights);
-    const graceApplied = earlyGraceApplied || lateGraceApplied;
+    const unWaivedNights = Math.max(1, regularNights + earlyNights);
 
-    const graceText =
-      gracePeriodMinutes > 0
-        ? ` • ${Math.round(gracePeriodMinutes / 60)}h Grace`
-        : lateGraceApplied
-        ? " • 1h Grace (Until 1:00 PM)"
-        : "";
+    let billableDays = unWaivedNights;
+    let graceApplied = earlyGraceApplied || lateGraceApplied;
+    let deadlineText = "";
+
+    if (isWaiveNextNight) {
+      if (unWaivedNights > 1) {
+        // Waive only the latest/next night
+        billableDays = unWaivedNights - 1;
+        graceApplied = true;
+        deadlineText = `Standard 11–12 PM (Next Night Waived • ${billableDays} of ${unWaivedNights} Billed)`;
+      } else {
+        // Not applicable when only 1 night stayed
+        billableDays = 1;
+        graceApplied = false;
+        deadlineText = "Standard 11–12 PM (Waive not applicable: 1 night stay)";
+      }
+    } else {
+      const graceText =
+        gracePeriodMinutes > 0
+          ? ` • ${Math.round(gracePeriodMinutes / 60)}h Grace`
+          : lateGraceApplied
+          ? " • 1h Grace (Until 1:00 PM)"
+          : "";
+      deadlineText = `Standard 11–12 PM Check-Out${graceText}`;
+    }
 
     return {
-      billableDays: totalNights,
+      billableDays,
       hoursElapsed,
       gracePeriodApplied: graceApplied,
-      isEarlyBird: isEarlyBird,
-      checkoutDeadlineText: `Standard 11–12 PM Check-Out${graceText}`,
+      isEarlyBird,
+      checkoutDeadlineText: deadlineText,
     };
   }
 
@@ -167,35 +178,216 @@ export function calculate24HrBillableDays(
   const completedBlocks = Math.floor(elapsedMinutes / (24 * 60));
   const remainderMinutes = elapsedMinutes % (24 * 60);
 
+  let unWaivedDays = 1;
+  let within24HrGrace = false;
+
   if (completedBlocks === 0) {
+    unWaivedDays = 1;
+  } else if (remainderMinutes <= effectiveGraceMinutes) {
+    unWaivedDays = completedBlocks;
+    within24HrGrace = effectiveGraceMinutes > 0;
+  } else {
+    unWaivedDays = completedBlocks + 1;
+  }
+
+  let billableDays = unWaivedDays;
+  let graceApplied = within24HrGrace;
+  let deadlineText = "";
+
+  if (isWaiveNextNight) {
+    if (unWaivedDays > 1) {
+      billableDays = unWaivedDays - 1;
+      graceApplied = true;
+      deadlineText = `24-Hr Cycle (Next Night Waived • ${billableDays} of ${unWaivedDays} Billed)`;
+    } else {
+      billableDays = 1;
+      graceApplied = false;
+      deadlineText = "24-Hr Cycle (Waive not applicable: 1 night stay)";
+    }
+  } else {
+    graceApplied = within24HrGrace;
+    deadlineText = effectiveGraceMinutes > 0
+      ? `24-Hr Cycle • ${Math.round(effectiveGraceMinutes / 60)}h Grace`
+      : completedBlocks > 0 && remainderMinutes > 0
+      ? "24-Hr Cycle (Rollover Billed)"
+      : "24-Hr Cycle Billing";
+  }
+
+  return {
+    billableDays,
+    hoursElapsed,
+    gracePeriodApplied: graceApplied,
+    isEarlyBird: false,
+    checkoutDeadlineText: deadlineText,
+  };
+}
+
+/**
+ * Calculates the dynamic departure date for a stay when a guest stays beyond the scheduled departure time.
+ * If the current time exceeds the scheduled departure (or passes checkout grace), the departure date
+ * automatically advances to match the guest's current active billing cycle / night.
+ * If the guest booked future nights in advance, the scheduled departure date is never reduced.
+ */
+export function calculateDynamicDepartureDate({
+  arrivalAt,
+  expectedDepartureAt,
+  checkoutType = "FIXED_TIME",
+  gracePeriodMinutes = 0,
+  now = new Date(),
+}: {
+  arrivalAt: Date | string;
+  expectedDepartureAt: Date | string;
+  checkoutType?: "24_HOURS" | "FIXED_TIME";
+  gracePeriodMinutes?: number;
+  now?: Date | string;
+}): {
+  effectiveDepartureAt: Date;
+  isExtended: boolean;
+  extensionNights: number;
+  originalDepartureAt: Date;
+  billableNights: number;
+} {
+  const arr = new Date(arrivalAt);
+  const origExp = new Date(expectedDepartureAt);
+  const currentTime = now ? new Date(now) : new Date();
+
+  // If stay hasn't reached original expected departure, keep original
+  if (currentTime.getTime() <= origExp.getTime()) {
     return {
-      billableDays: 1,
-      hoursElapsed,
-      gracePeriodApplied: false,
-      isEarlyBird: false,
-      checkoutDeadlineText: "24-Hr Cycle Billing",
+      effectiveDepartureAt: origExp,
+      isExtended: false,
+      extensionNights: 0,
+      originalDepartureAt: origExp,
+      billableNights: 1,
     };
   }
 
-  // Past 24 hours: check grace period
-  if (remainderMinutes <= gracePeriodMinutes) {
+  const isWaiveNextNight = gracePeriodMinutes >= 1440;
+  const effectiveGraceMinutes = isWaiveNextNight ? 0 : gracePeriodMinutes;
+
+  if (checkoutType === "24_HOURS") {
+    const elapsedMinutes = Math.max(0, Math.round((currentTime.getTime() - arr.getTime()) / (1000 * 60)));
+    const completedBlocks = Math.floor(elapsedMinutes / (24 * 60));
+    const remainderMinutes = elapsedMinutes % (24 * 60);
+
+    let activeCycles = completedBlocks;
+    if (remainderMinutes > effectiveGraceMinutes) {
+      activeCycles = completedBlocks + 1;
+    }
+    const targetCycles = Math.max(1, activeCycles);
+    const dynamicDeadline = new Date(arr.getTime() + targetCycles * 24 * 60 * 60 * 1000);
+
+    const isExtended = dynamicDeadline.getTime() > origExp.getTime();
+    const extensionNights = isExtended
+      ? Math.max(1, Math.round((dynamicDeadline.getTime() - origExp.getTime()) / (24 * 60 * 60 * 1000)))
+      : 0;
+
     return {
-      billableDays: completedBlocks,
-      hoursElapsed,
-      gracePeriodApplied: gracePeriodMinutes > 0,
-      isEarlyBird: false,
-      checkoutDeadlineText: gracePeriodMinutes > 0 ? `24-Hr Cycle • ${Math.round(gracePeriodMinutes / 60)}h Grace` : "24-Hr Cycle Billing",
-    };
-  } else {
-    return {
-      billableDays: completedBlocks + 1,
-      hoursElapsed,
-      gracePeriodApplied: false,
-      isEarlyBird: false,
-      checkoutDeadlineText: "24-Hr Cycle (Rollover Billed)",
+      effectiveDepartureAt: isExtended ? dynamicDeadline : origExp,
+      isExtended,
+      extensionNights,
+      originalDepartureAt: origExp,
+      billableNights: targetCycles,
     };
   }
+
+  // Standard FIXED_TIME (11:00 AM – 12:00 PM check-out):
+  const arrDate = new Date(arr);
+  const baseCheckoutNoon = new Date(arrDate);
+  baseCheckoutNoon.setDate(baseCheckoutNoon.getDate() + 1);
+  baseCheckoutNoon.setHours(12, 0, 0, 0);
+
+  const operationalGraceMinutes = Math.max(effectiveGraceMinutes, 60);
+  const checkoutGraceMs = operationalGraceMinutes * 60 * 1000;
+
+  let currentDeadlineMs = baseCheckoutNoon.getTime();
+  let regularNights = 1;
+
+  while (currentTime.getTime() > currentDeadlineMs + checkoutGraceMs) {
+    regularNights++;
+    currentDeadlineMs += 24 * 60 * 60 * 1000;
+  }
+
+  // Preserve scheduled checkout time of day (or default to 11:00 AM)
+  const origHour = origExp.getHours();
+  const origMinute = origExp.getMinutes();
+  const targetHour = origHour === 0 && origMinute === 0 ? 11 : origHour;
+  const targetMinute = origHour === 0 && origMinute === 0 ? 0 : origMinute;
+
+  const dynamicDeadline = new Date(currentDeadlineMs);
+  dynamicDeadline.setHours(targetHour, targetMinute, 0, 0);
+
+  // If dynamic deadline (e.g. 11:00 AM) has already passed by more than checkoutGraceMs today, roll to next day
+  if (currentTime.getTime() > dynamicDeadline.getTime() + checkoutGraceMs) {
+    dynamicDeadline.setDate(dynamicDeadline.getDate() + 1);
+  }
+
+  const isExtended = dynamicDeadline.getTime() > origExp.getTime();
+  const extensionNights = isExtended
+    ? Math.max(1, Math.round((dynamicDeadline.getTime() - origExp.getTime()) / (24 * 60 * 60 * 1000)))
+    : 0;
+
+  return {
+    effectiveDepartureAt: isExtended ? dynamicDeadline : origExp,
+    isExtended,
+    extensionNights,
+    originalDepartureAt: origExp,
+    billableNights: regularNights,
+  };
 }
+
+/**
+ * Resolves the effective departure date for a Stay record, automatically parsing room assignments
+ * for rate handling and grace periods if present.
+ */
+export function getEffectiveStayDeparture(
+  stay: {
+    arrivalAt: Date | string;
+    expectedDepartureAt: Date | string;
+    actualDepartureAt?: Date | string | null;
+    status?: string;
+    roomAssignments?: any[];
+  },
+  now: Date = new Date()
+) {
+  if (stay.status !== "IN_HOUSE" || stay.actualDepartureAt) {
+    const dep = stay.actualDepartureAt || stay.expectedDepartureAt;
+    return {
+      effectiveDepartureAt: new Date(dep),
+      isExtended: false,
+      extensionNights: 0,
+      originalDepartureAt: new Date(stay.expectedDepartureAt),
+      billableNights: 1,
+    };
+  }
+
+  let checkoutType: "24_HOURS" | "FIXED_TIME" = "FIXED_TIME";
+  let graceMinutes = 0;
+
+  const activeAssignment =
+    stay.roomAssignments?.find((a: any) => !a.endsAt) || stay.roomAssignments?.[0];
+
+  if (activeAssignment?.rateHandling) {
+    if (activeAssignment.rateHandling.includes("24_HOURS:")) {
+      checkoutType = "24_HOURS";
+      graceMinutes = Number(activeAssignment.rateHandling.split(":")[1]) || 0;
+    } else if (activeAssignment.rateHandling.includes("FIXED_TIME:")) {
+      checkoutType = "FIXED_TIME";
+      graceMinutes = Number(activeAssignment.rateHandling.split(":")[1]) || 0;
+    } else if (activeAssignment.rateHandling === "24_HOURS") {
+      checkoutType = "24_HOURS";
+    }
+  }
+
+  return calculateDynamicDepartureDate({
+    arrivalAt: stay.arrivalAt,
+    expectedDepartureAt: stay.expectedDepartureAt,
+    checkoutType,
+    gracePeriodMinutes: graceMinutes,
+    now,
+  });
+}
+
 
 export async function calculateAvailability(
   propertyId: string,

@@ -31,7 +31,7 @@ export const NAV_ITEMS: NavItem[] = [
     description: "Operational overview & live hotel KPIs",
   },
   {
-    label: "PMS & Front Desk",
+    label: "Front Desk",
     href: "/pms",
     icon: BedDouble,
     badge: "P",
@@ -45,14 +45,14 @@ export const NAV_ITEMS: NavItem[] = [
     description: "Room cleaning Kanban, tasks & inspections",
   },
   {
-    label: "Folio & Invoicing",
+    label: "Billing & Folio",
     href: "/billing",
     icon: Receipt,
     badge: "B",
     description: "Guest ledgers, tax invoices & charge posting",
   },
   {
-    label: "Corporate & Agents",
+    label: "Corporate B2B",
     href: "/companies",
     icon: Briefcase,
     badge: "24",
@@ -73,7 +73,7 @@ export const NAV_ITEMS: NavItem[] = [
     description: "Defect tickets, repairs & out-of-order blocks",
   },
   {
-    label: "Reports & Exports",
+    label: "Reports",
     href: "/reports",
     icon: BarChart3,
     badge: "R",
@@ -87,14 +87,14 @@ export const NAV_ITEMS: NavItem[] = [
     description: "Immutable compliance log of system operations",
   },
   {
-    label: "Master Admin & Editor",
+    label: "Admin Editor",
     href: "/admin",
     icon: SlidersHorizontal,
     badge: "ADM",
     description: "Password-protected database editor for Hotel, GRC, Rates & Rooms",
   },
   {
-    label: "Onboard Hotel",
+    label: "Onboarding",
     href: "/onboarding",
     icon: Building2,
     badge: "NEW",

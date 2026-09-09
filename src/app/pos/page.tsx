@@ -459,7 +459,7 @@ export default function POSPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] dark:bg-[#0c0c0e] text-zinc-900 dark:text-white p-3 sm:p-5 lg:p-6 space-y-4">
+    <div className="w-full max-w-[1600px] mx-auto text-zinc-900 dark:text-white space-y-4">
       
       {/* ========================================================================= */}
       {/* 1. TOP HEADER & LIVE STATUS BAR                                          */}
@@ -1226,55 +1226,58 @@ export default function POSPage() {
             </button>
           </div>
 
-          <div className="overflow-x-auto rounded-2xl border border-zinc-200 dark:border-zinc-800">
+          <div className="overflow-x-auto rounded-xl border border-zinc-200 dark:border-zinc-800">
             <table className="w-full text-left text-xs">
-              <thead className="bg-zinc-50 dark:bg-zinc-900 text-zinc-500 text-[11px] uppercase font-semibold border-b border-zinc-200 dark:border-zinc-800">
+              <thead className="bg-zinc-50/90 dark:bg-zinc-900/90 text-zinc-500 dark:text-zinc-400 text-[11px] uppercase font-semibold tracking-wider border-b border-zinc-200 dark:border-zinc-800">
                 <tr>
-                  <th className="py-2.5 px-3">KOT #</th>
-                  <th className="py-2.5 px-3">Time</th>
-                  <th className="py-2.5 px-3">Destination</th>
-                  <th className="py-2.5 px-3">Ordered Items</th>
-                  <th className="py-2.5 px-3">Status</th>
-                  <th className="py-2.5 px-3 text-right">Amount</th>
-                  <th className="py-2.5 px-3 text-right">Action</th>
+                  <th className="px-4 py-3">KOT #</th>
+                  <th className="px-4 py-3">Time</th>
+                  <th className="px-4 py-3">Destination</th>
+                  <th className="px-4 py-3">Ordered Items</th>
+                  <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3 text-right">Amount</th>
+                  <th className="px-4 py-3 text-right">Action</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
+              <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800/80">
                 {kotsList.map((kot) => (
-                  <tr key={kot.id} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-900/40 transition">
-                    <td className="py-2.5 px-3 font-mono font-bold text-orange-600 dark:text-orange-400">
+                  <tr key={kot.id} className="hover:bg-zinc-50/80 dark:hover:bg-zinc-900/40 transition">
+                    <td className="px-4 py-3 font-mono font-medium text-orange-600 dark:text-orange-400">
                       {kot.kotNo}
                     </td>
-                    <td className="py-2.5 px-3 text-zinc-500 font-mono text-[11px]">
+                    <td className="px-4 py-3 text-zinc-500 font-mono text-[11px]">
                       {new Date(kot.firedAt).toLocaleTimeString("en-GB")}
                     </td>
-                    <td className="py-2.5 px-3 font-bold text-zinc-900 dark:text-white">
+                    <td className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">
                       {kot.destinationTitle}
                     </td>
-                    <td className="py-2.5 px-3 text-zinc-700 dark:text-zinc-300">
-                      <span className="font-semibold">{kot.totalItemsCount} Items</span>
-                      <span className="text-[11px] text-zinc-400 ml-1.5">
+                    <td className="px-4 py-3 text-zinc-700 dark:text-zinc-300">
+                      <span className="font-medium">{kot.totalItemsCount} Items</span>
+                      <span className="text-[11px] text-zinc-400 ml-1.5 font-mono">
                         ({kot.lines.map((l: any) => `${l.name} ×${l.qty}`).join(", ")})
                       </span>
                     </td>
-                    <td className="py-2.5 px-3">
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                    <td className="px-4 py-3">
+                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium border ${
                         kot.status === "QUEUED"
-                          ? "bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-800"
+                          ? "bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800/50"
                           : kot.status === "PREPARING"
-                          ? "bg-blue-100 dark:bg-blue-950/60 text-blue-800 dark:text-blue-300 border border-blue-300 dark:border-blue-800"
-                          : "bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800"
+                          ? "bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800/50"
+                          : "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/50"
                       }`}>
-                        {kot.status}
+                        <span className={`h-1.5 w-1.5 rounded-full ${
+                          kot.status === "QUEUED" ? "bg-amber-500" : kot.status === "PREPARING" ? "bg-blue-500" : "bg-emerald-500"
+                        }`} />
+                        <span>{kot.status}</span>
                       </span>
                     </td>
-                    <td className="py-2.5 px-3 font-mono font-bold text-right">
+                    <td className="px-4 py-3 font-mono tabular-nums font-semibold text-right text-zinc-900 dark:text-zinc-100">
                       {formatINR(kot.totalAmount)}
                     </td>
-                    <td className="py-2.5 px-3 text-right">
+                    <td className="px-4 py-3 text-right">
                       <button
                         onClick={() => handleReprintKot(kot)}
-                        className="px-2.5 py-1 rounded-lg bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 font-bold text-[11px] transition inline-flex items-center gap-1 cursor-pointer"
+                        className="h-8 px-2.5 rounded-md bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 font-medium text-xs transition inline-flex items-center gap-1.5 cursor-pointer shadow-xs border border-zinc-200 dark:border-zinc-700"
                       >
                         <Printer className="h-3 w-3 text-zinc-500" />
                         <span>Print KOT</span>
@@ -1285,7 +1288,7 @@ export default function POSPage() {
 
                 {kotsList.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="p-8 text-center text-zinc-400">
+                    <td colSpan={7} className="px-4 py-12 text-center text-zinc-400">
                       No KOT tickets recorded yet.
                     </td>
                   </tr>
@@ -1301,11 +1304,11 @@ export default function POSPage() {
       {/* ========================================================================= */}
       {showCustomItemModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in">
-          <div className="w-full max-w-md rounded-3xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-[#121215] p-6 shadow-2xl space-y-4 text-zinc-900 dark:text-white">
+          <div className="w-full max-w-md rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121215] p-5 shadow-2xl space-y-4 text-zinc-900 dark:text-white">
             <div className="flex items-center justify-between pb-3 border-b border-zinc-200 dark:border-zinc-800">
               <div className="flex items-center gap-2">
-                <Plus className="h-5 w-5 text-orange-500" />
-                <h3 className="text-sm font-bold">Add Custom Off-Menu Dish</h3>
+                <Plus className="h-4.5 w-4.5 text-orange-500" />
+                <h3 className="text-sm font-semibold">Add Custom Off-Menu Dish</h3>
               </div>
               <button
                 onClick={() => setShowCustomItemModal(false)}
@@ -1315,53 +1318,53 @@ export default function POSPage() {
               </button>
             </div>
 
-            <form onSubmit={handleAddCustomItem} className="space-y-3.5">
-              <div>
-                <label className="text-xs font-bold block mb-1">Dish / Item Name *</label>
+            <form onSubmit={handleAddCustomItem} className="space-y-3.5 text-xs">
+              <div className="space-y-1">
+                <label className="text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider block">Dish / Item Name *</label>
                 <input
                   type="text"
                   required
                   placeholder="e.g. Special Assam Black Tea / Chef Custom Fish"
                   value={customItemForm.name}
                   onChange={(e) => setCustomItemForm({ ...customItemForm, name: e.target.value })}
-                  className="w-full h-10 px-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs font-semibold focus:outline-none focus:border-orange-500"
+                  className="w-full h-9 px-3 rounded-lg bg-white dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-zinc-100 font-medium placeholder:text-zinc-400 focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 focus:outline-none transition shadow-xs"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-bold block mb-1">Price (₹) *</label>
+                <div className="space-y-1">
+                  <label className="text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider block">Price (₹) *</label>
                   <input
                     type="number"
                     required
                     placeholder="250"
                     value={customItemForm.price}
                     onChange={(e) => setCustomItemForm({ ...customItemForm, price: e.target.value })}
-                    className="w-full h-10 px-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs font-mono font-bold focus:outline-none focus:border-orange-500"
+                    className="w-full h-9 px-3 rounded-lg bg-white dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 text-xs font-mono font-medium text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 focus:outline-none transition shadow-xs"
                   />
                 </div>
-                <div>
-                  <label className="text-xs font-bold block mb-1">Quantity</label>
+                <div className="space-y-1">
+                  <label className="text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider block">Quantity</label>
                   <input
                     type="number"
                     min="1"
                     value={customItemForm.qty}
                     onChange={(e) => setCustomItemForm({ ...customItemForm, qty: e.target.value })}
-                    className="w-full h-10 px-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs font-mono font-bold focus:outline-none focus:border-orange-500"
+                    className="w-full h-9 px-3 rounded-lg bg-white dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 text-xs font-mono font-medium text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 focus:outline-none transition shadow-xs"
                   />
                 </div>
               </div>
 
-              <div>
-                <label className="text-xs font-bold block mb-1">Dietary Type</label>
+              <div className="space-y-1">
+                <label className="text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider block">Dietary Type</label>
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
                     onClick={() => setCustomItemForm({ ...customItemForm, isVeg: true })}
-                    className={`flex-1 h-9 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer ${
+                    className={`flex-1 h-9 rounded-lg border text-xs font-medium flex items-center justify-center gap-1.5 cursor-pointer transition ${
                       customItemForm.isVeg
                         ? "bg-emerald-50 dark:bg-emerald-950/40 border-emerald-500 text-emerald-700 dark:text-emerald-300"
-                        : "bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-700 text-zinc-500"
+                        : "bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-500 hover:bg-zinc-50"
                     }`}
                   >
                     <span className="h-2 w-2 rounded-full bg-emerald-500"></span>
@@ -1370,10 +1373,10 @@ export default function POSPage() {
                   <button
                     type="button"
                     onClick={() => setCustomItemForm({ ...customItemForm, isVeg: false })}
-                    className={`flex-1 h-9 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer ${
+                    className={`flex-1 h-9 rounded-lg border text-xs font-medium flex items-center justify-center gap-1.5 cursor-pointer transition ${
                       !customItemForm.isVeg
                         ? "bg-rose-50 dark:bg-rose-950/40 border-rose-500 text-rose-700 dark:text-rose-300"
-                        : "bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-700 text-zinc-500"
+                        : "bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-500 hover:bg-zinc-50"
                     }`}
                   >
                     <span className="h-2 w-2 rounded-full bg-rose-500"></span>
@@ -1382,28 +1385,28 @@ export default function POSPage() {
                 </div>
               </div>
 
-              <div>
-                <label className="text-xs font-bold block mb-1">Kitchen Prep Notes (Optional)</label>
+              <div className="space-y-1">
+                <label className="text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider block">Kitchen Prep Notes (Optional)</label>
                 <input
                   type="text"
                   placeholder="e.g. Mild spice, no garlic"
                   value={customItemForm.notes}
                   onChange={(e) => setCustomItemForm({ ...customItemForm, notes: e.target.value })}
-                  className="w-full h-10 px-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs focus:outline-none focus:border-orange-500"
+                  className="w-full h-9 px-3 rounded-lg bg-white dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 focus:outline-none transition shadow-xs"
                 />
               </div>
 
-              <div className="flex justify-end gap-2 pt-2">
+              <div className="flex justify-end gap-2 pt-2 border-t border-zinc-200 dark:border-zinc-800">
                 <button
                   type="button"
                   onClick={() => setShowCustomItemModal(false)}
-                  className="h-10 px-4 rounded-xl text-xs font-bold text-zinc-500 hover:text-zinc-800"
+                  className="h-9 px-3.5 rounded-lg border border-zinc-200 dark:border-zinc-700 text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="h-10 px-5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs shadow-md"
+                  className="h-9 px-4 rounded-lg bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-100 dark:hover:bg-zinc-200 text-white dark:text-zinc-900 font-medium text-xs shadow-xs transition cursor-pointer"
                 >
                   Add to KOT
                 </button>
@@ -1418,10 +1421,10 @@ export default function POSPage() {
       {/* ========================================================================= */}
       {noteModalItem && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in">
-          <div className="w-full max-w-md rounded-3xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-[#121215] p-6 shadow-2xl space-y-4 text-zinc-900 dark:text-white">
+          <div className="w-full max-w-md rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121215] p-5 shadow-2xl space-y-4 text-zinc-900 dark:text-white">
             <div className="flex items-center justify-between pb-3 border-b border-zinc-200 dark:border-zinc-800">
               <div>
-                <h3 className="text-sm font-bold">Kitchen Instructions</h3>
+                <h3 className="text-sm font-semibold">Kitchen Instructions</h3>
                 <p className="text-xs text-zinc-500">{noteModalItem.name}</p>
               </div>
               <button
@@ -1444,7 +1447,7 @@ export default function POSPage() {
                       const next = current ? `${current}, ${preset}` : preset;
                       setNoteModalItem({ ...noteModalItem, notes: next });
                     }}
-                    className="px-2.5 py-1 rounded-lg bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 font-bold text-[11px] transition cursor-pointer"
+                    className="px-2.5 py-1 rounded-md bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 font-medium text-[11px] transition cursor-pointer border border-zinc-200/80 dark:border-zinc-700"
                   >
                     + {preset}
                   </button>
@@ -1456,15 +1459,15 @@ export default function POSPage() {
                 placeholder="Type custom note for the chef..."
                 value={noteModalItem.notes}
                 onChange={(e) => setNoteModalItem({ ...noteModalItem, notes: e.target.value })}
-                className="w-full p-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs focus:outline-none focus:border-orange-500 font-medium"
+                className="w-full p-3 rounded-lg bg-white dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 text-xs focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 focus:outline-none font-medium transition shadow-xs"
               />
             </div>
 
-            <div className="flex justify-end gap-2 pt-2">
+            <div className="flex justify-end gap-2 pt-2 border-t border-zinc-200 dark:border-zinc-800">
               <button
                 type="button"
                 onClick={() => setNoteModalItem(null)}
-                className="h-10 px-4 rounded-xl text-xs font-bold text-zinc-500 hover:text-zinc-800"
+                className="h-9 px-3.5 rounded-lg border border-zinc-200 dark:border-zinc-700 text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition cursor-pointer"
               >
                 Cancel
               </button>
@@ -1474,7 +1477,7 @@ export default function POSPage() {
                   setItemNotes(noteModalItem.id, noteModalItem.notes);
                   setNoteModalItem(null);
                 }}
-                className="h-10 px-5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs shadow-md"
+                className="h-9 px-4 rounded-lg bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-100 dark:hover:bg-zinc-200 text-white dark:text-zinc-900 font-medium text-xs shadow-xs transition cursor-pointer"
               >
                 Save Note
               </button>

@@ -460,7 +460,7 @@ export async function checkoutAndIssueInvoice({
   return { success: true, invoice, balance };
 }
 
-import { calculate24HrBillableDays } from "./pms-service";
+import { calculate24HrBillableDays, calculateDynamicDepartureDate } from "./pms-service";
 
 /**
  * Automatically evaluates 24-hour cycles and posts the next night's room charge
@@ -521,157 +521,256 @@ export async function sync24HourFolioCharges({
     };
   }
 
-  const activeAssignment = stay.roomAssignments[0];
-  const room = activeAssignment?.room;
-
-  // Determine agreed rate
-  let roomBasePrice = 3200;
-  let isComp = false;
-  let isRateInclusive = true;
-  if (activeAssignment?.rateHandling === "COMPLIMENTARY" || activeAssignment?.moveReason === "AGREED_RATE:0") {
-    roomBasePrice = 0;
-    isComp = true;
-  } else if (activeAssignment?.moveReason?.startsWith("AGREED_RATE:")) {
-    const parts = activeAssignment.moveReason.replace("AGREED_RATE:", "").split(":");
-    roomBasePrice = Number(parts[0]) || 3200;
-    if (parts[1] === "EXC") {
-      isRateInclusive = false;
-    }
+  const activeAssignments = stay.roomAssignments.filter((a: any) => !a.endsAt);
+  const assignmentsToProcess = activeAssignments.length > 0 ? activeAssignments : stay.roomAssignments;
+  if (assignmentsToProcess.length === 0) {
+    return {
+      billableNights: 1,
+      completedCycles: 0,
+      elapsedHours: "0.0",
+      isEarlyBird: false,
+      gracePeriodApplied: false,
+      checkoutDeadlineText: "Standard Billing",
+    };
   }
 
-  // Checkout Type & Grace Period (Default: Standard 11:00 AM - 12:00 PM Fixed Time, 0 grace)
-  let checkoutType: "24_HOURS" | "FIXED_TIME" = "FIXED_TIME";
-  let graceMinutes = 0;
-
-  if (overrideGraceMinutes !== undefined) {
-    graceMinutes = overrideGraceMinutes;
-  } else if (activeAssignment?.rateHandling?.includes("24_HOURS:")) {
-    checkoutType = "24_HOURS";
-    graceMinutes = Number(activeAssignment.rateHandling.split(":")[1]) || 0;
-  } else if (activeAssignment?.rateHandling?.includes("FIXED_TIME:")) {
-    checkoutType = "FIXED_TIME";
-    graceMinutes = Number(activeAssignment.rateHandling.split(":")[1]) || 0;
-  } else if (activeAssignment?.rateHandling === "FIXED_TIME") {
-    checkoutType = "FIXED_TIME";
-    graceMinutes = 0;
-  }
-
-  // Arrival timestamp
-  const arrivalTime = stay.arrivalAt ? new Date(stay.arrivalAt) : new Date(activeAssignment?.startsAt || Date.now());
+  const allRoomNumbers = assignmentsToProcess.map((a: any) => a.room?.number).filter(Boolean);
   const now = new Date();
-
-  // Elapsed duration
-  const elapsedMs = Math.max(0, now.getTime() - arrivalTime.getTime());
-  const elapsedHours = (elapsedMs / (1000 * 60 * 60)).toFixed(1);
-  const completedCycles = Math.floor(elapsedMs / (24 * 60 * 60 * 1000));
-  const remainingMinutes = Math.round(((elapsedMs / (1000 * 60 * 60)) % 24) * 60);
-
-  // Compute billable nights using domain engine (Early Bird + 24h + Grace Period)
-  const billableCalc = calculate24HrBillableDays(arrivalTime, now, checkoutType, graceMinutes);
-  const billableNights = billableCalc.billableDays;
-  const existingEntries = primaryWindow.entries || [];
-  const currentChargedNights = existingEntries.length;
   let folioMutated = false;
+  let primaryMetrics: any = null;
 
-  // 1. Synchronize any existing room tariff charges if the rate was adjusted
-  for (const entry of existingEntries) {
-    const isEntryComp = roomBasePrice === 0 || isComp;
-    const isPriceMismatched = isEntryComp
-      ? entry.totalAmount !== 0 || entry.unitAmount !== 0
-      : Math.abs(entry.unitAmount - roomBasePrice) > 0.01;
+  // Process each room assignment independently so multi-room group folios are accurately calculated
+  for (const assignment of assignmentsToProcess) {
+    const room = assignment.room;
+    const roomNo = room?.number;
 
-    if (isPriceMismatched) {
-      const gst = isEntryComp
-        ? { taxableAmount: 0, taxAmount: 0, totalAmount: 0, components: [] }
-        : calculateGST({
-            grossOrBaseAmount: roomBasePrice,
-            isInclusive: isRateInclusive,
-            sacHsn: "996311",
-            supplierStateCode: folio.property.stateCode || "18",
-            customTaxRate: 5,
-          });
-
-      await prisma.folioEntry.update({
-        where: { id: entry.id },
-        data: {
-          unitAmount: roomBasePrice,
-          taxableAmount: gst.taxableAmount,
-          taxComponentsJson: JSON.stringify(gst.components),
-          totalAmount: gst.totalAmount,
-        },
-      });
-      folioMutated = true;
+    // Determine agreed rate for this room
+    let roomBasePrice = 3200;
+    let isComp = false;
+    let isRateInclusive = true;
+    if (assignment.rateHandling === "COMPLIMENTARY" || assignment.moveReason === "AGREED_RATE:0") {
+      roomBasePrice = 0;
+      isComp = true;
+    } else if (assignment.moveReason?.startsWith("AGREED_RATE:")) {
+      const parts = assignment.moveReason.replace("AGREED_RATE:", "").split(":");
+      roomBasePrice = Number(parts[0]) || 3200;
+      if (parts[1] === "EXC") {
+        isRateInclusive = false;
+      }
     }
-  }
 
-  // 2. Post missing cycle room charges if billableNights > currentChargedNights
-  if (currentChargedNights < billableNights) {
-    for (let n = currentChargedNights + 1; n <= billableNights; n++) {
-      const cycleDate = new Date(arrivalTime.getTime() + (n - 1) * 24 * 60 * 60 * 1000)
-        .toISOString()
-        .split("T")[0];
+    // Checkout Type & Grace Period
+    let checkoutType: "24_HOURS" | "FIXED_TIME" = "FIXED_TIME";
+    let graceMinutes = 0;
 
-      const desc = isComp || roomBasePrice === 0
-        ? `Room Tariff - Room ${room?.number || "Stay"} (Night ${n} - COMPLIMENTARY)`
-        : billableCalc.isEarlyBird
-        ? `Room Tariff - Room ${room?.number || "Stay"} (Night ${n} - 12 PM Rollover)`
-        : `Room Tariff - Room ${room?.number || "Stay"} (Night ${n} - 24hr Cycle Rollover)`;
-
-      const gst = isComp || roomBasePrice === 0
-        ? { taxableAmount: 0, taxAmount: 0, totalAmount: 0, components: [] }
-        : calculateGST({
-            grossOrBaseAmount: roomBasePrice,
-            isInclusive: isRateInclusive,
-            sacHsn: "996311",
-            supplierStateCode: folio.property.stateCode || "18",
-            customTaxRate: 5,
-          });
-
-      await prisma.folioEntry.create({
-        data: {
-          organizationId: folio.organizationId,
-          propertyId: folio.propertyId,
-          folioId: folio.id,
-          folioWindowId: primaryWindow.id,
-          serviceDate: cycleDate,
-          type: "CHARGE",
-          chargeCode: "ROOM_TARIFF",
-          description: desc,
-          qty: 1,
-          unitAmount: roomBasePrice,
-          taxableAmount: gst.taxableAmount,
-          taxComponentsJson: JSON.stringify(gst.components),
-          totalAmount: gst.totalAmount,
-          sourceType: "PMS_24HR_AUTO_CHARGE",
-          status: "POSTED",
-        },
-      });
-
-      folioMutated = true;
+    if (overrideGraceMinutes !== undefined) {
+      graceMinutes = overrideGraceMinutes;
+    } else if (assignment.rateHandling?.includes("24_HOURS:")) {
+      checkoutType = "24_HOURS";
+      graceMinutes = Number(assignment.rateHandling.split(":")[1]) || 0;
+    } else if (assignment.rateHandling?.includes("FIXED_TIME:")) {
+      checkoutType = "FIXED_TIME";
+      graceMinutes = Number(assignment.rateHandling.split(":")[1]) || 0;
+    } else if (assignment.rateHandling === "FIXED_TIME") {
+      checkoutType = "FIXED_TIME";
+      graceMinutes = 0;
     }
-  }
 
-  // 3. Roll back excess charges if manager extended grace period or waived next night (billableNights < currentChargedNights)
-  if (currentChargedNights > billableNights) {
-    const excessCount = currentChargedNights - billableNights;
-    // Find auto-posted rollover charges ordered by most recent first
-    const autoEntries = await prisma.folioEntry.findMany({
-      where: {
-        folioId: folio.id,
-        chargeCode: "ROOM_TARIFF",
-        status: "POSTED",
-      },
-      orderBy: { createdAt: "desc" },
-      take: excessCount,
+    // Arrival timestamp for this room
+    const arrivalTime = stay.arrivalAt ? new Date(stay.arrivalAt) : new Date(assignment.startsAt || Date.now());
+
+    // Elapsed duration
+    const elapsedMs = Math.max(0, now.getTime() - arrivalTime.getTime());
+    const elapsedHours = (elapsedMs / (1000 * 60 * 60)).toFixed(1);
+    const completedCycles = Math.floor(elapsedMs / (24 * 60 * 60 * 1000));
+    const remainingMinutes = Math.round(((elapsedMs / (1000 * 60 * 60)) % 24) * 60);
+
+    // Compute billable nights using domain engine
+    const billableCalc = calculate24HrBillableDays(arrivalTime, now, checkoutType, graceMinutes);
+    const billableNights = billableCalc.billableDays;
+
+    // Filter existing entries belonging to this specific room
+    const otherRoomNumbers = allRoomNumbers.filter((r: any) => r !== roomNo);
+    const roomEntries = (primaryWindow.entries || []).filter((e: any) => {
+      if (!roomNo || roomNo === "Unassigned") return true;
+      const desc = e.description || "";
+      // If description explicitly mentions another room in the group, it's not this room
+      if (otherRoomNumbers.some((o: any) => new RegExp(`\\bRoom\\s*#?\\s*${o}\\b`, "i").test(desc))) {
+        return false;
+      }
+      // If description mentions this room, it belongs here
+      if (new RegExp(`\\bRoom\\s*#?\\s*${roomNo}\\b`, "i").test(desc)) {
+        return true;
+      }
+      // If only 1 room in stay, it belongs here
+      if (assignmentsToProcess.length === 1) return true;
+      return false;
     });
 
-    for (const e of autoEntries) {
-      await prisma.folioEntry.delete({ where: { id: e.id } });
-      folioMutated = true;
+    const currentChargedNights = roomEntries.length;
+
+    // Capture primary room metrics for return value
+    if (!primaryMetrics) {
+      primaryMetrics = {
+        billableNights,
+        completedCycles,
+        remainingMinutes,
+        graceMinutes,
+        elapsedHours,
+        isEarlyBird: billableCalc.isEarlyBird,
+        gracePeriodApplied: billableCalc.gracePeriodApplied,
+        checkoutDeadlineText: billableCalc.checkoutDeadlineText,
+      };
+    }
+
+    // 1. Synchronize any existing room tariff charges if the rate was adjusted
+    for (const entry of roomEntries) {
+      const isEntryComp = roomBasePrice === 0 || isComp;
+      const isPriceMismatched = isEntryComp
+        ? entry.totalAmount !== 0 || entry.unitAmount !== 0
+        : Math.abs(entry.unitAmount - roomBasePrice) > 0.01;
+
+      if (isPriceMismatched) {
+        const gst = isEntryComp
+          ? { taxableAmount: 0, taxAmount: 0, totalAmount: 0, components: [] }
+          : calculateGST({
+              grossOrBaseAmount: roomBasePrice,
+              isInclusive: isRateInclusive,
+              sacHsn: "996311",
+              supplierStateCode: folio.property.stateCode || "18",
+              customTaxRate: 5,
+            });
+
+        await prisma.folioEntry.update({
+          where: { id: entry.id },
+          data: {
+            unitAmount: roomBasePrice,
+            taxableAmount: gst.taxableAmount,
+            taxComponentsJson: JSON.stringify(gst.components),
+            totalAmount: gst.totalAmount,
+          },
+        });
+        folioMutated = true;
+      }
+    }
+
+    // 2. Post missing cycle room charges if billableNights > currentChargedNights for this room
+    if (currentChargedNights < billableNights) {
+      for (let n = currentChargedNights + 1; n <= billableNights; n++) {
+        const cycleDate = new Date(arrivalTime.getTime() + (n - 1) * 24 * 60 * 60 * 1000)
+          .toISOString()
+          .split("T")[0];
+
+        const desc = isComp || roomBasePrice === 0
+          ? `Room Tariff - Room ${room?.number || "Stay"} (Night ${n} - COMPLIMENTARY)`
+          : billableCalc.isEarlyBird
+          ? `Room Tariff - Room ${room?.number || "Stay"} (Night ${n} - 12 PM Rollover)`
+          : `Room Tariff - Room ${room?.number || "Stay"} (Night ${n} - 24hr Cycle Rollover)`;
+
+        const gst = isComp || roomBasePrice === 0
+          ? { taxableAmount: 0, taxAmount: 0, totalAmount: 0, components: [] }
+          : calculateGST({
+              grossOrBaseAmount: roomBasePrice,
+              isInclusive: isRateInclusive,
+              sacHsn: "996311",
+              supplierStateCode: folio.property.stateCode || "18",
+              customTaxRate: 5,
+            });
+
+        await prisma.folioEntry.create({
+          data: {
+            organizationId: folio.organizationId,
+            propertyId: folio.propertyId,
+            folioId: folio.id,
+            folioWindowId: primaryWindow.id,
+            serviceDate: cycleDate,
+            type: "CHARGE",
+            chargeCode: "ROOM_TARIFF",
+            description: desc,
+            qty: 1,
+            unitAmount: roomBasePrice,
+            taxableAmount: gst.taxableAmount,
+            taxComponentsJson: JSON.stringify(gst.components),
+            totalAmount: gst.totalAmount,
+            sourceType: "PMS_24HR_AUTO_CHARGE",
+            status: "POSTED",
+          },
+        });
+
+        folioMutated = true;
+      }
+    }
+
+    // 3. Roll back excess charges if manager extended grace period or waived next night (billableNights < currentChargedNights)
+    // CRITICAL: NEVER delete down to 0 nights! The 1st night of a stay is always preserved.
+    if (currentChargedNights > billableNights) {
+      const excessCount = currentChargedNights - billableNights;
+      // Sort newest to oldest so we remove only the latest night(s)
+      const sortedEntries = [...roomEntries].sort(
+        (a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+      // Guarantee the initial night of the stay is never deleted
+      const canDeleteCount = Math.min(excessCount, Math.max(0, roomEntries.length - 1));
+      const toDelete = sortedEntries.slice(0, canDeleteCount);
+
+      for (const e of toDelete) {
+        await prisma.folioEntry.delete({ where: { id: e.id } });
+        folioMutated = true;
+      }
     }
   }
 
-  // 4. Recalculate true balance if folio was mutated
+  // 4. Dynamically update stay expectedDepartureAt if the guest has stayed beyond expected time
+  let dynamicDepInfo: any = null;
+  if (stay.status === "IN_HOUSE" && assignmentsToProcess.length > 0) {
+    const firstAssignment = assignmentsToProcess[0];
+    let stayCheckoutType: "24_HOURS" | "FIXED_TIME" = "FIXED_TIME";
+    let stayGraceMinutes = 0;
+
+    if (overrideGraceMinutes !== undefined) {
+      stayGraceMinutes = overrideGraceMinutes;
+    } else if (firstAssignment?.rateHandling?.includes("24_HOURS:")) {
+      stayCheckoutType = "24_HOURS";
+      stayGraceMinutes = Number(firstAssignment.rateHandling.split(":")[1]) || 0;
+    } else if (firstAssignment?.rateHandling?.includes("FIXED_TIME:")) {
+      stayCheckoutType = "FIXED_TIME";
+      stayGraceMinutes = Number(firstAssignment.rateHandling.split(":")[1]) || 0;
+    } else if (firstAssignment?.rateHandling === "24_HOURS") {
+      stayCheckoutType = "24_HOURS";
+    }
+
+    const dynamicCalc = calculateDynamicDepartureDate({
+      arrivalAt: stay.arrivalAt,
+      expectedDepartureAt: stay.expectedDepartureAt,
+      checkoutType: stayCheckoutType,
+      gracePeriodMinutes: stayGraceMinutes,
+      now,
+    });
+
+    dynamicDepInfo = dynamicCalc;
+
+    if (
+      dynamicCalc.isExtended &&
+      dynamicCalc.effectiveDepartureAt.getTime() > new Date(stay.expectedDepartureAt).getTime()
+    ) {
+      await prisma.stay.update({
+        where: { id: stay.id },
+        data: {
+          expectedDepartureAt: dynamicCalc.effectiveDepartureAt,
+        },
+      });
+
+      // Synchronize linked guest registration departure date if any
+      await prisma.guestRegistration.updateMany({
+        where: { stayId: stay.id },
+        data: {
+          expectedDepartureDate: dynamicCalc.effectiveDepartureAt.toISOString().split("T")[0],
+        },
+      });
+    }
+  }
+
+  // 5. Recalculate true balance if folio was mutated
   if (folioMutated) {
     const allEntries = await prisma.folioEntry.findMany({
       where: { folioId: folio.id, status: "POSTED" },
@@ -690,16 +789,25 @@ export async function sync24HourFolioCharges({
     });
   }
 
-  return {
-    billableNights,
-    completedCycles,
-    remainingMinutes,
-    graceMinutes,
-    elapsedHours,
-    isEarlyBird: billableCalc.isEarlyBird,
-    gracePeriodApplied: billableCalc.gracePeriodApplied,
-    checkoutDeadlineText: billableCalc.checkoutDeadlineText,
+  const resultMetrics = primaryMetrics || {
+    billableNights: 1,
+    completedCycles: 0,
+    remainingMinutes: 0,
+    graceMinutes: 0,
+    elapsedHours: "0.0",
+    isEarlyBird: false,
+    gracePeriodApplied: false,
+    checkoutDeadlineText: "Standard Billing",
   };
+
+  if (dynamicDepInfo) {
+    resultMetrics.effectiveDepartureAt = dynamicDepInfo.effectiveDepartureAt;
+    resultMetrics.isExtendedDeparture = dynamicDepInfo.isExtended;
+    resultMetrics.extensionNights = dynamicDepInfo.extensionNights;
+    resultMetrics.originalDepartureAt = dynamicDepInfo.originalDepartureAt;
+  }
+
+  return resultMetrics;
 }
 
 export async function updateStayGracePeriod({

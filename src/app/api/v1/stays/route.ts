@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
+import { getEffectiveStayDeparture } from "@/lib/domain/pms-service";
 
 export async function GET(request: Request) {
   try {
@@ -74,6 +75,41 @@ export async function GET(request: Request) {
 
     const enrichedStays = await Promise.all(
       stays.map(async (stay) => {
+        let effectiveDepartureAt = stay.expectedDepartureAt;
+        let isExtendedDeparture = false;
+        let extensionNights = 0;
+        let originalExpectedDepartureAt = stay.expectedDepartureAt;
+
+        if (stay.status === "IN_HOUSE") {
+          const dynamicDep = getEffectiveStayDeparture(stay);
+          if (
+            dynamicDep.isExtended &&
+            dynamicDep.effectiveDepartureAt.getTime() > new Date(stay.expectedDepartureAt).getTime()
+          ) {
+            effectiveDepartureAt = dynamicDep.effectiveDepartureAt;
+            isExtendedDeparture = true;
+            extensionNights = dynamicDep.extensionNights;
+            originalExpectedDepartureAt = dynamicDep.originalDepartureAt;
+
+            // Auto-heal DB in background
+            prisma.stay
+              .update({
+                where: { id: stay.id },
+                data: { expectedDepartureAt: dynamicDep.effectiveDepartureAt },
+              })
+              .catch((err) => console.error("Auto-heal stay departure error:", err));
+
+            prisma.guestRegistration
+              .updateMany({
+                where: { stayId: stay.id },
+                data: {
+                  expectedDepartureDate: dynamicDep.effectiveDepartureAt.toISOString().split("T")[0],
+                },
+              })
+              .catch(() => {});
+          }
+        }
+
         const grc = await prisma.guestRegistration.findFirst({
           where: {
             OR: [
@@ -96,6 +132,10 @@ export async function GET(request: Request) {
 
         return {
           ...stay,
+          expectedDepartureAt: effectiveDepartureAt,
+          isExtendedDeparture,
+          extensionNights,
+          originalExpectedDepartureAt,
           guestRegistration: grc || null,
         };
       })

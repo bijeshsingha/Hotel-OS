@@ -56,34 +56,34 @@ export function StatCard({
   return (
     <div
       onClick={onClick}
-      className={`rounded-2xl border p-4 shadow-xs space-y-1.5 transition-all ${v.card} ${
+      className={`rounded-xl border p-4 shadow-xs space-y-1.5 transition-all ${v.card} ${
         onClick ? "cursor-pointer hover:shadow-md hover:border-blue-400 dark:hover:border-blue-500/50" : ""
       } ${className}`}
     >
       <div className="flex items-center justify-between gap-2">
-        <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider truncate">
+        <span className="text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider truncate">
           {label}
         </span>
         <div className="flex items-center gap-1.5 shrink-0">
           {badge && (
-            <span className="rounded-md px-1.5 py-0.5 text-[9.5px] font-bold font-mono bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300">
+            <span className="rounded-md px-1.5 py-0.5 text-[10px] font-medium font-mono bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300">
               {badge}
             </span>
           )}
           {Icon && (
-            <div className={`h-7 w-7 rounded-xl flex items-center justify-center ${v.iconBg}`}>
+            <div className={`h-7 w-7 rounded-lg flex items-center justify-center ${v.iconBg}`}>
               <Icon className="h-4 w-4" />
             </div>
           )}
         </div>
       </div>
 
-      <div className={`text-2xl font-bold font-mono tracking-tight ${v.text}`}>
+      <div className={`text-2xl font-bold font-mono tracking-tight tabular-nums ${v.text}`}>
         {value}
       </div>
 
       {subtext && (
-        <p className="text-[11.5px] text-zinc-500 truncate font-mono">
+        <p className="text-xs text-zinc-500 dark:text-zinc-400 truncate">
           {subtext}
         </p>
       )}

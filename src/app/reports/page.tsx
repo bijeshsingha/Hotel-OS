@@ -58,7 +58,7 @@ import { PageHeader, StatCard, SegmentedControl } from "@/components/ui";
 export default function ReportsPage() {
   const { activeProperty, refreshKey, refreshData } = useHotel();
   const [reportType, setReportType] = useState<
-    "ROOM_TRANSFERS" | "FINAL_BILLS" | "CASHIER_COLLECTIONS_EXPENSES" | "FRONT_OFFICE" | "REVENUE" | "FNB"
+    "ROOM_TRANSFERS" | "FINAL_BILLS" | "CASHIER_COLLECTIONS_EXPENSES" | "EXPENSES" | "FRONT_OFFICE" | "REVENUE" | "FNB"
   >("ROOM_TRANSFERS");
 
   // Date Filter State for 12 AM - 12 AM Cycle
@@ -71,6 +71,11 @@ export default function ReportsPage() {
   const [methodFilter, setMethodFilter] = useState<string>("ALL");
   const [categoryFilter, setCategoryFilter] = useState<string>("ALL");
   const [searchQuery, setSearchQuery] = useState("");
+
+  // Filters for Dedicated Expense Register Tab
+  const [expenseSearch, setExpenseSearch] = useState("");
+  const [expenseCategoryFilter, setExpenseCategoryFilter] = useState<string>("ALL");
+  const [expenseMethodFilter, setExpenseMethodFilter] = useState<string>("ALL");
 
   // Filters for Room Transfers Tab
   const [transferSearch, setTransferSearch] = useState("");
@@ -97,7 +102,9 @@ export default function ReportsPage() {
   const [snapshotLoading, setSnapshotLoading] = useState(false);
   const [snapshotMsg, setSnapshotMsg] = useState<string | null>(null);
   const [showAddExpenseModal, setShowAddExpenseModal] = useState(false);
+  const [showAddIncomeModal, setShowAddIncomeModal] = useState(false);
   const [showPrintModal, setShowPrintModal] = useState(false);
+  const [showExpensesPrintModal, setShowExpensesPrintModal] = useState(false);
   const [showTransfersPrintModal, setShowTransfersPrintModal] = useState(false);
   const [showFinalBillsPrintModal, setShowFinalBillsPrintModal] = useState(false);
   const [showKotPrintModal, setShowKotPrintModal] = useState(false);
@@ -119,6 +126,26 @@ export default function ReportsPage() {
   const [expenseSubmitting, setExpenseSubmitting] = useState(false);
   const [expenseError, setExpenseError] = useState<string | null>(null);
   const [expenseSuccess, setExpenseSuccess] = useState<string | null>(null);
+
+  // Add Direct Income Form state (Restaurant extra collections: Bar Food, Banquet Advance, Walk-In Dining)
+  const [incomeForm, setIncomeForm] = useState({
+    category: "BAR_FOOD_BILL",
+    payerName: "",
+    payerPhone: "",
+    amount: "",
+    paymentMethod: "CASH",
+    kotNo: "",
+    clientType: "INDIVIDUAL", // "INDIVIDUAL" | "COMPANY"
+    companyName: "",
+    gstin: "",
+    billingAddress: "",
+    eventDetails: "",
+    reference: "",
+    notes: "",
+  });
+  const [incomeSubmitting, setIncomeSubmitting] = useState(false);
+  const [incomeError, setIncomeError] = useState<string | null>(null);
+  const [incomeSuccess, setIncomeSuccess] = useState<string | null>(null);
 
   // Initialize selectedDate to activeProperty.businessDate
   useEffect(() => {
@@ -156,9 +183,12 @@ export default function ReportsPage() {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         setShowAddExpenseModal(false);
+        setShowAddIncomeModal(false);
         setShowPrintModal(false);
+        setShowExpensesPrintModal(false);
         setShowTransfersPrintModal(false);
         setShowFinalBillsPrintModal(false);
+        setShowKotPrintModal(false);
       }
     };
     window.addEventListener("keydown", handleKeyDown);
@@ -302,15 +332,166 @@ export default function ReportsPage() {
     }
   };
 
+  // Handle Add Direct Income Submit (Bar Food, Banquet, Walk-in Dining)
+  const handleAddIncomeSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!activeProperty) return;
+
+    // Validate Banquet requirements
+    if (incomeForm.category === "BANQUET_EVENT_ADVANCE") {
+      if (!incomeForm.payerName.trim()) {
+        setIncomeError("Guest / Client Contact Person name is mandatory for Banquet Advances.");
+        return;
+      }
+      if (!incomeForm.payerPhone.trim()) {
+        setIncomeError("Contact Mobile Number is mandatory for Banquet Advances.");
+        return;
+      }
+      if (incomeForm.clientType === "COMPANY" && !incomeForm.companyName.trim()) {
+        setIncomeError("Company Name is mandatory for Corporate Banquet bookings.");
+        return;
+      }
+    }
+
+    setIncomeSubmitting(true);
+    setIncomeError(null);
+    setIncomeSuccess(null);
+
+    try {
+      const res = await fetch("/api/v1/income", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          propertyId: activeProperty.id,
+          category: incomeForm.category,
+          payerName: incomeForm.payerName,
+          payerPhone: incomeForm.payerPhone,
+          amount: Number(incomeForm.amount),
+          paymentMethod: incomeForm.paymentMethod,
+          kotNo: incomeForm.kotNo,
+          clientType: incomeForm.clientType,
+          companyName: incomeForm.companyName,
+          gstin: incomeForm.gstin,
+          billingAddress: incomeForm.billingAddress,
+          eventDetails: incomeForm.eventDetails,
+          reference: incomeForm.reference,
+          notes: incomeForm.notes,
+          receivedAt: selectedDate ? new Date(`${selectedDate}T12:00:00Z`).toISOString() : undefined,
+          createdByName: "Front Desk Cashier",
+        }),
+      });
+
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || "Failed to record direct income");
+
+      setIncomeSuccess(`Direct collection recorded! Receipt: ${result.receiptNo}`);
+      setIncomeForm({
+        category: "BAR_FOOD_BILL",
+        payerName: "",
+        payerPhone: "",
+        amount: "",
+        paymentMethod: "CASH",
+        kotNo: "",
+        clientType: "INDIVIDUAL",
+        companyName: "",
+        gstin: "",
+        billingAddress: "",
+        eventDetails: "",
+        reference: "",
+        notes: "",
+      });
+
+      apiCache.invalidate("reports");
+      await loadReportData(true);
+      await refreshData();
+
+      setTimeout(() => {
+        setShowAddIncomeModal(false);
+        setIncomeSuccess(null);
+      }, 1800);
+    } catch (err: any) {
+      setIncomeError(err.message);
+    } finally {
+      setIncomeSubmitting(false);
+    }
+  };
+
+  // Filtered Expense Vouchers for Dedicated Expense Register Tab
+  const filteredExpenseVouchers = useMemo(() => {
+    const list: any[] = data?.expenses || [];
+    return list.filter((exp: any) => {
+      if (expenseCategoryFilter !== "ALL" && exp.category !== expenseCategoryFilter) return false;
+      if (expenseMethodFilter !== "ALL" && exp.method !== expenseMethodFilter) return false;
+      if (expenseSearch.trim()) {
+        const q = expenseSearch.toLowerCase().trim();
+        const vNo = (exp.voucherNo || "").toLowerCase();
+        const payee = (exp.payeeName || "").toLowerCase();
+        const desc = (exp.description || "").toLowerCase();
+        const ref = (exp.reference || "").toLowerCase();
+        const auth = (exp.authorizedBy || "").toLowerCase();
+        const cat = (exp.category || "").toLowerCase();
+        if (
+          !vNo.includes(q) &&
+          !payee.includes(q) &&
+          !desc.includes(q) &&
+          !ref.includes(q) &&
+          !auth.includes(q) &&
+          !cat.includes(q)
+        ) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }, [data?.expenses, expenseCategoryFilter, expenseMethodFilter, expenseSearch]);
+
+  // Dedicated Expense KPIs
+  const expenseKPIs = useMemo(() => {
+    const expenses: any[] = data?.expenses || [];
+    const totalOutflow = expenses.reduce((sum: number, e: any) => sum + (e.totalAmount || e.amount || 0), 0);
+    const cashOutflow = expenses
+      .filter((e: any) => e.method === "CASH")
+      .reduce((sum: number, e: any) => sum + (e.totalAmount || e.amount || 0), 0);
+    const upiOutflow = expenses
+      .filter((e: any) => e.method === "UPI")
+      .reduce((sum: number, e: any) => sum + (e.totalAmount || e.amount || 0), 0);
+    const bankOutflow = expenses
+      .filter((e: any) => e.method === "BANK_TRANSFER")
+      .reduce((sum: number, e: any) => sum + (e.totalAmount || e.amount || 0), 0);
+
+    const catMap: Record<string, number> = {};
+    expenses.forEach((e: any) => {
+      catMap[e.category] = (catMap[e.category] || 0) + (e.totalAmount || e.amount || 0);
+    });
+    let topCat = "None";
+    let topCatAmt = 0;
+    Object.entries(catMap).forEach(([cat, amt]) => {
+      if (amt > topCatAmt) {
+        topCat = cat;
+        topCatAmt = amt;
+      }
+    });
+
+    return {
+      totalOutflow,
+      totalCount: expenses.length,
+      cashOutflow,
+      upiOutflow,
+      bankOutflow,
+      topCategory: topCat.replace(/_/g, " "),
+      topCategoryAmount: topCatAmt,
+    };
+  }, [data?.expenses]);
+
   // Filtered Transactions for Cashier Report
   const filteredCashierTransactions = useMemo(() => {
     const list = data?.allTransactions || data?.recentTransactions || [];
     return list.filter((tx: any) => {
       if (flowFilter !== "ALL" && tx.flow !== flowFilter) return false;
       if (methodFilter === "ADVANCE") {
-        if (tx.sourceCategory !== "ADVANCE_DEPOSIT") return false;
+        if (tx.sourceCategory !== "ADVANCE_DEPOSIT" && tx.sourceCategory !== "BANQUET_ADVANCE") return false;
       } else if (methodFilter === "POS") {
-        if (tx.sourceCategory !== "POS_RESTAURANT") return false;
+        if (tx.sourceCategory !== "POS_RESTAURANT" && tx.sourceCategory !== "BAR_BEVERAGE" && tx.sourceCategory !== "MISC_OUTLET") return false;
       } else if (methodFilter === "OTA") {
         if (tx.sourceCategory !== "OTA_COLLECTION" && tx.method !== "OTA_VCC" && tx.method !== "DIRECT_BILL") return false;
       } else if (methodFilter === "FOLIO") {
@@ -756,11 +937,56 @@ export default function ReportsPage() {
     a.click();
   };
 
+  const exportExpensesCSV = () => {
+    if (!filteredExpenseVouchers.length) {
+      alert("No expense records to export for this view.");
+      return;
+    }
+    const headers = [
+      "Voucher No",
+      "Date",
+      "Time",
+      "Category",
+      "Payee / Vendor",
+      "Description",
+      "Net Amount (INR)",
+      "Tax Amount (INR)",
+      "Total Paid (INR)",
+      "Payment Mode",
+      "Reference",
+      "Status",
+      "Authorized By",
+    ];
+    const rows = filteredExpenseVouchers.map((e: any) => [
+      `"${e.voucherNo}"`,
+      `"${e.date}"`,
+      `"${e.time}"`,
+      `"${e.category}"`,
+      `"${(e.payeeName || "").replace(/"/g, '""')}"`,
+      `"${(e.description || "").replace(/"/g, '""')}"`,
+      e.amount,
+      e.taxAmount || 0,
+      e.totalAmount || e.amount,
+      `"${e.method}"`,
+      `"${(e.reference || "").replace(/"/g, '""')}"`,
+      `"${e.status}"`,
+      `"${(e.authorizedBy || "").replace(/"/g, '""')}"`,
+    ]);
+
+    const csvContent = [headers.join(","), ...rows.map((r: any[]) => r.join(","))].join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${activeProperty?.code || "HOTEL"}_Expenses_Register_${selectedDate || new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+  };
+
   const summary = data?.summary;
   const isToday = (selectedDate || activeProperty?.businessDate) === activeProperty?.businessDate;
 
   return (
-    <div className="space-y-4 max-w-[1700px] mx-auto w-full text-zinc-900 dark:text-zinc-100 pb-16 px-2 sm:px-4">
+    <div className="space-y-4 max-w-[1700px] mx-auto w-full text-zinc-900 dark:text-zinc-100 pb-16">
       {/* Top Banner */}
       <PageHeader
         title="Reports, Audits & Master Exports"
@@ -808,6 +1034,12 @@ export default function ReportsPage() {
             {reportType === "CASHIER_COLLECTIONS_EXPENSES" && (
               <>
                 <button
+                  onClick={() => setShowAddIncomeModal(true)}
+                  className="flex items-center gap-1.5 rounded-xl bg-emerald-50 border border-emerald-300 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:border-emerald-800/60 dark:hover:bg-emerald-900/50 px-3.5 py-2 text-xs font-semibold text-emerald-800 dark:text-emerald-300 transition shadow-xs cursor-pointer"
+                >
+                  <Plus className="h-4 w-4" /> Record Direct Income
+                </button>
+                <button
                   onClick={() => setShowAddExpenseModal(true)}
                   className="flex items-center gap-1.5 rounded-xl bg-rose-50 border border-rose-200 hover:bg-rose-100 dark:bg-rose-950/40 dark:border-rose-800/60 dark:hover:bg-rose-900/50 px-3.5 py-2 text-xs font-semibold text-rose-700 dark:text-rose-300 transition shadow-xs cursor-pointer"
                 >
@@ -828,8 +1060,37 @@ export default function ReportsPage() {
               </>
             )}
 
+            {reportType === "EXPENSES" && (
+              <>
+                <button
+                  onClick={() => setShowAddExpenseModal(true)}
+                  className="flex items-center gap-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white px-3.5 py-2 text-xs font-semibold transition shadow-xs cursor-pointer"
+                >
+                  <Plus className="h-4 w-4" /> Record Expense
+                </button>
+                <button
+                  onClick={() => setShowExpensesPrintModal(true)}
+                  className="flex items-center gap-1.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 border border-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 dark:border-zinc-700 px-3.5 py-2 text-xs font-semibold text-zinc-800 dark:text-zinc-200 transition shadow-xs cursor-pointer"
+                >
+                  <Printer className="h-4 w-4 text-zinc-500 dark:text-zinc-400" /> Print Expense Register
+                </button>
+                <button
+                  onClick={exportExpensesCSV}
+                  className="flex items-center gap-1.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-200 dark:text-zinc-950 px-4 py-2 text-xs font-semibold transition shadow-xs cursor-pointer"
+                >
+                  <Download className="h-4 w-4" /> Export Expenses CSV
+                </button>
+              </>
+            )}
+
             {reportType === "FNB" && (
               <>
+                <button
+                  onClick={() => setShowAddIncomeModal(true)}
+                  className="flex items-center gap-1.5 rounded-xl bg-emerald-50 border border-emerald-300 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:border-emerald-800/60 dark:hover:bg-emerald-900/50 px-3.5 py-2 text-xs font-semibold text-emerald-800 dark:text-emerald-300 transition shadow-xs cursor-pointer"
+                >
+                  <Plus className="h-4 w-4" /> Record Direct Income
+                </button>
                 <button
                   onClick={() => setShowKotPrintModal(true)}
                   className="flex items-center gap-1.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 border border-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 dark:border-zinc-700 px-3.5 py-2 text-xs font-semibold text-zinc-800 dark:text-zinc-200 transition shadow-xs cursor-pointer"
@@ -872,6 +1133,7 @@ export default function ReportsPage() {
             { value: "ROOM_TRANSFERS", label: "Room Transfers & Moves", icon: ArrowRightLeft },
             { value: "FINAL_BILLS", label: "Final Bills & Invoices", icon: Receipt },
             { value: "CASHIER_COLLECTIONS_EXPENSES", label: "Cashier Shift Sheet", icon: Wallet },
+            { value: "EXPENSES", label: "Expense Register", icon: ArrowUpRight },
             { value: "FRONT_OFFICE", label: "Front Desk Room Rack", icon: BedDouble },
             { value: "REVENUE", label: "Revenue & Tax Ledger", icon: TrendingUp },
             { value: "FNB", label: "Kitchen & Dining Collections", icon: UtensilsCrossed },
@@ -940,28 +1202,28 @@ export default function ReportsPage() {
           </div>
 
           {/* Filters Bar for Room Transfers */}
-          <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 p-3.5 rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs">
+          <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 p-3.5 rounded-xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs">
             {/* Search Box */}
             <div className="relative flex-1">
-              <Search className="h-4 w-4 absolute left-3 top-3 text-zinc-400" />
+              <Search className="h-4 w-4 absolute left-3 top-2.5 text-zinc-400 pointer-events-none" />
               <input
                 type="text"
                 placeholder="Search by Guest Name, Mobile, GRC #, From Room, To Room, Move Reason..."
                 value={transferSearch}
                 onChange={(e) => setTransferSearch(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 text-xs rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-zinc-900 dark:text-white"
+                className="w-full h-9 pl-9 pr-3 text-xs rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-zinc-900 dark:text-white placeholder:text-zinc-400 transition-all"
               />
             </div>
 
             {/* Filter Dropdowns */}
             <div className="flex items-center gap-2 flex-wrap">
               {/* Date Scope Filter */}
-              <div className="flex items-center gap-1.5 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 px-2.5 py-1.5 rounded-xl text-xs font-medium">
+              <div className="flex items-center gap-1.5 bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 px-2.5 h-9 rounded-lg text-xs font-medium">
                 <Calendar className="h-3.5 w-3.5 text-zinc-400" />
                 <select
                   value={transferDateRange}
                   onChange={(e: any) => setTransferDateRange(e.target.value)}
-                  className="bg-transparent border-none text-xs font-semibold focus:outline-none cursor-pointer"
+                  className="bg-transparent border-none text-xs font-medium text-zinc-900 dark:text-zinc-100 focus:outline-none cursor-pointer"
                 >
                   <option value="ALL_TIME">All Time</option>
                   <option value="TODAY">Today</option>
@@ -978,14 +1240,14 @@ export default function ReportsPage() {
                     type="date"
                     value={transferCustomStart}
                     onChange={(e) => setTransferCustomStart(e.target.value)}
-                    className="text-xs px-2.5 py-1.5 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 font-mono"
+                    className="text-xs h-9 px-2.5 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 font-mono text-zinc-900 dark:text-zinc-100"
                   />
                   <span className="text-zinc-400 text-xs">to</span>
                   <input
                     type="date"
                     value={transferCustomEnd}
                     onChange={(e) => setTransferCustomEnd(e.target.value)}
-                    className="text-xs px-2.5 py-1.5 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 font-mono"
+                    className="text-xs h-9 px-2.5 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 font-mono text-zinc-900 dark:text-zinc-100"
                   />
                 </div>
               )}
@@ -994,7 +1256,7 @@ export default function ReportsPage() {
               <select
                 value={transferRoomFilter}
                 onChange={(e) => setTransferRoomFilter(e.target.value)}
-                className="text-xs rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 px-3 py-2 font-medium cursor-pointer"
+                className="text-xs h-9 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 px-3 font-medium text-zinc-900 dark:text-zinc-100 cursor-pointer"
               >
                 <option value="ALL">All Rooms</option>
                 {allDistinctRooms.map((r) => (
@@ -1008,7 +1270,7 @@ export default function ReportsPage() {
               <select
                 value={transferStatusFilter}
                 onChange={(e: any) => setTransferStatusFilter(e.target.value)}
-                className="text-xs rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 px-3 py-2 font-medium cursor-pointer"
+                className="text-xs h-9 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 px-3 font-medium text-zinc-900 dark:text-zinc-100 cursor-pointer"
               >
                 <option value="ALL">All Statuses</option>
                 <option value="CURRENTLY_OCCUPIED">In-House Active</option>
@@ -1025,18 +1287,18 @@ export default function ReportsPage() {
                     setTransferCustomStart("");
                     setTransferCustomEnd("");
                   }}
-                  className="p-2 text-zinc-500 hover:text-zinc-900 dark:hover:text-white rounded-xl bg-zinc-100 dark:bg-zinc-800 text-xs cursor-pointer font-bold"
-                  title="Clear Filters"
+                  className="h-9 px-3 rounded-lg bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 font-medium text-xs flex items-center gap-1.5 transition cursor-pointer"
                 >
-                  Clear
+                  <X className="h-3.5 w-3.5" />
+                  <span>Clear Filters</span>
                 </button>
               )}
             </div>
           </div>
 
-          {/* Transfers Data Table */}
-          <div className="p-4 rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-3">
-            <div className="flex items-center justify-between pb-2 border-b border-zinc-200 dark:border-zinc-800 text-xs font-bold text-zinc-700 dark:text-zinc-300">
+          {/* Transfers Audit Table Card */}
+          <div className="p-4 sm:p-5 rounded-xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-3">
+            <div className="flex items-center justify-between pb-3 border-b border-zinc-200 dark:border-zinc-800 text-xs font-bold text-zinc-900 dark:text-zinc-100">
               <span className="flex items-center gap-2">
                 <ArrowRightLeft className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
                 <span>Room Transfer Audit Trail ({filteredTransfers.length} records)</span>
@@ -1046,21 +1308,21 @@ export default function ReportsPage() {
               </span>
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead>
-                  <tr className="border-b border-zinc-200 dark:border-zinc-800 text-[11px] font-bold text-zinc-400 uppercase font-mono">
-                    <th className="pb-2.5 whitespace-nowrap">Transfer Time</th>
-                    <th className="pb-2.5 whitespace-nowrap">GRC No.</th>
-                    <th className="pb-2.5 whitespace-nowrap">Primary Guest</th>
-                    <th className="pb-2.5 whitespace-nowrap">Transfer Route</th>
-                    <th className="pb-2.5 whitespace-nowrap">Duration in Old Room</th>
-                    <th className="pb-2.5 whitespace-nowrap">Move Reason & Rate</th>
-                    <th className="pb-2.5 whitespace-nowrap">Status</th>
-                    <th className="pb-2.5 text-right whitespace-nowrap">Actions</th>
+            <div className="overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-800">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead className="bg-zinc-50/90 dark:bg-zinc-900/90 text-zinc-500 dark:text-zinc-400 text-[11px] uppercase tracking-wider font-semibold border-b border-zinc-200 dark:border-zinc-800 sticky top-0 z-10 backdrop-blur-xs">
+                  <tr>
+                    <th className="px-4 py-3 font-semibold whitespace-nowrap">Transfer Time</th>
+                    <th className="px-4 py-3 font-semibold whitespace-nowrap">GRC No.</th>
+                    <th className="px-4 py-3 font-semibold whitespace-nowrap">Primary Guest</th>
+                    <th className="px-4 py-3 font-semibold whitespace-nowrap">Transfer Route</th>
+                    <th className="px-4 py-3 font-semibold whitespace-nowrap">Duration in Old Room</th>
+                    <th className="px-4 py-3 font-semibold whitespace-nowrap">Move Reason & Rate</th>
+                    <th className="px-4 py-3 font-semibold whitespace-nowrap">Status</th>
+                    <th className="px-4 py-3 font-semibold text-right whitespace-nowrap">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/60 font-mono">
+                <tbody className="divide-y divide-zinc-200/60 dark:divide-zinc-800/60 font-mono">
                   {filteredTransfers.length === 0 ? (
                     <tr>
                       <td colSpan={8} className="py-12 text-center text-zinc-500 font-sans">
@@ -1071,54 +1333,54 @@ export default function ReportsPage() {
                     </tr>
                   ) : (
                     filteredTransfers.map((t) => (
-                      <tr key={t.transferId} className="hover:bg-zinc-50 dark:hover:bg-zinc-900/50 transition">
-                        <td className="py-3 pr-2 text-zinc-800 dark:text-zinc-200 whitespace-nowrap">
-                          <span className="font-bold block font-sans text-xs">
+                      <tr key={t.transferId} className="hover:bg-zinc-50/80 dark:hover:bg-zinc-900/40 transition-colors">
+                        <td className="px-4 py-3 text-zinc-800 dark:text-zinc-200 whitespace-nowrap">
+                          <span className="font-semibold block font-sans text-xs text-zinc-900 dark:text-zinc-100">
                             {t.formattedDate || new Date(t.transferDate).toLocaleDateString()}
                           </span>
-                          <span className="text-[10px] text-zinc-400 font-mono">
+                          <span className="text-[10px] text-zinc-400 dark:text-zinc-500 font-mono">
                             {new Date(t.transferDate).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                           </span>
                         </td>
 
-                        <td className="py-3 pr-2 whitespace-nowrap">
-                          <span className="px-2 py-0.5 rounded-lg bg-blue-50 dark:bg-blue-950/50 border border-blue-200 dark:border-blue-800 text-blue-800 dark:text-blue-300 font-bold text-[11px]">
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-blue-50/80 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900/50 text-blue-700 dark:text-blue-300 font-semibold text-[11px]">
                             {t.grcNo}
                           </span>
                         </td>
 
-                        <td className="py-3 pr-2 whitespace-nowrap">
-                          <span className="font-bold font-sans text-zinc-900 dark:text-white block">
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <span className="font-medium font-sans text-zinc-900 dark:text-white block">
                             {t.guestName}
                           </span>
                           <span className="text-[11px] text-zinc-500 font-mono">
-                            📞 {t.phone}
+                            {t.phone}
                           </span>
                         </td>
 
-                        <td className="py-3 pr-2 whitespace-nowrap font-sans">
+                        <td className="px-4 py-3 whitespace-nowrap font-sans">
                           <div className="flex items-center gap-2">
-                            <div className="px-2.5 py-1 rounded-lg bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-800 dark:text-rose-300">
-                              <span className="font-bold font-mono text-xs">Room {t.fromRoomNumber}</span>
-                              <span className="block text-[10px] opacity-80">{t.fromRoomType}</span>
+                            <div className="px-2.5 py-1 rounded-md bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-800 dark:text-zinc-200">
+                              <span className="font-semibold font-mono text-xs">Room {t.fromRoomNumber}</span>
+                              <span className="block text-[10px] text-zinc-500">{t.fromRoomType}</span>
                             </div>
 
-                            <span className="text-zinc-400 font-bold">➔</span>
+                            <span className="text-zinc-400 font-bold">→</span>
 
-                            <div className="px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300">
-                              <span className="font-bold font-mono text-xs">Room {t.toRoomNumber}</span>
+                            <div className="px-2.5 py-1 rounded-md bg-emerald-50/80 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900/50 text-emerald-800 dark:text-emerald-300">
+                              <span className="font-semibold font-mono text-xs">Room {t.toRoomNumber}</span>
                               <span className="block text-[10px] opacity-80">{t.toRoomType}</span>
                             </div>
                           </div>
                         </td>
 
-                        <td className="py-3 pr-2 text-zinc-700 dark:text-zinc-300 font-medium whitespace-nowrap">
-                          <span className="px-2 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-xs font-mono">
-                            ⏱️ {t.durationText}
+                        <td className="px-4 py-3 text-zinc-700 dark:text-zinc-300 font-medium whitespace-nowrap">
+                          <span className="px-2 py-0.5 rounded-md bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-xs font-mono">
+                            {t.durationText}
                           </span>
                         </td>
 
-                        <td className="py-3 pr-2 font-sans max-w-xs">
+                        <td className="px-4 py-3 font-sans max-w-xs">
                           <p className="text-zinc-800 dark:text-zinc-200 font-medium text-xs truncate" title={t.moveReason}>
                             {t.moveReason}
                           </p>
@@ -1127,22 +1389,24 @@ export default function ReportsPage() {
                           </span>
                         </td>
 
-                        <td className="py-3 pr-2 whitespace-nowrap">
+                        <td className="px-4 py-3 whitespace-nowrap">
                           {t.currentRoomStatus === "CURRENTLY_OCCUPIED" ? (
-                            <span className="px-2.5 py-1 rounded-full bg-emerald-100 dark:bg-emerald-950 border border-emerald-300 dark:border-emerald-700 text-emerald-900 dark:text-emerald-200 font-bold text-[10px]">
-                              ● IN-HOUSE (ROOM {t.toRoomNumber})
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50/80 text-emerald-700 border border-emerald-200/80 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-900/50 font-medium text-[11px]">
+                              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                              IN-HOUSE (ROOM {t.toRoomNumber})
                             </span>
                           ) : (
-                            <span className="px-2.5 py-1 rounded-full bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 font-semibold text-[10px]">
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-zinc-100 text-zinc-700 border border-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:border-zinc-700 font-medium text-[11px]">
+                              <span className="h-1.5 w-1.5 rounded-full bg-zinc-400 dark:bg-zinc-500" />
                               CHECKED OUT
                             </span>
                           )}
                         </td>
 
-                        <td className="py-3 text-right whitespace-nowrap">
+                        <td className="px-4 py-3 text-right whitespace-nowrap">
                           <Link
                             href={`/billing?stayId=${t.stayId}`}
-                            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 border border-zinc-200 dark:border-zinc-700 font-bold text-[11px] text-zinc-800 dark:text-zinc-200 transition font-sans shadow-xs"
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 border border-zinc-200 dark:border-zinc-700 font-medium text-[11px] text-zinc-800 dark:text-zinc-200 transition font-sans shadow-xs"
                           >
                             <span>Open Folio</span>
                             <ExternalLink className="h-3 w-3" />
@@ -1226,28 +1490,28 @@ export default function ReportsPage() {
           </div>
 
           {/* Filters Bar for Final Bills */}
-          <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 p-3.5 rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs">
+          <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 p-3.5 rounded-xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs">
             {/* Search Box */}
             <div className="relative flex-1">
-              <Search className="h-4 w-4 absolute left-3 top-3 text-zinc-400" />
+              <Search className="h-4 w-4 absolute left-3 top-2.5 text-zinc-400 pointer-events-none" />
               <input
                 type="text"
                 placeholder="Search by Invoice #, Guest Name, Mobile, GRC #, Room(s), Company, GSTIN..."
                 value={billSearch}
                 onChange={(e) => setBillSearch(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 text-xs rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-zinc-900 dark:text-white"
+                className="w-full h-9 pl-9 pr-3 text-xs rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-zinc-900 dark:text-white placeholder:text-zinc-400 transition-all"
               />
             </div>
 
             {/* Filter Dropdowns */}
             <div className="flex items-center gap-2 flex-wrap">
               {/* Date Scope Filter */}
-              <div className="flex items-center gap-1.5 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 px-2.5 py-1.5 rounded-xl text-xs font-medium">
+              <div className="flex items-center gap-1.5 bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 px-2.5 h-9 rounded-lg text-xs font-medium">
                 <Calendar className="h-3.5 w-3.5 text-zinc-400" />
                 <select
                   value={billDateRange}
                   onChange={(e: any) => setBillDateRange(e.target.value)}
-                  className="bg-transparent border-none text-xs font-semibold focus:outline-none cursor-pointer"
+                  className="bg-transparent border-none text-xs font-medium text-zinc-900 dark:text-zinc-100 focus:outline-none cursor-pointer"
                 >
                   <option value="ALL_TIME">All Time</option>
                   <option value="TODAY">Today</option>
@@ -1264,14 +1528,14 @@ export default function ReportsPage() {
                     type="date"
                     value={billCustomStart}
                     onChange={(e) => setBillCustomStart(e.target.value)}
-                    className="text-xs px-2.5 py-1.5 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 font-mono"
+                    className="text-xs h-9 px-2.5 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 font-mono text-zinc-900 dark:text-zinc-100"
                   />
                   <span className="text-zinc-400 text-xs">to</span>
                   <input
                     type="date"
                     value={billCustomEnd}
                     onChange={(e) => setBillCustomEnd(e.target.value)}
-                    className="text-xs px-2.5 py-1.5 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 font-mono"
+                    className="text-xs h-9 px-2.5 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 font-mono text-zinc-900 dark:text-zinc-100"
                   />
                 </div>
               )}
@@ -1280,7 +1544,7 @@ export default function ReportsPage() {
               <select
                 value={billStatusFilter}
                 onChange={(e: any) => setBillStatusFilter(e.target.value)}
-                className="text-xs rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 px-3 py-2 font-medium cursor-pointer"
+                className="text-xs h-9 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 px-3 font-medium text-zinc-900 dark:text-zinc-100 cursor-pointer"
               >
                 <option value="ALL">All Bill Statuses</option>
                 <option value="SETTLED">Settled / Closed</option>
@@ -1292,7 +1556,7 @@ export default function ReportsPage() {
               <select
                 value={billMethodFilter}
                 onChange={(e) => setBillMethodFilter(e.target.value)}
-                className="text-xs rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 px-3 py-2 font-medium cursor-pointer"
+                className="text-xs h-9 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 px-3 font-medium text-zinc-900 dark:text-zinc-100 cursor-pointer"
               >
                 <option value="ALL">All Payment Methods</option>
                 <option value="CASH">Cash</option>
@@ -1312,18 +1576,18 @@ export default function ReportsPage() {
                     setBillCustomStart("");
                     setBillCustomEnd("");
                   }}
-                  className="p-2 text-zinc-500 hover:text-zinc-900 dark:hover:text-white rounded-xl bg-zinc-100 dark:bg-zinc-800 text-xs cursor-pointer font-bold"
-                  title="Clear Filters"
+                  className="h-9 px-3 rounded-lg bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 font-medium text-xs flex items-center gap-1.5 transition cursor-pointer"
                 >
-                  Clear
+                  <X className="h-3.5 w-3.5" />
+                  <span>Clear Filters</span>
                 </button>
               )}
             </div>
           </div>
 
           {/* Final Bills Data Table */}
-          <div className="p-4 rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-3">
-            <div className="flex items-center justify-between pb-2 border-b border-zinc-200 dark:border-zinc-800 text-xs font-bold text-zinc-700 dark:text-zinc-300">
+          <div className="p-4 sm:p-5 rounded-xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-3">
+            <div className="flex items-center justify-between pb-3 border-b border-zinc-200 dark:border-zinc-800 text-xs font-bold text-zinc-900 dark:text-zinc-100">
               <span className="flex items-center gap-2">
                 <Receipt className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
                 <span>Master Final Bills & Tax Invoices ({filteredFinalBills.length} records)</span>
@@ -1333,26 +1597,26 @@ export default function ReportsPage() {
               </span>
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead>
-                  <tr className="border-b border-zinc-200 dark:border-zinc-800 text-[11px] font-bold text-zinc-400 uppercase font-mono">
-                    <th className="pb-2.5 whitespace-nowrap">Invoice / Folio</th>
-                    <th className="pb-2.5 whitespace-nowrap">GRC No.</th>
-                    <th className="pb-2.5 whitespace-nowrap">Guest / Company</th>
-                    <th className="pb-2.5 whitespace-nowrap">Room(s) Stayed</th>
-                    <th className="pb-2.5 whitespace-nowrap">Nights</th>
-                    <th className="pb-2.5 text-right whitespace-nowrap">Room Tariff</th>
-                    <th className="pb-2.5 text-right whitespace-nowrap">F&B / Extra</th>
-                    <th className="pb-2.5 text-right whitespace-nowrap">Tax (GST)</th>
-                    <th className="pb-2.5 text-right whitespace-nowrap">Gross Total</th>
-                    <th className="pb-2.5 text-right whitespace-nowrap">Paid</th>
-                    <th className="pb-2.5 text-right whitespace-nowrap">Balance</th>
-                    <th className="pb-2.5 whitespace-nowrap">Status</th>
-                    <th className="pb-2.5 text-right whitespace-nowrap">Actions</th>
+            <div className="overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-800">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead className="bg-zinc-50/90 dark:bg-zinc-900/90 text-zinc-500 dark:text-zinc-400 text-[11px] uppercase tracking-wider font-semibold border-b border-zinc-200 dark:border-zinc-800 sticky top-0 z-10 backdrop-blur-xs">
+                  <tr>
+                    <th className="px-4 py-3 font-semibold whitespace-nowrap">Invoice / Folio</th>
+                    <th className="px-4 py-3 font-semibold whitespace-nowrap">GRC No.</th>
+                    <th className="px-4 py-3 font-semibold whitespace-nowrap">Guest / Company</th>
+                    <th className="px-4 py-3 font-semibold whitespace-nowrap">Room(s) Stayed</th>
+                    <th className="px-4 py-3 font-semibold whitespace-nowrap">Nights</th>
+                    <th className="px-4 py-3 font-semibold text-right whitespace-nowrap">Room Tariff</th>
+                    <th className="px-4 py-3 font-semibold text-right whitespace-nowrap">F&B / Extra</th>
+                    <th className="px-4 py-3 font-semibold text-right whitespace-nowrap">Tax (GST)</th>
+                    <th className="px-4 py-3 font-semibold text-right whitespace-nowrap">Gross Total</th>
+                    <th className="px-4 py-3 font-semibold text-right whitespace-nowrap">Paid</th>
+                    <th className="px-4 py-3 font-semibold text-right whitespace-nowrap">Balance</th>
+                    <th className="px-4 py-3 font-semibold whitespace-nowrap">Status</th>
+                    <th className="px-4 py-3 font-semibold text-right whitespace-nowrap">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/60 font-mono">
+                <tbody className="divide-y divide-zinc-200/60 dark:divide-zinc-800/60 font-mono">
                   {filteredFinalBills.length === 0 ? (
                     <tr>
                       <td colSpan={13} className="py-12 text-center text-zinc-500 font-sans">
@@ -1363,94 +1627,97 @@ export default function ReportsPage() {
                     </tr>
                   ) : (
                     filteredFinalBills.map((b) => (
-                      <tr key={b.stayId} className="hover:bg-zinc-50 dark:hover:bg-zinc-900/50 transition">
-                        <td className="py-3 pr-2 whitespace-nowrap">
-                          <span className="font-bold font-mono text-zinc-900 dark:text-white block text-xs">
+                      <tr key={b.stayId} className="hover:bg-zinc-50/80 dark:hover:bg-zinc-900/40 transition-colors">
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <span className="font-semibold font-mono text-zinc-900 dark:text-white block text-xs">
                             {b.invoiceNo}
                           </span>
-                          <span className="text-[10px] text-zinc-400 font-mono">
+                          <span className="text-[10px] text-zinc-400 dark:text-zinc-500 font-mono">
                             {new Date(b.checkOutDate).toLocaleDateString()}
                           </span>
                         </td>
 
-                        <td className="py-3 pr-2 whitespace-nowrap">
-                          <span className="px-2 py-0.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 font-bold text-[11px]">
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 font-medium text-[11px]">
                             {b.grcNo}
                           </span>
                         </td>
 
-                        <td className="py-3 pr-2 whitespace-nowrap font-sans">
-                          <span className="font-bold text-zinc-900 dark:text-white block text-xs">
+                        <td className="px-4 py-3 whitespace-nowrap font-sans">
+                          <span className="font-medium text-zinc-900 dark:text-white block text-xs">
                             {b.guestName}
                           </span>
                           <div className="flex items-center gap-1.5 text-[10px] text-zinc-500 font-mono">
-                            <span>📞 {b.phone}</span>
+                            <span>{b.phone}</span>
                             {b.companyName && b.companyName !== "—" && (
-                              <span className="text-blue-600 dark:text-blue-400 font-bold font-sans truncate max-w-[120px]">
+                              <span className="text-blue-600 dark:text-blue-400 font-medium font-sans truncate max-w-[120px]">
                                 • {b.companyName}
                               </span>
                             )}
                           </div>
                         </td>
 
-                        <td className="py-3 pr-2 whitespace-nowrap font-sans">
-                          <span className="px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 text-blue-800 dark:text-blue-300 font-bold font-mono text-xs">
+                        <td className="px-4 py-3 whitespace-nowrap font-sans">
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-md bg-blue-50/80 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900/50 text-blue-700 dark:text-blue-300 font-mono text-xs font-medium">
                             {b.roomDisplay}
                           </span>
                         </td>
 
-                        <td className="py-3 pr-2 text-zinc-700 dark:text-zinc-300 whitespace-nowrap">
-                          <span className="px-2 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 font-mono text-xs">
+                        <td className="px-4 py-3 text-zinc-700 dark:text-zinc-300 whitespace-nowrap">
+                          <span className="px-2 py-0.5 rounded-md bg-zinc-100 dark:bg-zinc-800 font-mono text-xs">
                             {b.nights} nt{b.nights > 1 ? "s" : ""}
                           </span>
                         </td>
 
-                        <td className="py-3 pr-2 text-right text-zinc-900 dark:text-zinc-100 font-bold whitespace-nowrap">
+                        <td className="px-4 py-3 text-right text-zinc-900 dark:text-zinc-100 font-mono tabular-nums font-medium whitespace-nowrap">
                           {formatINR(b.roomTariff)}
                         </td>
 
-                        <td className="py-3 pr-2 text-right text-zinc-600 dark:text-zinc-400 whitespace-nowrap">
+                        <td className="px-4 py-3 text-right text-zinc-600 dark:text-zinc-400 font-mono tabular-nums font-medium whitespace-nowrap">
                           {formatINR(b.fnbCharges + b.extraPax + b.otherCharges)}
                         </td>
 
-                        <td className="py-3 pr-2 text-right text-indigo-600 dark:text-indigo-400 font-semibold whitespace-nowrap">
+                        <td className="px-4 py-3 text-right text-indigo-600 dark:text-indigo-400 font-mono tabular-nums font-medium whitespace-nowrap">
                           {formatINR(b.totalTax)}
                         </td>
 
-                        <td className="py-3 pr-2 text-right text-emerald-600 dark:text-emerald-400 font-black text-xs whitespace-nowrap">
+                        <td className="px-4 py-3 text-right text-emerald-600 dark:text-emerald-400 font-mono tabular-nums font-semibold text-xs whitespace-nowrap">
                           {formatINR(b.grossTotal)}
                         </td>
 
-                        <td className="py-3 pr-2 text-right text-zinc-800 dark:text-zinc-200 font-semibold whitespace-nowrap">
+                        <td className="px-4 py-3 text-right text-zinc-800 dark:text-zinc-200 font-mono tabular-nums font-medium whitespace-nowrap">
                           {formatINR(b.totalPaid)}
                         </td>
 
-                        <td className="py-3 pr-2 text-right font-black whitespace-nowrap">
+                        <td className="px-4 py-3 text-right font-mono tabular-nums font-semibold whitespace-nowrap">
                           <span className={b.balance > 0 ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400"}>
                             {formatINR(b.balance)}
                           </span>
                         </td>
 
-                        <td className="py-3 pr-2 whitespace-nowrap font-sans">
+                        <td className="px-4 py-3 whitespace-nowrap font-sans">
                           {b.settlementStatus === "SETTLED" ? (
-                            <span className="px-2.5 py-1 rounded-full bg-emerald-100 dark:bg-emerald-950 border border-emerald-300 dark:border-emerald-700 text-emerald-900 dark:text-emerald-200 font-bold text-[10px]">
-                              ✓ SETTLED
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50/80 text-emerald-700 border border-emerald-200/80 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-900/50 font-medium text-[11px]">
+                              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                              SETTLED
                             </span>
                           ) : b.stayStatus === "IN_HOUSE" ? (
-                            <span className="px-2.5 py-1 rounded-full bg-blue-100 dark:bg-blue-950 border border-blue-300 dark:border-blue-700 text-blue-900 dark:text-blue-200 font-bold text-[10px]">
-                              ● IN-HOUSE
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-blue-50/80 text-blue-700 border border-blue-200/80 dark:bg-blue-950/40 dark:text-blue-400 dark:border-blue-900/50 font-medium text-[11px]">
+                              <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />
+                              IN-HOUSE
                             </span>
                           ) : (
-                            <span className="px-2.5 py-1 rounded-full bg-amber-100 dark:bg-amber-950 border border-amber-300 dark:border-amber-700 text-amber-900 dark:text-amber-200 font-bold text-[10px]">
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-50/80 text-amber-700 border border-amber-200/80 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-900/50 font-medium text-[11px]">
+                              <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
                               OPEN BALANCE
                             </span>
                           )}
                         </td>
 
-                        <td className="py-3 text-right whitespace-nowrap">
+                        <td className="px-4 py-3 text-right whitespace-nowrap">
                           <Link
                             href={`/billing?stayId=${b.stayId}`}
-                            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/50 dark:hover:bg-emerald-900/60 border border-emerald-300 dark:border-emerald-700 font-bold text-[11px] text-emerald-800 dark:text-emerald-300 transition font-sans shadow-xs"
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-emerald-50/80 hover:bg-emerald-100 dark:bg-emerald-950/50 dark:hover:bg-emerald-900/60 border border-emerald-300 dark:border-emerald-700 font-medium text-[11px] text-emerald-800 dark:text-emerald-300 transition font-sans shadow-xs"
                           >
                             <Eye className="h-3 w-3" />
                             <span>View Bill / Folio</span>
@@ -1535,15 +1802,15 @@ export default function ReportsPage() {
           )}
 
           {/* Search & Filter Controls */}
-          <div className="flex flex-col md:flex-row items-center gap-2 p-3 rounded-xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs">
+          <div className="flex flex-col md:flex-row items-center gap-2 p-3.5 rounded-xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs">
             <div className="relative flex-1 w-full">
-              <Search className="h-3.5 w-3.5 absolute left-3 top-3 text-zinc-400" />
+              <Search className="h-4 w-4 absolute left-3 top-2.5 text-zinc-400 pointer-events-none" />
               <input
                 type="text"
                 placeholder="Search by receipt/voucher #, guest, payee, room, reference..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 text-xs rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 focus:outline-none focus:ring-1 focus:ring-emerald-500 text-zinc-900 dark:text-white"
+                className="w-full h-9 pl-9 pr-3 text-xs rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-zinc-900 dark:text-white placeholder:text-zinc-400 transition-all"
               />
             </div>
 
@@ -1551,7 +1818,7 @@ export default function ReportsPage() {
               <select
                 value={flowFilter}
                 onChange={(e: any) => setFlowFilter(e.target.value)}
-                className="text-xs rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-3 py-2 font-medium"
+                className="text-xs h-9 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 px-3 font-medium text-zinc-900 dark:text-zinc-100 cursor-pointer"
               >
                 <option value="ALL">All Flows (In & Out)</option>
                 <option value="INFLOW">Collections Only</option>
@@ -1561,7 +1828,7 @@ export default function ReportsPage() {
               <select
                 value={methodFilter}
                 onChange={(e) => setMethodFilter(e.target.value)}
-                className="text-xs rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-3 py-2 font-medium"
+                className="text-xs h-9 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 px-3 font-medium text-zinc-900 dark:text-zinc-100 cursor-pointer"
               >
                 <option value="ALL">All Payment Methods</option>
                 <option value="CASH">Cash</option>
@@ -1577,58 +1844,60 @@ export default function ReportsPage() {
           </div>
 
           {/* Transactions Table */}
-          <div className="p-4 rounded-xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-3">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead>
-                  <tr className="border-b border-zinc-200 dark:border-zinc-800 text-[11px] font-bold text-zinc-400 uppercase font-mono">
-                    <th className="pb-2">Voucher / Receipt</th>
-                    <th className="pb-2">Time</th>
-                    <th className="pb-2">Type</th>
-                    <th className="pb-2">Party / Payee</th>
-                    <th className="pb-2">Particulars</th>
-                    <th className="pb-2">Method</th>
-                    <th className="pb-2 text-right">Amount</th>
+          <div className="p-4 sm:p-5 rounded-xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-3">
+            <div className="overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-800">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead className="bg-zinc-50/90 dark:bg-zinc-900/90 text-zinc-500 dark:text-zinc-400 text-[11px] uppercase tracking-wider font-semibold border-b border-zinc-200 dark:border-zinc-800 sticky top-0 z-10 backdrop-blur-xs">
+                  <tr>
+                    <th className="px-4 py-3 font-semibold whitespace-nowrap">Voucher / Receipt</th>
+                    <th className="px-4 py-3 font-semibold whitespace-nowrap">Time</th>
+                    <th className="px-4 py-3 font-semibold whitespace-nowrap">Type</th>
+                    <th className="px-4 py-3 font-semibold whitespace-nowrap">Party / Payee</th>
+                    <th className="px-4 py-3 font-semibold whitespace-nowrap">Particulars</th>
+                    <th className="px-4 py-3 font-semibold whitespace-nowrap">Method</th>
+                    <th className="px-4 py-3 font-semibold text-right whitespace-nowrap">Amount</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/60 font-mono">
+                <tbody className="divide-y divide-zinc-200/60 dark:divide-zinc-800/60 font-mono">
                   {filteredCashierTransactions.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="py-8 text-center text-zinc-500 font-sans">
+                      <td colSpan={7} className="py-12 text-center text-zinc-400 dark:text-zinc-500 font-sans">
                         No financial transactions recorded for this business date.
                       </td>
                     </tr>
                   ) : (
                     filteredCashierTransactions.map((tx: any) => (
-                      <tr key={tx.id} className="hover:bg-zinc-50 dark:hover:bg-zinc-900/50">
-                        <td className="py-2.5 font-bold text-zinc-900 dark:text-zinc-100">
+                      <tr key={tx.id} className="hover:bg-zinc-50/80 dark:hover:bg-zinc-900/40 transition-colors">
+                        <td className="px-4 py-3 font-semibold text-zinc-900 dark:text-zinc-100 whitespace-nowrap">
                           {tx.recordId}
                         </td>
-                        <td className="py-2.5 text-zinc-500">{tx.time}</td>
-                        <td className="py-2.5">
+                        <td className="px-4 py-3 text-zinc-500 dark:text-zinc-400 whitespace-nowrap text-[11px]">{tx.time}</td>
+                        <td className="px-4 py-3 whitespace-nowrap">
                           {tx.flow === "INFLOW" ? (
-                            <span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60 font-bold text-[10px]">
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50/80 text-emerald-700 border border-emerald-200/80 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-900/50 font-medium text-[11px]">
+                              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
                               RECEIPT
                             </span>
                           ) : (
-                            <span className="px-2 py-0.5 rounded bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-400 border border-rose-200 dark:border-rose-800/60 font-bold text-[10px]">
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-rose-50/80 text-rose-700 border border-rose-200/80 dark:bg-rose-950/40 dark:text-rose-400 dark:border-rose-900/50 font-medium text-[11px]">
+                              <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />
                               EXPENSE
                             </span>
                           )}
                         </td>
-                        <td className="py-2.5 font-sans font-medium text-zinc-900 dark:text-zinc-200">
+                        <td className="px-4 py-3 font-sans font-medium text-zinc-900 dark:text-zinc-100 whitespace-nowrap">
                           {tx.party}
                         </td>
-                        <td className="py-2.5 text-zinc-600 dark:text-zinc-400 font-sans">
+                        <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400 font-sans max-w-sm truncate">
                           {tx.particulars}
                         </td>
-                        <td className="py-2.5">
-                          <span className="px-2 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 text-[10px] font-semibold font-sans">
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 text-[11px] font-medium font-sans">
                             {tx.method}
                           </span>
                         </td>
                         <td
-                          className={`py-2.5 text-right font-bold ${
+                          className={`px-4 py-3 text-right font-mono tabular-nums font-semibold whitespace-nowrap ${
                             tx.flow === "INFLOW" ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"
                           }`}
                         >
@@ -1646,65 +1915,299 @@ export default function ReportsPage() {
       )}
 
       {/* ========================================================================= */}
+      {/* TAB: EXPENSE REGISTER & OUTFLOW AUDIT */}
+      {/* ========================================================================= */}
+      {reportType === "EXPENSES" && (
+        <div className="space-y-4 animate-in fade-in">
+          {/* Summary Stat Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="p-4 rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">Total Expenses (Outflows)</span>
+                <ArrowUpRight className="h-4 w-4 text-rose-500" />
+              </div>
+              <div className="text-2xl font-black font-mono text-rose-600 dark:text-rose-400">
+                {formatINR(expenseKPIs.totalOutflow)}
+              </div>
+              <div className="text-[11px] text-zinc-500 font-mono">
+                {expenseKPIs.totalCount} Total Vouchers Recorded
+              </div>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-rose-50/50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-800/50 shadow-xs space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-rose-800 dark:text-rose-300 uppercase tracking-wider">
+                  Cash In Drawer Impact
+                </span>
+                <Banknote className="h-4 w-4 text-rose-600" />
+              </div>
+              <div className="text-2xl font-black font-mono text-rose-800 dark:text-rose-300">
+                {formatINR(expenseKPIs.cashOutflow)}
+              </div>
+              <div className="text-[11px] text-rose-700/80 dark:text-rose-400 font-mono">
+                Direct petty cash & drawer payments
+              </div>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">UPI & Bank Outflows</span>
+                <Landmark className="h-4 w-4 text-indigo-500" />
+              </div>
+              <div className="text-2xl font-black font-mono text-indigo-600 dark:text-indigo-400">
+                {formatINR(expenseKPIs.upiOutflow + expenseKPIs.bankOutflow)}
+              </div>
+              <div className="text-[11px] text-zinc-500 font-mono">
+                UPI: {formatINR(expenseKPIs.upiOutflow)} • Bank: {formatINR(expenseKPIs.bankOutflow)}
+              </div>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">Top Expense Category</span>
+                <Tag className="h-4 w-4 text-amber-500" />
+              </div>
+              <div className="text-sm font-bold text-zinc-900 dark:text-zinc-100 truncate">
+                {expenseKPIs.topCategory}
+              </div>
+              <div className="text-[11px] text-zinc-500 font-mono">
+                {expenseKPIs.topCategoryAmount > 0 ? `${formatINR(expenseKPIs.topCategoryAmount)} Total Spent` : "No expenses recorded"}
+              </div>
+            </div>
+          </div>
+
+          {/* Filters Bar for Expenses */}
+          <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 p-3.5 rounded-xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs">
+            {/* Search Box */}
+            <div className="relative flex-1">
+              <Search className="h-4 w-4 absolute left-3 top-2.5 text-zinc-400 pointer-events-none" />
+              <input
+                type="text"
+                placeholder="Search by Voucher #, Payee, Description, Reference, Category..."
+                value={expenseSearch}
+                onChange={(e) => setExpenseSearch(e.target.value)}
+                className="w-full h-9 pl-9 pr-3 text-xs rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 text-zinc-900 dark:text-white placeholder:text-zinc-400 transition-all"
+              />
+            </div>
+
+            {/* Filter Dropdowns */}
+            <div className="flex items-center gap-2 flex-wrap">
+              {/* Category Filter */}
+              <select
+                value={expenseCategoryFilter}
+                onChange={(e) => setExpenseCategoryFilter(e.target.value)}
+                className="text-xs h-9 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 px-3 font-medium text-zinc-900 dark:text-zinc-100 cursor-pointer"
+              >
+                <option value="ALL">All Categories</option>
+                <option value="DRIVER_COMMISSION">Driver Commission</option>
+                <option value="VENDOR_PAYMENT">Vendor / Supplier</option>
+                <option value="STAFF_ADVANCE">Staff Advance / Salary</option>
+                <option value="FB_PURCHASE">F&B Raw Materials</option>
+                <option value="MAINTENANCE">Maintenance & Repairs</option>
+                <option value="HOUSEKEEPING">Housekeeping & Linen</option>
+                <option value="PETTY_CASH">Petty Cash Operational</option>
+                <option value="UTILITIES">Utilities & Power</option>
+                <option value="GUEST_REFUND">Guest Refund</option>
+                <option value="OTHER">Other Expense</option>
+              </select>
+
+              {/* Payment Method Filter */}
+              <select
+                value={expenseMethodFilter}
+                onChange={(e) => setExpenseMethodFilter(e.target.value)}
+                className="text-xs h-9 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 px-3 font-medium text-zinc-900 dark:text-zinc-100 cursor-pointer"
+              >
+                <option value="ALL">All Payment Modes</option>
+                <option value="CASH">Cash</option>
+                <option value="UPI">UPI / QR</option>
+                <option value="BANK_TRANSFER">Bank Transfer / NEFT</option>
+                <option value="CARD">Debit / Credit Card</option>
+                <option value="CHEQUE">Cheque</option>
+              </select>
+
+              {(expenseSearch || expenseCategoryFilter !== "ALL" || expenseMethodFilter !== "ALL") && (
+                <button
+                  onClick={() => {
+                    setExpenseSearch("");
+                    setExpenseCategoryFilter("ALL");
+                    setExpenseMethodFilter("ALL");
+                  }}
+                  className="h-9 px-3 rounded-lg bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 font-medium text-xs flex items-center gap-1.5 transition cursor-pointer"
+                >
+                  <X className="h-3.5 w-3.5" />
+                  <span>Clear Filters</span>
+                </button>
+              )}
+
+              <button
+                onClick={() => setShowAddExpenseModal(true)}
+                className="h-9 px-3.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-medium text-xs flex items-center gap-1.5 transition cursor-pointer shadow-xs"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                <span>Record Expense</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Expense Records Data Table */}
+          <div className="p-4 sm:p-5 rounded-xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-3">
+            <div className="flex items-center justify-between pb-3 border-b border-zinc-200 dark:border-zinc-800 text-xs font-bold text-zinc-900 dark:text-zinc-100">
+              <span className="flex items-center gap-2">
+                <ArrowUpRight className="h-4 w-4 text-rose-600 dark:text-rose-400" />
+                <span>Operational Expense Register ({filteredExpenseVouchers.length} vouchers)</span>
+              </span>
+              <span className="text-[11px] font-mono text-zinc-500 font-normal">
+                Filtered Outflows: {formatINR(filteredExpenseVouchers.reduce((s: number, e: any) => s + (e.totalAmount || e.amount || 0), 0))}
+              </span>
+            </div>
+
+            <div className="overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-800">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead className="bg-zinc-50/90 dark:bg-zinc-900/90 text-zinc-500 dark:text-zinc-400 text-[11px] uppercase tracking-wider font-semibold border-b border-zinc-200 dark:border-zinc-800 sticky top-0 z-10 backdrop-blur-xs">
+                  <tr>
+                    <th className="px-4 py-3 font-semibold whitespace-nowrap">Voucher #</th>
+                    <th className="px-4 py-3 font-semibold whitespace-nowrap">Date & Time</th>
+                    <th className="px-4 py-3 font-semibold whitespace-nowrap">Category</th>
+                    <th className="px-4 py-3 font-semibold whitespace-nowrap">Payee / Vendor</th>
+                    <th className="px-4 py-3 font-semibold whitespace-nowrap">Narration / Particulars</th>
+                    <th className="px-4 py-3 font-semibold whitespace-nowrap">Mode</th>
+                    <th className="px-4 py-3 font-semibold whitespace-nowrap">Reference</th>
+                    <th className="px-4 py-3 font-semibold text-right whitespace-nowrap">Amount</th>
+                    <th className="px-4 py-3 font-semibold whitespace-nowrap">Status</th>
+                    <th className="px-4 py-3 font-semibold whitespace-nowrap">Staff / Auth</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-zinc-200/60 dark:divide-zinc-800/60 font-mono">
+                  {filteredExpenseVouchers.length === 0 ? (
+                    <tr>
+                      <td colSpan={10} className="py-12 text-center text-zinc-500 font-sans">
+                        <ArrowUpRight className="h-8 w-8 mx-auto mb-2 text-zinc-400 opacity-50" />
+                        <p className="font-bold text-sm">No expense vouchers found.</p>
+                        <p className="text-xs text-zinc-400 mt-1">Click "+ Record Expense" to create a new expense voucher.</p>
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredExpenseVouchers.map((e: any) => (
+                      <tr key={e.id} className="hover:bg-zinc-50/80 dark:hover:bg-zinc-900/40 transition-colors">
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <span className="font-bold font-mono text-zinc-900 dark:text-white block text-xs">
+                            {e.voucherNo}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-zinc-500 dark:text-zinc-400 whitespace-nowrap text-[11px]">
+                          {e.date} {e.time}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap font-sans">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-800 dark:text-zinc-200 font-medium text-[11px]">
+                            {e.category.replace(/_/g, " ")}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 font-sans font-medium text-zinc-900 dark:text-white whitespace-nowrap">
+                          {e.payeeName}
+                        </td>
+                        <td className="px-4 py-3 font-sans text-zinc-600 dark:text-zinc-400 max-w-sm truncate">
+                          {e.description}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 text-[11px] font-medium font-sans">
+                            {e.method}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-zinc-500 dark:text-zinc-400 whitespace-nowrap text-[11px] font-mono">
+                          {e.reference || "—"}
+                        </td>
+                        <td className="px-4 py-3 text-right font-mono tabular-nums font-bold text-rose-600 dark:text-rose-400 whitespace-nowrap">
+                          {formatINR(e.totalAmount || e.amount)}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap font-sans">
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50/80 text-emerald-700 border border-emerald-200/80 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-900/50 font-medium text-[11px]">
+                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                            {e.status || "PAID"}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-zinc-500 dark:text-zinc-400 whitespace-nowrap font-sans text-[11px]">
+                          {e.authorizedBy}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
       {/* TAB 4: FRONT DESK ROOM RACK */}
       {/* ========================================================================= */}
       {reportType === "FRONT_OFFICE" && (
         <div className="space-y-4 animate-in fade-in">
-          <div className="p-4 rounded-xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-3">
-            <div className="flex items-center justify-between pb-2 border-b border-zinc-200 dark:border-zinc-800">
-              <span className="font-bold text-xs uppercase font-mono text-zinc-500">
+          <div className="p-4 sm:p-5 rounded-xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-3">
+            <div className="flex items-center justify-between pb-3 border-b border-zinc-200 dark:border-zinc-800">
+              <span className="font-semibold text-xs uppercase tracking-wider text-zinc-600 dark:text-zinc-400">
                 Front Office Room Occupancy ({data?.totalRooms ?? 0} Total Inventory)
               </span>
-              <span className="text-xs font-mono font-bold text-emerald-600 dark:text-emerald-400">
+              <span className="text-xs font-mono font-semibold text-emerald-600 dark:text-emerald-400">
                 Occupancy: {data?.occupancyRate ?? "0%"} ({data?.occupiedRooms ?? 0} Rooms In-House)
               </span>
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead>
-                  <tr className="border-b border-zinc-200 dark:border-zinc-800 text-[11px] font-bold text-zinc-400 uppercase font-mono">
-                    <th className="pb-2">Room</th>
-                    <th className="pb-2">Type</th>
-                    <th className="pb-2">Occupancy</th>
-                    <th className="pb-2">Housekeeping</th>
-                    <th className="pb-2">Guest</th>
-                    <th className="pb-2">Stay Ref</th>
+            <div className="overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-800">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead className="bg-zinc-50/90 dark:bg-zinc-900/90 text-zinc-500 dark:text-zinc-400 text-[11px] uppercase tracking-wider font-semibold border-b border-zinc-200 dark:border-zinc-800 sticky top-0 z-10 backdrop-blur-xs">
+                  <tr>
+                    <th className="px-4 py-3 font-semibold whitespace-nowrap">Room</th>
+                    <th className="px-4 py-3 font-semibold whitespace-nowrap">Type</th>
+                    <th className="px-4 py-3 font-semibold whitespace-nowrap">Occupancy</th>
+                    <th className="px-4 py-3 font-semibold whitespace-nowrap">Housekeeping</th>
+                    <th className="px-4 py-3 font-semibold whitespace-nowrap">Guest</th>
+                    <th className="px-4 py-3 font-semibold whitespace-nowrap">Stay Ref</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/60 font-mono">
+                <tbody className="divide-y divide-zinc-200/60 dark:divide-zinc-800/60 font-mono">
                   {(data?.rows || []).map((r: any) => (
-                    <tr key={r.number} className="hover:bg-zinc-50 dark:hover:bg-zinc-900/50">
-                      <td className="py-2.5 font-bold text-zinc-900 dark:text-zinc-100">
+                    <tr key={r.number} className="hover:bg-zinc-50/80 dark:hover:bg-zinc-900/40 transition-colors">
+                      <td className="px-4 py-3 font-semibold text-zinc-900 dark:text-zinc-100 whitespace-nowrap">
                         Room {r.number}
                       </td>
-                      <td className="py-2.5 text-zinc-500 font-sans">{r.roomType}</td>
-                      <td className="py-2.5">
+                      <td className="px-4 py-3 text-zinc-500 dark:text-zinc-400 font-sans whitespace-nowrap">{r.roomType}</td>
+                      <td className="px-4 py-3 whitespace-nowrap">
                         <span
-                          className={`px-2 py-0.5 rounded font-bold text-[10px] ${
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium border ${
                             r.occupancyStatus === "OCCUPIED"
-                              ? "bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-400"
-                              : "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400"
+                              ? "bg-blue-50/80 text-blue-700 border-blue-200/80 dark:bg-blue-950/40 dark:text-blue-400 dark:border-blue-900/50"
+                              : "bg-emerald-50/80 text-emerald-700 border-emerald-200/80 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-900/50"
                           }`}
                         >
+                          <span
+                            className={`h-1.5 w-1.5 rounded-full ${
+                              r.occupancyStatus === "OCCUPIED" ? "bg-blue-500" : "bg-emerald-500"
+                            }`}
+                          />
                           {r.occupancyStatus}
                         </span>
                       </td>
-                      <td className="py-2.5">
+                      <td className="px-4 py-3 whitespace-nowrap">
                         <span
-                          className={`px-2 py-0.5 rounded font-bold text-[10px] ${
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium border ${
                             r.housekeepingStatus === "CLEAN"
-                              ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400"
-                              : "bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400"
+                              ? "bg-emerald-50/80 text-emerald-700 border-emerald-200/80 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-900/50"
+                              : "bg-amber-50/80 text-amber-700 border-amber-200/80 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-900/50"
                           }`}
                         >
+                          <span
+                            className={`h-1.5 w-1.5 rounded-full ${
+                              r.housekeepingStatus === "CLEAN" ? "bg-emerald-500" : "bg-amber-500"
+                            }`}
+                          />
                           {r.housekeepingStatus}
                         </span>
                       </td>
-                      <td className="py-2.5 font-sans font-medium text-zinc-900 dark:text-zinc-200">
+                      <td className="px-4 py-3 font-sans font-medium text-zinc-900 dark:text-zinc-100 whitespace-nowrap">
                         {r.guestName}
                       </td>
-                      <td className="py-2.5 text-zinc-500">{r.stayId || "—"}</td>
+                      <td className="px-4 py-3 text-zinc-500 dark:text-zinc-400 whitespace-nowrap text-[11px]">{r.stayId || "—"}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -1719,36 +2222,36 @@ export default function ReportsPage() {
       {/* ========================================================================= */}
       {reportType === "REVENUE" && (
         <div className="space-y-4 animate-in fade-in">
-          <div className="p-4 rounded-xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-3">
-            <div className="flex items-center justify-between pb-2 border-b border-zinc-200 dark:border-zinc-800">
-              <span className="font-bold text-xs uppercase font-mono text-zinc-500">
+          <div className="p-4 sm:p-5 rounded-xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-3">
+            <div className="flex items-center justify-between pb-3 border-b border-zinc-200 dark:border-zinc-800">
+              <span className="font-semibold text-xs uppercase tracking-wider text-zinc-600 dark:text-zinc-400">
                 Posted Folio Entries & Tax Journal
               </span>
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead>
-                  <tr className="border-b border-zinc-200 dark:border-zinc-800 text-[11px] font-bold text-zinc-400 uppercase font-mono">
-                    <th className="pb-2">Date</th>
-                    <th className="pb-2">Charge Code</th>
-                    <th className="pb-2">Description</th>
-                    <th className="pb-2">Guest</th>
-                    <th className="pb-2 text-right">Taxable</th>
-                    <th className="pb-2 text-right">Tax</th>
-                    <th className="pb-2 text-right">Total Amount</th>
+            <div className="overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-800">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead className="bg-zinc-50/90 dark:bg-zinc-900/90 text-zinc-500 dark:text-zinc-400 text-[11px] uppercase tracking-wider font-semibold border-b border-zinc-200 dark:border-zinc-800 sticky top-0 z-10 backdrop-blur-xs">
+                  <tr>
+                    <th className="px-4 py-3 font-semibold whitespace-nowrap">Date</th>
+                    <th className="px-4 py-3 font-semibold whitespace-nowrap">Charge Code</th>
+                    <th className="px-4 py-3 font-semibold whitespace-nowrap">Description</th>
+                    <th className="px-4 py-3 font-semibold whitespace-nowrap">Guest</th>
+                    <th className="px-4 py-3 font-semibold text-right whitespace-nowrap">Taxable</th>
+                    <th className="px-4 py-3 font-semibold text-right whitespace-nowrap">Tax</th>
+                    <th className="px-4 py-3 font-semibold text-right whitespace-nowrap">Total Amount</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/60 font-mono">
+                <tbody className="divide-y divide-zinc-200/60 dark:divide-zinc-800/60 font-mono">
                   {(data?.rows || []).map((e: any) => (
-                    <tr key={e.id} className="hover:bg-zinc-50 dark:hover:bg-zinc-900/50">
-                      <td className="py-2.5 text-zinc-500">{e.serviceDate}</td>
-                      <td className="py-2.5 font-bold text-zinc-900 dark:text-zinc-100">{e.chargeCode}</td>
-                      <td className="py-2.5 font-sans text-zinc-700 dark:text-zinc-300">{e.description}</td>
-                      <td className="py-2.5 font-sans font-medium text-zinc-900 dark:text-zinc-200">{e.guestName}</td>
-                      <td className="py-2.5 text-right font-medium">{formatINR(e.taxableAmount)}</td>
-                      <td className="py-2.5 text-right font-medium text-indigo-600 dark:text-indigo-400">{formatINR(e.taxAmount)}</td>
-                      <td className="py-2.5 text-right font-bold text-emerald-600 dark:text-emerald-400">{formatINR(e.totalAmount)}</td>
+                    <tr key={e.id} className="hover:bg-zinc-50/80 dark:hover:bg-zinc-900/40 transition-colors">
+                      <td className="px-4 py-3 text-zinc-500 dark:text-zinc-400 whitespace-nowrap text-[11px]">{e.serviceDate}</td>
+                      <td className="px-4 py-3 font-semibold text-zinc-900 dark:text-zinc-100 whitespace-nowrap">{e.chargeCode}</td>
+                      <td className="px-4 py-3 font-sans text-zinc-700 dark:text-zinc-300 max-w-sm truncate">{e.description}</td>
+                      <td className="px-4 py-3 font-sans font-medium text-zinc-900 dark:text-zinc-100 whitespace-nowrap">{e.guestName}</td>
+                      <td className="px-4 py-3 text-right font-mono tabular-nums font-medium whitespace-nowrap">{formatINR(e.taxableAmount)}</td>
+                      <td className="px-4 py-3 text-right font-mono tabular-nums font-medium text-indigo-600 dark:text-indigo-400 whitespace-nowrap">{formatINR(e.taxAmount)}</td>
+                      <td className="px-4 py-3 text-right font-mono tabular-nums font-semibold text-emerald-600 dark:text-emerald-400 whitespace-nowrap">{formatINR(e.totalAmount)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -1825,15 +2328,15 @@ export default function ReportsPage() {
           </div>
 
           {/* Search & Filter Bar */}
-          <div className="flex flex-col md:flex-row items-center gap-2 p-3 rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs">
+          <div className="flex flex-col md:flex-row items-center gap-2 p-3.5 rounded-xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs">
             <div className="relative flex-1 w-full">
-              <Search className="h-3.5 w-3.5 absolute left-3 top-3 text-zinc-400" />
+              <Search className="h-4 w-4 absolute left-3 top-2.5 text-zinc-400 pointer-events-none" />
               <input
                 type="text"
                 placeholder="Search by Order #, KOT #, destination, room, guest, dish..."
                 value={kotSearch}
                 onChange={(e) => setKotSearch(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 text-xs rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 focus:outline-none focus:ring-1 focus:ring-emerald-500 text-zinc-900 dark:text-white"
+                className="w-full h-9 pl-9 pr-3 text-xs rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-zinc-900 dark:text-white placeholder:text-zinc-400 transition-all"
               />
             </div>
 
@@ -1841,105 +2344,108 @@ export default function ReportsPage() {
               <select
                 value={kotDestinationFilter}
                 onChange={(e) => setKotDestinationFilter(e.target.value)}
-                className="text-xs rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-3 py-2 font-medium text-zinc-900 dark:text-white"
+                className="text-xs h-9 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 px-3 font-medium text-zinc-900 dark:text-zinc-100 cursor-pointer"
               >
                 <option value="ALL">All Destinations</option>
-                <option value="ROOM_SERVICE">🏨 Room Service</option>
-                <option value="TABLE_DINE_IN">🍽️ Dine-In Tables</option>
-                <option value="BAR_LOUNGE">🍸 Bar Lounge</option>
-                <option value="TAKEAWAY">📦 Takeaways / Other</option>
+                <option value="ROOM_SERVICE">Room Service</option>
+                <option value="TABLE_DINE_IN">Dine-In Tables</option>
+                <option value="BAR_LOUNGE">Bar Lounge</option>
+                <option value="TAKEAWAY">Takeaways / Other</option>
               </select>
 
               <select
                 value={kotSettlementFilter}
                 onChange={(e) => setKotSettlementFilter(e.target.value)}
-                className="text-xs rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-3 py-2 font-medium text-zinc-900 dark:text-white"
+                className="text-xs h-9 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 px-3 font-medium text-zinc-900 dark:text-zinc-100 cursor-pointer"
               >
                 <option value="ALL">All Settlements</option>
-                <option value="POSTED_TO_ROOM">🏨 Posted to Room Folio</option>
-                <option value="DIRECT_PAID">💵 Direct Paid / Settled</option>
-                <option value="UNSETTLED">🕒 Unsettled / Open</option>
+                <option value="POSTED_TO_ROOM">Posted to Room Folio</option>
+                <option value="DIRECT_PAID">Direct Paid / Settled</option>
+                <option value="UNSETTLED">Unsettled / Open</option>
               </select>
             </div>
           </div>
 
           {/* Kitchen Orders Table */}
-          <div className="p-4 rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-3">
-            <div className="flex items-center justify-between pb-2 border-b border-zinc-200 dark:border-zinc-800">
-              <span className="font-bold text-xs uppercase font-mono text-zinc-500">
+          <div className="p-4 sm:p-5 rounded-xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-3">
+            <div className="flex items-center justify-between pb-3 border-b border-zinc-200 dark:border-zinc-800">
+              <span className="font-semibold text-xs uppercase tracking-wider text-zinc-600 dark:text-zinc-400">
                 Kitchen Orders & Collections Register ({filteredKitchenOrders.length} Records)
               </span>
-              <span className="text-xs font-mono font-bold text-emerald-600 dark:text-emerald-400">
+              <span className="text-xs font-mono font-semibold text-emerald-600 dark:text-emerald-400">
                 GST SAC 996331 (5% Composite Food & Beverage Supply)
               </span>
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead>
-                  <tr className="border-b border-zinc-200 dark:border-zinc-800 text-[11px] font-bold text-zinc-400 uppercase font-mono">
-                    <th className="pb-2">Order / KOT #</th>
-                    <th className="pb-2">Time</th>
-                    <th className="pb-2">Destination</th>
-                    <th className="pb-2">Guest / Payee</th>
-                    <th className="pb-2">Dishes Ordered</th>
-                    <th className="pb-2 text-right">Taxable</th>
-                    <th className="pb-2 text-right">GST (5%)</th>
-                    <th className="pb-2 text-right">Total Bill</th>
-                    <th className="pb-2 text-center">Settlement</th>
+            <div className="overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-800">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead className="bg-zinc-50/90 dark:bg-zinc-900/90 text-zinc-500 dark:text-zinc-400 text-[11px] uppercase tracking-wider font-semibold border-b border-zinc-200 dark:border-zinc-800 sticky top-0 z-10 backdrop-blur-xs">
+                  <tr>
+                    <th className="px-4 py-3 font-semibold whitespace-nowrap">Order / KOT #</th>
+                    <th className="px-4 py-3 font-semibold whitespace-nowrap">Time</th>
+                    <th className="px-4 py-3 font-semibold whitespace-nowrap">Destination</th>
+                    <th className="px-4 py-3 font-semibold whitespace-nowrap">Guest / Payee</th>
+                    <th className="px-4 py-3 font-semibold whitespace-nowrap">Dishes Ordered</th>
+                    <th className="px-4 py-3 font-semibold text-right whitespace-nowrap">Taxable</th>
+                    <th className="px-4 py-3 font-semibold text-right whitespace-nowrap">GST (5%)</th>
+                    <th className="px-4 py-3 font-semibold text-right whitespace-nowrap">Total Bill</th>
+                    <th className="px-4 py-3 font-semibold text-center whitespace-nowrap">Settlement</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/60 font-mono">
+                <tbody className="divide-y divide-zinc-200/60 dark:divide-zinc-800/60 font-mono">
                   {filteredKitchenOrders.length === 0 ? (
                     <tr>
-                      <td colSpan={9} className="py-8 text-center text-zinc-500 font-sans">
+                      <td colSpan={9} className="py-12 text-center text-zinc-400 dark:text-zinc-500 font-sans">
                         No kitchen orders or dining sales recorded for this date.
                       </td>
                     </tr>
                   ) : (
                     filteredKitchenOrders.map((o: any) => (
-                      <tr key={o.id} className="hover:bg-zinc-50 dark:hover:bg-zinc-900/50">
-                        <td className="py-2.5 font-bold text-zinc-900 dark:text-zinc-100">
+                      <tr key={o.id} className="hover:bg-zinc-50/80 dark:hover:bg-zinc-900/40 transition-colors">
+                        <td className="px-4 py-3 font-semibold text-zinc-900 dark:text-zinc-100 whitespace-nowrap">
                           <div>{o.orderNo}</div>
-                          <div className="text-[10px] font-normal text-orange-600 dark:text-orange-400">{o.kotNumbers}</div>
+                          <div className="text-[10px] font-normal text-amber-600 dark:text-amber-400">{o.kotNumbers}</div>
                         </td>
-                        <td className="py-2.5 text-zinc-500">{o.timeFormatted}</td>
-                        <td className="py-2.5 font-sans">
+                        <td className="px-4 py-3 text-zinc-500 dark:text-zinc-400 whitespace-nowrap text-[11px]">{o.timeFormatted}</td>
+                        <td className="px-4 py-3 font-sans whitespace-nowrap">
                           <span
-                            className={`px-2 py-0.5 rounded-md font-bold text-[10.5px] inline-flex items-center gap-1 ${
+                            className={`inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium border ${
                               o.destinationCategory === "ROOM_SERVICE"
-                                ? "bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-200 dark:border-blue-800/60"
+                                ? "bg-blue-50/80 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 border-blue-200 dark:border-blue-900/50"
                                 : o.destinationCategory === "BAR_LOUNGE"
-                                ? "bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-200 dark:border-purple-800/60"
+                                ? "bg-purple-50/80 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300 border-purple-200 dark:border-purple-900/50"
                                 : o.destinationCategory === "TAKEAWAY"
-                                ? "bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-200 dark:border-amber-800/60"
-                                : "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60"
+                                ? "bg-amber-50/80 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 border-amber-200 dark:border-amber-900/50"
+                                : "bg-emerald-50/80 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border-emerald-200 dark:border-emerald-900/50"
                             }`}
                           >
                             {o.destinationLabel}
                           </span>
                         </td>
-                        <td className="py-2.5 font-sans font-medium text-zinc-900 dark:text-zinc-200">
+                        <td className="px-4 py-3 font-sans font-medium text-zinc-900 dark:text-zinc-100 whitespace-nowrap">
                           {o.guestName}
                         </td>
-                        <td className="py-2.5 font-sans text-zinc-700 dark:text-zinc-300 max-w-xs truncate" title={o.itemsSummary}>
+                        <td className="px-4 py-3 font-sans text-zinc-700 dark:text-zinc-300 max-w-xs truncate" title={o.itemsSummary}>
                           {o.itemsSummary}
                         </td>
-                        <td className="py-2.5 text-right font-medium">{formatINR(o.taxableAmount)}</td>
-                        <td className="py-2.5 text-right font-medium text-indigo-600 dark:text-indigo-400">{formatINR(o.totalTax)}</td>
-                        <td className="py-2.5 text-right font-bold text-emerald-600 dark:text-emerald-400">{formatINR(o.totalAmount)}</td>
-                        <td className="py-2.5 text-center font-sans">
+                        <td className="px-4 py-3 text-right font-mono tabular-nums font-medium whitespace-nowrap">{formatINR(o.taxableAmount)}</td>
+                        <td className="px-4 py-3 text-right font-mono tabular-nums font-medium text-indigo-600 dark:text-indigo-400 whitespace-nowrap">{formatINR(o.totalTax)}</td>
+                        <td className="px-4 py-3 text-right font-mono tabular-nums font-semibold text-emerald-600 dark:text-emerald-400 whitespace-nowrap">{formatINR(o.totalAmount)}</td>
+                        <td className="px-4 py-3 text-center font-sans whitespace-nowrap">
                           {o.settlementType === "POSTED_TO_ROOM" ? (
-                            <span className="px-2 py-0.5 rounded bg-blue-100 dark:bg-blue-950/80 text-blue-800 dark:text-blue-300 border border-blue-300 dark:border-blue-700 text-[10px] font-bold">
-                              🏨 Room Folio
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-blue-50/80 text-blue-700 border border-blue-200/80 dark:bg-blue-950/40 dark:text-blue-400 dark:border-blue-900/50 text-[11px] font-medium">
+                              <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />
+                              Room Folio
                             </span>
                           ) : o.settlementType === "DIRECT_PAID" ? (
-                            <span className="px-2 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700 text-[10px] font-bold">
-                              ✓ Paid Settle
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50/80 text-emerald-700 border border-emerald-200/80 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-900/50 text-[11px] font-medium">
+                              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                              Paid Settle
                             </span>
                           ) : (
-                            <span className="px-2 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-300 dark:border-zinc-700 text-[10px] font-bold">
-                              🕒 Open Ticket
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-zinc-100 text-zinc-700 border border-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:border-zinc-700 text-[11px] font-medium">
+                              <span className="h-1.5 w-1.5 rounded-full bg-zinc-400 dark:bg-zinc-500" />
+                              Open Ticket
                             </span>
                           )}
                         </td>
@@ -2074,6 +2580,409 @@ export default function ReportsPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL: RECORD DIRECT NON-ROOM INCOME (BAR, BANQUET, WALK-IN DINING) */}
+      {/* ========================================================================= */}
+      {showAddIncomeModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-xs p-4 overflow-y-auto animate-in fade-in">
+          <div className="w-full max-w-lg rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#111114] p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-zinc-200 dark:border-zinc-800">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60">
+                  <Banknote className="h-5 w-5" />
+                </div>
+                <div>
+                  <h2 className="text-sm font-black text-zinc-900 dark:text-zinc-100">
+                    Record Direct Collection / Income
+                  </h2>
+                  <p className="text-[11px] text-zinc-500">
+                    Interim manual register for Bar, Banquet advances & Walk-in dining
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowAddIncomeModal(false)}
+                className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 transition cursor-pointer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {incomeError && (
+              <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-xs text-rose-700 dark:text-rose-300 font-semibold flex items-center gap-2">
+                <AlertCircle className="h-4 w-4 shrink-0" />
+                <span>{incomeError}</span>
+              </div>
+            )}
+
+            {incomeSuccess && (
+              <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-xs text-emerald-700 dark:text-emerald-300 font-semibold flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
+                <span>{incomeSuccess}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleAddIncomeSubmit} className="space-y-3.5 text-xs">
+              {/* Income Category Dropdown */}
+              <div>
+                <label className="block text-zinc-700 dark:text-zinc-300 font-bold mb-1">
+                  Collection Source / Category *
+                </label>
+                <select
+                  required
+                  value={incomeForm.category}
+                  onChange={(e) => setIncomeForm({ ...incomeForm, category: e.target.value })}
+                  className="w-full rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-3 py-2.5 font-medium text-zinc-900 dark:text-zinc-100 focus:border-emerald-500 focus:outline-none cursor-pointer"
+                >
+                  <option value="BAR_FOOD_BILL">Bar Food Orders (Kitchen Food Bill)</option>
+                  <option value="BANQUET_EVENT_ADVANCE">Banquet & Event Advance Deposit</option>
+                  <option value="OUTSIDER_WALKIN_DINING">Direct Non-Resident Walk-In Dining</option>
+                  <option value="MISC_OUTLET_REVENUE">Ancillary & Other Outlet Collections</option>
+                </select>
+                <p className="text-[10px] text-zinc-500 dark:text-zinc-400 mt-1 font-mono">
+                  {incomeForm.category === "BAR_FOOD_BILL" && "Direct collection for food dispatched from kitchen to Bar/Lounge. (Bar liquor & drinks sales are not tracked in Hotel OS)."}
+                  {incomeForm.category === "BANQUET_EVENT_ADVANCE" && "Advance deposits or hall bookings. Client contact is mandatory; supports corporate GST details."}
+                  {incomeForm.category === "OUTSIDER_WALKIN_DINING" && "Direct food bill settlement for outside walk-in dining guests without room folio settlement."}
+                  {incomeForm.category === "MISC_OUTLET_REVENUE" && "Bakery, pool counter, merchandise, or miscellaneous counter sales."}
+                </p>
+              </div>
+
+              {/* Special Banquet Corporate / Individual Toggle & Details */}
+              {incomeForm.category === "BANQUET_EVENT_ADVANCE" && (
+                <div className="p-3 rounded-xl bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-200/80 dark:border-emerald-800/40 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-emerald-900 dark:text-emerald-300 flex items-center gap-1.5">
+                      <Building2 className="h-3.5 w-3.5" /> Client / Booking Type
+                    </span>
+                    <div className="flex rounded-lg bg-zinc-200 dark:bg-zinc-800 p-0.5 text-[10px] font-bold">
+                      <button
+                        type="button"
+                        onClick={() => setIncomeForm({ ...incomeForm, clientType: "INDIVIDUAL" })}
+                        className={`px-2.5 py-1 rounded-md transition cursor-pointer ${
+                          incomeForm.clientType === "INDIVIDUAL"
+                            ? "bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 shadow-xs"
+                            : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900"
+                        }`}
+                      >
+                        Individual Host
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setIncomeForm({ ...incomeForm, clientType: "COMPANY" })}
+                        className={`px-2.5 py-1 rounded-md transition cursor-pointer ${
+                          incomeForm.clientType === "COMPANY"
+                            ? "bg-emerald-600 text-white shadow-xs"
+                            : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900"
+                        }`}
+                      >
+                        Corporate / Company
+                      </button>
+                    </div>
+                  </div>
+
+                  {incomeForm.clientType === "COMPANY" && (
+                    <div className="space-y-2 pt-1">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <div>
+                          <label className="block text-zinc-700 dark:text-zinc-300 font-bold mb-1 text-[11px]">
+                            Company / Organization Name *
+                          </label>
+                          <input
+                            required={incomeForm.clientType === "COMPANY"}
+                            type="text"
+                            placeholder="e.g. Tata Consultancy Services Ltd"
+                            value={incomeForm.companyName}
+                            onChange={(e) => setIncomeForm({ ...incomeForm, companyName: e.target.value })}
+                            className="w-full rounded-lg bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 px-2.5 py-1.5 text-zinc-900 dark:text-zinc-100 focus:border-emerald-500 focus:outline-none"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-zinc-700 dark:text-zinc-300 font-bold mb-1 text-[11px]">
+                            Company GSTIN (15 Digits)
+                          </label>
+                          <input
+                            type="text"
+                            maxLength={15}
+                            placeholder="e.g. 18AABCT1332L1Z1"
+                            value={incomeForm.gstin}
+                            onChange={(e) => setIncomeForm({ ...incomeForm, gstin: e.target.value.toUpperCase() })}
+                            className="w-full rounded-lg bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 px-2.5 py-1.5 font-mono text-zinc-900 dark:text-zinc-100 focus:border-emerald-500 focus:outline-none uppercase"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <div>
+                          <label className="block text-zinc-700 dark:text-zinc-300 font-bold mb-1 text-[11px]">
+                            Company Billing Address
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="e.g. GS Road, Guwahati, Assam - 781005"
+                            value={incomeForm.billingAddress}
+                            onChange={(e) => setIncomeForm({ ...incomeForm, billingAddress: e.target.value })}
+                            className="w-full rounded-lg bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 px-2.5 py-1.5 text-zinc-900 dark:text-zinc-100 focus:border-emerald-500 focus:outline-none"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-zinc-700 dark:text-zinc-300 font-bold mb-1 text-[11px]">
+                            Event / Function Details
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="e.g. Annual Conference & Gala Dinner"
+                            value={incomeForm.eventDetails}
+                            onChange={(e) => setIncomeForm({ ...incomeForm, eventDetails: e.target.value })}
+                            className="w-full rounded-lg bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 px-2.5 py-1.5 text-zinc-900 dark:text-zinc-100 focus:border-emerald-500 focus:outline-none"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Guest / Party Name & Mobile */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-zinc-700 dark:text-zinc-300 font-bold mb-1">
+                    {incomeForm.category === "BANQUET_EVENT_ADVANCE"
+                      ? "Contact Person / Host Name *"
+                      : "Guest / Party Name (Optional)"}
+                  </label>
+                  <input
+                    required={incomeForm.category === "BANQUET_EVENT_ADVANCE"}
+                    type="text"
+                    placeholder={
+                      incomeForm.category === "BANQUET_EVENT_ADVANCE"
+                        ? "e.g. Mr. Rajesh Sharma (Host)"
+                        : incomeForm.category === "BAR_FOOD_BILL"
+                        ? "e.g. Bar Table 4, Counter Guest"
+                        : "e.g. Walk-In Guest (Optional)"
+                    }
+                    value={incomeForm.payerName}
+                    onChange={(e) => setIncomeForm({ ...incomeForm, payerName: e.target.value })}
+                    className="w-full rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-3 py-2 text-zinc-900 dark:text-zinc-100 focus:border-emerald-500 focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-zinc-700 dark:text-zinc-300 font-bold mb-1">
+                    {incomeForm.category === "BANQUET_EVENT_ADVANCE"
+                      ? "Contact Mobile Number *"
+                      : "Contact Mobile (Optional)"}
+                  </label>
+                  <input
+                    required={incomeForm.category === "BANQUET_EVENT_ADVANCE"}
+                    type="tel"
+                    placeholder="e.g. 9876543210"
+                    value={incomeForm.payerPhone}
+                    onChange={(e) => setIncomeForm({ ...incomeForm, payerPhone: e.target.value })}
+                    className="w-full rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-3 py-2 text-zinc-900 dark:text-zinc-100 focus:border-emerald-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              {/* KOT Number & Reference / Slip (Only for F&B Dining and Bar Outlets, hidden for Banquet) */}
+              {incomeForm.category !== "BANQUET_EVENT_ADVANCE" && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-zinc-700 dark:text-zinc-300 font-bold mb-1 flex items-center gap-1">
+                      <UtensilsCrossed className="h-3.5 w-3.5 text-orange-600 dark:text-orange-400" />
+                      <span>KOT / Kitchen Slip # (Optional)</span>
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. KOT-104, KOT-42"
+                      value={incomeForm.kotNo}
+                      onChange={(e) => setIncomeForm({ ...incomeForm, kotNo: e.target.value })}
+                      className="w-full rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-3 py-2 text-zinc-900 dark:text-zinc-100 focus:border-emerald-500 focus:outline-none font-mono"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-zinc-700 dark:text-zinc-300 font-bold mb-1">
+                      Bill / POS Slip / UTR # (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Slip #8812, UTR 29384"
+                      value={incomeForm.reference}
+                      onChange={(e) => setIncomeForm({ ...incomeForm, reference: e.target.value })}
+                      className="w-full rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-3 py-2 text-zinc-900 dark:text-zinc-100 focus:border-emerald-500 focus:outline-none font-mono"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Amount and Payment Mode */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-zinc-700 dark:text-zinc-300 font-bold mb-1">
+                    Collected Amount (INR) *
+                  </label>
+                  <input
+                    required
+                    type="number"
+                    min="1"
+                    step="any"
+                    placeholder="e.g. 1500"
+                    value={incomeForm.amount}
+                    onChange={(e) => setIncomeForm({ ...incomeForm, amount: e.target.value })}
+                    className="w-full rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-3 py-2 font-mono font-bold text-zinc-900 dark:text-zinc-100 focus:border-emerald-500 focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-zinc-700 dark:text-zinc-300 font-bold mb-1">
+                    Payment Method *
+                  </label>
+                  <select
+                    value={incomeForm.paymentMethod}
+                    onChange={(e) => setIncomeForm({ ...incomeForm, paymentMethod: e.target.value })}
+                    className="w-full rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-3 py-2 text-zinc-900 dark:text-zinc-100 focus:border-emerald-500 focus:outline-none cursor-pointer"
+                  >
+                    <option value="CASH">Cash (Drawer Handover)</option>
+                    <option value="UPI">UPI / QR Code</option>
+                    <option value="CARD">Credit / Debit Card</option>
+                    <option value="BANK_TRANSFER">Bank Transfer / NEFT</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Narration and Notes */}
+              <div>
+                <label className="block text-zinc-700 dark:text-zinc-300 font-bold mb-1">
+                  Narration / Remarks (Optional)
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder="Additional billing details, guest requests, or event schedule..."
+                  value={incomeForm.notes}
+                  onChange={(e) => setIncomeForm({ ...incomeForm, notes: e.target.value })}
+                  className="w-full rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-3 py-2 text-zinc-900 dark:text-zinc-100 focus:border-emerald-500 focus:outline-none resize-none"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t border-zinc-200 dark:border-zinc-800">
+                <button
+                  type="button"
+                  onClick={() => setShowAddIncomeModal(false)}
+                  className="rounded-xl border border-zinc-300 dark:border-zinc-700 px-4 py-2 font-bold text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={incomeSubmitting}
+                  className="rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-2 font-bold shadow-xs transition cursor-pointer flex items-center gap-1.5"
+                >
+                  {incomeSubmitting ? (
+                    <>
+                      <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                      <span>Recording Receipt...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Check className="h-3.5 w-3.5" />
+                      <span>Record Collection & Issue Receipt</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL: PRINTABLE EXPENSE REGISTER SHEET */}
+      {/* ========================================================================= */}
+      {showExpensesPrintModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4 overflow-y-auto">
+          <div className="w-full max-w-5xl rounded-2xl border border-zinc-700 bg-white text-zinc-950 p-6 shadow-2xl space-y-4 font-sans text-xs">
+            <div className="flex items-center justify-between pb-3 border-b border-zinc-200">
+              <span className="text-xs font-bold uppercase font-mono text-zinc-600">
+                Official Operational Expense Register
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => window.print()}
+                  className="flex items-center gap-1.5 rounded-lg bg-zinc-950 px-3 py-1.5 text-xs font-bold text-white hover:bg-zinc-800 transition shadow-sm cursor-pointer"
+                >
+                  <Printer className="h-3.5 w-3.5" /> Print Expense Sheet
+                </button>
+                <button onClick={() => setShowExpensesPrintModal(false)} className="text-zinc-500 hover:text-zinc-900 cursor-pointer">
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div className="flex justify-between items-start border-b border-zinc-300 pb-3">
+                <div>
+                  <h1 className="text-base font-black uppercase text-zinc-950">{activeProperty?.displayName || "Hotel Ambarish Grand Residency"}</h1>
+                  <p className="text-[11px] text-zinc-600">{activeProperty?.legalName}</p>
+                  <p className="font-mono text-[11px] text-zinc-700">
+                    GSTIN: {activeProperty?.gstin || "N/A"} | State: {activeProperty?.stateCode || "18"}
+                  </p>
+                </div>
+                <div className="text-right font-mono">
+                  <div className="font-bold text-zinc-950">EXPENSE REGISTER & CASH OUTFLOWS</div>
+                  <div className="text-zinc-600 text-[11px]">Business Date: {selectedDate || activeProperty?.businessDate}</div>
+                  <div className="text-zinc-600 text-[11px]">Printed: {new Date().toLocaleString()}</div>
+                  <div className="font-bold text-rose-700 text-sm mt-1">
+                    Total Outflows: {formatINR(expenseKPIs.totalOutflow)} ({filteredExpenseVouchers.length} Vouchers)
+                  </div>
+                </div>
+              </div>
+
+              <table className="w-full text-left text-xs border border-zinc-200">
+                <thead>
+                  <tr className="bg-zinc-100 border-b border-zinc-200 text-[10px] font-bold text-zinc-600 uppercase font-mono">
+                    <th className="p-2">Voucher #</th>
+                    <th className="p-2">Time</th>
+                    <th className="p-2">Category</th>
+                    <th className="p-2">Payee / Vendor</th>
+                    <th className="p-2">Particulars</th>
+                    <th className="p-2">Mode</th>
+                    <th className="p-2">Reference</th>
+                    <th className="p-2 text-right">Amount</th>
+                    <th className="p-2">Authorized By</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-zinc-200 font-mono text-[11px]">
+                  {filteredExpenseVouchers.map((e: any) => (
+                    <tr key={e.id}>
+                      <td className="p-2 font-bold">{e.voucherNo}</td>
+                      <td className="p-2">{e.time}</td>
+                      <td className="p-2 font-sans">{e.category.replace(/_/g, " ")}</td>
+                      <td className="p-2 font-sans font-medium">{e.payeeName}</td>
+                      <td className="p-2 font-sans">{e.description}</td>
+                      <td className="p-2">{e.method}</td>
+                      <td className="p-2">{e.reference || "—"}</td>
+                      <td className="p-2 text-right font-bold text-rose-700">{formatINR(e.totalAmount || e.amount)}</td>
+                      <td className="p-2 font-sans">{e.authorizedBy}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+
+              <div className="pt-8 flex justify-between items-end text-[11px]">
+                <div className="text-center">
+                  <div className="w-40 border-b border-zinc-400 pb-6 text-zinc-400 italic">Front Desk Cashier</div>
+                  <span className="font-bold">Disbursed By</span>
+                </div>
+                <div className="text-center">
+                  <div className="w-40 border-b border-zinc-400 pb-6 text-zinc-400 italic">Duty Manager / Auditor</div>
+                  <span className="font-bold">Audited & Approved By</span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}

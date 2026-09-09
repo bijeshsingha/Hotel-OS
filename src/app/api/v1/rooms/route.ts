@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
+import { getEffectiveStayDeparture } from "@/lib/domain/pms-service";
 
 export async function GET(request: Request) {
   try {
@@ -59,7 +60,24 @@ export async function GET(request: Request) {
         }).catch((err) => console.error("Auto-heal roomState error:", err));
       }
 
-      const activeAssignments = room.assignments.filter((a: any) => a.stay?.status === "IN_HOUSE");
+      const activeAssignments = room.assignments
+        .filter((a: any) => a.stay?.status === "IN_HOUSE")
+        .map((a: any) => {
+          if (a.stay) {
+            const dynamicDep = getEffectiveStayDeparture(a.stay);
+            return {
+              ...a,
+              stay: {
+                ...a.stay,
+                expectedDepartureAt: dynamicDep.effectiveDepartureAt.toISOString(),
+                isExtendedDeparture: dynamicDep.isExtended,
+                extensionNights: dynamicDep.extensionNights,
+                originalExpectedDepartureAt: dynamicDep.originalDepartureAt.toISOString(),
+              },
+            };
+          }
+          return a;
+        });
 
       return {
         ...room,

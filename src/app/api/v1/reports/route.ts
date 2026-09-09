@@ -83,11 +83,16 @@ export async function GET(request: Request) {
         let payerName = "Guest Payer";
         let roomNumber = "—";
         let stayId = p.folio?.stayId || "—";
+        let incomeCategory = "";
+        let incomeCategoryLabel = "";
+        let snapshot: any = {};
 
         if (p.payerSnapshot) {
           try {
-            const parsed = JSON.parse(p.payerSnapshot);
-            if (parsed.name) payerName = parsed.name;
+            snapshot = JSON.parse(p.payerSnapshot);
+            if (snapshot.name) payerName = snapshot.name;
+            if (snapshot.category) incomeCategory = snapshot.category;
+            if (snapshot.categoryLabel) incomeCategoryLabel = snapshot.categoryLabel;
           } catch (e) {}
         }
         if (p.folio?.stay?.primaryGuest?.name) {
@@ -105,6 +110,22 @@ export async function GET(request: Request) {
         let sourceLabel = "Room Folio Settlement";
 
         if (
+          incomeCategory === "BAR_FOOD_BILL" ||
+          incomeCategory === "BAR_BEVERAGE_DIRECT" ||
+          (!p.folioId && (refLower.includes("bar food") || refLower.includes("bar")))
+        ) {
+          sourceCategory = "BAR_BEVERAGE";
+          sourceLabel = incomeCategoryLabel || "Bar Food Orders (Kitchen Food Bill)";
+        } else if (incomeCategory === "BANQUET_EVENT_ADVANCE" || (!p.folioId && refLower.includes("banquet"))) {
+          sourceCategory = "BANQUET_ADVANCE";
+          sourceLabel = incomeCategoryLabel || "Banquet & Event Advance Deposit";
+        } else if (incomeCategory === "OUTSIDER_WALKIN_DINING" || (!p.folioId && (refLower.includes("walk-in") || refLower.includes("dining")))) {
+          sourceCategory = "POS_RESTAURANT";
+          sourceLabel = incomeCategoryLabel || "Direct Non-Resident Walk-In Dining";
+        } else if (incomeCategory === "MISC_OUTLET_REVENUE") {
+          sourceCategory = "MISC_OUTLET";
+          sourceLabel = incomeCategoryLabel || "Ancillary & Other Outlet Collections";
+        } else if (
           p.reservationId ||
           refLower.includes("grc-deposit") ||
           refLower.includes("advance") ||
@@ -117,8 +138,7 @@ export async function GET(request: Request) {
           p.orderId ||
           refLower.includes("pos") ||
           refLower.includes("order-") ||
-          refLower.includes("restaurant") ||
-          refLower.includes("dining")
+          refLower.includes("restaurant")
         ) {
           sourceCategory = "POS_RESTAURANT";
           sourceLabel = "Restaurant / POS Direct";
@@ -153,6 +173,9 @@ export async function GET(request: Request) {
           sourceLabel,
           collectionType: sourceLabel,
           payerName,
+          companyName: snapshot.companyName || null,
+          gstin: snapshot.gstin || null,
+          kotNo: snapshot.kotNo || null,
           roomNumber,
           stayId,
           folioId: p.folioId || "—",
@@ -160,7 +183,7 @@ export async function GET(request: Request) {
           method: p.method, // UPI, CASH, CARD, OTA_VCC, BANK_TRANSFER, DIRECT_BILL
           reference: p.reference && !p.reference.startsWith("GRC-DEPOSIT-") ? p.reference : "—",
           status: p.status,
-          receivedBy: "Front Desk Cashier",
+          receivedBy: p.createdById || "Front Desk Cashier",
         };
       });
 
@@ -198,6 +221,9 @@ export async function GET(request: Request) {
         ADVANCE_DEPOSIT: 0,
         FOLIO_SETTLEMENT: 0,
         POS_RESTAURANT: 0,
+        BAR_BEVERAGE: 0,
+        BANQUET_ADVANCE: 0,
+        MISC_OUTLET: 0,
         OTA_COLLECTION: 0,
         DIRECT_PAYMENT: 0,
       };
@@ -269,14 +295,24 @@ export async function GET(request: Request) {
         collections: formattedCollections,
         expenses: formattedExpenses,
         allTransactions: [
-          ...formattedCollections.map((c) => ({
-            ...c,
-            recordId: c.receiptNo,
-            flow: "INFLOW",
-            party: c.payerName,
-            particulars: `Room ${c.roomNumber} (${c.sourceLabel})`,
-            netAmount: c.amount,
-          })),
+          ...formattedCollections.map((c) => {
+            const kotFormatted = c.kotNo
+              ? c.kotNo.toUpperCase().startsWith("KOT")
+                ? c.kotNo
+                : `KOT #${c.kotNo}`
+              : null;
+            return {
+              ...c,
+              recordId: c.receiptNo,
+              flow: "INFLOW",
+              party: c.companyName ? `${c.payerName} (${c.companyName})` : c.payerName,
+              particulars:
+                c.roomNumber && c.roomNumber !== "—"
+                  ? `Room ${c.roomNumber} (${c.sourceLabel})`
+                  : `${c.sourceLabel}${kotFormatted ? ` [${kotFormatted}]` : ""}${c.gstin ? ` [GST: ${c.gstin}]` : ""}${c.reference && c.reference !== "—" && !c.reference.includes(c.sourceLabel) ? ` - ${c.reference}` : ""}`,
+              netAmount: c.amount,
+            };
+          }),
           ...formattedExpenses.map((e) => ({
             ...e,
             recordId: e.voucherNo,
@@ -367,7 +403,7 @@ export async function GET(request: Request) {
         orderWhere.createdAt = dateFilter;
       }
 
-      const [orders, property] = await Promise.all([
+      const [orders, directPayments, property] = await Promise.all([
         prisma.order.findMany({
           where: orderWhere,
           include: {
@@ -388,6 +424,15 @@ export async function GET(request: Request) {
             },
           },
           orderBy: { createdAt: "desc" },
+        }),
+        prisma.payment.findMany({
+          where: {
+            propertyId,
+            status: "SUCCEEDED",
+            folioId: null,
+            ...(dateFilter ? { receivedAt: dateFilter } : {}),
+          },
+          orderBy: { receivedAt: "desc" },
         }),
         prisma.property.findUnique({
           where: { id: propertyId },
@@ -508,6 +553,75 @@ export async function GET(request: Request) {
         };
       });
 
+      // Process Direct F&B, Bar & Banquet Collections (Non-POS)
+      const directFnbCollections = directPayments
+        .map((p) => {
+          let snapshot: any = {};
+          try {
+            if (p.payerSnapshot) snapshot = JSON.parse(p.payerSnapshot);
+          } catch (e) {}
+
+          const refLower = (p.reference || "").toLowerCase();
+          const isFnbRelated =
+            snapshot.category === "BAR_FOOD_BILL" ||
+            snapshot.category === "BAR_BEVERAGE_DIRECT" ||
+            snapshot.category === "BANQUET_EVENT_ADVANCE" ||
+            snapshot.category === "OUTSIDER_WALKIN_DINING" ||
+            snapshot.category === "MISC_OUTLET_REVENUE" ||
+            p.orderId ||
+            refLower.includes("bar food") ||
+            refLower.includes("bar") ||
+            refLower.includes("dining") ||
+            refLower.includes("restaurant") ||
+            refLower.includes("banquet");
+
+          if (!isFnbRelated) return null;
+
+          const amount = p.amount;
+          const taxable = Math.round((amount / 1.05) * 100) / 100;
+          const tax = Math.round((amount - taxable) * 100) / 100;
+
+          return {
+            id: p.id,
+            receiptNo: p.receiptNo,
+            category: snapshot.category || "OUTSIDER_WALKIN_DINING",
+            categoryLabel:
+              snapshot.categoryLabel ||
+              (refLower.includes("bar")
+                ? "Bar Food Orders (Kitchen Food Bill)"
+                : refLower.includes("banquet")
+                ? "Banquet & Event Advance Deposit"
+                : "Direct Non-Resident Walk-In Dining"),
+            payerName:
+              snapshot.companyName
+                ? `${snapshot.name || "Guest"} (${snapshot.companyName})`
+                : snapshot.name || (snapshot.category?.startsWith("BAR") ? "Bar Counter (Food)" : "Walk-In Guest"),
+            phone: snapshot.phone || null,
+            kotNo: snapshot.kotNo || null,
+            companyName: snapshot.companyName || null,
+            gstin: snapshot.gstin || null,
+            amount,
+            taxableAmount: taxable,
+            taxAmount: tax,
+            method: p.method,
+            reference: p.reference || "—",
+            notes: snapshot.notes || null,
+            receivedAt: p.receivedAt.toISOString(),
+            dateFormatted: p.receivedAt.toISOString().split("T")[0],
+            timeFormatted: p.receivedAt.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }),
+          };
+        })
+        .filter(Boolean);
+
+      const directFnbTotal = directFnbCollections.reduce((sum: number, d: any) => sum + d.amount, 0);
+      const directFnbTaxable = directFnbCollections.reduce((sum: number, d: any) => sum + d.taxableAmount, 0);
+      const directFnbTax = directFnbCollections.reduce((sum: number, d: any) => sum + d.taxAmount, 0);
+
+      const combinedGross = totalGross + directFnbTotal;
+      const combinedTaxable = totalTaxable + directFnbTaxable;
+      const combinedGst = totalGst + directFnbTax;
+      const combinedDirectSettled = directSettledAmount + directFnbTotal;
+
       return NextResponse.json({
         reportType: "FNB",
         dayCycle: "12:00 AM – 12:00 AM Midnight",
@@ -516,14 +630,16 @@ export async function GET(request: Request) {
           totalOrdersCount: orders.length,
           totalKotsFired: totalKotsCount,
           totalItemsPrepared,
-          grossCollection: totalGross,
-          taxableSales: totalTaxable,
-          gstCollected: totalGst,
+          grossCollection: combinedGross,
+          taxableSales: combinedTaxable,
+          gstCollected: combinedGst,
           folioPostedAmount,
-          directSettledAmount,
+          directSettledAmount: combinedDirectSettled,
+          directFnbTotal,
           destinationsBreakdown,
         },
         rows,
+        directFnbCollections,
       });
     }
 

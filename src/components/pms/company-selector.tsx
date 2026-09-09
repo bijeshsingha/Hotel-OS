@@ -157,7 +157,7 @@ export function CompanySelector({
         <button
           type="button"
           onClick={() => setIsOpen(!isOpen)}
-          className="w-full h-10 px-3 pr-16 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs text-zinc-900 dark:text-white flex items-center justify-between gap-2 focus:border-indigo-500 focus:outline-none transition shadow-xs cursor-pointer text-left"
+          className="w-full h-9 px-3 pr-16 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-white flex items-center justify-between gap-2 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all shadow-xs cursor-pointer text-left"
         >
           <div className="flex items-center gap-2 truncate">
             {selectedCompany?.accountType === "TRAVEL_AGENT" ? (
@@ -165,11 +165,11 @@ export function CompanySelector({
             ) : (
               <Briefcase className="h-4 w-4 text-indigo-500 shrink-0" />
             )}
-            <span className={`truncate font-semibold ${currentSelectionName ? "text-zinc-900 dark:text-white" : "text-zinc-400"}`}>
+            <span className={`truncate font-medium ${currentSelectionName ? "text-zinc-900 dark:text-white" : "text-zinc-400"}`}>
               {currentSelectionName || placeholder}
             </span>
             {selectedCompany?.gstin && (
-              <span className="hidden sm:inline-block text-[10px] font-mono font-bold bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 px-1.5 py-0.5 rounded border border-zinc-200 dark:border-zinc-700 shrink-0">
+              <span className="hidden sm:inline-block text-[10px] font-mono font-medium bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 px-1.5 py-0.5 rounded border border-zinc-200 dark:border-zinc-700 shrink-0">
                 GST: {selectedCompany.gstin}
               </span>
             )}
@@ -187,9 +187,9 @@ export function CompanySelector({
                 setIsOpen(false);
               }}
               title="Unselect / Clear Company"
-              className="p-1 rounded-lg text-zinc-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition cursor-pointer"
+              className="p-1 rounded-md text-zinc-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition cursor-pointer"
             >
-              <X className="h-4 w-4" />
+              <X className="h-3.5 w-3.5" />
             </button>
           ) : null}
 
@@ -205,10 +205,10 @@ export function CompanySelector({
 
       {/* Dropdown Menu */}
       {isOpen && (
-        <div className="absolute left-0 right-0 top-full mt-1 z-50 bg-white dark:bg-[#18181b] border border-zinc-200 dark:border-zinc-700 rounded-2xl shadow-xl overflow-hidden animate-in fade-in slide-in-from-top-1 max-h-72 flex flex-col">
+        <div className="absolute left-0 right-0 top-full mt-1 z-50 bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-xl overflow-hidden animate-in fade-in slide-in-from-top-1 max-h-72 flex flex-col">
           
           {/* Search Header */}
-          <div className="p-2 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/60 flex items-center gap-2">
+          <div className="p-2 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/50 flex items-center gap-2">
             <Search className="h-3.5 w-3.5 text-zinc-400 shrink-0 ml-1" />
             <input
               type="text"

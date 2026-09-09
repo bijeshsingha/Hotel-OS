@@ -1324,70 +1324,82 @@ function PMSFrontDeskContent() {
 
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs whitespace-nowrap">
-              <thead className="bg-zinc-50 dark:bg-zinc-900/80 text-zinc-600 dark:text-zinc-400 uppercase font-mono text-[10.5px] border-b border-zinc-200 dark:border-zinc-800">
+              <thead className="bg-zinc-50/90 dark:bg-zinc-900/90 text-zinc-600 dark:text-zinc-400 uppercase text-[11px] font-semibold tracking-wider border-b border-zinc-200 dark:border-zinc-800">
                 <tr>
-                  <th className="px-3.5 py-2.5 font-bold">Room #</th>
-                  <th className="px-3.5 py-2.5 font-bold">Bed Setup</th>
-                  <th className="px-3.5 py-2.5 font-bold">Guest Name</th>
-                  <th className="px-3.5 py-2.5 font-bold">Phone Number</th>
-                  <th className="px-3.5 py-2.5 font-bold">Pax</th>
-                  <th className="px-3.5 py-2.5 font-bold">Arrival Date</th>
-                  <th className="px-3.5 py-2.5 font-bold">Departure</th>
-                  <th className="px-3.5 py-2.5 font-bold">Folio / Tariff</th>
-                  <th className="px-3.5 py-2.5 font-bold text-right">Actions</th>
+                  <th className="px-4 py-3">Room #</th>
+                  <th className="px-4 py-3">Bed Setup</th>
+                  <th className="px-4 py-3">Guest Name</th>
+                  <th className="px-4 py-3">Phone Number</th>
+                  <th className="px-4 py-3">Pax</th>
+                  <th className="px-4 py-3">Arrival Date</th>
+                  <th className="px-4 py-3">Departure</th>
+                  <th className="px-4 py-3">Folio Balance</th>
+                  <th className="px-4 py-3 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800/60 font-medium">
+              <tbody className="divide-y divide-zinc-200/70 dark:divide-zinc-800/60 font-medium">
                 {stays.filter(s => s.status === "IN_HOUSE").map((stay) => {
                   const roomAssignment = stay.roomAssignments?.[0]?.room;
-                  const roomNumber = roomAssignment?.number || "N/A";
+                  const roomNumber = roomAssignment?.number || "—";
                   const bedCat = roomAssignment ? getBedCategory(roomAssignment) : "KING";
                   const guestName = formatGuestDisplayName(stay.primaryGuest?.name) || "Valued Guest";
-                  const guestPhone = stay.primaryGuest?.phone || "N/A";
-                  const arrival = stay.arrivalAt ? new Date(stay.arrivalAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "N/A";
-                  const departure = stay.expectedDepartureAt ? new Date(stay.expectedDepartureAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "N/A";
+                  const guestPhone = stay.primaryGuest?.phone || "—";
+                  const arrival = stay.arrivalAt ? new Date(stay.arrivalAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—";
+                  const departure = stay.expectedDepartureAt ? new Date(stay.expectedDepartureAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—";
 
                   return (
-                    <tr key={stay.id} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/40 transition">
-                      <td className="px-3.5 py-2.5 font-bold text-sm font-mono text-zinc-900 dark:text-white">
-                        <span className="px-2 py-0.5 rounded-lg bg-blue-50 dark:bg-blue-600/20 border border-blue-200 dark:border-blue-500/40 text-blue-800 dark:text-blue-300">
+                    <tr key={stay.id} className="hover:bg-zinc-50/80 dark:hover:bg-zinc-900/40 transition-colors">
+                      <td className="px-4 py-3 font-semibold text-sm font-mono text-zinc-900 dark:text-white">
+                        <span className="px-2.5 py-0.5 rounded-md bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100">
                           {roomNumber}
                         </span>
                       </td>
-                      <td className="px-3.5 py-2.5 font-mono text-xs">
+                      <td className="px-4 py-3 text-xs">
                         {bedCat === "TWIN" ? (
-                          <span className="text-cyan-700 dark:text-cyan-400 font-bold">🛏️🛏️ Twin</span>
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-cyan-50 dark:bg-cyan-950/40 text-cyan-700 dark:text-cyan-300 border border-cyan-200/80 dark:border-cyan-800/60">Twin Bed</span>
                         ) : bedCat === "SUITE" ? (
-                          <span className="text-purple-700 dark:text-purple-400 font-bold">👑 Suite</span>
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border border-purple-200/80 dark:border-purple-800/60">Suite</span>
                         ) : (
-                          <span className="text-amber-700 dark:text-amber-400 font-bold">🛏️ King</span>
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200/80 dark:border-amber-800/60">King Bed</span>
                         )}
                       </td>
-                      <td className="px-3.5 py-2.5 font-bold text-zinc-900 dark:text-white text-xs">{guestName}</td>
-                      <td className="px-3.5 py-2.5 font-mono text-zinc-600 dark:text-zinc-300">{guestPhone}</td>
-                      <td className="px-3.5 py-2.5 font-mono text-zinc-600 dark:text-zinc-300">{stay.adults || 1} Adults</td>
-                      <td className="px-3.5 py-2.5 font-mono text-zinc-600 dark:text-zinc-300">{arrival}</td>
-                      <td className="px-3.5 py-2.5 font-mono text-zinc-600 dark:text-zinc-300">{departure}</td>
-                      <td className="px-3.5 py-2.5 font-mono font-bold text-emerald-700 dark:text-emerald-400">
+                      <td className="px-4 py-3 font-semibold text-zinc-900 dark:text-white text-xs">{guestName}</td>
+                      <td className="px-4 py-3 font-mono text-zinc-600 dark:text-zinc-400">{guestPhone}</td>
+                      <td className="px-4 py-3 font-mono text-zinc-600 dark:text-zinc-400">{stay.adults || 1} Adults</td>
+                      <td className="px-4 py-3 font-mono text-zinc-600 dark:text-zinc-400">{arrival}</td>
+                      <td className="px-4 py-3 font-mono text-zinc-600 dark:text-zinc-400">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span>{departure}</span>
+                          {stay.isExtendedDeparture && (
+                            <span
+                              title={stay.originalExpectedDepartureAt ? `Original departure: ${new Date(stay.originalExpectedDepartureAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}` : "Auto-extended stay"}
+                              className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200/80 dark:border-amber-800/60"
+                            >
+                              Extended{stay.extensionNights > 1 ? ` (+${stay.extensionNights - 1}N)` : ""}
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 font-mono font-bold tabular-nums text-emerald-700 dark:text-emerald-400">
                         {formatINR(stay.folio?.balance || 0)}
                       </td>
-                      <td className="px-3.5 py-2.5 text-right space-x-1.5">
+                      <td className="px-4 py-3 text-right space-x-1.5">
                         <button
                           onClick={() => router.push(`/billing?stayId=${stay.id}`)}
-                          className="px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 font-bold text-white text-xs transition shadow-xs cursor-pointer"
+                          className="px-2.5 py-1 rounded-md bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-100 dark:hover:bg-white font-medium text-white dark:text-zinc-950 text-xs transition shadow-2xs cursor-pointer"
                         >
                           Folio
                         </button>
                         <button
                           onClick={(e) => handleOpenMoveModal(stay, stay.roomAssignments?.[0]?.room, e)}
-                          className="px-2.5 py-1 rounded-lg bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 font-bold text-zinc-700 dark:text-zinc-300 text-xs transition shadow-xs cursor-pointer"
+                          className="px-2.5 py-1 rounded-md bg-white hover:bg-zinc-100 dark:bg-zinc-800 dark:hover:bg-zinc-700 font-medium text-zinc-700 dark:text-zinc-300 text-xs border border-zinc-200 dark:border-zinc-700 transition shadow-2xs cursor-pointer"
                           title="Move Room / Room Change"
                         >
                           Move
                         </button>
                         <button
                           onClick={(e) => handleDirectCheckout(stay.id, e)}
-                          className="px-2.5 py-1 rounded-lg bg-rose-600/90 hover:bg-rose-600 font-bold text-white text-xs transition shadow-xs cursor-pointer"
+                          className="px-2.5 py-1 rounded-md bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 font-medium text-rose-700 dark:text-rose-300 text-xs border border-rose-200 dark:border-rose-800/60 transition shadow-2xs cursor-pointer"
                         >
                           Checkout
                         </button>
@@ -1464,7 +1476,7 @@ function PMSFrontDeskContent() {
                 placeholder="Search by guest name, mobile phone, registration number, or room..."
                 value={regSearchQuery}
                 onChange={(e) => setRegSearchQuery(e.target.value)}
-                className="w-full h-9 pl-9 pr-8 rounded-xl bg-white dark:bg-zinc-900/90 border border-zinc-200 dark:border-zinc-700/80 text-zinc-900 dark:text-white text-xs placeholder:text-zinc-400 focus:outline-none focus:border-blue-500 transition font-mono shadow-xs"
+                className="w-full h-9 pl-9 pr-8 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 text-xs sm:text-sm placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 transition shadow-2xs font-normal"
               />
               {regSearchQuery && (
                 <button
@@ -1479,19 +1491,19 @@ function PMSFrontDeskContent() {
 
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs whitespace-nowrap">
-              <thead className="bg-zinc-50 dark:bg-zinc-900/80 text-zinc-600 dark:text-zinc-400 uppercase font-mono text-[10.5px] border-b border-zinc-200 dark:border-zinc-800">
+              <thead className="bg-zinc-50/90 dark:bg-zinc-900/90 text-zinc-600 dark:text-zinc-400 uppercase text-[11px] font-semibold tracking-wider border-b border-zinc-200 dark:border-zinc-800">
                 <tr>
-                  <th className="px-3.5 py-2.5 font-bold min-w-[120px]">Status</th>
-                  <th className="px-3.5 py-2.5 font-bold min-w-[140px]">GRC Number</th>
-                  <th className="px-3.5 py-2.5 font-bold min-w-[160px]">Guest Full Name</th>
-                  <th className="px-3.5 py-2.5 font-bold min-w-[120px]">Contact Mobile</th>
-                  <th className="px-3.5 py-2.5 font-bold min-w-[120px]">Room Allocated</th>
-                  <th className="px-3.5 py-2.5 font-bold min-w-[130px]">Submission Date</th>
-                  <th className="px-3.5 py-2.5 font-bold min-w-[140px]">City / State</th>
-                  <th className="px-3.5 py-2.5 font-bold text-right min-w-[140px]">Actions</th>
+                  <th className="px-4 py-3 min-w-[120px]">Status</th>
+                  <th className="px-4 py-3 min-w-[140px]">GRC Number</th>
+                  <th className="px-4 py-3 min-w-[160px]">Guest Full Name</th>
+                  <th className="px-4 py-3 min-w-[120px]">Contact Mobile</th>
+                  <th className="px-4 py-3 min-w-[120px]">Room Allocated</th>
+                  <th className="px-4 py-3 min-w-[130px]">Submission Date</th>
+                  <th className="px-4 py-3 min-w-[140px]">City / State</th>
+                  <th className="px-4 py-3 text-right min-w-[140px]">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800/60 font-medium">
+              <tbody className="divide-y divide-zinc-200/70 dark:divide-zinc-800/60 font-medium">
                 {registrations
                   .filter((reg) => {
                     if (registrationStatusFilter === "PENDING_REVIEW" && reg.status !== "PENDING_REVIEW") return false;
@@ -1512,39 +1524,40 @@ function PMSFrontDeskContent() {
                     return (
                       <tr
                         key={reg.id}
-                        className={`transition ${
-                          isPending ? "bg-amber-50/70 dark:bg-amber-950/10 hover:bg-amber-100/70 dark:hover:bg-amber-950/20" : "hover:bg-zinc-50 dark:hover:bg-zinc-800/40"
+                        className={`transition-colors ${
+                          isPending ? "bg-amber-50/50 dark:bg-amber-950/10 hover:bg-amber-100/60 dark:hover:bg-amber-950/20" : "hover:bg-zinc-50/80 dark:hover:bg-zinc-900/40"
                         }`}
                       >
-                        <td className="px-3.5 py-2.5 whitespace-nowrap">
+                        <td className="px-4 py-3 whitespace-nowrap">
                           <span
-                            className={`px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold border whitespace-nowrap inline-flex items-center gap-1 shrink-0 ${
+                            className={`px-2.5 py-0.5 rounded-full text-xs font-medium border whitespace-nowrap inline-flex items-center gap-1.5 shrink-0 ${
                               isPending
-                                ? "bg-amber-100 dark:bg-amber-500/10 text-amber-800 dark:text-amber-400 border-amber-300 dark:border-amber-500/30 animate-pulse"
-                                : "bg-emerald-100 dark:bg-emerald-500/10 text-emerald-800 dark:text-emerald-400 border-emerald-300 dark:border-emerald-500/30"
+                                ? "bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800/60"
+                                : "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/60"
                             }`}
                           >
-                            {isPending ? "⏳ PENDING REVIEW" : "✓ CHECKED IN"}
+                            <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${isPending ? "bg-amber-500" : "bg-emerald-500"}`} />
+                            {isPending ? "Pending Review" : "Checked In"}
                           </span>
                         </td>
-                        <td className="px-3.5 py-2.5 font-mono font-bold text-blue-600 dark:text-blue-400 whitespace-nowrap">{reg.registrationNo}</td>
-                        <td className="px-3.5 py-2.5 font-bold text-zinc-900 dark:text-white whitespace-nowrap">
+                        <td className="px-4 py-3 font-mono font-semibold text-blue-600 dark:text-blue-400 whitespace-nowrap">{reg.registrationNo}</td>
+                        <td className="px-4 py-3 font-semibold text-zinc-900 dark:text-white whitespace-nowrap">
                           <div className="flex items-center gap-1.5">
                             <span>{reg.fullName}</span>
                             {reg.idPhotoUrl && (
-                              <span className="text-[9.5px] bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-300 px-1.5 py-0.5 rounded border border-blue-200 dark:border-blue-800 font-mono">
+                              <span className="text-[10px] bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 px-1.5 py-0.5 rounded-md border border-blue-200/80 dark:border-blue-800/60 font-medium">
                                 ID Photo
                               </span>
                             )}
                           </div>
                         </td>
-                        <td className="px-3.5 py-2.5 font-mono text-zinc-600 dark:text-zinc-300 whitespace-nowrap">{reg.mobilePhone || "N/A"}</td>
-                        <td className="px-3.5 py-2.5 font-mono font-bold text-zinc-900 dark:text-white whitespace-nowrap">
+                        <td className="px-4 py-3 font-mono text-zinc-600 dark:text-zinc-400 whitespace-nowrap">{reg.mobilePhone || "—"}</td>
+                        <td className="px-4 py-3 font-mono font-semibold text-zinc-900 dark:text-white whitespace-nowrap">
                           <span
-                            className={`px-2 py-0.5 rounded border whitespace-nowrap inline-block text-[11px] ${
+                            className={`px-2 py-0.5 rounded-md border whitespace-nowrap inline-block text-xs font-medium ${
                               isPending
-                                ? "bg-amber-100 dark:bg-amber-950/40 border-amber-300 dark:border-amber-700/50 text-amber-900 dark:text-amber-300"
-                                : "bg-zinc-100 dark:bg-zinc-800 border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white"
+                                ? "bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800/60 text-amber-900 dark:text-amber-200"
+                                : "bg-zinc-100 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-white"
                             }`}
                           >
                             {reg.assignedRoomNumber
@@ -1554,9 +1567,9 @@ function PMSFrontDeskContent() {
                               : "Unassigned"}
                           </span>
                         </td>
-                        <td className="px-3.5 py-2.5 font-mono text-zinc-500 dark:text-zinc-400 whitespace-nowrap">{reg.arrivalDateTime || "N/A"}</td>
-                        <td className="px-3.5 py-2.5 text-zinc-600 dark:text-zinc-400 whitespace-nowrap">{reg.city || "—"}, {reg.state || "—"}</td>
-                        <td className="px-3.5 py-2.5 text-right whitespace-nowrap">
+                        <td className="px-4 py-3 font-mono text-zinc-500 dark:text-zinc-400 whitespace-nowrap">{reg.arrivalDateTime || "—"}</td>
+                        <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400 whitespace-nowrap">{reg.city || "—"}, {reg.state || "—"}</td>
+                        <td className="px-4 py-3 text-right whitespace-nowrap">
                           <div className="flex items-center justify-end gap-1.5">
                             {/* Primary Review Button */}
                             <button
@@ -1564,10 +1577,10 @@ function PMSFrontDeskContent() {
                                 setSelectedRegForReview(reg);
                                 setShowReviewModal(true);
                               }}
-                              className={`px-2.5 py-1 rounded-lg font-bold text-xs inline-flex items-center gap-1 transition shadow-xs ${
+                              className={`px-2.5 py-1 rounded-md font-medium text-xs inline-flex items-center gap-1 transition shadow-2xs ${
                                 isPending
-                                  ? "bg-amber-500 hover:bg-amber-400 text-zinc-950 shadow-amber-500/20 font-black active:scale-95"
-                                  : "bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 border border-zinc-300 dark:border-zinc-700"
+                                  ? "bg-amber-500 hover:bg-amber-400 text-zinc-950 font-semibold active:scale-98"
+                                  : "bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-100 dark:hover:bg-white text-white dark:text-zinc-900"
                               }`}
                             >
                               <ShieldCheck className="h-3 w-3" />
@@ -1853,7 +1866,7 @@ function PMSFrontDeskContent() {
                     placeholder="Search by guest name, mobile, confirmation #, channel, or company..."
                     value={resSearchQuery}
                     onChange={(e) => setResSearchQuery(e.target.value)}
-                    className="w-full h-9 pl-9 pr-8 rounded-xl bg-white dark:bg-zinc-900/90 border border-zinc-200 dark:border-zinc-700/80 text-zinc-900 dark:text-white text-xs placeholder:text-zinc-400 focus:outline-none focus:border-indigo-500 transition font-mono shadow-xs"
+                    className="w-full h-9 pl-9 pr-8 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 text-xs sm:text-sm placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 transition shadow-2xs font-normal"
                   />
                   {resSearchQuery && (
                     <button
@@ -1866,33 +1879,33 @@ function PMSFrontDeskContent() {
                 </div>
 
                 {/* Status Filter Tabs */}
-                <div className="md:col-span-4 flex items-center gap-1 bg-zinc-100 dark:bg-zinc-900 p-0.5 rounded-xl border border-zinc-200 dark:border-zinc-800 text-xs">
+                <div className="md:col-span-4 flex items-center gap-0.5 bg-zinc-100 dark:bg-zinc-900 p-0.5 rounded-lg border border-zinc-200 dark:border-zinc-800 text-xs">
                   <button
                     onClick={() => setResStatusFilter("CONFIRMED")}
-                    className={`flex-1 py-1 rounded-lg font-bold text-center transition cursor-pointer ${
+                    className={`flex-1 py-1 rounded-md font-medium text-center transition cursor-pointer ${
                       resStatusFilter === "CONFIRMED"
-                        ? "bg-indigo-600 text-white shadow-xs font-black"
-                        : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900"
+                        ? "bg-white dark:bg-zinc-800 text-blue-700 dark:text-blue-300 shadow-2xs font-semibold border border-zinc-200/80 dark:border-zinc-700/60"
+                        : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200"
                     }`}
                   >
                     Confirmed ({resMetrics.confirmedCount})
                   </button>
                   <button
                     onClick={() => setResStatusFilter("CHECKED_IN")}
-                    className={`flex-1 py-1 rounded-lg font-bold text-center transition cursor-pointer ${
+                    className={`flex-1 py-1 rounded-md font-medium text-center transition cursor-pointer ${
                       resStatusFilter === "CHECKED_IN"
-                        ? "bg-emerald-600 text-white shadow-xs font-black"
-                        : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900"
+                        ? "bg-white dark:bg-zinc-800 text-emerald-700 dark:text-emerald-300 shadow-2xs font-semibold border border-zinc-200/80 dark:border-zinc-700/60"
+                        : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200"
                     }`}
                   >
                     Checked In ({resMetrics.checkedInCount})
                   </button>
                   <button
                     onClick={() => setResStatusFilter("ALL")}
-                    className={`flex-1 py-1 rounded-lg font-bold text-center transition cursor-pointer ${
+                    className={`flex-1 py-1 rounded-md font-medium text-center transition cursor-pointer ${
                       resStatusFilter === "ALL"
-                        ? "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-xs font-black"
-                        : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900"
+                        ? "bg-white dark:bg-zinc-800 text-zinc-950 dark:text-zinc-50 shadow-2xs font-semibold border border-zinc-200/80 dark:border-zinc-700/60"
+                        : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200"
                     }`}
                   >
                     All ({resMetrics.totalAllCount})
@@ -1904,7 +1917,7 @@ function PMSFrontDeskContent() {
                   <select
                     value={resCategoryFilter}
                     onChange={(e) => setResCategoryFilter(e.target.value)}
-                    className="w-full h-9 px-2.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-zinc-800 dark:text-zinc-200 text-xs font-semibold focus:border-indigo-500 focus:outline-none cursor-pointer"
+                    className="w-full h-9 px-2.5 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-800 dark:text-zinc-200 text-xs font-medium focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 focus:outline-none cursor-pointer"
                   >
                     <option value="ALL">All Categories</option>
                     {roomTypesList.map((rt) => (
@@ -1920,19 +1933,19 @@ function PMSFrontDeskContent() {
             {/* Reservations Table */}
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs whitespace-nowrap">
-                <thead className="bg-zinc-50 dark:bg-zinc-900/80 text-zinc-600 dark:text-zinc-400 uppercase font-mono text-[10.5px] border-b border-zinc-200 dark:border-zinc-800">
+                <thead className="bg-zinc-50/90 dark:bg-zinc-900/90 text-zinc-600 dark:text-zinc-400 uppercase text-[11px] font-semibold tracking-wider border-b border-zinc-200 dark:border-zinc-800">
                   <tr>
-                    <th className="px-3.5 py-2.5 font-bold min-w-[110px]">Status</th>
-                    <th className="px-3.5 py-2.5 font-bold min-w-[130px]">Confirmation #</th>
-                    <th className="px-3.5 py-2.5 font-bold min-w-[170px]">Guest Information</th>
-                    <th className="px-3.5 py-2.5 font-bold min-w-[160px]">Arrival & Stay</th>
-                    <th className="px-3.5 py-2.5 font-bold min-w-[150px]">Room Category & Pre-Allocation</th>
-                    <th className="px-3.5 py-2.5 font-bold min-w-[120px]">Channel / Source</th>
-                    <th className="px-3.5 py-2.5 font-bold min-w-[140px]">Tariff & Advance</th>
-                    <th className="px-3.5 py-2.5 font-bold text-right min-w-[150px]">Actions</th>
+                    <th className="px-4 py-3 min-w-[110px]">Status</th>
+                    <th className="px-4 py-3 min-w-[130px]">Confirmation #</th>
+                    <th className="px-4 py-3 min-w-[170px]">Guest Information</th>
+                    <th className="px-4 py-3 min-w-[160px]">Arrival & Stay</th>
+                    <th className="px-4 py-3 min-w-[150px]">Room Category & Pre-Allocation</th>
+                    <th className="px-4 py-3 min-w-[120px]">Channel / Source</th>
+                    <th className="px-4 py-3 min-w-[140px]">Tariff & Advance</th>
+                    <th className="px-4 py-3 text-right min-w-[150px]">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800/60 font-medium">
+                <tbody className="divide-y divide-zinc-200/70 dark:divide-zinc-800/60 font-medium">
                   {filteredReservations.map((res: any) => {
                     const checkInRaw = res.arrivalDate || res.checkInDate;
                     const checkOutRaw = res.departureDate || res.checkOutDate;
@@ -1940,10 +1953,10 @@ function PMSFrontDeskContent() {
                     
                     const checkInFormatted = checkInRaw
                       ? new Date(checkInRaw).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
-                      : "N/A";
+                      : "—";
                     const checkOutFormatted = checkOutRaw
                       ? new Date(checkOutRaw).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
-                      : "N/A";
+                      : "—";
 
                     const isTodayArrival = checkInStr === todayStr;
                     const isConfirmed = res.status === "CONFIRMED";
@@ -1959,54 +1972,56 @@ function PMSFrontDeskContent() {
                     let relativeBadge = null;
                     if (isTodayArrival) {
                       relativeBadge = (
-                        <span className="px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300 font-bold font-mono text-[9.5px] border border-amber-300 dark:border-amber-500/40 inline-flex items-center gap-1">
-                          ⚡ ARRIVING TODAY
+                        <span className="px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 font-medium text-[10.5px] border border-amber-200 dark:border-amber-800/60 inline-flex items-center gap-1">
+                          <span className="h-1.5 w-1.5 rounded-full bg-amber-500 shrink-0" />
+                          Today
                         </span>
                       );
                     }
 
                     return (
-                      <tr key={res.id} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/40 transition">
+                      <tr key={res.id} className="hover:bg-zinc-50/80 dark:hover:bg-zinc-900/40 transition-colors">
                         {/* Status Badge */}
-                        <td className="px-3.5 py-2.5 whitespace-nowrap">
+                        <td className="px-4 py-3 whitespace-nowrap">
                           <span
-                            className={`px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold border whitespace-nowrap inline-flex items-center gap-1 shrink-0 ${
+                            className={`px-2.5 py-0.5 rounded-full text-xs font-medium border whitespace-nowrap inline-flex items-center gap-1.5 shrink-0 ${
                               isCheckedIn
-                                ? "bg-emerald-100 dark:bg-emerald-500/10 text-emerald-800 dark:text-emerald-400 border-emerald-300 dark:border-emerald-500/30"
+                                ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/60"
                                 : isCancelled
-                                ? "bg-rose-100 dark:bg-rose-500/10 text-rose-800 dark:text-rose-400 border-rose-300 dark:border-rose-500/30"
-                                : "bg-indigo-100 dark:bg-indigo-500/10 text-indigo-800 dark:text-indigo-300 border-indigo-300 dark:border-indigo-500/30"
+                                ? "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700"
+                                : "bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800/60"
                             }`}
                           >
-                            {isCheckedIn ? "✓ CHECKED IN" : isCancelled ? "✕ CANCELLED" : "● CONFIRMED"}
+                            <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${isCheckedIn ? "bg-emerald-500" : isCancelled ? "bg-zinc-400" : "bg-blue-500"}`} />
+                            {isCheckedIn ? "Checked In" : isCancelled ? "Cancelled" : "Confirmed"}
                           </span>
                         </td>
 
                         {/* Confirmation # */}
-                        <td className="px-3.5 py-2.5 font-mono font-bold text-indigo-600 dark:text-indigo-400 whitespace-nowrap">
+                        <td className="px-4 py-3 font-mono font-semibold text-blue-600 dark:text-blue-400 whitespace-nowrap">
                           {res.confirmationNo || res.reservationNo || res.id.slice(0, 8)}
                         </td>
 
                         {/* Guest Information */}
-                        <td className="px-3.5 py-2.5 text-zinc-900 dark:text-white whitespace-nowrap">
-                          <div className="font-bold uppercase">{formatGuestDisplayName(res.primaryGuest?.name || res.guestName) || "VALUED GUEST"}</div>
-                          <div className="text-[11px] text-zinc-500 font-mono flex items-center gap-1.5 uppercase">
-                            <span>{res.primaryGuest?.phone || res.phone || "No Phone"}</span>
+                        <td className="px-4 py-3 text-zinc-900 dark:text-white whitespace-nowrap">
+                          <div className="font-semibold text-zinc-900 dark:text-zinc-100">{formatGuestDisplayName(res.primaryGuest?.name || res.guestName) || "Valued Guest"}</div>
+                          <div className="text-xs text-zinc-500 dark:text-zinc-400 font-mono flex items-center gap-1.5 mt-0.5">
+                            <span>{res.primaryGuest?.phone || res.phone || "—"}</span>
                             {res.primaryGuest?.city && <span>• {res.primaryGuest.city}</span>}
                             {res.primaryGuest?.companyName && (
-                              <span className="text-amber-600 font-bold">• {res.primaryGuest.companyName}</span>
+                              <span className="text-amber-600 dark:text-amber-400 font-medium">• {res.primaryGuest.companyName}</span>
                             )}
                           </div>
                         </td>
 
                         {/* Stay Dates */}
-                        <td className="px-3.5 py-2.5 font-mono text-zinc-700 dark:text-zinc-300 whitespace-nowrap">
+                        <td className="px-4 py-3 font-mono text-zinc-700 dark:text-zinc-300 whitespace-nowrap">
                           <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className="font-bold text-zinc-900 dark:text-white">{checkInFormatted}</span>
-                            <span>→</span>
-                            <span className="font-bold text-zinc-900 dark:text-white">{checkOutFormatted}</span>
+                            <span className="font-semibold text-zinc-900 dark:text-white">{checkInFormatted}</span>
+                            <span className="text-zinc-400">→</span>
+                            <span className="font-semibold text-zinc-900 dark:text-white">{checkOutFormatted}</span>
                           </div>
-                          <div className="text-[10.5px] text-zinc-500 flex items-center gap-1.5 mt-0.5">
+                          <div className="text-xs text-zinc-500 dark:text-zinc-400 flex items-center gap-1.5 mt-0.5">
                             <span>
                               {nightsCount} Night{nightsCount > 1 ? "s" : ""} • {res.adults || res.rooms?.[0]?.adults || 2} Adults
                               {(res.rooms?.length > 1 || res.roomCount > 1) && ` (${res.rooms?.length || res.roomCount} Rooms)`}
@@ -2016,20 +2031,20 @@ function PMSFrontDeskContent() {
                         </td>
 
                         {/* Room Category & Allocation */}
-                        <td className="px-3.5 py-2.5 text-zinc-800 dark:text-zinc-200 whitespace-nowrap">
-                          <div className="font-bold">
+                        <td className="px-4 py-3 text-zinc-800 dark:text-zinc-200 whitespace-nowrap">
+                          <div className="font-semibold text-zinc-900 dark:text-zinc-100">
                             {(res.rooms?.length > 1 || res.roomCount > 1) && `${res.rooms?.length || res.roomCount} × `}
                             {res.roomTypeName || res.roomType?.name || "Standard Room"}
                           </div>
-                          <div className="text-[10.5px] text-zinc-500 font-mono">
+                          <div className="text-xs text-zinc-500 dark:text-zinc-400 font-mono mt-0.5">
                             {res.rooms?.[0]?.assignedRoomId ? (
-                              <span className="text-emerald-600 dark:text-emerald-400 font-bold">
+                              <span className="text-emerald-600 dark:text-emerald-400 font-medium">
                                 Assigned Room {rooms.find((r) => r.id === res.rooms[0].assignedRoomId)?.number || ""}
                               </span>
                             ) : (
                               <span className="text-zinc-400 italic">
                                 {(res.rooms?.length > 1 || res.roomCount > 1)
-                                  ? `${res.rooms?.length || res.roomCount} Rooms Auto-Assigned at Check-In`
+                                  ? `${res.rooms?.length || res.roomCount} Rooms Auto-Assigned`
                                   : "Auto-Assign at Check-In"}
                               </span>
                             )}
@@ -2037,23 +2052,23 @@ function PMSFrontDeskContent() {
                         </td>
 
                         {/* Channel Source */}
-                        <td className="px-3.5 py-2.5 font-mono text-[11px] whitespace-nowrap">
-                          <span className="px-2 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 font-bold text-zinc-700 dark:text-zinc-300 inline-block">
+                        <td className="px-4 py-3 font-mono text-xs whitespace-nowrap">
+                          <span className="px-2 py-0.5 rounded-md bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 font-medium text-zinc-700 dark:text-zinc-300 inline-block">
                             {res.source || "DIRECT"}
                           </span>
                           {res.channelRef && (
-                            <div className="text-[10px] text-zinc-400 mt-0.5 truncate max-w-[130px]" title={res.channelRef}>
+                            <div className="text-[10.5px] text-zinc-400 dark:text-zinc-500 mt-0.5 truncate max-w-[130px]" title={res.channelRef}>
                               {res.channelRef}
                             </div>
                           )}
                         </td>
 
                         {/* Tariff & Deposit */}
-                        <td className="px-3.5 py-2.5 font-mono whitespace-nowrap">
-                          <div className="font-bold text-zinc-900 dark:text-white">{formatINR(total)}</div>
+                        <td className="px-4 py-3 font-mono whitespace-nowrap">
+                          <div className="font-semibold tabular-nums text-zinc-900 dark:text-white">{formatINR(total)}</div>
                           <div className="flex items-center gap-1 mt-0.5">
                             {deposit > 0 ? (
-                              <span className="text-[10px] text-emerald-700 dark:text-emerald-400 font-bold bg-emerald-50 dark:bg-emerald-950/40 px-1.5 py-0.2 rounded border border-emerald-200 dark:border-emerald-800 inline-block">
+                              <span className="text-[10px] text-emerald-700 dark:text-emerald-400 font-medium bg-emerald-50 dark:bg-emerald-950/40 px-1.5 py-0.2 rounded border border-emerald-200 dark:border-emerald-800 inline-block">
                                 Adv: {formatINR(deposit)}
                               </span>
                             ) : (
@@ -2068,15 +2083,15 @@ function PMSFrontDeskContent() {
                         </td>
 
                         {/* Actions */}
-                        <td className="px-3.5 py-2.5 text-right whitespace-nowrap">
+                        <td className="px-4 py-3 text-right whitespace-nowrap">
                           <div className="flex items-center justify-end gap-1.5">
                             {/* 1-Click Check-In Button */}
                             {isConfirmed && (
                               <button
                                 onClick={(e) => handleFulfillReservation(res, e)}
-                                className={`px-2.5 py-1 rounded-lg font-bold text-xs inline-flex items-center gap-1 transition shadow-xs active:scale-95 cursor-pointer ${
+                                className={`px-2.5 py-1 rounded-md font-medium text-xs inline-flex items-center gap-1 transition shadow-2xs cursor-pointer ${
                                   isTodayArrival
-                                    ? "bg-emerald-600 hover:bg-emerald-500 text-white ring-2 ring-emerald-400/40"
+                                    ? "bg-emerald-600 hover:bg-emerald-500 text-white ring-2 ring-emerald-400/30"
                                     : "bg-emerald-600 hover:bg-emerald-500 text-white"
                                 }`}
                                 title="Check-In this guest now"
@@ -2092,10 +2107,10 @@ function PMSFrontDeskContent() {
                                 setSelectedResForVoucher(res);
                                 setShowResVoucherModal(true);
                               }}
-                              className="px-2 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-600/20 hover:bg-indigo-100 dark:hover:bg-indigo-600/40 border border-indigo-200 dark:border-indigo-500/40 font-bold text-indigo-700 dark:text-indigo-300 text-xs inline-flex items-center gap-1 transition shadow-xs cursor-pointer"
+                              className="px-2.5 py-1 rounded-md bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 border border-zinc-200 dark:border-zinc-700 font-medium text-zinc-700 dark:text-zinc-300 text-xs inline-flex items-center gap-1 transition shadow-2xs cursor-pointer"
                               title="View & Print Confirmation Voucher"
                             >
-                              <FileText className="h-3 w-3 text-indigo-600 dark:text-indigo-400" />
+                              <FileText className="h-3 w-3 text-zinc-500" />
                               <span className="hidden sm:inline">Voucher</span>
                             </button>
 
@@ -2103,7 +2118,7 @@ function PMSFrontDeskContent() {
                             {isConfirmed && (
                               <button
                                 onClick={(e) => handleCancelReservation(res.id, e)}
-                                className="p-1 rounded-lg text-rose-500 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition cursor-pointer"
+                                className="p-1 rounded-md text-zinc-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition cursor-pointer"
                                 title="Cancel Reservation"
                               >
                                 <X className="h-3.5 w-3.5" />
@@ -2388,7 +2403,7 @@ function PMSFrontDeskContent() {
                     required
                     value={moveForm.targetRoomId}
                     onChange={(e) => setMoveForm({ ...moveForm, targetRoomId: e.target.value })}
-                    className="w-full h-11 px-3.5 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white font-mono font-bold focus:border-blue-500 focus:outline-none shadow-xs text-xs"
+                    className="w-full h-10 px-3.5 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-xs"
                   >
                     <option value="">-- Choose New Vacant Room --</option>
                     {rooms
@@ -2397,7 +2412,7 @@ function PMSFrontDeskContent() {
                         const bedCat = getBedCategory(r);
                         return (
                           <option key={r.id} value={r.id}>
-                            Room {r.number} — {r.roomType?.name || "Room"} [{bedCat === "TWIN" ? "🛏️🛏️ Twin" : "🛏️ King"}] (Floor {r.floor})
+                            Room {r.number} — {r.roomType?.name || "Room"} [{bedCat === "TWIN" ? "Twin Beds" : "King Bed"}] (Floor {r.floor})
                           </option>
                         );
                       })}
@@ -2437,7 +2452,7 @@ function PMSFrontDeskContent() {
                     value={moveForm.reason}
                     onChange={(e) => setMoveForm({ ...moveForm, reason: e.target.value })}
                     placeholder="Enter or select reason..."
-                    className="w-full h-10 px-3.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white text-xs focus:border-blue-500 focus:outline-none"
+                    className="w-full h-10 px-3.5 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                   />
                 </div>
 
@@ -2735,8 +2750,16 @@ function PMSFrontDeskContent() {
 
                     <div>
                       <span className="text-[10.5px] font-medium text-zinc-500 dark:text-zinc-400 block">Expected Departure</span>
-                      <strong className="text-xs font-mono font-bold text-zinc-900 dark:text-zinc-100 block">
-                        {departureFormatted}
+                      <strong className="text-xs font-mono font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5 flex-wrap">
+                        <span>{departureFormatted}</span>
+                        {activeStay?.isExtendedDeparture && (
+                          <span
+                            title={activeStay.originalExpectedDepartureAt ? `Originally scheduled: ${new Date(activeStay.originalExpectedDepartureAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}` : "Auto-extended stay"}
+                            className="px-1.5 py-0.5 rounded text-[9.5px] font-bold bg-amber-100 text-amber-900 dark:bg-amber-950/80 dark:text-amber-300 border border-amber-300 dark:border-amber-800"
+                          >
+                            Auto-Extended
+                          </span>
+                        )}
                       </strong>
                     </div>
 

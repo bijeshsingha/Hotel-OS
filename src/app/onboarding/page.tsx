@@ -438,7 +438,7 @@ export default function OnboardingPage() {
                       placeholder="e.g. Hotel Ambarish Grand Residency, Hotel Pine Vista"
                       value={formData.displayName}
                       onChange={e => setFormData({ ...formData, displayName: e.target.value })}
-                      className="w-full h-11 px-4 rounded-xl bg-zinc-900/80 border border-zinc-700 text-white text-sm focus:border-blue-500 focus:outline-none"
+                      className="w-full h-11 px-4 rounded-lg bg-zinc-900/80 border border-zinc-700 text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                     />
                   </div>
 
@@ -451,7 +451,7 @@ export default function OnboardingPage() {
                       placeholder="e.g. AMBARISH RESIDENCY, Pine Vista Resorts LLP"
                       value={formData.legalName}
                       onChange={e => setFormData({ ...formData, legalName: e.target.value })}
-                      className="w-full h-11 px-4 rounded-xl bg-zinc-900/80 border border-zinc-700 text-white text-sm focus:border-blue-500 focus:outline-none"
+                      className="w-full h-11 px-4 rounded-lg bg-zinc-900/80 border border-zinc-700 text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                     />
                   </div>
 
@@ -464,7 +464,7 @@ export default function OnboardingPage() {
                       placeholder="e.g. GUW-01, SHL-01, KAZ-01"
                       value={formData.code}
                       onChange={e => setFormData({ ...formData, code: e.target.value.toUpperCase() })}
-                      className="w-full h-11 px-4 rounded-xl bg-zinc-900/80 border border-zinc-700 text-white text-sm font-mono focus:border-blue-500 focus:outline-none uppercase"
+                      className="w-full h-11 px-4 rounded-lg bg-zinc-900/80 border border-zinc-700 text-white text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all uppercase"
                     />
                   </div>
 
@@ -477,7 +477,7 @@ export default function OnboardingPage() {
                       placeholder="e.g. 18AACCB2447F1ZX"
                       value={formData.gstin}
                       onChange={e => handleGstinChange(e.target.value)}
-                      className="w-full h-11 px-4 rounded-xl bg-zinc-900/80 border border-zinc-700 text-white text-sm font-mono focus:border-blue-500 focus:outline-none uppercase"
+                      className="w-full h-11 px-4 rounded-lg bg-zinc-900/80 border border-zinc-700 text-white text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all uppercase"
                     />
                   </div>
 
@@ -512,7 +512,7 @@ export default function OnboardingPage() {
                       placeholder="e.g. MD Shah Road, Paltan Bazar"
                       value={formData.address}
                       onChange={e => setFormData({ ...formData, address: e.target.value })}
-                      className="w-full h-11 px-4 rounded-xl bg-zinc-900/80 border border-zinc-700 text-white text-sm focus:border-blue-500 focus:outline-none"
+                      className="w-full h-11 px-4 rounded-lg bg-zinc-900/80 border border-zinc-700 text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                     />
                   </div>
 

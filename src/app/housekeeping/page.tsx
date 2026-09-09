@@ -376,50 +376,53 @@ export default function HousekeepingPage() {
       {/* TAB 2: TASKS LIST */}
 
       {activeTab === "tasks" && (
-        <div className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-[#111114] overflow-hidden shadow-xs">
-          <div className="p-4 sm:p-5 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
-            <h2 className="text-xs font-bold text-zinc-900 dark:text-white uppercase tracking-wider">Housekeeping Tasks</h2>
+        <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121215] overflow-hidden shadow-xs">
+          <div className="p-4 sm:p-5 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
+            <h2 className="text-xs font-semibold text-zinc-900 dark:text-zinc-100 uppercase tracking-wider">Housekeeping Tasks</h2>
+            <span className="text-xs font-mono text-zinc-500">{tasks.length} Total Tasks</span>
           </div>
 
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
-              <thead className="bg-zinc-50 dark:bg-zinc-900/60 text-zinc-600 dark:text-zinc-400 text-xs uppercase font-semibold border-b border-zinc-200/80 dark:border-zinc-800">
+              <thead className="bg-zinc-50/90 dark:bg-zinc-900/90 text-zinc-500 dark:text-zinc-400 text-[11px] uppercase font-semibold tracking-wider border-b border-zinc-200 dark:border-zinc-800">
                 <tr>
-                  <th className="p-3.5">Room</th>
-                  <th className="p-3.5">Task</th>
-                  <th className="p-3.5">Priority</th>
-                  <th className="p-3.5">Status</th>
-                  <th className="p-3.5">Notes</th>
-                  <th className="p-3.5 text-right">Actions</th>
+                  <th className="px-4 py-3">Room</th>
+                  <th className="px-4 py-3">Task</th>
+                  <th className="px-4 py-3">Priority</th>
+                  <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3">Notes</th>
+                  <th className="px-4 py-3 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/60">
+              <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800/80">
                 {tasks.map((task) => (
-                  <tr key={task.id} className="hover:bg-zinc-50/60 dark:hover:bg-zinc-900/30 transition">
-                    <td className="p-3.5 font-mono font-bold text-zinc-900 dark:text-white">Room {task.room.number}</td>
-                    <td className="p-3.5 text-zinc-700 dark:text-zinc-300 font-medium">{task.type.replace("_", " ")}</td>
-                    <td className="p-3.5">
+                  <tr key={task.id} className="hover:bg-zinc-50/80 dark:hover:bg-zinc-900/40 transition">
+                    <td className="px-4 py-3 font-mono font-semibold text-zinc-900 dark:text-zinc-100">Room {task.room.number}</td>
+                    <td className="px-4 py-3 text-zinc-700 dark:text-zinc-300 font-medium capitalize">{task.type.replace("_", " ").toLowerCase()}</td>
+                    <td className="px-4 py-3">
                       <span
-                        className={`rounded-md px-2 py-0.5 text-[10px] font-semibold ${
+                        className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-medium border ${
                           task.priority === "URGENT" || task.priority === "HIGH"
-                            ? "bg-rose-50 dark:bg-rose-500/10 text-rose-700 dark:text-rose-400 border border-rose-200 dark:border-rose-500/20"
-                            : "bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700"
+                            ? "bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400 border-rose-200 dark:border-rose-800/50"
+                            : "bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700"
                         }`}
                       >
-                        {task.priority}
+                        <span className={`h-1.5 w-1.5 rounded-full ${task.priority === "URGENT" || task.priority === "HIGH" ? "bg-rose-500" : "bg-zinc-400"}`} />
+                        <span>{task.priority}</span>
                       </span>
                     </td>
-                    <td className="p-3.5">
-                      <span className="rounded-md px-2 py-0.5 text-[10px] font-medium bg-zinc-100 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 border border-zinc-200 dark:border-zinc-700">
-                        {task.status}
+                    <td className="px-4 py-3">
+                      <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-medium bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700">
+                        <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />
+                        <span>{task.status}</span>
                       </span>
                     </td>
-                    <td className="p-3.5 text-zinc-500 max-w-xs truncate">{task.notes || "—"}</td>
-                    <td className="p-3.5 text-right space-x-2">
+                    <td className="px-4 py-3 text-zinc-500 max-w-xs truncate">{task.notes || "—"}</td>
+                    <td className="px-4 py-3 text-right space-x-2">
                       {task.status === "OPEN" && (
                         <button
                           onClick={() => handleTaskStatus(task.id, "IN_PROGRESS")}
-                          className="rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 px-3 py-1.5 text-xs text-zinc-800 dark:text-zinc-200 font-semibold border border-zinc-200 dark:border-zinc-700 shadow-xs"
+                          className="h-8 px-3 rounded-md bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-xs text-zinc-800 dark:text-zinc-200 font-medium border border-zinc-200 dark:border-zinc-700 shadow-xs transition cursor-pointer"
                         >
                           Start
                         </button>
@@ -427,7 +430,7 @@ export default function HousekeepingPage() {
                       {task.status === "IN_PROGRESS" && (
                         <button
                           onClick={() => handleTaskStatus(task.id, "COMPLETED")}
-                          className="rounded-xl bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-100 dark:hover:bg-white text-white dark:text-zinc-950 px-3 py-1.5 text-xs font-semibold shadow-xs"
+                          className="h-8 px-3 rounded-md bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-100 dark:hover:bg-zinc-200 text-white dark:text-zinc-900 text-xs font-medium shadow-xs transition cursor-pointer"
                         >
                           Complete
                         </button>
@@ -444,43 +447,43 @@ export default function HousekeepingPage() {
       {/* INSPECTION MODAL */}
       {inspectModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-          <div className="w-full max-w-md rounded-2xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-[#121215] p-5 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-zinc-100 dark:border-zinc-800">
-              <h2 className="text-sm font-bold text-zinc-900 dark:text-white flex items-center gap-2">
+          <div className="w-full max-w-md rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121215] p-5 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-zinc-200 dark:border-zinc-800">
+              <h2 className="text-sm font-semibold text-zinc-900 dark:text-white flex items-center gap-2">
                 <ShieldCheck className="h-4.5 w-4.5 text-blue-600 dark:text-blue-400" />
                 Supervisor Inspection — Room {inspectModal.number}
               </h2>
-              <button onClick={() => setInspectModal(null)} className="text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200">
+              <button onClick={() => setInspectModal(null)} className="text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 cursor-pointer">
                 <X className="h-4 w-4" />
               </button>
             </div>
 
             <div className="space-y-3.5 text-xs">
-              <div className="rounded-xl bg-zinc-50 dark:bg-zinc-900 p-3.5 border border-zinc-200/80 dark:border-zinc-800 space-y-1.5 text-zinc-600 dark:text-zinc-400 shadow-xs">
+              <div className="rounded-lg bg-zinc-50 dark:bg-zinc-900 p-3 border border-zinc-200 dark:border-zinc-800 space-y-1 text-zinc-600 dark:text-zinc-400 shadow-xs">
                 <div className="font-semibold text-zinc-900 dark:text-white">Checklist items:</div>
                 <div>• Linen & bedding inspected</div>
                 <div>• Bathroom sanitised & amenities restocked</div>
                 <div>• Minibar & electricals verified</div>
               </div>
 
-              <div>
-                <label className="text-xs font-semibold text-zinc-700 dark:text-zinc-400 uppercase">Defect Note (if failing)</label>
+              <div className="space-y-1">
+                <label className="text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider">Defect Note (if failing)</label>
                 <input
                   type="text"
                   placeholder="Optional defect note"
                   value={inspectionDefectNote}
                   onChange={(e) => setInspectionDefectNote(e.target.value)}
-                  className="mt-1 w-full rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-3 py-2 text-zinc-900 dark:text-white focus:outline-none focus:border-blue-500 text-xs"
+                  className="w-full h-9 px-3 rounded-lg bg-white dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-xs shadow-xs"
                 />
               </div>
 
-              <div className="pt-3 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-between gap-2">
+              <div className="pt-3 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-between gap-2">
                 <button
                   onClick={async () => {
                     await handleRoomHKState(inspectModal.id, "DIRTY");
                     setInspectModal(null);
                   }}
-                  className="rounded-xl bg-zinc-100 hover:bg-rose-50 hover:text-rose-700 dark:bg-zinc-800 dark:hover:bg-rose-900/40 dark:hover:text-rose-200 text-zinc-700 dark:text-zinc-300 px-3.5 py-2 font-semibold text-xs border border-zinc-200 dark:border-zinc-700 transition cursor-pointer"
+                  className="h-9 px-3.5 rounded-lg bg-zinc-100 hover:bg-rose-50 hover:text-rose-700 dark:bg-zinc-800 dark:hover:bg-rose-950/40 dark:hover:text-rose-300 text-zinc-700 dark:text-zinc-300 font-medium text-xs border border-zinc-200 dark:border-zinc-700 transition cursor-pointer"
                 >
                   Fail (Mark Dirty)
                 </button>
@@ -490,7 +493,7 @@ export default function HousekeepingPage() {
                     await handleRoomHKState(inspectModal.id, "INSPECTED");
                     setInspectModal(null);
                   }}
-                  className="rounded-xl bg-zinc-900 px-4 py-2 font-semibold text-xs text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-950 dark:hover:bg-white transition cursor-pointer shadow-xs"
+                  className="h-9 px-4 rounded-lg bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-100 dark:hover:bg-zinc-200 font-medium text-xs text-white dark:text-zinc-900 transition cursor-pointer shadow-xs"
                 >
                   Pass Inspection
                 </button>

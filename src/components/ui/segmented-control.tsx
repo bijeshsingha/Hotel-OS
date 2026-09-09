@@ -35,7 +35,7 @@ export function SegmentedControl<T extends string = string>({
 
   return (
     <div
-      className={`inline-flex items-center gap-1 bg-zinc-100 dark:bg-zinc-900/90 p-1 rounded-xl border border-zinc-200/80 dark:border-zinc-800/80 max-w-full overflow-x-auto ${className}`}
+      className={`inline-flex items-center gap-0.5 bg-zinc-100 dark:bg-zinc-900 p-0.5 rounded-lg border border-zinc-200 dark:border-zinc-800 max-w-full overflow-x-auto ${className}`}
     >
       {options.map((opt) => {
         const isActive = opt.value === value;
@@ -46,12 +46,12 @@ export function SegmentedControl<T extends string = string>({
             key={opt.value}
             type="button"
             onClick={() => onChange(opt.value)}
-            className={`flex items-center gap-1.5 rounded-lg font-semibold transition-all whitespace-nowrap cursor-pointer select-none ${
-              size === "sm" ? "px-2.5 py-1 text-xs min-h-[34px]" : "px-3.5 py-1.5 text-xs min-h-[40px]"
+            className={`flex items-center gap-1.5 rounded-md font-medium transition-all whitespace-nowrap cursor-pointer select-none ${
+              size === "sm" ? "px-2.5 py-1 text-xs min-h-[32px]" : "px-3 py-1.5 text-xs min-h-[36px]"
             } ${
               isActive
-                ? "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-xs font-bold"
-                : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-200/60 dark:hover:bg-zinc-800/50"
+                ? "bg-white dark:bg-zinc-800 text-zinc-950 dark:text-zinc-50 shadow-2xs border border-zinc-200/80 dark:border-zinc-700/60 font-semibold"
+                : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 hover:bg-zinc-200/50 dark:hover:bg-zinc-800/40"
             }`}
           >
             {Icon && <Icon className="h-3.5 w-3.5 shrink-0 text-zinc-500 dark:text-zinc-400" />}

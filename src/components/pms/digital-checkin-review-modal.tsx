@@ -542,7 +542,7 @@ export function DigitalCheckInReviewModal({
                             disabled={isAlreadyCheckedIn || loading}
                             value={agreedTariff}
                             onChange={(e) => setAgreedTariff(e.target.value)}
-                            className="w-full h-10 pl-7 pr-3 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white font-mono text-xs font-bold focus:border-blue-500 focus:outline-none"
+                            className="w-full h-10 pl-7 pr-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                           />
                         </div>
                       </div>
@@ -649,7 +649,7 @@ export function DigitalCheckInReviewModal({
                                         onChange={(e) =>
                                           setRoomRates((prev) => ({ ...prev, [id]: e.target.value }))
                                         }
-                                        className="w-28 h-9 pl-6 pr-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white font-mono text-xs font-bold focus:border-blue-500 focus:outline-none disabled:opacity-60 disabled:bg-zinc-100 dark:disabled:bg-zinc-800"
+                                        className="w-28 h-9 pl-6 pr-2.5 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all disabled:opacity-60 disabled:bg-zinc-100 dark:disabled:bg-zinc-800"
                                       />
                                     </div>
                                     <button
@@ -898,7 +898,7 @@ export function DigitalCheckInReviewModal({
                     placeholder="e.g. Guest requested upper floor, VIP group"
                     value={staffNotes}
                     onChange={(e) => setStaffNotes(e.target.value)}
-                    className="w-full rounded-xl bg-white dark:bg-zinc-900/90 border border-zinc-300 dark:border-zinc-700 p-3 text-zinc-900 dark:text-white text-xs focus:border-blue-500 focus:outline-none transition shadow-xs"
+                    className="w-full rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 p-3 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all shadow-xs"
                   />
                 </div>
 

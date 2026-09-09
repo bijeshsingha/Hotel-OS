@@ -313,7 +313,7 @@ export function NewReservationModal({
                       agencyName: src === "TRAVEL_AGENT" ? form.agencyName || "Yashraj Travels" : "",
                     });
                   }}
-                  className="w-full h-9 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs text-zinc-900 dark:text-white font-bold focus:border-indigo-500 focus:outline-none transition shadow-xs cursor-pointer"
+                  className="w-full h-9 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-white font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition shadow-xs cursor-pointer"
                 >
                   {BOOKING_SOURCES.map((src) => (
                     <option key={src.code} value={src.code}>
@@ -365,7 +365,7 @@ export function NewReservationModal({
                       placeholder="Agency phone number"
                       value={form.agencyPhone}
                       onChange={(e) => setForm({ ...form, agencyPhone: e.target.value })}
-                      className="w-full h-9 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs text-zinc-900 dark:text-white font-mono focus:border-indigo-500 focus:outline-none transition shadow-xs"
+                      className="w-full h-9 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-white font-mono focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition shadow-xs"
                     />
                   </div>
 
@@ -378,7 +378,7 @@ export function NewReservationModal({
                       placeholder="e.g. YSH-2026-9812 / Agoda YCS Ref"
                       value={form.channelRef}
                       onChange={(e) => setForm({ ...form, channelRef: e.target.value })}
-                      className="w-full h-9 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs text-zinc-900 dark:text-white font-mono focus:border-indigo-500 focus:outline-none transition shadow-xs"
+                      className="w-full h-9 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-white font-mono focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition shadow-xs"
                     />
                   </div>
                 </>
@@ -427,7 +427,7 @@ export function NewReservationModal({
                       placeholder="15-digit GSTIN"
                       value={form.guestGstin}
                       onChange={(e) => setForm({ ...form, guestGstin: e.target.value.toUpperCase() })}
-                      className="w-full h-9 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs text-zinc-900 dark:text-white font-mono uppercase focus:border-indigo-500 focus:outline-none transition shadow-xs"
+                      className="w-full h-9 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-white font-mono uppercase focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition shadow-xs"
                     />
                   </div>
                 </>
@@ -444,7 +444,7 @@ export function NewReservationModal({
                     placeholder="e.g. MMT-891238912"
                     value={form.channelRef}
                     onChange={(e) => setForm({ ...form, channelRef: e.target.value })}
-                    className="w-full h-9 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs text-zinc-900 dark:text-white font-mono focus:border-indigo-500 focus:outline-none transition shadow-xs"
+                    className="w-full h-9 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-white font-mono focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition shadow-xs"
                   />
                 </div>
               )}
@@ -469,7 +469,7 @@ export function NewReservationModal({
                   placeholder="e.g. BIJESH SINGHA"
                   value={form.guestName}
                   onChange={(e) => setForm({ ...form, guestName: e.target.value.toUpperCase() })}
-                  className="w-full h-9 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs text-zinc-900 dark:text-white focus:border-indigo-500 focus:outline-none transition shadow-xs font-semibold uppercase"
+                  className="w-full h-9 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition shadow-xs font-semibold uppercase"
                 />
               </div>
 
@@ -483,7 +483,7 @@ export function NewReservationModal({
                   placeholder="10-digit mobile number"
                   value={form.guestPhone}
                   onChange={(e) => setForm({ ...form, guestPhone: e.target.value })}
-                  className="w-full h-9 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs text-zinc-900 dark:text-white font-mono focus:border-indigo-500 focus:outline-none transition shadow-xs font-semibold"
+                  className="w-full h-9 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-white font-mono focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition shadow-xs font-semibold"
                 />
               </div>
 
@@ -496,7 +496,7 @@ export function NewReservationModal({
                   placeholder="guest@example.com"
                   value={form.guestEmail}
                   onChange={(e) => setForm({ ...form, guestEmail: e.target.value })}
-                  className="w-full h-9 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs text-zinc-900 dark:text-white focus:border-indigo-500 focus:outline-none transition shadow-xs"
+                  className="w-full h-9 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition shadow-xs"
                 />
               </div>
 
@@ -509,7 +509,7 @@ export function NewReservationModal({
                   placeholder="e.g. GUWAHATI / KOLKATA"
                   value={form.guestCity}
                   onChange={(e) => setForm({ ...form, guestCity: e.target.value.toUpperCase() })}
-                  className="w-full h-9 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs text-zinc-900 dark:text-white focus:border-indigo-500 focus:outline-none transition shadow-xs uppercase"
+                  className="w-full h-9 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition shadow-xs uppercase"
                 />
               </div>
 
@@ -522,7 +522,7 @@ export function NewReservationModal({
                   placeholder="e.g. ASSAM, INDIA"
                   value={form.guestState}
                   onChange={(e) => setForm({ ...form, guestState: e.target.value.toUpperCase() })}
-                  className="w-full h-9 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs text-zinc-900 dark:text-white focus:border-indigo-500 focus:outline-none transition shadow-xs uppercase"
+                  className="w-full h-9 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition shadow-xs uppercase"
                 />
               </div>
 
@@ -534,7 +534,7 @@ export function NewReservationModal({
                   type="text"
                   value={form.guestNationality}
                   onChange={(e) => setForm({ ...form, guestNationality: e.target.value.toUpperCase() })}
-                  className="w-full h-9 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs text-zinc-900 dark:text-white focus:border-indigo-500 focus:outline-none transition shadow-xs uppercase"
+                  className="w-full h-9 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition shadow-xs uppercase"
                 />
               </div>
             </div>
@@ -557,7 +557,7 @@ export function NewReservationModal({
                   required
                   value={form.arrivalDate}
                   onChange={(e) => setForm({ ...form, arrivalDate: e.target.value })}
-                  className="w-full h-9 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs text-zinc-900 dark:text-white font-mono focus:border-indigo-500 focus:outline-none transition shadow-xs font-bold"
+                  className="w-full h-9 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-white font-mono focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition shadow-xs font-bold"
                 />
               </div>
 
@@ -571,7 +571,7 @@ export function NewReservationModal({
                   value={form.departureDate}
                   min={form.arrivalDate}
                   onChange={(e) => setForm({ ...form, departureDate: e.target.value })}
-                  className="w-full h-9 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs text-zinc-900 dark:text-white font-mono focus:border-indigo-500 focus:outline-none transition shadow-xs font-bold"
+                  className="w-full h-9 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-white font-mono focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition shadow-xs font-bold"
                 />
               </div>
 
@@ -590,7 +590,7 @@ export function NewReservationModal({
                   required
                   value={form.roomCount}
                   onChange={(e) => setForm({ ...form, roomCount: Math.max(1, Number(e.target.value) || 1) })}
-                  className="w-full h-9 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs text-zinc-900 dark:text-white font-mono font-bold focus:border-indigo-500 focus:outline-none transition shadow-xs"
+                  className="w-full h-9 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-white font-mono font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition shadow-xs"
                 />
               </div>
 
@@ -602,7 +602,7 @@ export function NewReservationModal({
                   required
                   value={form.roomTypeId}
                   onChange={(e) => setForm({ ...form, roomTypeId: e.target.value, assignedRoomId: "" })}
-                  className="w-full h-9 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs text-zinc-900 dark:text-white font-semibold focus:border-indigo-500 focus:outline-none transition shadow-xs cursor-pointer"
+                  className="w-full h-9 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-white font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition shadow-xs cursor-pointer"
                 >
                   {roomCategories.map((rc) => (
                     <option key={rc.id} value={rc.id}>
@@ -621,7 +621,7 @@ export function NewReservationModal({
                 <select
                   value={form.assignedRoomId}
                   onChange={(e) => setForm({ ...form, assignedRoomId: e.target.value })}
-                  className="w-full h-9 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs text-zinc-900 dark:text-white font-mono focus:border-indigo-500 focus:outline-none transition shadow-xs cursor-pointer"
+                  className="w-full h-9 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-white font-mono focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition shadow-xs cursor-pointer"
                 >
                   <option value="">Auto-Assign at Check-In</option>
                   {selectableRooms.map((r) => (
@@ -642,7 +642,7 @@ export function NewReservationModal({
                   max="10"
                   value={form.adults}
                   onChange={(e) => setForm({ ...form, adults: Number(e.target.value) })}
-                  className="w-full h-9 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs text-zinc-900 dark:text-white font-mono focus:border-indigo-500 focus:outline-none transition shadow-xs"
+                  className="w-full h-9 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-white font-mono focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition shadow-xs"
                 />
               </div>
 
@@ -657,7 +657,7 @@ export function NewReservationModal({
                   max="10"
                   value={form.children}
                   onChange={(e) => setForm({ ...form, children: Number(e.target.value) })}
-                  className="w-full h-9 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs text-zinc-900 dark:text-white font-mono focus:border-indigo-500 focus:outline-none transition shadow-xs"
+                  className="w-full h-9 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-white font-mono focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition shadow-xs"
                 />
               </div>
             </div>
@@ -697,7 +697,7 @@ export function NewReservationModal({
                     placeholder={form.isComplimentary ? "0 (Complimentary)" : "Rate"}
                     value={form.isComplimentary ? 0 : form.ratePerNight}
                     onChange={(e) => setForm({ ...form, ratePerNight: Number(e.target.value) })}
-                    className="w-full h-9 pl-7 pr-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs text-zinc-900 dark:text-white font-mono font-bold focus:border-indigo-500 focus:outline-none transition shadow-xs disabled:opacity-60 disabled:bg-zinc-100 dark:disabled:bg-zinc-800"
+                    className="w-full h-9 pl-7 pr-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-white font-mono font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition shadow-xs disabled:opacity-60 disabled:bg-zinc-100 dark:disabled:bg-zinc-800"
                   />
                 </div>
               </div>
@@ -711,7 +711,7 @@ export function NewReservationModal({
                   <select
                     value={form.kitchenDining || "NO"}
                     onChange={(e: any) => setForm({ ...form, kitchenDining: e.target.value })}
-                    className="h-9 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs text-zinc-900 dark:text-white font-bold focus:border-indigo-500 focus:outline-none transition shadow-xs cursor-pointer flex-1"
+                    className="h-9 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-white font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition shadow-xs cursor-pointer flex-1"
                   >
                     <option value="NO">No</option>
                     <option value="YES">Yes</option>
@@ -724,7 +724,7 @@ export function NewReservationModal({
                         placeholder="Rate"
                         value={form.diningFixedRate || ""}
                         onChange={(e) => setForm({ ...form, diningFixedRate: e.target.value })}
-                        className="w-full h-9 pl-6 pr-2 rounded-xl bg-white dark:bg-zinc-900 border border-amber-400 dark:border-amber-600 text-xs text-zinc-900 dark:text-white font-mono font-bold focus:border-indigo-500 focus:outline-none transition shadow-xs"
+                        className="w-full h-9 pl-6 pr-2 rounded-xl bg-white dark:bg-zinc-900 border border-amber-400 dark:border-amber-600 text-xs text-zinc-900 dark:text-white font-mono font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition shadow-xs"
                       />
                     </div>
                   )}
@@ -742,7 +742,7 @@ export function NewReservationModal({
                     placeholder="0"
                     value={form.depositAmount}
                     onChange={(e) => setForm({ ...form, depositAmount: Number(e.target.value) })}
-                    className="w-full h-9 pl-7 pr-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs text-emerald-700 dark:text-emerald-400 font-mono font-bold focus:border-indigo-500 focus:outline-none transition shadow-xs"
+                    className="w-full h-9 pl-7 pr-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-xs text-emerald-700 dark:text-emerald-400 font-mono font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition shadow-xs"
                   />
                 </div>
               </div>
@@ -754,7 +754,7 @@ export function NewReservationModal({
                 <select
                   value={form.depositMethod}
                   onChange={(e) => setForm({ ...form, depositMethod: e.target.value })}
-                  className="w-full h-9 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs text-zinc-900 dark:text-white font-bold focus:border-indigo-500 focus:outline-none transition shadow-xs cursor-pointer"
+                  className="w-full h-9 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-white font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition shadow-xs cursor-pointer"
                 >
                   <option value="UPI">UPI / QR</option>
                   <option value="CASH">CASH</option>
@@ -776,7 +776,7 @@ export function NewReservationModal({
                 placeholder="e.g. Early check-in requested at 10 AM, high floor room, airport pickup needed"
                 value={form.notes}
                 onChange={(e) => setForm({ ...form, notes: e.target.value })}
-                className="w-full p-2.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs text-zinc-900 dark:text-white focus:border-indigo-500 focus:outline-none transition shadow-xs"
+                className="w-full p-2.5 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition shadow-xs"
               />
             </div>
           </div>

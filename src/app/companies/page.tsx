@@ -168,8 +168,8 @@ export default function CompaniesMasterPage() {
       {/* 1. TOP HEADER & METRIC STATS */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-5 rounded-3xl bg-white dark:bg-[#111114] border border-zinc-200/90 dark:border-zinc-800 shadow-xs">
         <div className="flex items-center gap-3.5">
-          <div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-indigo-600 via-indigo-700 to-purple-800 text-white flex items-center justify-center shadow-lg shadow-indigo-500/20 shrink-0">
-            <Building2 className="h-6 w-6" />
+          <div className="h-11 w-11 rounded-xl bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800/60 text-blue-600 dark:text-blue-400 flex items-center justify-center shadow-xs shrink-0">
+            <Building2 className="h-5 w-5" />
           </div>
           <div>
             <div className="flex items-center gap-2 flex-wrap">
@@ -201,17 +201,17 @@ export default function CompaniesMasterPage() {
       </div>
 
       {/* 2. FILTER RIBBON & STATS BAR */}
-      <div className="p-4 rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 shadow-xs">
+      <div className="p-3.5 sm:p-4 rounded-xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 shadow-2xs">
         
         {/* Search Input */}
         <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3.5 top-2.5 h-4 w-4 text-zinc-400" />
+          <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-zinc-400" />
           <input
             type="text"
             placeholder="Search by company, short code, GSTIN, phone, city, or address..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full h-9 pl-9 pr-8 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700/80 text-xs text-zinc-900 dark:text-white placeholder-zinc-400 focus:border-indigo-500 focus:bg-white dark:focus:bg-zinc-950 focus:outline-none transition shadow-xs font-medium"
+            className="w-full h-9 pl-9 pr-8 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs sm:text-sm text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 focus:outline-none transition shadow-2xs font-normal"
           />
           {search && (
             <button
@@ -224,14 +224,14 @@ export default function CompaniesMasterPage() {
         </div>
 
         {/* Segmented Filter Pills */}
-        <div className="flex items-center gap-1.5 bg-zinc-100 dark:bg-zinc-900/90 p-1 rounded-xl border border-zinc-200/80 dark:border-zinc-800 text-xs font-bold overflow-x-auto">
+        <div className="flex items-center gap-0.5 bg-zinc-100 dark:bg-zinc-900 p-0.5 rounded-lg border border-zinc-200 dark:border-zinc-800 text-xs font-medium overflow-x-auto">
           <button
             type="button"
             onClick={() => setTypeFilter("ALL")}
-            className={`px-3 py-1.5 rounded-lg transition whitespace-nowrap cursor-pointer ${
+            className={`px-3 py-1.5 rounded-md transition whitespace-nowrap cursor-pointer ${
               typeFilter === "ALL"
-                ? "bg-white dark:bg-zinc-800 text-zinc-950 dark:text-white shadow-xs font-black"
-                : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
+                ? "bg-white dark:bg-zinc-800 text-zinc-950 dark:text-zinc-50 shadow-2xs font-semibold border border-zinc-200/80 dark:border-zinc-700/60"
+                : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200"
             }`}
           >
             All ({totalCount})
@@ -240,10 +240,10 @@ export default function CompaniesMasterPage() {
           <button
             type="button"
             onClick={() => setTypeFilter("COMPANY")}
-            className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
+            className={`px-3 py-1.5 rounded-md transition flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
               typeFilter === "COMPANY"
-                ? "bg-white dark:bg-zinc-800 text-emerald-700 dark:text-emerald-400 shadow-xs font-black"
-                : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
+                ? "bg-white dark:bg-zinc-800 text-emerald-700 dark:text-emerald-400 shadow-2xs font-semibold border border-zinc-200/80 dark:border-zinc-700/60"
+                : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200"
             }`}
           >
             <Briefcase className="h-3.5 w-3.5" />
@@ -253,10 +253,10 @@ export default function CompaniesMasterPage() {
           <button
             type="button"
             onClick={() => setTypeFilter("TRAVEL_AGENT")}
-            className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
+            className={`px-3 py-1.5 rounded-md transition flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
               typeFilter === "TRAVEL_AGENT"
-                ? "bg-white dark:bg-zinc-800 text-purple-700 dark:text-purple-400 shadow-xs font-black"
-                : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
+                ? "bg-white dark:bg-zinc-800 text-purple-700 dark:text-purple-400 shadow-2xs font-semibold border border-zinc-200/80 dark:border-zinc-700/60"
+                : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200"
             }`}
           >
             <Compass className="h-3.5 w-3.5" />
@@ -266,10 +266,10 @@ export default function CompaniesMasterPage() {
           <button
             type="button"
             onClick={() => setTypeFilter("OTA")}
-            className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
+            className={`px-3 py-1.5 rounded-md transition flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
               typeFilter === "OTA"
-                ? "bg-white dark:bg-zinc-800 text-blue-700 dark:text-blue-400 shadow-xs font-black"
-                : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
+                ? "bg-white dark:bg-zinc-800 text-blue-700 dark:text-blue-400 shadow-2xs font-semibold border border-zinc-200/80 dark:border-zinc-700/60"
+                : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200"
             }`}
           >
             <Globe className="h-3.5 w-3.5" />
@@ -279,27 +279,27 @@ export default function CompaniesMasterPage() {
       </div>
 
       {/* 3. MASTER DIRECTORY ENTERPRISE TABLE */}
-      <div className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-[#111114] overflow-hidden shadow-xs">
+      <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#111114] overflow-hidden shadow-2xs">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse text-xs">
             <thead>
-              <tr className="border-b border-zinc-200 dark:border-zinc-800 text-[10.5px] font-mono uppercase tracking-wider text-zinc-500 dark:text-zinc-400 bg-slate-50 dark:bg-zinc-900/80 sticky top-0 z-10">
-                <th className="py-3 px-4 font-bold">Company / Account Name</th>
-                <th className="py-3 px-3 font-bold">Account Type</th>
-                <th className="py-3 px-3 font-bold">GSTIN (B2B Tax Credit)</th>
-                <th className="py-3 px-3 font-bold">Contact & Phone</th>
-                <th className="py-3 px-3 font-bold">City & Address</th>
-                <th className="py-3 px-3 font-bold">Terms & Plan</th>
-                <th className="py-3 px-4 font-bold text-right">Quick Action</th>
+              <tr className="border-b border-zinc-200 dark:border-zinc-800 text-[11px] uppercase tracking-wider text-zinc-600 dark:text-zinc-400 bg-zinc-50/90 dark:bg-zinc-900/90 sticky top-0 z-10 backdrop-blur-xs font-semibold">
+                <th className="py-3 px-4 font-semibold">Company / Account Name</th>
+                <th className="py-3 px-4 font-semibold">Account Type</th>
+                <th className="py-3 px-4 font-semibold">GSTIN (B2B Tax Credit)</th>
+                <th className="py-3 px-4 font-semibold">Contact & Phone</th>
+                <th className="py-3 px-4 font-semibold">City & Address</th>
+                <th className="py-3 px-4 font-semibold">Terms & Plan</th>
+                <th className="py-3 px-4 font-semibold text-right">Quick Action</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/60">
+            <tbody className="divide-y divide-zinc-200/70 dark:divide-zinc-800/60">
               {companies.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-16 text-center text-zinc-400 font-mono text-xs">
+                  <td colSpan={7} className="py-16 text-center text-zinc-400 dark:text-zinc-500 font-mono text-xs">
                     <div className="flex flex-col items-center justify-center space-y-2">
-                      <Search className="h-8 w-8 text-zinc-300 dark:text-zinc-700" />
-                      <span className="font-bold text-zinc-700 dark:text-zinc-300">
+                      <Search className="h-8 w-8 text-zinc-300 dark:text-zinc-600" />
+                      <span className="font-semibold text-zinc-700 dark:text-zinc-300">
                         No master accounts found matching "{search}"
                       </span>
                       <button
@@ -307,7 +307,7 @@ export default function CompaniesMasterPage() {
                           setSearch("");
                           setTypeFilter("ALL");
                         }}
-                        className="text-indigo-600 dark:text-indigo-400 text-xs font-bold hover:underline cursor-pointer"
+                        className="text-blue-600 dark:text-blue-400 text-xs font-medium hover:underline cursor-pointer"
                       >
                         Reset search filters
                       </button>
@@ -325,18 +325,18 @@ export default function CompaniesMasterPage() {
                   return (
                     <tr
                       key={c.id || c.accountName || idx}
-                      className="hover:bg-indigo-50/40 dark:hover:bg-zinc-800/40 transition duration-150 group"
+                      className="hover:bg-zinc-50/80 dark:hover:bg-zinc-900/40 transition-colors group"
                     >
                       {/* Account Name + Monogram */}
                       <td className="py-3 px-4">
                         <div className="flex items-center gap-3">
                           <div
-                            className={`h-9 w-9 rounded-xl flex items-center justify-center text-xs font-black text-white shrink-0 shadow-xs ${
+                            className={`h-8 w-8 rounded-lg flex items-center justify-center text-xs font-semibold text-white shrink-0 shadow-2xs ${
                               isCorporate
-                                ? "bg-gradient-to-br from-emerald-600 to-teal-700"
+                                ? "bg-emerald-600"
                                 : isOTA
-                                ? "bg-gradient-to-br from-blue-600 to-cyan-700"
-                                : "bg-gradient-to-br from-purple-600 to-indigo-700"
+                                ? "bg-blue-600"
+                                : "bg-purple-600"
                             }`}
                           >
                             {initials}
@@ -344,22 +344,22 @@ export default function CompaniesMasterPage() {
 
                           <div className="space-y-0.5 min-w-0">
                             <div className="flex items-center gap-1.5 flex-wrap">
-                              <span className="font-extrabold text-zinc-950 dark:text-zinc-100 text-[13px] tracking-tight group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition">
+                              <span className="font-semibold text-zinc-900 dark:text-zinc-100 text-sm tracking-tight group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
                                 {c.accountName}
                               </span>
                               {c.shortName && (
-                                <span className="text-[10px] font-mono font-bold px-1.5 py-0.2 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700">
+                                <span className="text-[10px] font-mono font-medium px-1.5 py-0.2 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700">
                                   {c.shortName}
                                 </span>
                               )}
                             </div>
 
                             {c.remarks ? (
-                              <p className="text-[11px] text-zinc-400 truncate max-w-xs italic">
+                              <p className="text-xs text-zinc-500 dark:text-zinc-400 truncate max-w-xs italic">
                                 {c.remarks}
                               </p>
                             ) : (
-                              <p className="text-[10.5px] text-zinc-400 font-mono">
+                              <p className="text-[11px] text-zinc-500 dark:text-zinc-400 font-mono">
                                 Registered Master B2B Account
                               </p>
                             )}
@@ -368,23 +368,23 @@ export default function CompaniesMasterPage() {
                       </td>
 
                       {/* Account Type Pill */}
-                      <td className="py-3 px-3 whitespace-nowrap">
+                      <td className="py-3 px-4 whitespace-nowrap">
                         {isCorporate && (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/50 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/50 font-bold text-[11px]">
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60 font-medium text-xs">
                             <Briefcase className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
                             <span>Corporate B2B</span>
                           </span>
                         )}
 
                         {isOTA && (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-950/50 text-blue-800 dark:text-blue-300 border border-blue-200 dark:border-blue-800/50 font-bold text-[11px]">
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800/60 font-medium text-xs">
                             <Globe className="h-3 w-3 text-blue-600 dark:text-blue-400" />
                             <span>OTA Channel</span>
                           </span>
                         )}
 
                         {isAgent && (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-purple-50 dark:bg-purple-950/50 text-purple-800 dark:text-purple-300 border border-purple-200 dark:border-purple-800/50 font-bold text-[11px]">
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800/60 font-medium text-xs">
                             <Compass className="h-3 w-3 text-purple-600 dark:text-purple-400" />
                             <span>Travel Agent</span>
                           </span>
@@ -392,11 +392,11 @@ export default function CompaniesMasterPage() {
                       </td>
 
                       {/* GSTIN & Tax Details */}
-                      <td className="py-3 px-3">
+                      <td className="py-3 px-4">
                         {c.gstin ? (
                           <div className="space-y-1">
                             <div className="flex items-center gap-1.5 font-mono">
-                              <span className="font-extrabold text-zinc-900 dark:text-zinc-100 text-xs tracking-tight bg-zinc-100 dark:bg-zinc-800/80 px-2 py-0.5 rounded border border-zinc-200 dark:border-zinc-700">
+                              <span className="font-semibold text-zinc-900 dark:text-zinc-100 text-xs tracking-tight bg-zinc-100 dark:bg-zinc-800/80 px-2 py-0.5 rounded border border-zinc-200 dark:border-zinc-700">
                                 {c.gstin}
                               </span>
                               <button
@@ -413,37 +413,37 @@ export default function CompaniesMasterPage() {
                               </button>
                             </div>
                             {stateBadge && (
-                              <div className="text-[10px] text-zinc-500 font-mono font-medium">
-                                📍 {stateBadge}
+                              <div className="text-[10px] text-zinc-500 dark:text-zinc-400 font-mono font-medium">
+                                {stateBadge}
                               </div>
                             )}
                           </div>
                         ) : (
-                          <span className="text-zinc-400 font-mono text-[11px] italic">
-                            — No GSTIN on file
+                          <span className="text-zinc-400 dark:text-zinc-500 font-mono text-xs italic">
+                            — No GSTIN
                           </span>
                         )}
                       </td>
 
                       {/* Contact Phone & Email */}
-                      <td className="py-3 px-3">
-                        <div className="space-y-1 font-mono text-[11.5px]">
+                      <td className="py-3 px-4">
+                        <div className="space-y-1 font-mono text-xs">
                           {(c.mobile || c.phone) ? (
                             <a
                               href={`tel:${c.mobile || c.phone}`}
-                              className="font-bold text-zinc-900 dark:text-zinc-100 hover:text-indigo-600 dark:hover:text-indigo-400 flex items-center gap-1.5 transition"
+                              className="font-medium text-zinc-900 dark:text-zinc-100 hover:text-blue-600 dark:hover:text-blue-400 flex items-center gap-1.5 transition-colors"
                             >
                               <Phone className="h-3 w-3 text-zinc-400" />
                               <span>{c.mobile || c.phone}</span>
                             </a>
                           ) : (
-                            <span className="text-zinc-400 italic text-[11px]">— No Phone</span>
+                            <span className="text-zinc-400 dark:text-zinc-500 italic text-xs">— No Phone</span>
                           )}
 
                           {c.email && (
                             <a
                               href={`mailto:${c.email}`}
-                              className="text-[10.5px] text-zinc-500 dark:text-zinc-400 hover:text-indigo-600 dark:hover:text-indigo-400 flex items-center gap-1.5 truncate max-w-[180px]"
+                              className="text-xs text-zinc-500 dark:text-zinc-400 hover:text-blue-600 dark:hover:text-blue-400 flex items-center gap-1.5 truncate max-w-[180px] transition-colors"
                             >
                               <Mail className="h-3 w-3 text-zinc-400 shrink-0" />
                               <span className="truncate">{c.email}</span>

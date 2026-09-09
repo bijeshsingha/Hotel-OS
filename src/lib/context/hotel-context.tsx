@@ -42,6 +42,9 @@ interface HotelContextType {
   sidebarCollapsed: boolean;
   toggleSidebar: () => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
+  mobileMenuOpen: boolean;
+  toggleMobileMenu: () => void;
+  setMobileMenuOpen: (open: boolean) => void;
   switchProperty: (propertyId: string) => void;
   switchUser: (identifier: string) => void;
   logout: () => void;
@@ -78,14 +81,15 @@ export function HotelProvider({ children }: { children: React.ReactNode }) {
   const [allUsers, setAllUsers] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
-  const [sidebarCollapsed, setSidebarCollapsedState] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsedState] = useState(true);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Initialize sidebar collapsed state from localStorage
   useEffect(() => {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("hotel_sidebar_collapsed");
-      if (saved === "true") {
-        setSidebarCollapsedState(true);
+      if (saved !== null) {
+        setSidebarCollapsedState(saved === "true");
       }
     }
   }, []);
@@ -107,13 +111,8 @@ export function HotelProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  // Ensure root dark mode is fixed
-  useEffect(() => {
-    if (typeof document !== "undefined") {
-      document.documentElement.classList.remove("light");
-      document.documentElement.classList.add("dark");
-      document.documentElement.setAttribute("data-theme", "dark");
-    }
+  const toggleMobileMenu = useCallback(() => {
+    setMobileMenuOpen((prev) => !prev);
   }, []);
 
   const fetchSession = useCallback(async (identifier?: string, propId?: string) => {
@@ -198,6 +197,9 @@ export function HotelProvider({ children }: { children: React.ReactNode }) {
         sidebarCollapsed,
         toggleSidebar,
         setSidebarCollapsed,
+        mobileMenuOpen,
+        toggleMobileMenu,
+        setMobileMenuOpen,
         switchProperty,
         switchUser,
         logout,

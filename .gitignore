@@ -48,3 +48,13 @@ prisma/backups/
 scratch/
 *.Bak
 *.bak
+
+# test results
+test-results/
+playwright-report/
+
+# local agent configs & skills
+.agents/
+.claude/
+agent/
+skills-lock.json

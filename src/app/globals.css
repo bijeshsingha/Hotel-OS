@@ -5,49 +5,49 @@
 
 @layer base {
   :root {
-    --background: #f8fafc;
-    --foreground: #0f172a;
+    --background: #fafafa;
+    --foreground: #09090b;
     --card: #ffffff;
-    --card-foreground: #0f172a;
+    --card-foreground: #09090b;
     --popover: #ffffff;
-    --popover-foreground: #0f172a;
-    --primary: #2563eb;
+    --popover-foreground: #09090b;
+    --primary: #09090b;
     --primary-foreground: #ffffff;
-    --secondary: #f1f5f9;
-    --secondary-foreground: #0f172a;
-    --muted: #f1f5f9;
-    --muted-foreground: #64748b;
+    --secondary: #f4f4f5;
+    --secondary-foreground: #09090b;
+    --muted: #f4f4f5;
+    --muted-foreground: #71717a;
     --accent: #2563eb;
     --accent-foreground: #ffffff;
     --destructive: #ef4444;
     --destructive-foreground: #ffffff;
-    --border: #e2e8f0;
-    --input: #e2e8f0;
-    --ring: #2563eb;
-    --radius: 0.75rem;
+    --border: #e4e4e7;
+    --input: #e4e4e7;
+    --ring: #09090b;
+    --radius: 0.5rem;
   }
 
   .dark {
     --background: #09090b;
-    --foreground: #f4f4f5;
+    --foreground: #fafafa;
     --card: #121215;
-    --card-foreground: #f4f4f5;
+    --card-foreground: #fafafa;
     --popover: #18181b;
-    --popover-foreground: #f4f4f5;
-    --primary: #3b82f6;
-    --primary-foreground: #ffffff;
+    --popover-foreground: #fafafa;
+    --primary: #fafafa;
+    --primary-foreground: #09090b;
     --secondary: #18181b;
-    --secondary-foreground: #f4f4f5;
+    --secondary-foreground: #fafafa;
     --muted: #27272a;
     --muted-foreground: #a1a1aa;
-    --accent: #2563eb;
+    --accent: #3b82f6;
     --accent-foreground: #ffffff;
     --destructive: #ef4444;
     --destructive-foreground: #ffffff;
     --border: #27272a;
     --input: #27272a;
-    --ring: #3b82f6;
-    --radius: 0.75rem;
+    --ring: #fafafa;
+    --radius: 0.5rem;
   }
 }
 
@@ -63,6 +63,8 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   line-height: 1.5;
+  background-color: var(--background);
+  color: var(--foreground);
 }
 
 .font-mono {
@@ -78,14 +80,9 @@ body {
 
 /* Minimalist Clean Panels & Cards */
 .panel {
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-radius: 0.75rem;
-}
-
-.dark .panel {
-  background: #111114;
-  border: 1px solid #222226;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
 }
 
 .panel-hover {
@@ -133,19 +130,143 @@ button, [role="button"] {
   min-height: 32px;
 }
 
-input:not([type="checkbox"]):not([type="radio"]),
+/* Hide Next.js dev tools floating badge so it does not block sidebar controls */
+nextjs-portal {
+  display: none !important;
+}
+
+
+/* ================================================================
+   VERCEL GEIST FORM CONTROLS & TYPOGRAPHY ELEVATION
+   ================================================================ */
+
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
 select,
 textarea {
   min-height: 36px;
   font-size: 13.5px;
+  border-radius: 0.5rem;
+  border: 1px solid var(--border);
+  background-color: var(--card);
+  color: var(--foreground);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+}
+
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"])::placeholder,
+textarea::placeholder {
+  color: var(--muted-foreground);
+  opacity: 0.7;
+}
+
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):focus,
+select:focus,
+textarea:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 1px #2563eb, 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.dark input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):focus,
+.dark select:focus,
+.dark textarea:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 1px #3b82f6, 0 0 0 3px rgba(59, 130, 246, 0.2);
+}
+
+input:disabled,
+select:disabled,
+textarea:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  background-color: var(--muted);
 }
 
 label {
   font-size: 12px;
+  font-weight: 500;
+  color: var(--foreground);
+  letter-spacing: -0.01em;
 }
 
 .backdrop-blur-sm {
   backdrop-filter: blur(8px);
+}
+
+/* Responsive Table Scroll Container */
+.responsive-table-container {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ================================================================
+   VERCEL GEIST DATA TABLE STYLING UTILITIES
+   ================================================================ */
+
+.table-container {
+  width: 100%;
+  overflow-x: auto;
+  border-radius: 0.75rem;
+  border: 1px solid var(--border);
+  background-color: var(--card);
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.03);
+}
+
+.table-header {
+  background-color: rgba(244, 244, 245, 0.75);
+  border-bottom: 1px solid var(--border);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted-foreground);
+  user-select: none;
+}
+
+.dark .table-header {
+  background-color: rgba(24, 24, 27, 0.75);
+}
+
+.table-cell {
+  padding: 0.75rem 1rem;
+  vertical-align: middle;
+  font-size: 13px;
+}
+
+.table-row {
+  border-bottom: 1px solid var(--border);
+  transition: background-color 0.12s ease;
+}
+
+.table-row:last-child {
+  border-bottom: none;
+}
+
+.table-row:hover {
+  background-color: rgba(244, 244, 245, 0.5);
+}
+
+.dark .table-row:hover {
+  background-color: rgba(39, 39, 42, 0.35);
+}
+
+/* Hide scrollbar while allowing scrolling */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+@media (max-width: 640px) {
+  input:not([type="checkbox"]):not([type="radio"]),
+  select,
+  textarea {
+    font-size: 14px;
+    min-height: 38px;
+  }
 }
 
 /* ================================================================
