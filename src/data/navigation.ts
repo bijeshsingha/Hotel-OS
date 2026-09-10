@@ -3,6 +3,7 @@ import {
   BedDouble,
   Sparkles,
   Receipt,
+  Wallet,
   Briefcase,
   Moon,
   Wrench,
@@ -50,6 +51,13 @@ export const NAV_ITEMS: NavItem[] = [
     icon: Receipt,
     badge: "B",
     description: "Guest ledgers, tax invoices & charge posting",
+  },
+  {
+    label: "Cashier Shift",
+    href: "/cashier-shift",
+    icon: Wallet,
+    badge: "CS",
+    description: "Daily shift entry ledger, income receipts, expenses & drawer handover",
   },
   {
     label: "Corporate B2B",

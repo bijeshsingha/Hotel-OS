@@ -4,6 +4,7 @@ import { getNextDocumentNumber } from "@/lib/sequence/generator";
 import { quoteStay } from "@/lib/domain/pms-service";
 import { calculateGST } from "@/lib/gst/calculator";
 import { normalizeGuestName } from "@/lib/domain/name-utils";
+import { logAuditEvent } from "@/lib/domain/audit-service";
 
 export async function GET(request: Request) {
   try {
@@ -450,6 +451,30 @@ export async function POST(request: Request) {
       roomCount: fullReservation?.rooms?.length || 1,
     };
 
+    // Audit log for reservation creation
+    await logAuditEvent({
+      organizationId: property.organizationId,
+      propertyId,
+      actorName: "Staff / Reservations",
+      action: "RESERVATION_CREATE",
+      targetType: "RESERVATION",
+      targetId: reservation.id,
+      reason: `Reservation ${reservation.confirmationNo} created for ${guestName}`,
+      afterJson: {
+        confirmationNo: reservation.confirmationNo,
+        guestName,
+        guestPhone,
+        roomCount: fullReservation?.rooms?.length || 1,
+        nights: nightsCount,
+        arrivalDate: start.toISOString().split("T")[0],
+        departureDate: end.toISOString().split("T")[0],
+        totalAmount: finalTotal,
+        depositAmount: effectiveDepositAmount,
+        source,
+        bookingType,
+      },
+    });
+
     return NextResponse.json({
       success: true,
       reservation: enrichedReservation,
@@ -469,6 +494,11 @@ export async function PATCH(request: Request) {
     if (!id) {
       return NextResponse.json({ error: "Reservation ID is required." }, { status: 400 });
     }
+
+    const currentRes = await prisma.reservation.findUnique({
+      where: { id },
+      include: { primaryGuest: true },
+    });
 
     const updated = await prisma.reservation.update({
       where: { id },
@@ -494,6 +524,30 @@ export async function PATCH(request: Request) {
           category: "FRONT_DESK",
           text: `Status updated to ${status}. Reason: ${reason}`,
           visibility: "INTERNAL",
+        },
+      });
+    }
+
+    // Audit log for status transition or cancellation
+    if (currentRes) {
+      const isCancellation = status === "CANCELLED";
+      await logAuditEvent({
+        organizationId: currentRes.organizationId,
+        propertyId: currentRes.propertyId,
+        actorName: "Staff / Front Desk",
+        action: isCancellation ? "RESERVATION_CANCEL" : "RESERVATION_STATUS_CHANGE",
+        targetType: "RESERVATION",
+        targetId: id,
+        reason: reason || `Reservation status changed from ${currentRes.status} to ${status}`,
+        beforeJson: {
+          confirmationNo: currentRes.confirmationNo,
+          status: currentRes.status,
+          guestName: currentRes.primaryGuest?.name,
+        },
+        afterJson: {
+          confirmationNo: currentRes.confirmationNo,
+          status,
+          assignedRoomId: assignedRoomId || null,
         },
       });
     }

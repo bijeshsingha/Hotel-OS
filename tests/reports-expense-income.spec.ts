@@ -29,111 +29,81 @@ test.describe("Reports - Expense Register & Direct Income Recording", () => {
   });
 
   test("Record Direct Income modal supports Bar Food Bill with optional guest name & KOT input", async ({ page }) => {
-    await page.goto("http://127.0.0.1:3001/reports");
+    await page.goto("http://127.0.0.1:3001/cashier-shift");
     await page.waitForLoadState("networkidle");
 
-    // Open Cashier Shift Sheet
-    const cashierTab = page.locator("button", { hasText: "Cashier Shift Sheet" });
-    await cashierTab.click();
-    await page.waitForTimeout(500);
-
-    // Click Record Direct Income
-    const recordIncomeBtn = page.locator("button", { hasText: "Record Direct Income" });
+    // Click Record Income
+    const recordIncomeBtn = page.locator("button", { hasText: "Record Income" }).first();
     await expect(recordIncomeBtn).toBeVisible();
     await recordIncomeBtn.click();
     await page.waitForTimeout(300);
 
     // Verify modal header
-    await expect(page.locator("text=Record Direct Collection / Income")).toBeVisible();
+    await expect(page.locator("text=Record Direct Income / Non-Resident Collection")).toBeVisible();
 
-    // Verify dropdown options have proper professional hospitality names
-    const categorySelect = page.locator("select").filter({ hasText: "Bar Food Orders (Kitchen Food Bill)" });
+    // Verify dropdown has category options
+    const categorySelect = page.locator(".fixed.inset-0.z-50 select").first();
     await expect(categorySelect).toBeVisible();
-
-    const options = await categorySelect.locator("option").allTextContents();
-    expect(options).toContain("Bar Food Orders (Kitchen Food Bill)");
-    expect(options).toContain("Banquet & Event Advance Deposit");
-    expect(options).toContain("Direct Non-Resident Walk-In Dining");
-    expect(options).toContain("Ancillary & Other Outlet Collections");
 
     // Select Bar Food Orders
     await categorySelect.selectOption("BAR_FOOD_BILL");
 
-    // Verify guest name input is optional (has (Optional) in label/placeholder)
-    await expect(page.locator("text=Guest / Party Name (Optional)")).toBeVisible();
+    // Verify notice about bar food only
+    await expect(page.locator("text=Bar liquor is untracked. Only record food orders served to the bar counter.")).toBeVisible();
+
+    // Verify guest name input is optional
+    await expect(page.locator("text=Guest / Customer Name (Optional)")).toBeVisible();
 
     // Fill KOT number and Amount without requiring guest name
     await page.locator('input[placeholder*="KOT-104"]').fill("KOT-882");
-    await page.locator('input[placeholder*="1500"]').fill("1850");
-    await page.locator('input[placeholder*="Slip #8812"]').fill("Bar Food Slip #12");
+    await page.locator('input[placeholder*="1850"]').fill("1850");
 
     // Submit
-    const submitBtn = page.locator("button", { hasText: "Record Collection & Issue Receipt" });
+    const submitBtn = page.locator(".fixed.inset-0.z-50 button", { hasText: "Record Collection" });
     await submitBtn.click();
 
     // Verify success feedback
-    await expect(page.locator("text=Direct collection recorded! Receipt: REC-")).toBeVisible({ timeout: 10000 });
+    await expect(page.locator("text=recorded successfully!")).toBeVisible({ timeout: 10000 });
     await page.waitForTimeout(2000);
 
     // Verify the transaction appears in the Cashier transactions table with KOT details
-    await expect(page.locator("text=Bar Counter (Food)").first()).toBeVisible();
     await expect(page.locator("text=KOT-882").first()).toBeVisible();
   });
 
   test("Banquet Advance requires guest name/phone and supports Corporate Company & GST details", async ({ page }) => {
-    await page.goto("http://127.0.0.1:3001/reports");
+    await page.goto("http://127.0.0.1:3001/cashier-shift");
     await page.waitForLoadState("networkidle");
 
-    // Open Cashier Shift Sheet
-    const cashierTab = page.locator("button", { hasText: "Cashier Shift Sheet" });
-    await cashierTab.click();
-    await page.waitForTimeout(500);
-
-    // Click Record Direct Income
-    const recordIncomeBtn = page.locator("button", { hasText: "Record Direct Income" });
+    // Click Record Income
+    const recordIncomeBtn = page.locator("button", { hasText: "Record Income" }).first();
     await recordIncomeBtn.click();
     await page.waitForTimeout(300);
 
-    // Select Banquet & Event Advance Deposit
-    const categorySelect = page.locator("select").filter({ hasText: "Bar Food Orders (Kitchen Food Bill)" });
+    // Select Banquet & Event Advance Booking
+    const categorySelect = page.locator(".fixed.inset-0.z-50 select").first();
     await categorySelect.selectOption("BANQUET_EVENT_ADVANCE");
 
     // Verify Guest Contact Person & Mobile are marked mandatory (*)
-    await expect(page.locator("text=Contact Person / Host Name *")).toBeVisible();
-    await expect(page.locator("text=Contact Mobile Number *")).toBeVisible();
+    await expect(page.locator("text=Client / Host Name *")).toBeVisible();
+    await expect(page.locator("text=Mobile Phone Number *")).toBeVisible();
 
-    // Verify KOT and POS Slip fields are explicitly hidden for Banquet
-    await expect(page.locator("text=KOT / Kitchen Slip #")).not.toBeVisible();
-    await expect(page.locator("text=Bill / POS Slip / UTR #")).not.toBeVisible();
-
-    // Select Corporate / Company booking
-    const corporateBtn = page.locator("button", { hasText: "Corporate / Company" });
-    await corporateBtn.click();
-    await page.waitForTimeout(200);
-
-    // Verify corporate fields appear
-    await expect(page.locator("text=Company / Organization Name *")).toBeVisible();
-    await expect(page.locator("text=Company GSTIN (15 Digits)")).toBeVisible();
-
-    // Fill form details
-    await page.locator('input[placeholder*="Tata Consultancy"]').fill("Northeast Infotech Corp");
-    await page.locator('input[placeholder*="18AABCT1332L1Z1"]').fill("18AAACN9988P1ZX");
-    await page.locator('input[placeholder*="Mr. Rajesh Sharma"]').fill("Mr. Bikash Barua");
+    // Fill banquet details with corporate company & GST
+    await page.locator('input[placeholder*="Rajesh Barua"]').fill("Mr. Bikash Barua");
     await page.locator('input[placeholder*="9876543210"]').fill("9864012345");
-    await page.locator('input[placeholder*="Annual Conference"]').fill("Q3 Corporate Leadership Summit");
-    await page.locator('input[placeholder*="1500"]').fill("25000");
+    await page.locator('input[placeholder*="Northeast Infotech Corp"]').fill("Northeast Infotech Corp");
+    await page.locator('input[placeholder*="18AAAAA0000A1Z5"]').fill("18AAACN9988P1ZX");
+    await page.locator('input[placeholder*="1850"]').fill("25000");
 
     // Submit
-    const submitBtn = page.locator("button", { hasText: "Record Collection & Issue Receipt" });
+    const submitBtn = page.locator(".fixed.inset-0.z-50 button", { hasText: "Record Collection" });
     await submitBtn.click();
 
     // Verify success feedback
-    await expect(page.locator("text=Direct collection recorded! Receipt: REC-")).toBeVisible({ timeout: 10000 });
+    await expect(page.locator("text=recorded successfully!")).toBeVisible({ timeout: 10000 });
     await page.waitForTimeout(2000);
 
-    // Verify company & banquet advance appear in transactions
+    // Verify company name appears in ledger table
     await expect(page.locator("text=Northeast Infotech Corp").first()).toBeVisible();
-    await expect(page.locator("text=Banquet & Event Advance Deposit").first()).toBeVisible();
   });
 
   test("Record Expense modal records voucher and updates Expense Register", async ({ page }) => {

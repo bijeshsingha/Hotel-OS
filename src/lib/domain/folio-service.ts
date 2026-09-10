@@ -1,6 +1,7 @@
 import { prisma } from "../db/prisma";
 import { calculateGST } from "../gst/calculator";
 import { getNextDocumentNumber } from "../sequence/generator";
+import { logAuditEvent } from "./audit-service";
 
 export async function postManualFolioCharge({
   folioId,
@@ -85,6 +86,30 @@ export async function postManualFolioCharge({
   await prisma.folio.update({
     where: { id: folio.id },
     data: { balance: newBalance },
+  });
+
+  // Audit log for manual charge or discount
+  const isDiscount = chargeCode === "DISCOUNT" || amount < 0;
+  await logAuditEvent({
+    organizationId: folio.organizationId,
+    propertyId: folio.propertyId,
+    actorId: actorId || null,
+    actorName: "Staff / Cashier",
+    action: isDiscount ? "FOLIO_DISCOUNT_APPLIED" : "FOLIO_CHARGE_ADD",
+    targetType: "FOLIO_ENTRY",
+    targetId: entry.id,
+    reason: description || (isDiscount ? "Discount posted" : "Manual folio charge posted"),
+    afterJson: {
+      folioId: folio.id,
+      chargeCode,
+      description,
+      qty,
+      unitAmount: amount,
+      taxableAmount: gst.taxableAmount,
+      taxAmount: gst.taxAmount,
+      totalAmount: gst.totalAmount,
+      newBalance,
+    },
   });
 
   return entry;
@@ -262,6 +287,33 @@ export async function recordPayment({
     where: { id: folio.id },
     data: {
       balance: { decrement: finalAmount },
+    },
+  });
+
+  // Audit log for payment receipt or surplus refund payout
+  const auditAction = isActuallyRefund ? "REFUND_PAYOUT" : "PAYMENT_RECEIVE";
+  const roomNumbers = (folio.stay as any)?.roomAssignments?.map((a: any) => a.room?.number).filter(Boolean).join(", ") || "";
+  await logAuditEvent({
+    organizationId: folio.organizationId,
+    propertyId: folio.propertyId,
+    actorId: actorId || null,
+    actorName: "Cashier / Front Desk",
+    action: auditAction,
+    targetType: "FOLIO_PAYMENT",
+    targetId: payment.id,
+    reason: isActuallyRefund
+      ? "Surplus advance refund payout to guest"
+      : (reference || `Payment received via ${method}`),
+    afterJson: {
+      receiptNo: payment.receiptNo,
+      amount: payment.amount,
+      method: payment.method,
+      reference: payment.reference,
+      folioId: folio.id,
+      guestName: payerName || folio.stay?.primaryGuest?.name || "Guest",
+      roomNumbers,
+      isRefund: isActuallyRefund,
+      isBTC,
     },
   });
 

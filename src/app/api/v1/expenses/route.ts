@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
+import { logAuditEvent } from "@/lib/domain/audit-service";
 
 export async function GET(request: Request) {
   try {
@@ -80,6 +81,28 @@ export async function POST(request: Request) {
         paidAt: paidAt ? new Date(paidAt) : new Date(),
         createdByName,
         status: "PAID",
+      },
+    });
+
+    // Audit log for expense voucher
+    await logAuditEvent({
+      organizationId: property.organizationId,
+      propertyId: property.id,
+      actorName: createdByName || "Staff",
+      action: "EXPENSE_VOUCHER_CREATE",
+      targetType: "EXPENSE",
+      targetId: expense.id,
+      reason: description || `Expense voucher for ${payeeName} (${category})`,
+      afterJson: {
+        voucherNo: expense.voucherNo,
+        category: expense.category,
+        payeeName: expense.payeeName,
+        amount: expense.amount,
+        taxAmount: expense.taxAmount,
+        totalAmount: expense.totalAmount,
+        paymentMethod: expense.paymentMethod,
+        reference: expense.reference,
+        businessDate: expense.businessDate,
       },
     });
 

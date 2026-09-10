@@ -75,16 +75,16 @@ function formatShortDate(dateStr?: string | null): string {
   }
 }
 
-function formatDateTimeShort(dateStr?: string | null): string {
+function formatDateTimeShort(dateStr?: string | Date | null): string {
   if (!dateStr) return "—";
   try {
-    const d = new Date(dateStr);
-    if (isNaN(d.getTime())) return dateStr;
+    const d = dateStr instanceof Date ? dateStr : new Date(dateStr);
+    if (isNaN(d.getTime())) return typeof dateStr === "string" ? dateStr : "—";
     const datePart = d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
     const timePart = d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
     return `${datePart}, ${timePart}`;
   } catch {
-    return dateStr;
+    return typeof dateStr === "string" ? dateStr : "—";
   }
 }
 
@@ -594,6 +594,11 @@ function BillingContent() {
       prev.includes(key) ? prev.filter((id) => id !== key) : [...prev, key]
     );
   };
+
+  const selectedGroupStayIds = useMemo(() => {
+    const selectedItems = directoryItems.filter((d) => selectedRoomKeys.includes(d.key));
+    return Array.from(new Set(selectedItems.map((d) => d.stayId)));
+  }, [directoryItems, selectedRoomKeys]);
 
   // Stay Calculations for Active Selected Room
   const stayCalculations = useMemo(() => {

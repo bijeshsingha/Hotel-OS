@@ -44,6 +44,8 @@ dev.db
 dev.db-journal
 prisma/*.db
 prisma/backups/
+dump_*.json
+*.dump
 # scratch & local tools
 scratch/
 *.Bak

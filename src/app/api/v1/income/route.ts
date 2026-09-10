@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { getNextDocumentNumber } from "@/lib/sequence/generator";
 import { getMidnightDayBoundaries } from "@/lib/domain/daily-report-service";
+import { logAuditEvent } from "@/lib/domain/audit-service";
 
 export const CATEGORY_LABELS: Record<string, string> = {
   BAR_FOOD_BILL: "Bar Food Orders (Kitchen Food Bill)",
@@ -194,6 +195,29 @@ export async function POST(request: Request) {
         status: "SUCCEEDED",
         receivedAt: receivedAt ? new Date(receivedAt) : new Date(),
         createdById: createdByName,
+      },
+    });
+
+    // Audit log for direct income collection
+    await logAuditEvent({
+      organizationId: property.organizationId,
+      propertyId: property.id,
+      actorName: createdByName || "Staff",
+      action: "DIRECT_INCOME_COLLECT",
+      targetType: "DIRECT_INCOME",
+      targetId: payment.id,
+      reason: computedReference || `${categoryLabel} collection`,
+      afterJson: {
+        receiptNo: payment.receiptNo,
+        category,
+        categoryLabel,
+        amount: payment.amount,
+        paymentMethod: payment.method,
+        reference: payment.reference,
+        kotNo: kotNo?.trim() || null,
+        guestName: resolvedPayerName,
+        companyName: companyName?.trim() || null,
+        gstin: gstin?.trim() || null,
       },
     });
 

@@ -363,36 +363,182 @@ export async function GET(request: Request) {
 
     // 3. REVENUE & GST JOURNAL
     if (reportType === "REVENUE") {
-      const entryWhere: any = { propertyId, status: "POSTED" };
-      if (date) {
-        entryWhere.OR = [
-          { serviceDate: date },
-          { postedAt: dateFilter },
-        ];
-      } else if (dateFilter) {
-        entryWhere.postedAt = dateFilter;
-      }
+      const entryWhere: any = { propertyId, status: "POSTED", type: "CHARGE" };
 
-      const entries = await prisma.folioEntry.findMany({
-        where: entryWhere,
-        include: { folio: { include: { stay: { include: { primaryGuest: true } } } } },
-        orderBy: { postedAt: "desc" },
+      const [entries, property] = await Promise.all([
+        prisma.folioEntry.findMany({
+          where: entryWhere,
+          include: {
+            folio: {
+              include: {
+                stay: {
+                  include: {
+                    primaryGuest: true,
+                    roomAssignments: {
+                      include: { room: true },
+                      orderBy: { startsAt: "desc" },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          orderBy: [{ serviceDate: "desc" }, { postedAt: "desc" }],
+        }),
+        prisma.property.findUnique({
+          where: { id: propertyId },
+          select: { displayName: true, code: true, gstin: true, stateCode: true, businessDate: true },
+        }),
+      ]);
+
+      let totalGrossRevenue = 0;
+      let totalTaxable = 0;
+      let totalCgst = 0;
+      let totalSgst = 0;
+      let totalIgst = 0;
+
+      const departmentBreakdown = {
+        ROOMS: 0,
+        FNB: 0,
+        EXTRA: 0,
+        ANCILLARY: 0,
+      };
+
+      const taxRateBreakdown: Record<string, number> = {
+        "0%": 0,
+        "5%": 0,
+        "12%": 0,
+        "18%": 0,
+        "28%": 0,
+      };
+
+      const formattedRows = entries.map((e) => {
+        let cgstAmount = 0;
+        let sgstAmount = 0;
+        let igstAmount = 0;
+        let effectiveTaxRate = 0;
+
+        if (e.taxComponentsJson) {
+          try {
+            const comp = JSON.parse(e.taxComponentsJson);
+            if (typeof comp === "object" && comp !== null) {
+              cgstAmount = Number(comp.cgstAmount || 0);
+              sgstAmount = Number(comp.sgstAmount || 0);
+              igstAmount = Number(comp.igstAmount || 0);
+              effectiveTaxRate = Number(
+                comp.effectiveTaxRate || (comp.cgstRate ? comp.cgstRate * 2 : 0)
+              );
+            }
+          } catch {}
+        }
+
+        const calculatedTax =
+          cgstAmount + sgstAmount + igstAmount ||
+          Math.max(0, e.totalAmount - (e.taxableAmount || 0));
+
+        if (effectiveTaxRate === 0 && e.taxableAmount > 0 && calculatedTax > 0) {
+          effectiveTaxRate = Math.round((calculatedTax / e.taxableAmount) * 100);
+        }
+
+        // Categorize Department
+        let department: "ROOMS" | "FNB" | "EXTRA" | "ANCILLARY" = "ANCILLARY";
+        let departmentLabel = "Ancillary & Misc";
+
+        const code = (e.chargeCode || "").toUpperCase();
+        const desc = (e.description || "").toLowerCase();
+
+        if (code === "ROOM_TARIFF") {
+          department = "ROOMS";
+          departmentLabel = "Room Tariff";
+        } else if (code === "EXTRA_PAX" || code === "EXTRA_BED") {
+          department = "EXTRA";
+          departmentLabel = "Extra Pax / Bed";
+        } else if (
+          code.includes("FOOD") ||
+          code.includes("RESTAURANT") ||
+          code.includes("DINING") ||
+          code.includes("BREAKFAST") ||
+          desc.includes("dinner") ||
+          desc.includes("food") ||
+          e.sourceType === "POS_ORDER"
+        ) {
+          department = "FNB";
+          departmentLabel = "F&B Dining";
+        } else if (code.includes("LAUNDRY")) {
+          department = "ANCILLARY";
+          departmentLabel = "Laundry";
+        } else if (code.includes("MINIBAR")) {
+          department = "ANCILLARY";
+          departmentLabel = "Minibar";
+        }
+
+        // Accumulate statistics
+        totalGrossRevenue += e.totalAmount;
+        totalTaxable += e.taxableAmount || 0;
+        totalCgst += cgstAmount;
+        totalSgst += sgstAmount;
+        totalIgst += igstAmount;
+        departmentBreakdown[department] += e.totalAmount;
+
+        const rateKey = `${effectiveTaxRate}%`;
+        taxRateBreakdown[rateKey] = (taxRateBreakdown[rateKey] || 0) + e.totalAmount;
+
+        const primaryGuest = e.folio?.stay?.primaryGuest;
+        const roomAssignments = e.folio?.stay?.roomAssignments || [];
+        const roomNumber = roomAssignments[0]?.room?.number || "—";
+
+        return {
+          id: e.id,
+          folioId: e.folioId,
+          stayId: e.folio?.stayId || "—",
+          serviceDate: e.serviceDate,
+          postedAt: e.postedAt.toISOString(),
+          chargeCode: e.chargeCode,
+          department,
+          departmentLabel,
+          description: e.description,
+          guestName: primaryGuest?.name || "Direct Guest / Resident",
+          phone: primaryGuest?.phone || "—",
+          companyName: primaryGuest?.companyName || null,
+          gstin: primaryGuest?.gstin || null,
+          roomNumber,
+          qty: e.qty || 1,
+          unitAmount: e.unitAmount || e.totalAmount,
+          taxableAmount: Math.round((e.taxableAmount || 0) * 100) / 100,
+          cgstAmount: Math.round(cgstAmount * 100) / 100,
+          sgstAmount: Math.round(sgstAmount * 100) / 100,
+          igstAmount: Math.round(igstAmount * 100) / 100,
+          taxAmount: Math.round(calculatedTax * 100) / 100,
+          effectiveTaxRate,
+          totalAmount: Math.round(e.totalAmount * 100) / 100,
+          sourceType: e.sourceType || "PMS_CHARGE",
+        };
       });
+
+      const totalTax = totalCgst + totalSgst + totalIgst;
 
       return NextResponse.json({
         reportType,
         dayCycle: "12:00 AM – 12:00 AM Midnight",
         generatedAt: new Date().toISOString(),
-        rows: entries.map((e) => ({
-          id: e.id,
-          serviceDate: e.serviceDate,
-          chargeCode: e.chargeCode,
-          description: e.description,
-          guestName: e.folio.stay.primaryGuest.name,
-          taxableAmount: e.taxableAmount,
-          totalAmount: e.totalAmount,
-          taxAmount: e.totalAmount - e.taxableAmount,
-        })),
+        property,
+        summary: {
+          totalEntries: formattedRows.length,
+          totalGrossRevenue: Math.round(totalGrossRevenue * 100) / 100,
+          totalTaxable: Math.round(totalTaxable * 100) / 100,
+          totalTax: Math.round(totalTax * 100) / 100,
+          totalCgst: Math.round(totalCgst * 100) / 100,
+          totalSgst: Math.round(totalSgst * 100) / 100,
+          totalIgst: Math.round(totalIgst * 100) / 100,
+          departmentBreakdown: {
+            ROOMS: Math.round(departmentBreakdown.ROOMS * 100) / 100,
+            FNB: Math.round(departmentBreakdown.FNB * 100) / 100,
+            EXTRA: Math.round(departmentBreakdown.EXTRA * 100) / 100,
+            ANCILLARY: Math.round(departmentBreakdown.ANCILLARY * 100) / 100,
+          },
+          taxRateBreakdown,
+        },
+        rows: formattedRows,
       });
     }
 

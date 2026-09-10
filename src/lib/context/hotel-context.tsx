@@ -49,6 +49,7 @@ interface HotelContextType {
   switchUser: (identifier: string) => void;
   logout: () => void;
   refreshData: () => Promise<void>;
+  triggerRefresh: () => void;
   refreshKey: number;
 }
 
@@ -178,6 +179,10 @@ export function HotelProvider({ children }: { children: React.ReactNode }) {
     window.location.href = "/login";
   };
 
+  const triggerRefresh = () => {
+    setRefreshKey((k) => k + 1);
+  };
+
   const refreshData = async () => {
     if (activeProperty) {
       await fetchSession(user?.username || user?.email, activeProperty.id);
@@ -204,6 +209,7 @@ export function HotelProvider({ children }: { children: React.ReactNode }) {
         switchUser,
         logout,
         refreshData,
+        triggerRefresh,
         refreshKey,
       }}
     >

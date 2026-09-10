@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { Calendar } from "lucide-react";
 
 interface PageHeaderProps {
   title: string;
@@ -67,9 +68,16 @@ export function PageHeader({
       <div className="flex items-center gap-2 flex-wrap md:self-center">
         {metadata}
         {businessDate && (
-          <div className="rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 px-3 py-1.5 text-right shadow-xs shrink-0">
-            <span className="text-zinc-400 text-[10px] block font-semibold uppercase">Business Date</span>
-            <span className="font-bold font-mono text-xs text-zinc-800 dark:text-zinc-200">{businessDate}</span>
+          <div className="flex items-center gap-2 h-9 px-3 rounded-xl bg-zinc-50/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 text-xs shadow-2xs shrink-0 select-none">
+            <span className="flex items-center gap-1.5 text-[10.5px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+              <Calendar className="h-3.5 w-3.5 text-zinc-400 dark:text-zinc-500 shrink-0" />
+              <span>Business Date</span>
+            </span>
+            <span className="h-3.5 w-px bg-zinc-200 dark:bg-zinc-700" />
+            <span className="font-mono font-bold text-xs text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              {businessDate}
+            </span>
           </div>
         )}
         {actions}

@@ -44,6 +44,7 @@ import {
   Sun,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   Activity,
   BedDouble,
   RefreshCw,
@@ -58,19 +59,13 @@ import { PageHeader, StatCard, SegmentedControl } from "@/components/ui";
 export default function ReportsPage() {
   const { activeProperty, refreshKey, refreshData } = useHotel();
   const [reportType, setReportType] = useState<
-    "ROOM_TRANSFERS" | "FINAL_BILLS" | "CASHIER_COLLECTIONS_EXPENSES" | "EXPENSES" | "FRONT_OFFICE" | "REVENUE" | "FNB"
+    "ROOM_TRANSFERS" | "FINAL_BILLS" | "EXPENSES" | "REVENUE" | "FNB"
   >("ROOM_TRANSFERS");
 
   // Date Filter State for 12 AM - 12 AM Cycle
   const [selectedDate, setSelectedDate] = useState<string>("");
   const [data, setData] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
-
-  // Filters for Cashier Collections & Expenses
-  const [flowFilter, setFlowFilter] = useState<"ALL" | "INFLOW" | "OUTFLOW">("ALL");
-  const [methodFilter, setMethodFilter] = useState<string>("ALL");
-  const [categoryFilter, setCategoryFilter] = useState<string>("ALL");
-  const [searchQuery, setSearchQuery] = useState("");
 
   // Filters for Dedicated Expense Register Tab
   const [expenseSearch, setExpenseSearch] = useState("");
@@ -98,16 +93,26 @@ export default function ReportsPage() {
   const [kotDestinationFilter, setKotDestinationFilter] = useState("ALL");
   const [kotSettlementFilter, setKotSettlementFilter] = useState("ALL");
 
+  // Filters for Revenue & Tax Ledger Tab
+  const [revenueSearch, setRevenueSearch] = useState("");
+  const [revenueDateRange, setRevenueDateRange] = useState<
+    "ALL_TIME" | "TODAY" | "YESTERDAY" | "LAST_7_DAYS" | "THIS_MONTH" | "CUSTOM"
+  >("ALL_TIME");
+  const [revenueCustomStart, setRevenueCustomStart] = useState("");
+  const [revenueCustomEnd, setRevenueCustomEnd] = useState("");
+  const [revenueDepartmentFilter, setRevenueDepartmentFilter] = useState<string>("ALL");
+  const [revenueTaxRateFilter, setRevenueTaxRateFilter] = useState<string>("ALL");
+
   // Modals & Printable Sheets
   const [snapshotLoading, setSnapshotLoading] = useState(false);
   const [snapshotMsg, setSnapshotMsg] = useState<string | null>(null);
   const [showAddExpenseModal, setShowAddExpenseModal] = useState(false);
   const [showAddIncomeModal, setShowAddIncomeModal] = useState(false);
-  const [showPrintModal, setShowPrintModal] = useState(false);
   const [showExpensesPrintModal, setShowExpensesPrintModal] = useState(false);
   const [showTransfersPrintModal, setShowTransfersPrintModal] = useState(false);
   const [showFinalBillsPrintModal, setShowFinalBillsPrintModal] = useState(false);
   const [showKotPrintModal, setShowKotPrintModal] = useState(false);
+  const [showRevenuePrintModal, setShowRevenuePrintModal] = useState(false);
 
   // Countdown to next 12 AM Midnight
   const [timeUntilMidnight, setTimeUntilMidnight] = useState("");
@@ -154,23 +159,19 @@ export default function ReportsPage() {
     }
   }, [activeProperty?.businessDate]);
 
-  // Update Countdown to 12:00 AM Midnight
+  // Update Countdown Timer
   useEffect(() => {
     const updateCountdown = () => {
       const now = new Date();
-      const midnight = new Date();
-      midnight.setHours(24, 0, 0, 0); // Next 12:00 AM midnight
+      const midnight = new Date(now);
+      midnight.setHours(24, 0, 0, 0);
       const diffMs = midnight.getTime() - now.getTime();
-      if (diffMs > 0) {
-        const hours = Math.floor(diffMs / (1000 * 60 * 60));
-        const mins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-        const secs = Math.floor((diffMs % (1000 * 60)) / 1000);
-        setTimeUntilMidnight(
-          `${hours.toString().padStart(2, "0")}h ${mins.toString().padStart(2, "0")}m ${secs.toString().padStart(2, "0")}s`
-        );
-      } else {
-        setTimeUntilMidnight("00h 00m 00s");
-      }
+      const hrs = Math.floor(diffMs / (1000 * 60 * 60));
+      const mins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+      const secs = Math.floor((diffMs % (1000 * 60)) / 1000);
+      setTimeUntilMidnight(
+        `${hrs.toString().padStart(2, "0")}:${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`
+      );
     };
 
     updateCountdown();
@@ -184,11 +185,11 @@ export default function ReportsPage() {
       if (e.key === "Escape") {
         setShowAddExpenseModal(false);
         setShowAddIncomeModal(false);
-        setShowPrintModal(false);
         setShowExpensesPrintModal(false);
         setShowTransfersPrintModal(false);
         setShowFinalBillsPrintModal(false);
         setShowKotPrintModal(false);
+        setShowRevenuePrintModal(false);
       }
     };
     window.addEventListener("keydown", handleKeyDown);
@@ -483,50 +484,6 @@ export default function ReportsPage() {
     };
   }, [data?.expenses]);
 
-  // Filtered Transactions for Cashier Report
-  const filteredCashierTransactions = useMemo(() => {
-    const list = data?.allTransactions || data?.recentTransactions || [];
-    return list.filter((tx: any) => {
-      if (flowFilter !== "ALL" && tx.flow !== flowFilter) return false;
-      if (methodFilter === "ADVANCE") {
-        if (tx.sourceCategory !== "ADVANCE_DEPOSIT" && tx.sourceCategory !== "BANQUET_ADVANCE") return false;
-      } else if (methodFilter === "POS") {
-        if (tx.sourceCategory !== "POS_RESTAURANT" && tx.sourceCategory !== "BAR_BEVERAGE" && tx.sourceCategory !== "MISC_OUTLET") return false;
-      } else if (methodFilter === "OTA") {
-        if (tx.sourceCategory !== "OTA_COLLECTION" && tx.method !== "OTA_VCC" && tx.method !== "DIRECT_BILL") return false;
-      } else if (methodFilter === "FOLIO") {
-        if (tx.sourceCategory !== "FOLIO_SETTLEMENT") return false;
-      } else if (methodFilter !== "ALL") {
-        if (tx.method !== methodFilter) return false;
-      }
-
-      if (categoryFilter !== "ALL" && tx.category !== categoryFilter) return false;
-
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase().trim();
-        const party = (tx.party || "").toLowerCase();
-        const rec = (tx.recordId || "").toLowerCase();
-        const ref = (tx.reference || "").toLowerCase();
-        const room = (tx.roomNumber || "").toLowerCase();
-        const desc = (tx.description || tx.particulars || "").toLowerCase();
-        const src = (tx.sourceLabel || "").toLowerCase();
-
-        if (
-          !party.includes(q) &&
-          !rec.includes(q) &&
-          !ref.includes(q) &&
-          !room.includes(q) &&
-          !desc.includes(q) &&
-          !src.includes(q)
-        ) {
-          return false;
-        }
-      }
-
-      return true;
-    });
-  }, [data, flowFilter, methodFilter, categoryFilter, searchQuery]);
-
   // Filtered Room Transfers
   const filteredTransfers = useMemo(() => {
     const list: any[] = data?.transfers || [];
@@ -717,6 +674,125 @@ export default function ReportsPage() {
     });
   }, [data, reportType, kotDestinationFilter, kotSettlementFilter, kotSearch]);
 
+  // Filtered Revenue & Tax Ledger Entries
+  const filteredRevenueEntries = useMemo(() => {
+    const list: any[] = data?.rows || [];
+    if (reportType !== "REVENUE") return list;
+
+    return list.filter((r) => {
+      // 1. Department Filter
+      if (revenueDepartmentFilter !== "ALL" && r.department !== revenueDepartmentFilter) {
+        return false;
+      }
+
+      // 2. Tax Rate Filter
+      if (revenueTaxRateFilter !== "ALL") {
+        if (`${r.effectiveTaxRate}%` !== revenueTaxRateFilter) return false;
+      }
+
+      // 3. Date Range Filter
+      if (revenueDateRange !== "ALL_TIME") {
+        const entryDate = r.serviceDate || r.postedAt?.split("T")[0];
+        const now = new Date();
+        const todayStr = activeProperty?.businessDate || now.toISOString().split("T")[0];
+
+        if (revenueDateRange === "TODAY") {
+          if (entryDate !== todayStr) return false;
+        } else if (revenueDateRange === "YESTERDAY") {
+          const y = new Date(todayStr);
+          y.setDate(y.getDate() - 1);
+          const yStr = y.toISOString().split("T")[0];
+          if (entryDate !== yStr) return false;
+        } else if (revenueDateRange === "LAST_7_DAYS") {
+          const past7 = new Date();
+          past7.setDate(past7.getDate() - 7);
+          const past7Str = past7.toISOString().split("T")[0];
+          if (entryDate < past7Str) return false;
+        } else if (revenueDateRange === "THIS_MONTH") {
+          const [entryY, entryM] = (entryDate || "").split("-");
+          const curY = String(now.getFullYear());
+          const curM = String(now.getMonth() + 1).padStart(2, "0");
+          if (entryY !== curY || entryM !== curM) return false;
+        } else if (revenueDateRange === "CUSTOM") {
+          if (revenueCustomStart && entryDate < revenueCustomStart) return false;
+          if (revenueCustomEnd && entryDate > revenueCustomEnd) return false;
+        }
+      }
+
+      // 4. Search Filter
+      if (revenueSearch.trim()) {
+        const q = revenueSearch.toLowerCase().trim();
+        const guest = (r.guestName || "").toLowerCase();
+        const room = (r.roomNumber || "").toLowerCase();
+        const desc = (r.description || "").toLowerCase();
+        const code = (r.chargeCode || "").toLowerCase();
+        const phone = (r.phone || "").toLowerCase();
+        const comp = (r.companyName || "").toLowerCase();
+        const gstin = (r.gstin || "").toLowerCase();
+        const folio = (r.folioId || "").toLowerCase();
+
+        if (
+          !guest.includes(q) &&
+          !room.includes(q) &&
+          !desc.includes(q) &&
+          !code.includes(q) &&
+          !phone.includes(q) &&
+          !comp.includes(q) &&
+          !gstin.includes(q) &&
+          !folio.includes(q)
+        ) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }, [
+    data,
+    reportType,
+    revenueDepartmentFilter,
+    revenueTaxRateFilter,
+    revenueDateRange,
+    revenueCustomStart,
+    revenueCustomEnd,
+    revenueSearch,
+    activeProperty?.businessDate,
+  ]);
+
+  // Computed Revenue & Tax KPIs
+  const revenueKPIs = useMemo(() => {
+    const totalGross = filteredRevenueEntries.reduce((s, r) => s + r.totalAmount, 0);
+    const totalTaxable = filteredRevenueEntries.reduce((s, r) => s + r.taxableAmount, 0);
+    const totalTax = filteredRevenueEntries.reduce((s, r) => s + r.taxAmount, 0);
+    const totalCgst = filteredRevenueEntries.reduce((s, r) => s + r.cgstAmount, 0);
+    const totalSgst = filteredRevenueEntries.reduce((s, r) => s + r.sgstAmount, 0);
+
+    const roomsRev = filteredRevenueEntries
+      .filter((r) => r.department === "ROOMS")
+      .reduce((s, r) => s + r.totalAmount, 0);
+    const fnbRev = filteredRevenueEntries
+      .filter((r) => r.department === "FNB")
+      .reduce((s, r) => s + r.totalAmount, 0);
+    const extraRev = filteredRevenueEntries
+      .filter((r) => r.department === "EXTRA")
+      .reduce((s, r) => s + r.totalAmount, 0);
+    const miscRev = filteredRevenueEntries
+      .filter((r) => r.department === "ANCILLARY")
+      .reduce((s, r) => s + r.totalAmount, 0);
+
+    return {
+      totalGross,
+      totalTaxable,
+      totalTax,
+      totalCgst,
+      totalSgst,
+      roomsRev,
+      fnbRev,
+      extraRev,
+      miscRev,
+    };
+  }, [filteredRevenueEntries]);
+
   // Distinct room numbers for filter dropdown
   const allDistinctRooms = useMemo(() => {
     const set = new Set<string>();
@@ -850,39 +926,6 @@ export default function ReportsPage() {
     a.click();
   };
 
-  const exportCashierCSV = () => {
-    if (!filteredCashierTransactions.length) return;
-    const headers = [
-      "Record No / Voucher",
-      "Timestamp",
-      "Type (Inflow / Outflow)",
-      "Party / Guest / Payee",
-      "Room / Particulars",
-      "Payment Method",
-      "Reference / UTR",
-      "Amount (INR)",
-      "Status",
-    ];
-    const rows = filteredCashierTransactions.map((tx: any) => [
-      tx.recordId,
-      `${tx.date} ${tx.time}`,
-      tx.flow,
-      JSON.stringify(tx.party || ""),
-      JSON.stringify(tx.particulars || ""),
-      tx.method,
-      JSON.stringify(tx.reference || ""),
-      tx.amount,
-      tx.status,
-    ]);
-    const csvContent = [headers.join(","), ...rows.map((r: any[]) => r.join(","))].join("\n");
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${activeProperty?.code}_Cashier_Report_${selectedDate || new Date().toISOString().slice(0, 10)}.csv`;
-    a.click();
-  };
-
   const exportKitchenOrdersCSV = () => {
     if (!filteredKitchenOrders.length) {
       alert("No kitchen order records to export.");
@@ -982,6 +1025,63 @@ export default function ReportsPage() {
     a.click();
   };
 
+  const exportRevenueCSV = () => {
+    if (!filteredRevenueEntries.length) {
+      alert("No revenue entries to export.");
+      return;
+    }
+
+    const headers = [
+      "Service Date",
+      "Charge Code",
+      "Department",
+      "Description",
+      "Room #",
+      "Guest / Entity Name",
+      "Phone",
+      "Company",
+      "GSTIN",
+      "Quantity",
+      "Unit Price (INR)",
+      "Taxable Base (INR)",
+      "CGST (INR)",
+      "SGST (INR)",
+      "Total GST (INR)",
+      "GST Rate (%)",
+      "Total Gross Amount (INR)",
+      "Source System",
+    ];
+
+    const rows = filteredRevenueEntries.map((r: any) => [
+      `"${r.serviceDate}"`,
+      `"${r.chargeCode}"`,
+      `"${r.departmentLabel}"`,
+      `"${(r.description || "").replace(/"/g, '""')}"`,
+      `"${r.roomNumber}"`,
+      `"${(r.guestName || "").replace(/"/g, '""')}"`,
+      `"${r.phone}"`,
+      `"${(r.companyName || "").replace(/"/g, '""')}"`,
+      `"${r.gstin || ""}"`,
+      r.qty,
+      r.unitAmount,
+      r.taxableAmount,
+      r.cgstAmount,
+      r.sgstAmount,
+      r.taxAmount,
+      `"${r.effectiveTaxRate}%"`,
+      r.totalAmount,
+      `"${r.sourceType}"`,
+    ]);
+
+    const csvContent = [headers.join(","), ...rows.map((row) => row.join(","))].join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${activeProperty?.code || "HOTEL"}_Revenue_Tax_Ledger_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+  };
+
   const summary = data?.summary;
   const isToday = (selectedDate || activeProperty?.businessDate) === activeProperty?.businessDate;
 
@@ -990,7 +1090,7 @@ export default function ReportsPage() {
       {/* Top Banner */}
       <PageHeader
         title="Reports, Audits & Master Exports"
-        description="Comprehensive dynamic logs for room transfers, settled final bills, cashier sheets & operational registers"
+        description="Comprehensive master registers for room transfers, settled final bills, expenses, tax ledgers & F&B collections"
         icon={BarChart3}
         badge="Live Dynamic Database Sync"
         badgeVariant="info"
@@ -1001,13 +1101,13 @@ export default function ReportsPage() {
               <>
                 <button
                   onClick={() => setShowTransfersPrintModal(true)}
-                  className="flex items-center gap-1.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 border border-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 dark:border-zinc-700 px-3.5 py-2 text-xs font-semibold text-zinc-800 dark:text-zinc-200 transition shadow-xs cursor-pointer"
+                  className="h-9 flex items-center gap-1.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 border border-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 dark:border-zinc-700 px-3.5 text-xs font-semibold text-zinc-800 dark:text-zinc-200 transition shadow-xs cursor-pointer"
                 >
                   <Printer className="h-4 w-4 text-zinc-500 dark:text-zinc-400" /> Print Transfer Log
                 </button>
                 <button
                   onClick={exportRoomTransfersCSV}
-                  className="flex items-center gap-1.5 rounded-xl bg-emerald-700 hover:bg-emerald-600 text-white px-4 py-2 text-xs font-semibold transition shadow-xs cursor-pointer"
+                  className="h-9 flex items-center gap-1.5 rounded-xl bg-emerald-700 hover:bg-emerald-600 text-white px-4 text-xs font-semibold transition shadow-xs cursor-pointer"
                 >
                   <FileSpreadsheet className="h-4 w-4" /> Export Transfers CSV
                 </button>
@@ -1018,67 +1118,65 @@ export default function ReportsPage() {
               <>
                 <button
                   onClick={() => setShowFinalBillsPrintModal(true)}
-                  className="flex items-center gap-1.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 border border-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 dark:border-zinc-700 px-3.5 py-2 text-xs font-semibold text-zinc-800 dark:text-zinc-200 transition shadow-xs cursor-pointer"
+                  className="h-9 flex items-center gap-1.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 border border-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 dark:border-zinc-700 px-3.5 text-xs font-semibold text-zinc-800 dark:text-zinc-200 transition shadow-xs cursor-pointer"
                 >
                   <Printer className="h-4 w-4 text-zinc-500 dark:text-zinc-400" /> Print Bills Register
                 </button>
                 <button
                   onClick={exportFinalBillsCSV}
-                  className="flex items-center gap-1.5 rounded-xl bg-emerald-700 hover:bg-emerald-600 text-white px-4 py-2 text-xs font-semibold transition shadow-xs cursor-pointer"
+                  className="h-9 flex items-center gap-1.5 rounded-xl bg-emerald-700 hover:bg-emerald-600 text-white px-4 text-xs font-semibold transition shadow-xs cursor-pointer"
                 >
                   <FileSpreadsheet className="h-4 w-4" /> Export Final Bills CSV
                 </button>
               </>
             )}
 
-            {reportType === "CASHIER_COLLECTIONS_EXPENSES" && (
-              <>
-                <button
-                  onClick={() => setShowAddIncomeModal(true)}
-                  className="flex items-center gap-1.5 rounded-xl bg-emerald-50 border border-emerald-300 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:border-emerald-800/60 dark:hover:bg-emerald-900/50 px-3.5 py-2 text-xs font-semibold text-emerald-800 dark:text-emerald-300 transition shadow-xs cursor-pointer"
-                >
-                  <Plus className="h-4 w-4" /> Record Direct Income
-                </button>
-                <button
-                  onClick={() => setShowAddExpenseModal(true)}
-                  className="flex items-center gap-1.5 rounded-xl bg-rose-50 border border-rose-200 hover:bg-rose-100 dark:bg-rose-950/40 dark:border-rose-800/60 dark:hover:bg-rose-900/50 px-3.5 py-2 text-xs font-semibold text-rose-700 dark:text-rose-300 transition shadow-xs cursor-pointer"
-                >
-                  <Plus className="h-4 w-4" /> Record Expense
-                </button>
-                <button
-                  onClick={() => setShowPrintModal(true)}
-                  className="flex items-center gap-1.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 border border-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 dark:border-zinc-700 px-3.5 py-2 text-xs font-semibold text-zinc-800 dark:text-zinc-200 transition shadow-xs cursor-pointer"
-                >
-                  <Printer className="h-4 w-4 text-zinc-500 dark:text-zinc-400" /> Print Cashier Sheet
-                </button>
-                <button
-                  onClick={exportCashierCSV}
-                  className="flex items-center gap-1.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-200 dark:text-zinc-950 px-4 py-2 text-xs font-semibold transition shadow-xs cursor-pointer"
-                >
-                  <Download className="h-4 w-4" /> Export CSV
-                </button>
-              </>
-            )}
+            {/* Quick Link to Dedicated Cashier Shift Entry Ledger */}
+            <Link
+              href="/cashier-shift"
+              className="h-9 flex items-center gap-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 border border-blue-200 dark:bg-blue-950/40 dark:hover:bg-blue-900/50 dark:border-blue-800/60 px-3.5 text-xs font-semibold text-blue-700 dark:text-blue-300 transition shadow-2xs cursor-pointer"
+              title="Open Dedicated Cashier Shift Entry Ledger & Till Reconciler"
+            >
+              <Wallet className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+              <span>Cashier Shift Ledger →</span>
+            </Link>
 
             {reportType === "EXPENSES" && (
               <>
                 <button
                   onClick={() => setShowAddExpenseModal(true)}
-                  className="flex items-center gap-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white px-3.5 py-2 text-xs font-semibold transition shadow-xs cursor-pointer"
+                  className="h-9 flex items-center gap-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white px-3.5 text-xs font-semibold transition shadow-xs cursor-pointer"
                 >
                   <Plus className="h-4 w-4" /> Record Expense
                 </button>
                 <button
                   onClick={() => setShowExpensesPrintModal(true)}
-                  className="flex items-center gap-1.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 border border-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 dark:border-zinc-700 px-3.5 py-2 text-xs font-semibold text-zinc-800 dark:text-zinc-200 transition shadow-xs cursor-pointer"
+                  className="h-9 flex items-center gap-1.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 border border-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 dark:border-zinc-700 px-3.5 text-xs font-semibold text-zinc-800 dark:text-zinc-200 transition shadow-xs cursor-pointer"
                 >
                   <Printer className="h-4 w-4 text-zinc-500 dark:text-zinc-400" /> Print Expense Register
                 </button>
                 <button
                   onClick={exportExpensesCSV}
-                  className="flex items-center gap-1.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-200 dark:text-zinc-950 px-4 py-2 text-xs font-semibold transition shadow-xs cursor-pointer"
+                  className="h-9 flex items-center gap-1.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-200 dark:text-zinc-950 px-4 text-xs font-semibold transition shadow-xs cursor-pointer"
                 >
                   <Download className="h-4 w-4" /> Export Expenses CSV
+                </button>
+              </>
+            )}
+
+            {reportType === "REVENUE" && (
+              <>
+                <button
+                  onClick={() => setShowRevenuePrintModal(true)}
+                  className="h-9 flex items-center gap-1.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 border border-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 dark:border-zinc-700 px-3.5 text-xs font-semibold text-zinc-800 dark:text-zinc-200 transition shadow-xs cursor-pointer"
+                >
+                  <Printer className="h-4 w-4 text-zinc-500 dark:text-zinc-400" /> Print Tax Ledger
+                </button>
+                <button
+                  onClick={exportRevenueCSV}
+                  className="h-9 flex items-center gap-1.5 rounded-xl bg-emerald-700 hover:bg-emerald-600 text-white px-4 text-xs font-semibold transition shadow-xs cursor-pointer"
+                >
+                  <FileSpreadsheet className="h-4 w-4" /> Export Revenue CSV
                 </button>
               </>
             )}
@@ -1087,19 +1185,19 @@ export default function ReportsPage() {
               <>
                 <button
                   onClick={() => setShowAddIncomeModal(true)}
-                  className="flex items-center gap-1.5 rounded-xl bg-emerald-50 border border-emerald-300 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:border-emerald-800/60 dark:hover:bg-emerald-900/50 px-3.5 py-2 text-xs font-semibold text-emerald-800 dark:text-emerald-300 transition shadow-xs cursor-pointer"
+                  className="h-9 flex items-center gap-1.5 rounded-xl bg-emerald-50 border border-emerald-300 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:border-emerald-800/60 dark:hover:bg-emerald-900/50 px-3.5 text-xs font-semibold text-emerald-800 dark:text-emerald-300 transition shadow-xs cursor-pointer"
                 >
                   <Plus className="h-4 w-4" /> Record Direct Income
                 </button>
                 <button
                   onClick={() => setShowKotPrintModal(true)}
-                  className="flex items-center gap-1.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 border border-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 dark:border-zinc-700 px-3.5 py-2 text-xs font-semibold text-zinc-800 dark:text-zinc-200 transition shadow-xs cursor-pointer"
+                  className="h-9 flex items-center gap-1.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 border border-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 dark:border-zinc-700 px-3.5 text-xs font-semibold text-zinc-800 dark:text-zinc-200 transition shadow-xs cursor-pointer"
                 >
                   <Printer className="h-4 w-4 text-zinc-500 dark:text-zinc-400" /> Print Kitchen Log
                 </button>
                 <button
                   onClick={exportKitchenOrdersCSV}
-                  className="flex items-center gap-1.5 rounded-xl bg-emerald-700 hover:bg-emerald-600 text-white px-4 py-2 text-xs font-semibold transition shadow-xs cursor-pointer"
+                  className="h-9 flex items-center gap-1.5 rounded-xl bg-emerald-700 hover:bg-emerald-600 text-white px-4 text-xs font-semibold transition shadow-xs cursor-pointer"
                 >
                   <FileSpreadsheet className="h-4 w-4" /> Export Kitchen CSV
                 </button>
@@ -1108,7 +1206,7 @@ export default function ReportsPage() {
 
             <button
               onClick={() => loadReportData(true)}
-              className="p-2 rounded-xl bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 transition cursor-pointer"
+              className="h-9 w-9 flex items-center justify-center rounded-xl bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 transition cursor-pointer shadow-2xs"
               title="Refresh Data"
             >
               <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin text-emerald-600" : ""}`} />
@@ -1132,9 +1230,7 @@ export default function ReportsPage() {
           options={[
             { value: "ROOM_TRANSFERS", label: "Room Transfers & Moves", icon: ArrowRightLeft },
             { value: "FINAL_BILLS", label: "Final Bills & Invoices", icon: Receipt },
-            { value: "CASHIER_COLLECTIONS_EXPENSES", label: "Cashier Shift Sheet", icon: Wallet },
             { value: "EXPENSES", label: "Expense Register", icon: ArrowUpRight },
-            { value: "FRONT_OFFICE", label: "Front Desk Room Rack", icon: BedDouble },
             { value: "REVENUE", label: "Revenue & Tax Ledger", icon: TrendingUp },
             { value: "FNB", label: "Kitchen & Dining Collections", icon: UtensilsCrossed },
           ]}
@@ -1218,12 +1314,12 @@ export default function ReportsPage() {
             {/* Filter Dropdowns */}
             <div className="flex items-center gap-2 flex-wrap">
               {/* Date Scope Filter */}
-              <div className="flex items-center gap-1.5 bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 px-2.5 h-9 rounded-lg text-xs font-medium">
-                <Calendar className="h-3.5 w-3.5 text-zinc-400" />
+              <div className="relative flex items-center">
+                <Calendar className="h-3.5 w-3.5 absolute left-3 text-zinc-400 pointer-events-none" />
                 <select
                   value={transferDateRange}
                   onChange={(e: any) => setTransferDateRange(e.target.value)}
-                  className="bg-transparent border-none text-xs font-medium text-zinc-900 dark:text-zinc-100 focus:outline-none cursor-pointer"
+                  className="h-9 pl-8 pr-7 text-xs font-semibold rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 cursor-pointer appearance-none"
                 >
                   <option value="ALL_TIME">All Time</option>
                   <option value="TODAY">Today</option>
@@ -1232,6 +1328,7 @@ export default function ReportsPage() {
                   <option value="THIS_MONTH">This Month</option>
                   <option value="CUSTOM">Custom Date Range</option>
                 </select>
+                <ChevronDown className="h-3.5 w-3.5 absolute right-2.5 text-zinc-400 pointer-events-none" />
               </div>
 
               {transferDateRange === "CUSTOM" && (
@@ -1506,65 +1603,73 @@ export default function ReportsPage() {
             {/* Filter Dropdowns */}
             <div className="flex items-center gap-2 flex-wrap">
               {/* Date Scope Filter */}
-              <div className="flex items-center gap-1.5 bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 px-2.5 h-9 rounded-lg text-xs font-medium">
-                <Calendar className="h-3.5 w-3.5 text-zinc-400" />
+              <div className="relative flex items-center">
+                <Calendar className="h-3.5 w-3.5 absolute left-3 text-zinc-400 pointer-events-none" />
                 <select
                   value={billDateRange}
                   onChange={(e: any) => setBillDateRange(e.target.value)}
-                  className="bg-transparent border-none text-xs font-medium text-zinc-900 dark:text-zinc-100 focus:outline-none cursor-pointer"
+                  className="h-9 pl-8 pr-7 text-xs font-semibold rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 cursor-pointer appearance-none"
                 >
-                  <option value="ALL_TIME">All Time</option>
-                  <option value="TODAY">Today</option>
+                  <option value="ALL_TIME">All Time (Master Bills)</option>
+                  <option value="TODAY">Today ({activeProperty?.businessDate || "Live"})</option>
                   <option value="YESTERDAY">Yesterday</option>
                   <option value="LAST_7_DAYS">Last 7 Days</option>
-                  <option value="THIS_MONTH">This Month</option>
+                  <option value="THIS_MONTH">This Month (MTD)</option>
                   <option value="CUSTOM">Custom Date Range</option>
                 </select>
+                <ChevronDown className="h-3.5 w-3.5 absolute right-2.5 text-zinc-400 pointer-events-none" />
               </div>
 
               {billDateRange === "CUSTOM" && (
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1.5 p-1 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800">
+                  <span className="text-[11px] text-zinc-500 font-medium pl-1.5">From:</span>
                   <input
                     type="date"
                     value={billCustomStart}
                     onChange={(e) => setBillCustomStart(e.target.value)}
-                    className="text-xs h-9 px-2.5 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 font-mono text-zinc-900 dark:text-zinc-100"
+                    className="text-xs h-7 px-2 rounded-md bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 font-mono text-zinc-900 dark:text-zinc-100"
                   />
-                  <span className="text-zinc-400 text-xs">to</span>
+                  <span className="text-zinc-400 text-xs">To:</span>
                   <input
                     type="date"
                     value={billCustomEnd}
                     onChange={(e) => setBillCustomEnd(e.target.value)}
-                    className="text-xs h-9 px-2.5 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 font-mono text-zinc-900 dark:text-zinc-100"
+                    className="text-xs h-7 px-2 rounded-md bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 font-mono text-zinc-900 dark:text-zinc-100"
                   />
                 </div>
               )}
 
               {/* Status Filter */}
-              <select
-                value={billStatusFilter}
-                onChange={(e: any) => setBillStatusFilter(e.target.value)}
-                className="text-xs h-9 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 px-3 font-medium text-zinc-900 dark:text-zinc-100 cursor-pointer"
-              >
-                <option value="ALL">All Bill Statuses</option>
-                <option value="SETTLED">Settled / Closed</option>
-                <option value="IN_HOUSE">In-House Active</option>
-                <option value="OPEN">Open Balance</option>
-              </select>
+              <div className="relative flex items-center">
+                <select
+                  value={billStatusFilter}
+                  onChange={(e: any) => setBillStatusFilter(e.target.value)}
+                  className="text-xs h-9 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 pl-3 pr-7 font-medium text-zinc-900 dark:text-zinc-100 cursor-pointer appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                >
+                  <option value="ALL">All Bill Statuses</option>
+                  <option value="SETTLED">Settled / Closed</option>
+                  <option value="IN_HOUSE">In-House Active</option>
+                  <option value="OPEN">Open Balance</option>
+                </select>
+                <ChevronDown className="h-3.5 w-3.5 absolute right-2.5 text-zinc-400 pointer-events-none" />
+              </div>
 
               {/* Payment Method Filter */}
-              <select
-                value={billMethodFilter}
-                onChange={(e) => setBillMethodFilter(e.target.value)}
-                className="text-xs h-9 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 px-3 font-medium text-zinc-900 dark:text-zinc-100 cursor-pointer"
-              >
-                <option value="ALL">All Payment Methods</option>
-                <option value="CASH">Cash</option>
-                <option value="UPI">UPI / QR</option>
-                <option value="CARD">Card</option>
-                <option value="DIRECT_BILL">Direct Bill / Company</option>
-                <option value="SPLIT">Split Payments</option>
-              </select>
+              <div className="relative flex items-center">
+                <select
+                  value={billMethodFilter}
+                  onChange={(e) => setBillMethodFilter(e.target.value)}
+                  className="text-xs h-9 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 pl-3 pr-7 font-medium text-zinc-900 dark:text-zinc-100 cursor-pointer appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                >
+                  <option value="ALL">All Payment Methods</option>
+                  <option value="CASH">Cash</option>
+                  <option value="UPI">UPI / QR</option>
+                  <option value="CARD">Card</option>
+                  <option value="DIRECT_BILL">Direct Bill / Company</option>
+                  <option value="SPLIT">Split Payments</option>
+                </select>
+                <ChevronDown className="h-3.5 w-3.5 absolute right-2.5 text-zinc-400 pointer-events-none" />
+              </div>
 
               {(billSearch || billStatusFilter !== "ALL" || billMethodFilter !== "ALL" || billDateRange !== "ALL_TIME") && (
                 <button
@@ -1734,187 +1839,6 @@ export default function ReportsPage() {
       )}
 
       {/* ========================================================================= */}
-      {/* TAB 3: CASHIER COLLECTIONS & EXPENSES LEDGER */}
-      {/* ========================================================================= */}
-      {reportType === "CASHIER_COLLECTIONS_EXPENSES" && (
-        <div className="space-y-4 animate-in fade-in">
-          {/* Summary Cards */}
-          {summary && (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-              <div className="p-4 rounded-xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-1">
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-bold text-zinc-500 uppercase">Total Collections (Inflows)</span>
-                  <ArrowDownLeft className="h-4 w-4 text-emerald-500" />
-                </div>
-                <div className="text-xl font-black text-zinc-900 dark:text-zinc-100 font-mono">
-                  {formatINR(summary.totalCollections)}
-                </div>
-                <div className="text-[10px] text-zinc-500 font-mono">
-                  {summary.collectionsCount} Total Receipts
-                </div>
-              </div>
-
-              <div className="p-4 rounded-xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-1">
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-bold text-zinc-500 uppercase">Total Expenses (Outflows)</span>
-                  <ArrowUpRight className="h-4 w-4 text-rose-500" />
-                </div>
-                <div className="text-xl font-black text-rose-600 dark:text-rose-400 font-mono">
-                  {formatINR(summary.totalExpenses)}
-                </div>
-                <div className="text-[10px] text-zinc-500 font-mono">
-                  {summary.expensesCount} Total Vouchers
-                </div>
-              </div>
-
-              <div className="p-4 rounded-xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-1">
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-bold text-zinc-500 uppercase">Net Day Cash Flow</span>
-                  <TrendingUp className="h-4 w-4 text-blue-500" />
-                </div>
-                <div
-                  className={`text-xl font-black font-mono ${
-                    summary.netCashFlow >= 0 ? "text-emerald-600" : "text-rose-600"
-                  }`}
-                >
-                  {formatINR(summary.netCashFlow)}
-                </div>
-                <div className="text-[10px] text-zinc-500 font-mono">
-                  Collections minus Expenses
-                </div>
-              </div>
-
-              <div className="p-4 rounded-xl bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-300 dark:border-emerald-800/60 shadow-xs space-y-1">
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-bold text-emerald-800 dark:text-emerald-300 uppercase">
-                    Cash in Drawer Handover
-                  </span>
-                  <Banknote className="h-4 w-4 text-emerald-600" />
-                </div>
-                <div className="text-xl font-black text-emerald-800 dark:text-emerald-300 font-mono">
-                  {formatINR(summary.cashDrawerPosition?.netCashInHand || 0)}
-                </div>
-                <div className="text-[10px] text-emerald-700 dark:text-emerald-400 font-mono">
-                  Cash In: {formatINR(summary.cashDrawerPosition?.cashIn || 0)} | Cash Out: {formatINR(summary.cashDrawerPosition?.cashOut || 0)}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Search & Filter Controls */}
-          <div className="flex flex-col md:flex-row items-center gap-2 p-3.5 rounded-xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs">
-            <div className="relative flex-1 w-full">
-              <Search className="h-4 w-4 absolute left-3 top-2.5 text-zinc-400 pointer-events-none" />
-              <input
-                type="text"
-                placeholder="Search by receipt/voucher #, guest, payee, room, reference..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full h-9 pl-9 pr-3 text-xs rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-zinc-900 dark:text-white placeholder:text-zinc-400 transition-all"
-              />
-            </div>
-
-            <div className="flex items-center gap-2 w-full md:w-auto flex-wrap">
-              <select
-                value={flowFilter}
-                onChange={(e: any) => setFlowFilter(e.target.value)}
-                className="text-xs h-9 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 px-3 font-medium text-zinc-900 dark:text-zinc-100 cursor-pointer"
-              >
-                <option value="ALL">All Flows (In & Out)</option>
-                <option value="INFLOW">Collections Only</option>
-                <option value="OUTFLOW">Expenses Only</option>
-              </select>
-
-              <select
-                value={methodFilter}
-                onChange={(e) => setMethodFilter(e.target.value)}
-                className="text-xs h-9 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 px-3 font-medium text-zinc-900 dark:text-zinc-100 cursor-pointer"
-              >
-                <option value="ALL">All Payment Methods</option>
-                <option value="CASH">Cash</option>
-                <option value="UPI">UPI / QR</option>
-                <option value="CARD">Cards</option>
-                <option value="OTA">OTA / VCC</option>
-                <option value="BANK_TRANSFER">Bank Transfer</option>
-                <option value="ADVANCE">Advance Deposits</option>
-                <option value="POS">Restaurant / POS</option>
-                <option value="FOLIO">Folio Checkouts</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Transactions Table */}
-          <div className="p-4 sm:p-5 rounded-xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-3">
-            <div className="overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-800">
-              <table className="w-full text-left text-xs border-collapse">
-                <thead className="bg-zinc-50/90 dark:bg-zinc-900/90 text-zinc-500 dark:text-zinc-400 text-[11px] uppercase tracking-wider font-semibold border-b border-zinc-200 dark:border-zinc-800 sticky top-0 z-10 backdrop-blur-xs">
-                  <tr>
-                    <th className="px-4 py-3 font-semibold whitespace-nowrap">Voucher / Receipt</th>
-                    <th className="px-4 py-3 font-semibold whitespace-nowrap">Time</th>
-                    <th className="px-4 py-3 font-semibold whitespace-nowrap">Type</th>
-                    <th className="px-4 py-3 font-semibold whitespace-nowrap">Party / Payee</th>
-                    <th className="px-4 py-3 font-semibold whitespace-nowrap">Particulars</th>
-                    <th className="px-4 py-3 font-semibold whitespace-nowrap">Method</th>
-                    <th className="px-4 py-3 font-semibold text-right whitespace-nowrap">Amount</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-zinc-200/60 dark:divide-zinc-800/60 font-mono">
-                  {filteredCashierTransactions.length === 0 ? (
-                    <tr>
-                      <td colSpan={7} className="py-12 text-center text-zinc-400 dark:text-zinc-500 font-sans">
-                        No financial transactions recorded for this business date.
-                      </td>
-                    </tr>
-                  ) : (
-                    filteredCashierTransactions.map((tx: any) => (
-                      <tr key={tx.id} className="hover:bg-zinc-50/80 dark:hover:bg-zinc-900/40 transition-colors">
-                        <td className="px-4 py-3 font-semibold text-zinc-900 dark:text-zinc-100 whitespace-nowrap">
-                          {tx.recordId}
-                        </td>
-                        <td className="px-4 py-3 text-zinc-500 dark:text-zinc-400 whitespace-nowrap text-[11px]">{tx.time}</td>
-                        <td className="px-4 py-3 whitespace-nowrap">
-                          {tx.flow === "INFLOW" ? (
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50/80 text-emerald-700 border border-emerald-200/80 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-900/50 font-medium text-[11px]">
-                              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                              RECEIPT
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-rose-50/80 text-rose-700 border border-rose-200/80 dark:bg-rose-950/40 dark:text-rose-400 dark:border-rose-900/50 font-medium text-[11px]">
-                              <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />
-                              EXPENSE
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3 font-sans font-medium text-zinc-900 dark:text-zinc-100 whitespace-nowrap">
-                          {tx.party}
-                        </td>
-                        <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400 font-sans max-w-sm truncate">
-                          {tx.particulars}
-                        </td>
-                        <td className="px-4 py-3 whitespace-nowrap">
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 text-[11px] font-medium font-sans">
-                            {tx.method}
-                          </span>
-                        </td>
-                        <td
-                          className={`px-4 py-3 text-right font-mono tabular-nums font-semibold whitespace-nowrap ${
-                            tx.flow === "INFLOW" ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"
-                          }`}
-                        >
-                          {tx.flow === "INFLOW" ? "+" : "-"}
-                          {formatINR(tx.amount)}
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ========================================================================= */}
       {/* TAB: EXPENSE REGISTER & OUTFLOW AUDIT */}
       {/* ========================================================================= */}
       {reportType === "EXPENSES" && (
@@ -1993,37 +1917,43 @@ export default function ReportsPage() {
             {/* Filter Dropdowns */}
             <div className="flex items-center gap-2 flex-wrap">
               {/* Category Filter */}
-              <select
-                value={expenseCategoryFilter}
-                onChange={(e) => setExpenseCategoryFilter(e.target.value)}
-                className="text-xs h-9 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 px-3 font-medium text-zinc-900 dark:text-zinc-100 cursor-pointer"
-              >
-                <option value="ALL">All Categories</option>
-                <option value="DRIVER_COMMISSION">Driver Commission</option>
-                <option value="VENDOR_PAYMENT">Vendor / Supplier</option>
-                <option value="STAFF_ADVANCE">Staff Advance / Salary</option>
-                <option value="FB_PURCHASE">F&B Raw Materials</option>
-                <option value="MAINTENANCE">Maintenance & Repairs</option>
-                <option value="HOUSEKEEPING">Housekeeping & Linen</option>
-                <option value="PETTY_CASH">Petty Cash Operational</option>
-                <option value="UTILITIES">Utilities & Power</option>
-                <option value="GUEST_REFUND">Guest Refund</option>
-                <option value="OTHER">Other Expense</option>
-              </select>
+              <div className="relative flex items-center">
+                <select
+                  value={expenseCategoryFilter}
+                  onChange={(e) => setExpenseCategoryFilter(e.target.value)}
+                  className="text-xs h-9 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 pl-3 pr-7 font-medium text-zinc-900 dark:text-zinc-100 cursor-pointer appearance-none focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500"
+                >
+                  <option value="ALL">All Categories</option>
+                  <option value="DRIVER_COMMISSION">Driver Commission</option>
+                  <option value="VENDOR_PAYMENT">Vendor / Supplier</option>
+                  <option value="STAFF_ADVANCE">Staff Advance / Salary</option>
+                  <option value="FB_PURCHASE">F&B Raw Materials</option>
+                  <option value="MAINTENANCE">Maintenance & Repairs</option>
+                  <option value="HOUSEKEEPING">Housekeeping & Linen</option>
+                  <option value="PETTY_CASH">Petty Cash Operational</option>
+                  <option value="UTILITIES">Utilities & Power</option>
+                  <option value="GUEST_REFUND">Guest Refund</option>
+                  <option value="OTHER">Other Expense</option>
+                </select>
+                <ChevronDown className="h-3.5 w-3.5 absolute right-2.5 text-zinc-400 pointer-events-none" />
+              </div>
 
               {/* Payment Method Filter */}
-              <select
-                value={expenseMethodFilter}
-                onChange={(e) => setExpenseMethodFilter(e.target.value)}
-                className="text-xs h-9 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 px-3 font-medium text-zinc-900 dark:text-zinc-100 cursor-pointer"
-              >
-                <option value="ALL">All Payment Modes</option>
-                <option value="CASH">Cash</option>
-                <option value="UPI">UPI / QR</option>
-                <option value="BANK_TRANSFER">Bank Transfer / NEFT</option>
-                <option value="CARD">Debit / Credit Card</option>
-                <option value="CHEQUE">Cheque</option>
-              </select>
+              <div className="relative flex items-center">
+                <select
+                  value={expenseMethodFilter}
+                  onChange={(e) => setExpenseMethodFilter(e.target.value)}
+                  className="text-xs h-9 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 pl-3 pr-7 font-medium text-zinc-900 dark:text-zinc-100 cursor-pointer appearance-none focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500"
+                >
+                  <option value="ALL">All Payment Modes</option>
+                  <option value="CASH">Cash</option>
+                  <option value="UPI">UPI / QR</option>
+                  <option value="BANK_TRANSFER">Bank Transfer / NEFT</option>
+                  <option value="CARD">Debit / Credit Card</option>
+                  <option value="CHEQUE">Cheque</option>
+                </select>
+                <ChevronDown className="h-3.5 w-3.5 absolute right-2.5 text-zinc-400 pointer-events-none" />
+              </div>
 
               {(expenseSearch || expenseCategoryFilter !== "ALL" || expenseMethodFilter !== "ALL") && (
                 <button
@@ -2138,122 +2068,301 @@ export default function ReportsPage() {
         </div>
       )}
 
-      {/* ========================================================================= */}
-      {/* TAB 4: FRONT DESK ROOM RACK */}
-      {/* ========================================================================= */}
-      {reportType === "FRONT_OFFICE" && (
-        <div className="space-y-4 animate-in fade-in">
-          <div className="p-4 sm:p-5 rounded-xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-3">
-            <div className="flex items-center justify-between pb-3 border-b border-zinc-200 dark:border-zinc-800">
-              <span className="font-semibold text-xs uppercase tracking-wider text-zinc-600 dark:text-zinc-400">
-                Front Office Room Occupancy ({data?.totalRooms ?? 0} Total Inventory)
-              </span>
-              <span className="text-xs font-mono font-semibold text-emerald-600 dark:text-emerald-400">
-                Occupancy: {data?.occupancyRate ?? "0%"} ({data?.occupiedRooms ?? 0} Rooms In-House)
-              </span>
-            </div>
-
-            <div className="overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-800">
-              <table className="w-full text-left text-xs border-collapse">
-                <thead className="bg-zinc-50/90 dark:bg-zinc-900/90 text-zinc-500 dark:text-zinc-400 text-[11px] uppercase tracking-wider font-semibold border-b border-zinc-200 dark:border-zinc-800 sticky top-0 z-10 backdrop-blur-xs">
-                  <tr>
-                    <th className="px-4 py-3 font-semibold whitespace-nowrap">Room</th>
-                    <th className="px-4 py-3 font-semibold whitespace-nowrap">Type</th>
-                    <th className="px-4 py-3 font-semibold whitespace-nowrap">Occupancy</th>
-                    <th className="px-4 py-3 font-semibold whitespace-nowrap">Housekeeping</th>
-                    <th className="px-4 py-3 font-semibold whitespace-nowrap">Guest</th>
-                    <th className="px-4 py-3 font-semibold whitespace-nowrap">Stay Ref</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-zinc-200/60 dark:divide-zinc-800/60 font-mono">
-                  {(data?.rows || []).map((r: any) => (
-                    <tr key={r.number} className="hover:bg-zinc-50/80 dark:hover:bg-zinc-900/40 transition-colors">
-                      <td className="px-4 py-3 font-semibold text-zinc-900 dark:text-zinc-100 whitespace-nowrap">
-                        Room {r.number}
-                      </td>
-                      <td className="px-4 py-3 text-zinc-500 dark:text-zinc-400 font-sans whitespace-nowrap">{r.roomType}</td>
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <span
-                          className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium border ${
-                            r.occupancyStatus === "OCCUPIED"
-                              ? "bg-blue-50/80 text-blue-700 border-blue-200/80 dark:bg-blue-950/40 dark:text-blue-400 dark:border-blue-900/50"
-                              : "bg-emerald-50/80 text-emerald-700 border-emerald-200/80 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-900/50"
-                          }`}
-                        >
-                          <span
-                            className={`h-1.5 w-1.5 rounded-full ${
-                              r.occupancyStatus === "OCCUPIED" ? "bg-blue-500" : "bg-emerald-500"
-                            }`}
-                          />
-                          {r.occupancyStatus}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <span
-                          className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium border ${
-                            r.housekeepingStatus === "CLEAN"
-                              ? "bg-emerald-50/80 text-emerald-700 border-emerald-200/80 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-900/50"
-                              : "bg-amber-50/80 text-amber-700 border-amber-200/80 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-900/50"
-                          }`}
-                        >
-                          <span
-                            className={`h-1.5 w-1.5 rounded-full ${
-                              r.housekeepingStatus === "CLEAN" ? "bg-emerald-500" : "bg-amber-500"
-                            }`}
-                          />
-                          {r.housekeepingStatus}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 font-sans font-medium text-zinc-900 dark:text-zinc-100 whitespace-nowrap">
-                        {r.guestName}
-                      </td>
-                      <td className="px-4 py-3 text-zinc-500 dark:text-zinc-400 whitespace-nowrap text-[11px]">{r.stayId || "—"}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* ========================================================================= */}
       {/* TAB 5: REVENUE & TAX LEDGER */}
       {/* ========================================================================= */}
       {reportType === "REVENUE" && (
         <div className="space-y-4 animate-in fade-in">
-          <div className="p-4 sm:p-5 rounded-xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-3">
-            <div className="flex items-center justify-between pb-3 border-b border-zinc-200 dark:border-zinc-800">
-              <span className="font-semibold text-xs uppercase tracking-wider text-zinc-600 dark:text-zinc-400">
-                Posted Folio Entries & Tax Journal
-              </span>
+          {/* Executive Revenue & Tax Stat Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            {/* 1. Gross Revenue Recognized */}
+            <div className="p-4 rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">
+                  Gross Recognized Revenue
+                </span>
+                <TrendingUp className="h-4 w-4 text-emerald-500" />
+              </div>
+              <div className="text-2xl font-black font-mono text-zinc-900 dark:text-zinc-100">
+                {formatINR(revenueKPIs.totalGross)}
+              </div>
+              <div className="text-[11px] text-zinc-500 font-mono">
+                {filteredRevenueEntries.length} Posted Charges • Rooms: {formatINR(revenueKPIs.roomsRev)}
+              </div>
             </div>
 
+            {/* 2. Net Taxable Base Turnover */}
+            <div className="p-4 rounded-2xl bg-blue-50/50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800/50 shadow-xs space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-blue-800 dark:text-blue-300 uppercase tracking-wider">
+                  Net Taxable Base Turnover
+                </span>
+                <Receipt className="h-4 w-4 text-blue-600" />
+              </div>
+              <div className="text-2xl font-black font-mono text-blue-800 dark:text-blue-300">
+                {formatINR(revenueKPIs.totalTaxable)}
+              </div>
+              <div className="text-[11px] text-blue-700/80 dark:text-blue-400 font-mono">
+                Base taxable revenue excluding GST
+              </div>
+            </div>
+
+            {/* 3. Total GST Output Tax */}
+            <div className="p-4 rounded-2xl bg-indigo-50/50 dark:bg-indigo-950/20 border border-indigo-200 dark:border-indigo-800/50 shadow-xs space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-indigo-800 dark:text-indigo-300 uppercase tracking-wider">
+                  Total GST Output Tax
+                </span>
+                <DollarSign className="h-4 w-4 text-indigo-600" />
+              </div>
+              <div className="text-2xl font-black font-mono text-indigo-800 dark:text-indigo-300">
+                {formatINR(revenueKPIs.totalTax)}
+              </div>
+              <div className="text-[11px] text-indigo-700/80 dark:text-indigo-400 font-mono">
+                CGST: {formatINR(revenueKPIs.totalCgst)} • SGST: {formatINR(revenueKPIs.totalSgst)}
+              </div>
+            </div>
+
+            {/* 4. Departmental Breakdown */}
+            <div className="p-4 rounded-2xl bg-purple-50/50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-800/50 shadow-xs space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-purple-800 dark:text-purple-300 uppercase tracking-wider">
+                  Departmental Split
+                </span>
+                <Layers className="h-4 w-4 text-purple-600" />
+              </div>
+              <div className="text-2xl font-black font-mono text-purple-800 dark:text-purple-300">
+                {formatINR(revenueKPIs.fnbRev + revenueKPIs.extraRev + revenueKPIs.miscRev)}
+              </div>
+              <div className="text-[11px] text-purple-700/80 dark:text-purple-400 font-mono">
+                F&B: {formatINR(revenueKPIs.fnbRev)} • Extra/Misc: {formatINR(revenueKPIs.extraRev + revenueKPIs.miscRev)}
+              </div>
+            </div>
+          </div>
+
+          {/* Master Table & Interactive Filters Card */}
+          <div className="p-4 sm:p-5 rounded-xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-3">
+            {/* Filter Toolbar */}
+            <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 pb-3 border-b border-zinc-200 dark:border-zinc-800">
+              <div className="flex items-center gap-2 flex-wrap flex-1">
+                {/* Search Input */}
+                <div className="relative flex-1 min-w-[260px] max-w-md">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-zinc-400" />
+                  <input
+                    type="text"
+                    placeholder="Search by Guest, Room #, Description, Charge Code, GSTIN..."
+                    value={revenueSearch}
+                    onChange={(e) => setRevenueSearch(e.target.value)}
+                    className="w-full pl-9 pr-3 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-xs text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-none focus:border-emerald-500"
+                  />
+                  {revenueSearch && (
+                    <button
+                      onClick={() => setRevenueSearch("")}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </div>
+
+                {/* Date Range Selector */}
+                <div className="relative flex items-center">
+                  <Calendar className="h-3.5 w-3.5 absolute left-3 text-zinc-400 pointer-events-none" />
+                  <select
+                    value={revenueDateRange}
+                    onChange={(e) => setRevenueDateRange(e.target.value as any)}
+                    className="h-9 pl-8 pr-7 text-xs font-semibold rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:border-emerald-500 cursor-pointer appearance-none"
+                  >
+                    <option value="ALL_TIME">All Time (Master Ledger)</option>
+                    <option value="TODAY">Today ({activeProperty?.businessDate || "Live"})</option>
+                    <option value="YESTERDAY">Yesterday</option>
+                    <option value="LAST_7_DAYS">Last 7 Days</option>
+                    <option value="THIS_MONTH">This Month (MTD)</option>
+                    <option value="CUSTOM">Custom Date Range</option>
+                  </select>
+                  <ChevronDown className="h-3.5 w-3.5 absolute right-2.5 text-zinc-400 pointer-events-none" />
+                </div>
+
+                {/* Department Filter */}
+                <div className="relative flex items-center">
+                  <select
+                    value={revenueDepartmentFilter}
+                    onChange={(e) => setRevenueDepartmentFilter(e.target.value)}
+                    className="h-9 pl-3 pr-7 text-xs font-semibold rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:border-emerald-500 cursor-pointer appearance-none"
+                  >
+                    <option value="ALL">All Departments</option>
+                    <option value="ROOMS">Room Tariffs</option>
+                    <option value="FNB">F&B Dining</option>
+                    <option value="EXTRA">Extra Pax & Bedding</option>
+                    <option value="ANCILLARY">Ancillary & Misc</option>
+                  </select>
+                  <ChevronDown className="h-3.5 w-3.5 absolute right-2.5 text-zinc-400 pointer-events-none" />
+                </div>
+
+                {/* GST Tax Rate Filter */}
+                <div className="relative flex items-center">
+                  <select
+                    value={revenueTaxRateFilter}
+                    onChange={(e) => setRevenueTaxRateFilter(e.target.value)}
+                    className="h-9 pl-3 pr-7 text-xs font-semibold rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:border-emerald-500 cursor-pointer appearance-none"
+                  >
+                    <option value="ALL">All GST Rates</option>
+                    <option value="0%">0% GST (Nil / Exempt)</option>
+                    <option value="5%">5% GST</option>
+                    <option value="12%">12% GST</option>
+                    <option value="18%">18% GST</option>
+                  </select>
+                  <ChevronDown className="h-3.5 w-3.5 absolute right-2.5 text-zinc-400 pointer-events-none" />
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400 font-mono self-end lg:self-auto">
+                <span>Showing <strong>{filteredRevenueEntries.length}</strong> of {data?.rows?.length || 0} entries</span>
+              </div>
+            </div>
+
+            {/* Custom Date Inputs if CUSTOM selected */}
+            {revenueDateRange === "CUSTOM" && (
+              <div className="flex items-center gap-3 p-3 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-zinc-500 font-medium">From:</span>
+                  <input
+                    type="date"
+                    value={revenueCustomStart}
+                    onChange={(e) => setRevenueCustomStart(e.target.value)}
+                    className="rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-2 py-1 font-mono text-xs"
+                  />
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-zinc-500 font-medium">To:</span>
+                  <input
+                    type="date"
+                    value={revenueCustomEnd}
+                    onChange={(e) => setRevenueCustomEnd(e.target.value)}
+                    className="rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-2 py-1 font-mono text-xs"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Revenue & Tax Table */}
             <div className="overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-800">
               <table className="w-full text-left text-xs border-collapse">
                 <thead className="bg-zinc-50/90 dark:bg-zinc-900/90 text-zinc-500 dark:text-zinc-400 text-[11px] uppercase tracking-wider font-semibold border-b border-zinc-200 dark:border-zinc-800 sticky top-0 z-10 backdrop-blur-xs">
                   <tr>
-                    <th className="px-4 py-3 font-semibold whitespace-nowrap">Date</th>
-                    <th className="px-4 py-3 font-semibold whitespace-nowrap">Charge Code</th>
-                    <th className="px-4 py-3 font-semibold whitespace-nowrap">Description</th>
-                    <th className="px-4 py-3 font-semibold whitespace-nowrap">Guest</th>
-                    <th className="px-4 py-3 font-semibold text-right whitespace-nowrap">Taxable</th>
-                    <th className="px-4 py-3 font-semibold text-right whitespace-nowrap">Tax</th>
-                    <th className="px-4 py-3 font-semibold text-right whitespace-nowrap">Total Amount</th>
+                    <th className="px-4 py-3 font-semibold whitespace-nowrap">Service Date</th>
+                    <th className="px-4 py-3 font-semibold whitespace-nowrap">Room & Stay</th>
+                    <th className="px-4 py-3 font-semibold whitespace-nowrap">Guest / Entity</th>
+                    <th className="px-4 py-3 font-semibold whitespace-nowrap">Department & Code</th>
+                    <th className="px-4 py-3 font-semibold whitespace-nowrap">Particulars / Description</th>
+                    <th className="px-4 py-3 font-semibold text-right whitespace-nowrap">Taxable Base</th>
+                    <th className="px-4 py-3 font-semibold text-right whitespace-nowrap">GST (Tax)</th>
+                    <th className="px-4 py-3 font-semibold text-right whitespace-nowrap">Total Gross</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-200/60 dark:divide-zinc-800/60 font-mono">
-                  {(data?.rows || []).map((e: any) => (
-                    <tr key={e.id} className="hover:bg-zinc-50/80 dark:hover:bg-zinc-900/40 transition-colors">
-                      <td className="px-4 py-3 text-zinc-500 dark:text-zinc-400 whitespace-nowrap text-[11px]">{e.serviceDate}</td>
-                      <td className="px-4 py-3 font-semibold text-zinc-900 dark:text-zinc-100 whitespace-nowrap">{e.chargeCode}</td>
-                      <td className="px-4 py-3 font-sans text-zinc-700 dark:text-zinc-300 max-w-sm truncate">{e.description}</td>
-                      <td className="px-4 py-3 font-sans font-medium text-zinc-900 dark:text-zinc-100 whitespace-nowrap">{e.guestName}</td>
-                      <td className="px-4 py-3 text-right font-mono tabular-nums font-medium whitespace-nowrap">{formatINR(e.taxableAmount)}</td>
-                      <td className="px-4 py-3 text-right font-mono tabular-nums font-medium text-indigo-600 dark:text-indigo-400 whitespace-nowrap">{formatINR(e.taxAmount)}</td>
-                      <td className="px-4 py-3 text-right font-mono tabular-nums font-semibold text-emerald-600 dark:text-emerald-400 whitespace-nowrap">{formatINR(e.totalAmount)}</td>
+                  {filteredRevenueEntries.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} className="px-4 py-16 text-center text-zinc-400 dark:text-zinc-500">
+                        <TrendingUp className="h-8 w-8 mx-auto mb-2 opacity-40 text-zinc-400" />
+                        <p className="text-sm font-medium text-zinc-800 dark:text-zinc-200">
+                          No revenue or tax records found for the selected filter
+                        </p>
+                        <p className="text-xs mt-1 text-zinc-400">
+                          Try adjusting the date range or clearing the department and search filters
+                        </p>
+                        <button
+                          onClick={() => {
+                            setRevenueDateRange("ALL_TIME");
+                            setRevenueDepartmentFilter("ALL");
+                            setRevenueTaxRateFilter("ALL");
+                            setRevenueSearch("");
+                          }}
+                          className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 transition cursor-pointer"
+                        >
+                          <RefreshCw className="h-3.5 w-3.5" />
+                          Reset Filters to All Time
+                        </button>
+                      </td>
                     </tr>
-                  ))}
+                  ) : (
+                    filteredRevenueEntries.map((e: any) => (
+                      <tr key={e.id} className="hover:bg-zinc-50/80 dark:hover:bg-zinc-900/40 transition-colors">
+                        {/* Service Date */}
+                        <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400 whitespace-nowrap text-[11px] font-mono">
+                          {e.serviceDate}
+                        </td>
+
+                        {/* Room & Stay Ref */}
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          {e.roomNumber && e.roomNumber !== "—" ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-mono text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800">
+                              Room {e.roomNumber}
+                            </span>
+                          ) : (
+                            <span className="text-zinc-400 text-[11px]">Direct Folio</span>
+                          )}
+                        </td>
+
+                        {/* Guest / Company */}
+                        <td className="px-4 py-3 font-sans font-medium text-zinc-900 dark:text-zinc-100 whitespace-nowrap">
+                          <div>{e.guestName}</div>
+                          {e.companyName && (
+                            <div className="text-[10px] text-zinc-500 font-sans">{e.companyName}</div>
+                          )}
+                          {e.gstin && (
+                            <div className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400">
+                              GST: {e.gstin}
+                            </div>
+                          )}
+                        </td>
+
+                        {/* Department & Charge Code */}
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <span
+                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold font-sans uppercase ${
+                              e.department === "ROOMS"
+                                ? "bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800"
+                                : e.department === "FNB"
+                                ? "bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800"
+                                : e.department === "EXTRA"
+                                ? "bg-purple-50 text-purple-700 border border-purple-200 dark:bg-purple-950/40 dark:text-purple-300 dark:border-purple-800"
+                                : "bg-zinc-100 text-zinc-700 border border-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:border-zinc-700"
+                            }`}
+                          >
+                            {e.departmentLabel}
+                          </span>
+                          <span className="ml-1.5 text-[10px] font-mono text-zinc-400">{e.chargeCode}</span>
+                        </td>
+
+                        {/* Description */}
+                        <td className="px-4 py-3 font-sans text-zinc-700 dark:text-zinc-300 max-w-sm truncate" title={e.description}>
+                          {e.description}
+                        </td>
+
+                        {/* Taxable Base */}
+                        <td className="px-4 py-3 text-right font-mono tabular-nums font-medium text-zinc-800 dark:text-zinc-200 whitespace-nowrap">
+                          {formatINR(e.taxableAmount)}
+                        </td>
+
+                        {/* GST Amount & Rate */}
+                        <td className="px-4 py-3 text-right font-mono tabular-nums whitespace-nowrap">
+                          <span className="font-semibold text-indigo-600 dark:text-indigo-400">
+                            {formatINR(e.taxAmount)}
+                          </span>
+                          <span className="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 font-sans">
+                            {e.effectiveTaxRate}%
+                          </span>
+                        </td>
+
+                        {/* Total Amount */}
+                        <td className="px-4 py-3 text-right font-mono tabular-nums font-bold text-emerald-600 dark:text-emerald-400 whitespace-nowrap">
+                          {formatINR(e.totalAmount)}
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
@@ -3160,115 +3269,7 @@ export default function ReportsPage() {
         </div>
       )}
 
-      {/* ========================================================================= */}
-      {/* MODAL 4: PRINTABLE CASHIER SUMMARY */}
-      {/* ========================================================================= */}
-      {showPrintModal && summary && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4 overflow-y-auto">
-          <div className="w-full max-w-2xl rounded-2xl border border-zinc-700 bg-white text-zinc-950 p-6 shadow-2xl space-y-4 font-sans text-xs">
-            <div className="flex items-center justify-between pb-3 border-b border-zinc-200">
-              <span className="text-xs font-bold uppercase font-mono text-zinc-600">
-                Official Cashier Daily Settlement Sheet
-              </span>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => window.print()}
-                  className="flex items-center gap-1.5 rounded-lg bg-zinc-950 px-3 py-1.5 text-xs font-bold text-white hover:bg-zinc-800 transition shadow-sm cursor-pointer"
-                >
-                  <Printer className="h-3.5 w-3.5" /> Print Sheet
-                </button>
-                <button onClick={() => setShowPrintModal(false)} className="text-zinc-500 hover:text-zinc-900 cursor-pointer">
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-            </div>
 
-            {/* Document Body */}
-            <div className="space-y-4">
-              <div className="flex justify-between items-start border-b border-zinc-300 pb-3">
-                <div>
-                  <h1 className="text-base font-black uppercase text-zinc-950">{activeProperty?.displayName || "Hotel Ambarish Grand Residency"}</h1>
-                  <p className="text-[11px] text-zinc-600">{activeProperty?.legalName}</p>
-                  <p className="font-mono text-[11px] text-zinc-700">
-                    GSTIN: {activeProperty?.gstin || "N/A"} | State: {activeProperty?.stateCode || "18"}
-                  </p>
-                </div>
-                <div className="text-right font-mono">
-                  <div className="font-bold text-zinc-950">DAILY CASHIER AUDIT</div>
-                  <div className="text-zinc-600 text-[11px]">Business Date: {selectedDate || activeProperty?.businessDate}</div>
-                  <div className="text-zinc-600 text-[11px]">Printed: {new Date().toLocaleString()}</div>
-                </div>
-              </div>
-
-              {/* Collections by Method & Source Bifurcation */}
-              <div className="space-y-1.5">
-                <h3 className="font-bold uppercase text-[11px] text-zinc-800 border-b pb-1">
-                  1. Collections Inflow Bifurcation (Advances / Cash / UPI / OTA / POS / Folio)
-                </h3>
-                <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-[11px] font-mono">
-                  <div>Advances & Pre-payments: <strong>{formatINR(summary.collectionsBySource?.ADVANCE_DEPOSIT || 0)}</strong></div>
-                  <div>Cash Drawer Receipts: <strong>{formatINR(summary.collectionsByMethod?.CASH || 0)}</strong></div>
-                  <div>UPI (GooglePay / PhonePe / QR): <strong>{formatINR(summary.collectionsByMethod?.UPI || 0)}</strong></div>
-                  <div>Credit / Debit Cards (POS Machine): <strong>{formatINR(summary.collectionsByMethod?.CARD || 0)}</strong></div>
-                  <div>OTA / Virtual Cards (MMT / Booking): <strong>{formatINR((summary.collectionsBySource?.OTA_COLLECTION || 0) + (summary.collectionsByMethod?.OTA_VCC || 0))}</strong></div>
-                  <div>Restaurant / POS Outlet Sales: <strong>{formatINR(summary.collectionsBySource?.POS_RESTAURANT || 0)}</strong></div>
-                  <div>Room Folio Checkout Settlements: <strong>{formatINR(summary.collectionsBySource?.FOLIO_SETTLEMENT || 0)}</strong></div>
-                  <div>Bank Transfer / NEFT: <strong>{formatINR(summary.collectionsByMethod?.BANK_TRANSFER || 0)}</strong></div>
-                </div>
-                <div className="text-right font-mono font-bold text-xs pt-1 border-t">
-                  Total Collections Inflow: {formatINR(summary.totalCollections)}
-                </div>
-              </div>
-
-              {/* Expenses by Category */}
-              <div className="space-y-1.5 pt-2">
-                <h3 className="font-bold uppercase text-[11px] text-zinc-800 border-b pb-1">
-                  2. Expenses Outflow Breakdown
-                </h3>
-                <div className="grid grid-cols-2 gap-2 text-[11px] font-mono">
-                  <div>Driver Commissions: <strong>{formatINR(summary.expensesByCategory?.DRIVER_COMMISSION || 0)}</strong></div>
-                  <div>Vendor Payments: <strong>{formatINR(summary.expensesByCategory?.VENDOR_PAYMENT || 0)}</strong></div>
-                  <div>F&B Purchases: <strong>{formatINR(summary.expensesByCategory?.FB_PURCHASE || 0)}</strong></div>
-                  <div>Maintenance & Repairs: <strong>{formatINR(summary.expensesByCategory?.MAINTENANCE || 0)}</strong></div>
-                  <div>Petty Cash & Stationery: <strong>{formatINR(summary.expensesByCategory?.PETTY_CASH || 0)}</strong></div>
-                </div>
-                <div className="text-right font-mono font-bold text-xs pt-1 border-t">
-                  Total Expenses Outflow: {formatINR(summary.totalExpenses)}
-                </div>
-              </div>
-
-              {/* Cash Drawer Position */}
-              <div className="bg-zinc-100 p-3 rounded-lg border border-zinc-300 space-y-1 font-mono text-xs">
-                <div className="font-bold uppercase text-[11px] text-zinc-950">3. Physical Cash Drawer Position:</div>
-                <div className="flex justify-between">
-                  <span>Physical Cash Collected:</span>
-                  <span>{formatINR(summary.cashDrawerPosition?.cashIn || 0)}</span>
-                </div>
-                <div className="flex justify-between text-rose-700">
-                  <span>Less Physical Cash Paid Out:</span>
-                  <span>-{formatINR(summary.cashDrawerPosition?.cashOut || 0)}</span>
-                </div>
-                <div className="flex justify-between font-black text-sm border-t border-zinc-400 pt-1">
-                  <span>Net Physical Cash in Drawer to Handover:</span>
-                  <span>{formatINR(summary.cashDrawerPosition?.netCashInHand || 0)}</span>
-                </div>
-              </div>
-
-              {/* Signatures */}
-              <div className="pt-8 flex justify-between items-end text-[11px]">
-                <div className="text-center">
-                  <div className="w-40 border-b border-zinc-400 pb-6 text-zinc-400 italic">Front Desk Cashier</div>
-                  <span className="font-bold">Handed Over By</span>
-                </div>
-                <div className="text-center">
-                  <div className="w-40 border-b border-zinc-400 pb-6 text-zinc-400 italic">General Manager / Auditor</div>
-                  <span className="font-bold">Verified & Received By</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* ========================================================================= */}
       {/* MODAL 5: PRINTABLE KITCHEN ORDERS & DINING REGISTER */}
@@ -3361,6 +3362,117 @@ export default function ReportsPage() {
                 <div className="text-center">
                   <div className="w-40 border-b border-zinc-400 pb-6 text-zinc-400 italic">Front Desk / Auditor</div>
                   <span className="font-bold">Audited By</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL: PRINTABLE OFFICIAL REVENUE & GST TAX JOURNAL */}
+      {/* ========================================================================= */}
+      {showRevenuePrintModal && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/85 backdrop-blur-md p-4 md:py-8 overflow-y-auto">
+          <div className="w-full max-w-5xl rounded-2xl border border-zinc-700 bg-white text-zinc-950 p-6 shadow-2xl space-y-4 font-sans text-xs my-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-zinc-200">
+              <span className="text-xs font-bold uppercase font-mono text-zinc-600">
+                Official Revenue Recognition & GST Output Journal
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => window.print()}
+                  className="flex items-center gap-1.5 rounded-lg bg-zinc-950 px-3 py-1.5 text-xs font-bold text-white hover:bg-zinc-800 transition shadow-sm cursor-pointer"
+                >
+                  <Printer className="h-3.5 w-3.5" /> Print Tax Ledger
+                </button>
+                <button
+                  onClick={() => setShowRevenuePrintModal(false)}
+                  className="text-zinc-500 hover:text-zinc-900 cursor-pointer"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div className="flex justify-between items-start border-b border-zinc-300 pb-3">
+                <div>
+                  <h1 className="text-base font-black uppercase text-zinc-950">
+                    {activeProperty?.displayName || "Hotel Ambarish Grand Residency"}
+                  </h1>
+                  <p className="text-[11px] text-zinc-600">{activeProperty?.legalName}</p>
+                  <p className="font-mono text-[11px] text-zinc-700">
+                    GSTIN: {activeProperty?.gstin || "N/A"} | State: {activeProperty?.stateCode || "18"}
+                  </p>
+                </div>
+                <div className="text-right font-mono">
+                  <div className="font-bold text-zinc-950">REVENUE & GST OUTPUT JOURNAL</div>
+                  <div className="text-zinc-600 text-[11px]">
+                    Period: {revenueDateRange.replace(/_/g, " ")}
+                  </div>
+                  <div className="text-zinc-600 text-[11px]">Printed: {new Date().toLocaleString()}</div>
+                  <div className="font-bold text-emerald-800 text-sm mt-1">
+                    Gross Revenue: {formatINR(revenueKPIs.totalGross)} ({filteredRevenueEntries.length} Records)
+                  </div>
+                </div>
+              </div>
+
+              {/* Tax & Department Summary Box */}
+              <div className="grid grid-cols-4 gap-2 bg-zinc-100 p-2.5 rounded font-mono text-xs">
+                <div>
+                  Gross Revenue: <strong>{formatINR(revenueKPIs.totalGross)}</strong>
+                </div>
+                <div>
+                  Taxable Base: <strong>{formatINR(revenueKPIs.totalTaxable)}</strong>
+                </div>
+                <div>
+                  Total GST: <strong>{formatINR(revenueKPIs.totalTax)}</strong>
+                </div>
+                <div>
+                  CGST / SGST: <strong>{formatINR(revenueKPIs.totalCgst)} / {formatINR(revenueKPIs.totalSgst)}</strong>
+                </div>
+              </div>
+
+              <table className="w-full text-left text-[11px] border border-zinc-200">
+                <thead>
+                  <tr className="bg-zinc-100 border-b border-zinc-200 text-[10px] font-bold text-zinc-600 uppercase font-mono">
+                    <th className="p-2">Date</th>
+                    <th className="p-2">Room</th>
+                    <th className="p-2">Guest / Entity</th>
+                    <th className="p-2">Department</th>
+                    <th className="p-2">Particulars</th>
+                    <th className="p-2 text-right">Taxable</th>
+                    <th className="p-2 text-right">GST</th>
+                    <th className="p-2 text-right">Gross Total</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-zinc-200 font-mono">
+                  {filteredRevenueEntries.map((e: any) => (
+                    <tr key={e.id}>
+                      <td className="p-2">{e.serviceDate}</td>
+                      <td className="p-2 font-bold">{e.roomNumber && e.roomNumber !== "—" ? `Room ${e.roomNumber}` : "Folio"}</td>
+                      <td className="p-2 font-sans font-medium">{e.guestName}</td>
+                      <td className="p-2 font-sans">{e.departmentLabel}</td>
+                      <td className="p-2 font-sans max-w-xs truncate">{e.description}</td>
+                      <td className="p-2 text-right">{formatINR(e.taxableAmount)}</td>
+                      <td className="p-2 text-right text-indigo-700">
+                        {formatINR(e.taxAmount)} ({e.effectiveTaxRate}%)
+                      </td>
+                      <td className="p-2 text-right font-bold text-emerald-800">{formatINR(e.totalAmount)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+
+              <div className="pt-8 flex justify-between items-end text-[11px]">
+                <div className="text-center">
+                  <div className="w-40 border-b border-zinc-400 pb-6 text-zinc-400 italic">Front Desk Auditor</div>
+                  <span className="font-bold">Prepared By</span>
+                </div>
+                <div className="text-center">
+                  <div className="w-40 border-b border-zinc-400 pb-6 text-zinc-400 italic">Chartered Accountant / GM</div>
+                  <span className="font-bold">Audited & Approved By</span>
                 </div>
               </div>
             </div>

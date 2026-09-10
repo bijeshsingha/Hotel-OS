@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { recordPayment } from "@/lib/domain/folio-service";
+import { logAuditEvent } from "@/lib/domain/audit-service";
 
 export async function POST(
   request: Request,
@@ -142,6 +143,31 @@ export async function PUT(
       data: { balance: newBalance },
     });
 
+    // Audit log for payment modification
+    await logAuditEvent({
+      organizationId: payment.organizationId,
+      propertyId: payment.propertyId,
+      actorId: null,
+      actorName: "Cashier / Front Desk",
+      action: "PAYMENT_EDIT",
+      targetType: "FOLIO_PAYMENT",
+      targetId: paymentId,
+      reason: "Payment amount or payment method edited",
+      beforeJson: {
+        receiptNo: payment.receiptNo,
+        amount: payment.amount,
+        method: payment.method,
+        reference: payment.reference,
+      },
+      afterJson: {
+        receiptNo: updatedPayment.receiptNo,
+        amount: updatedPayment.amount,
+        method: updatedPayment.method,
+        reference: updatedPayment.reference,
+        newFolioBalance: newBalance,
+      },
+    });
+
     return NextResponse.json({ success: true, payment: updatedPayment, newBalance });
   } catch (error: any) {
     console.error("Error editing payment:", error);
@@ -165,6 +191,8 @@ export async function DELETE(
 
     const { prisma } = await import("@/lib/db/prisma");
 
+    const targetPayment = await prisma.payment.findUnique({ where: { id: paymentId } });
+
     await prisma.paymentAllocation.deleteMany({ where: { paymentId } });
     await prisma.payment.delete({ where: { id: paymentId } });
 
@@ -185,6 +213,30 @@ export async function DELETE(
       where: { id: folioId },
       data: { balance: newBalance },
     });
+
+    // Audit log for voided payment
+    if (targetPayment) {
+      await logAuditEvent({
+        organizationId: targetPayment.organizationId,
+        propertyId: targetPayment.propertyId,
+        actorId: null,
+        actorName: "Cashier / Front Desk",
+        action: "DELETE_FOLIO_CHARGE",
+        targetType: "FOLIO_PAYMENT",
+        targetId: paymentId,
+        reason: "Voided payment receipt from folio",
+        beforeJson: {
+          receiptNo: targetPayment.receiptNo,
+          amount: targetPayment.amount,
+          method: targetPayment.method,
+          reference: targetPayment.reference,
+          folioId,
+        },
+        afterJson: {
+          newFolioBalance: newBalance,
+        },
+      });
+    }
 
     return NextResponse.json({ success: true, deletedId: paymentId, newBalance });
   } catch (error: any) {
