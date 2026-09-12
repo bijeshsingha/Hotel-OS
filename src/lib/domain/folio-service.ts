@@ -148,7 +148,12 @@ export async function deleteFolioCharge({
     throw new Error("Folio entry not found on this folio.");
   }
 
-  if (targetEntry.chargeCode?.includes("ROOM_TARIFF") || targetEntry.sourceType === "PMS_NIGHTLY_CHARGE") {
+  if (
+    (targetEntry.chargeCode?.includes("ROOM_TARIFF") ||
+      targetEntry.sourceType === "PMS_NIGHTLY_CHARGE" ||
+      targetEntry.sourceType === "PMS_24HR_AUTO_CHARGE") &&
+    targetEntry.sourceType !== "MANUAL_CHARGE"
+  ) {
     throw new Error("System-generated room tariff charges cannot be deleted. To adjust room tariff, edit the GRC rate or post a Discount/Rebate.");
   }
 
@@ -533,7 +538,11 @@ export async function sync24HourFolioCharges({
       windows: {
         include: {
           entries: {
-            where: { chargeCode: "ROOM_TARIFF", status: "POSTED" },
+            where: {
+              chargeCode: "ROOM_TARIFF",
+              status: "POSTED",
+              NOT: { sourceType: "MANUAL_CHARGE" },
+            },
             orderBy: { createdAt: "asc" },
           },
         },
@@ -766,8 +775,10 @@ export async function sync24HourFolioCharges({
       const toDelete = sortedEntries.slice(0, canDeleteCount);
 
       for (const e of toDelete) {
-        await prisma.folioEntry.delete({ where: { id: e.id } });
-        folioMutated = true;
+        if (e.sourceType !== "MANUAL_CHARGE") {
+          await prisma.folioEntry.delete({ where: { id: e.id } });
+          folioMutated = true;
+        }
       }
     }
   }

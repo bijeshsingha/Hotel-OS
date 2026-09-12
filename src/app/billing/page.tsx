@@ -663,7 +663,7 @@ function BillingContent() {
     );
 
     const items = folioData?.windows?.[0]?.entries || folioData?.windows?.[0]?.lineItems || [];
-    const allRoomEntries = items.filter((i: any) => i.chargeCode?.includes("ROOM_TARIFF") && i.status === "POSTED");
+    const allRoomEntries = items.filter((i: any) => i.chargeCode?.includes("ROOM_TARIFF") && i.status === "POSTED" && i.sourceType !== "MANUAL_CHARGE");
     const chargedRoomEntries = allRoomEntries.filter((i: any) => {
       if (groupBillingMode === "YES" || !isMultiRoomGroup) return true;
       if (allRoomEntries.length <= 1) return true;
@@ -733,9 +733,9 @@ function BillingContent() {
   const entries = useMemo(() => {
     return modeFilteredEntries.filter((e: any) => {
       // Type Filter
-      if (ledgerTypeFilter === "ROOM_TARIFF" && !e.chargeCode?.includes("ROOM_TARIFF")) return false;
+      if (ledgerTypeFilter === "ROOM_TARIFF" && !e.chargeCode?.includes("ROOM_TARIFF") && e.chargeCode !== "STAY_EXTENSION") return false;
       if (ledgerTypeFilter === "RESTAURANT_FOOD" && !e.chargeCode?.includes("FOOD") && !e.chargeCode?.includes("RESTAURANT") && !e.chargeCode?.includes("FB")) return false;
-      if (ledgerTypeFilter === "MANUAL" && (e.chargeCode?.includes("ROOM_TARIFF") || e.chargeCode?.includes("FOOD") || e.chargeCode?.includes("RESTAURANT"))) return false;
+      if (ledgerTypeFilter === "MANUAL" && (e.chargeCode?.includes("ROOM_TARIFF") || e.chargeCode === "STAY_EXTENSION" || e.chargeCode?.includes("FOOD") || e.chargeCode?.includes("RESTAURANT"))) return false;
 
       // Search Query
       if (!ledgerSearchQuery.trim()) return true;
@@ -2027,7 +2027,8 @@ function BillingContent() {
                       {entries.map((e: any) => {
                         const taxAmt = (e.totalAmount || 0) - (e.taxableAmount || 0);
                         const isFood = e.chargeCode?.includes("FOOD") || e.chargeCode?.includes("RESTAURANT") || e.chargeCode?.includes("FB");
-                        const isRoom = e.chargeCode?.includes("ROOM_TARIFF") || e.sourceType === "PMS_NIGHTLY_CHARGE" || e.chargeCode === "EXTRA_PAX";
+                        const isRoom = e.chargeCode?.includes("ROOM_TARIFF") || e.chargeCode === "STAY_EXTENSION" || e.sourceType === "PMS_NIGHTLY_CHARGE" || e.chargeCode === "EXTRA_PAX";
+                        const isSystemRoomCharge = isRoom && e.sourceType !== "MANUAL_CHARGE";
                         const isDiscount = (e.amount || 0) < 0 || (e.totalAmount || 0) < 0;
 
                         return (
@@ -2066,7 +2067,7 @@ function BillingContent() {
                               {formatINR(e.totalAmount || 0)}
                             </td>
                             <td className="py-3 px-5 text-right">
-                              {!isRoom && activeStay?.status === "IN_HOUSE" && folioData?.status === "OPEN" ? (
+                              {!isSystemRoomCharge && activeStay?.status === "IN_HOUSE" && folioData?.status === "OPEN" ? (
                                 <button
                                   type="button"
                                   onClick={() => handleDeleteCharge(e.id, e.description, e.totalAmount || 0)}
@@ -2331,7 +2332,8 @@ function BillingContent() {
                     const val = e.target.value;
                     const presets: Record<string, { desc: string; sac: string }> = {
                       RESTAURANT_FOOD: { desc: "Kitchen Order (KOT)", sac: "996331" },
-                      ROOM_TARIFF: { desc: "Extra Bed / Stay Extension", sac: "996311" },
+                      STAY_EXTENSION: { desc: "Stay Extension Charge", sac: "996311" },
+                      ROOM_TARIFF: { desc: "Room Tariff / Extra Bed Adjustment", sac: "996311" },
                       LAUNDRY: { desc: "Laundry & Pressing Service", sac: "9997" },
                       TRANSPORT: { desc: "Cab / Airport Pick & Drop", sac: "9964" },
                       MISC: { desc: "Guest Service Charge", sac: "9999" },
@@ -2349,7 +2351,8 @@ function BillingContent() {
                   className="w-full h-11 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 px-3.5 text-xs sm:text-sm text-zinc-900 dark:text-white font-semibold focus:outline-none focus:border-blue-500 transition cursor-pointer"
                 >
                   <option value="RESTAURANT_FOOD">🍽️ Food & Beverage / Kitchen Order (KOT) (5% GST)</option>
-                  <option value="ROOM_TARIFF">🛏️ Room Tariff / Extension (5% GST)</option>
+                  <option value="STAY_EXTENSION">⏱️ Stay Extension Charge (5% GST)</option>
+                  <option value="ROOM_TARIFF">🛏️ Room Tariff / Extra Bed Adjustment (5% GST)</option>
                   <option value="LAUNDRY">🧺 Laundry & Valet Service (5% GST)</option>
                   <option value="TRANSPORT">🚗 Travel / Cab / Transfer (5% GST)</option>
                   <option value="MISC">📦 Miscellaneous Guest Service (5% GST)</option>

@@ -447,9 +447,9 @@ export async function GET(request: Request) {
         const code = (e.chargeCode || "").toUpperCase();
         const desc = (e.description || "").toLowerCase();
 
-        if (code === "ROOM_TARIFF") {
+        if (code === "ROOM_TARIFF" || code === "STAY_EXTENSION") {
           department = "ROOMS";
-          departmentLabel = "Room Tariff";
+          departmentLabel = code === "STAY_EXTENSION" ? "Stay Extension" : "Room Tariff";
         } else if (code === "EXTRA_PAX" || code === "EXTRA_BED") {
           department = "EXTRA";
           departmentLabel = "Extra Pax / Bed";
@@ -952,7 +952,7 @@ export async function GET(request: Request) {
         const payments = folio?.payments || [];
 
         const roomTariff = entries
-          .filter((e) => e.chargeCode === "ROOM_TARIFF" && e.type === "CHARGE")
+          .filter((e) => (e.chargeCode === "ROOM_TARIFF" || e.chargeCode === "STAY_EXTENSION") && e.type === "CHARGE")
           .reduce((sum, e) => sum + e.totalAmount, 0);
 
         const extraPax = entries
@@ -975,6 +975,7 @@ export async function GET(request: Request) {
           .filter(
             (e) =>
               e.chargeCode !== "ROOM_TARIFF" &&
+              e.chargeCode !== "STAY_EXTENSION" &&
               e.chargeCode !== "EXTRA_PAX" &&
               !["FOOD", "RESTAURANT", "ROOM_SERVICE", "DINNER", "BREAKFAST"].some(
                 (k) =>
