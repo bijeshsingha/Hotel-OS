@@ -8,12 +8,27 @@ export async function POST(
   try {
     const { id: stayId } = await params;
     const body = await request.json().catch(() => ({}));
-    const { folioWindowId, actorId } = body;
+    const {
+      roomId,
+      roomNumber,
+      folioWindowId,
+      actorId,
+      allowOutstanding,
+      outstandingReason,
+      outstandingRemarks,
+      settlementDueDate,
+    } = body;
 
     const result = await checkoutAndIssueInvoice({
       stayId,
+      roomId,
+      roomNumber,
       folioWindowId,
       actorId,
+      allowOutstanding: Boolean(allowOutstanding),
+      outstandingReason,
+      outstandingRemarks,
+      settlementDueDate,
     });
 
     return NextResponse.json({

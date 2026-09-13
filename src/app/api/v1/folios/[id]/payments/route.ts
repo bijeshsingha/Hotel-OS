@@ -17,6 +17,7 @@ export async function POST(
       payerName,
       companyName,
       gstin,
+      companyAddress,
       creditPeriod,
       billingRemarks,
       isRefund,
@@ -28,6 +29,7 @@ export async function POST(
       snapshotStr = JSON.stringify({
         name: payerName || "Guest",
         companyName: companyName || "",
+        companyAddress: companyAddress || "",
         gstin: gstin || "",
         creditPeriod: creditPeriod || "30_DAYS",
         remarks: billingRemarks || "",

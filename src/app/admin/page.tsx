@@ -2740,10 +2740,9 @@ export default function AdminPortalPage() {
                               ...prev,
                               companyName: comp.accountName,
                               guestGstin: comp.gstin || "",
-                              city: comp.city ? comp.city.toUpperCase() : prev.city,
-                              streetAddress: comp.address ? comp.address.toUpperCase() : prev.streetAddress,
-                              email: comp.email || prev.email || "",
-                              alternatePhone: comp.phone || comp.mobile || prev.alternatePhone || "",
+                              // Company address is for billing only; do not overwrite guest personal residential address
+                              email: prev.email || comp.email || "",
+                              alternatePhone: prev.alternatePhone || comp.phone || comp.mobile || "",
                               referralChannel: comp.accountType === "TRAVEL_AGENT" ? (comp.shortName || comp.accountName) : prev.referralChannel,
                             }));
                           }}

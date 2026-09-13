@@ -2,6 +2,7 @@ import { prisma } from "../db/prisma";
 import { calculateGST } from "../gst/calculator";
 import { getNextDocumentNumber } from "../sequence/generator";
 import { logAuditEvent } from "./audit-service";
+import { saveOutstandingRecord, markOutstandingSettled } from "./outstanding-ledger-service";
 
 export async function postManualFolioCharge({
   folioId,
@@ -295,6 +296,20 @@ export async function recordPayment({
     },
   });
 
+  // Check if this folio was checked out with outstanding and is now settled
+  try {
+    const updatedFolio = await prisma.folio.findUnique({ where: { id: folio.id } });
+    if (updatedFolio && updatedFolio.status === "CLOSED_OUTSTANDING" && updatedFolio.balance <= 0.5) {
+      await prisma.folio.update({
+        where: { id: folio.id },
+        data: { status: "CLOSED" },
+      });
+    }
+    markOutstandingSettled(folio.id, finalAmount, method, reference);
+  } catch (settleErr) {
+    console.warn("Could not sync outstanding ledger status:", settleErr);
+  }
+
   // Audit log for payment receipt or surplus refund payout
   const auditAction = isActuallyRefund ? "REFUND_PAYOUT" : "PAYMENT_RECEIVE";
   const roomNumbers = (folio.stay as any)?.roomAssignments?.map((a: any) => a.room?.number).filter(Boolean).join(", ") || "";
@@ -326,14 +341,49 @@ export async function recordPayment({
 }
 
 
+// Helper to match charges with specific rooms in separate billing mode
+export function isEntryForRoom(entry: any, roomNumber: string, allOtherRoomNumbers: string[]): boolean {
+  if (!roomNumber || roomNumber === "Unassigned") return true;
+  const desc = entry.description || "";
+
+  // Check if description explicitly mentions another room in the group
+  const otherRooms = allOtherRoomNumbers.filter((r) => r !== roomNumber);
+  for (const other of otherRooms) {
+    const regex = new RegExp(`\\b(?:Room|Rm)\\s*#?\\s*${other}\\b`, "i");
+    if (regex.test(desc)) {
+      return false; // Belongs to the other room
+    }
+  }
+
+  // If description mentions this room, it definitely belongs here
+  const thisRoomRegex = new RegExp(`\\b(?:Room|Rm)\\s*#?\\s*${roomNumber}\\b`, "i");
+  if (thisRoomRegex.test(desc)) {
+    return true;
+  }
+
+  return false;
+}
+
 export async function checkoutAndIssueInvoice({
   stayId,
+  roomId,
+  roomNumber,
   folioWindowId,
   actorId,
+  allowOutstanding = false,
+  outstandingReason,
+  outstandingRemarks,
+  settlementDueDate,
 }: {
   stayId: string;
+  roomId?: string;
+  roomNumber?: string;
   folioWindowId?: string;
   actorId?: string;
+  allowOutstanding?: boolean;
+  outstandingReason?: string;
+  outstandingRemarks?: string;
+  settlementDueDate?: string;
 }) {
   const stay = await prisma.stay.findUniqueOrThrow({
     where: { id: stayId },
@@ -359,14 +409,317 @@ export async function checkoutAndIssueInvoice({
     throw new Error("No folio linked with this stay.");
   }
 
-  // Calculate balance: sum of charges - sum of payments
+  const activeAssignments = stay.roomAssignments;
+  const targetAssignment = roomId
+    ? activeAssignments.find((a) => a.roomId === roomId)
+    : roomNumber
+    ? activeAssignments.find((a) => a.room?.number === roomNumber)
+    : null;
+
+  // Check if this is an individual room checkout from a multi-room group stay
+  const isIndividualCheckout = Boolean(targetAssignment && activeAssignments.length > 1);
+
+  if (isIndividualCheckout && targetAssignment) {
+    const targetRoomNo = targetAssignment.room?.number || "Unassigned";
+    const otherRoomNumbers = activeAssignments
+      .filter((a) => a.id !== targetAssignment.id)
+      .map((a) => a.room?.number || "")
+      .filter(Boolean);
+
+    const allEntries = folio.windows.flatMap((w) => w.entries);
+    
+    // Filter charges that belong to this room
+    const targetEntries = allEntries.filter((e) => isEntryForRoom(e, targetRoomNo, otherRoomNumbers));
+    const targetCharges = targetEntries.reduce((sum, e) => sum + e.totalAmount, 0);
+
+    // Filter payments that belong to this room
+    const targetPayments = folio.payments.filter((p) => {
+      const text = `${p.reference || ""} ${p.payerSnapshot || ""} ${(p as any).notes || ""}`;
+      const isThis = new RegExp(`\\b(?:Room|Rm)\\s*#?\\s*${targetRoomNo}\\b`, "i").test(text);
+      const isOther = otherRoomNumbers.some((o) => new RegExp(`\\b(?:Room|Rm)\\s*#?\\s*${o}\\b`, "i").test(text));
+      return isThis && !isOther;
+    });
+    const targetPaid = targetPayments.reduce((sum, p) => sum + p.amount, 0);
+    const targetBalance = Math.round((targetCharges - targetPaid) * 100) / 100;
+
+    if (targetBalance > 1.0 && !allowOutstanding) {
+      throw new Error(`Cannot checkout Room ${targetRoomNo} with outstanding balance of ₹${targetBalance.toFixed(2)}. Please settle folio or choose Check Out with Outstanding Balance.`);
+    }
+
+    // 1. Close target room assignment
+    await prisma.roomAssignment.update({
+      where: { id: targetAssignment.id },
+      data: { endsAt: new Date() },
+    });
+
+    // 2. Mark target room VACANT and DIRTY
+    await prisma.roomState.upsert({
+      where: { roomId: targetAssignment.roomId },
+      create: {
+        organizationId: stay.organizationId,
+        propertyId: stay.propertyId,
+        roomId: targetAssignment.roomId,
+        occupancyStatus: "VACANT",
+        housekeepingStatus: "DIRTY",
+        sellabilityStatus: "SELLABLE",
+      },
+      update: {
+        occupancyStatus: "VACANT",
+        housekeepingStatus: "DIRTY",
+        lastChangedAt: new Date(),
+      },
+    });
+
+    // 3. Create checkout clean HK task
+    await prisma.housekeepingTask.create({
+      data: {
+        organizationId: stay.organizationId,
+        propertyId: stay.propertyId,
+        roomId: targetAssignment.roomId,
+        stayId: stay.id,
+        type: "CHECKOUT_CLEAN",
+        priority: "HIGH",
+        status: "OPEN",
+        notes: `Individual room checkout clean for Room ${targetRoomNo} (Group Stay: ${stay.primaryGuest.name})`,
+      },
+    }).catch((e) => console.error("HK task error:", e));
+
+    // 4. Create dedicated CHECKED_OUT Stay for this individual room
+    const checkedOutStay = await prisma.stay.create({
+      data: {
+        organizationId: stay.organizationId,
+        propertyId: stay.propertyId,
+        primaryGuestId: stay.primaryGuestId,
+        status: "CHECKED_OUT",
+        arrivalAt: stay.arrivalAt,
+        expectedDepartureAt: stay.expectedDepartureAt,
+        actualDepartureAt: new Date(),
+        adults: 1,
+        children: 0,
+      },
+    });
+
+    // Re-link the ended room assignment to checkedOutStay
+    await prisma.roomAssignment.update({
+      where: { id: targetAssignment.id },
+      data: { stayId: checkedOutStay.id },
+    });
+
+    // 5. Create new Folio for the checked-out room
+    const newFolioStatus = targetBalance > 1.0 && allowOutstanding ? "CLOSED_OUTSTANDING" : "CLOSED";
+    const newFolio = await prisma.folio.create({
+      data: {
+        organizationId: stay.organizationId,
+        propertyId: stay.propertyId,
+        stayId: checkedOutStay.id,
+        status: newFolioStatus,
+        currency: stay.property.currency,
+        balance: targetBalance,
+        closedAt: new Date(),
+      },
+    });
+
+    await prisma.stay.update({
+      where: { id: checkedOutStay.id },
+      data: { folioId: newFolio.id },
+    });
+
+    const newWindow = await prisma.folioWindow.create({
+      data: {
+        folioId: newFolio.id,
+        name: `Room ${targetRoomNo} Window`,
+        windowNumber: 1,
+        payerType: "GUEST",
+        guestOrCompanySnapshot: JSON.stringify({
+          name: stay.primaryGuest.name,
+          phone: stay.primaryGuest.phone,
+          email: stay.primaryGuest.email,
+          address: (stay.primaryGuest as any).addressJson || "",
+          companyName: stay.primaryGuest.companyName || "",
+          gstin: stay.primaryGuest.gstin || "",
+          roomNumber: targetRoomNo,
+          checkedOutWithOutstanding: targetBalance > 1.0,
+          outstandingAmount: targetBalance > 1.0 ? targetBalance : 0,
+          outstandingReason: outstandingReason || "GUEST_DUE",
+          outstandingRemarks: outstandingRemarks || "",
+          settlementDueDate: settlementDueDate || "",
+          checkoutDate: new Date().toISOString(),
+        }),
+        status: "CLOSED",
+      },
+    });
+
+    // Move target entries & payments
+    for (const entry of targetEntries) {
+      await prisma.folioEntry.update({
+        where: { id: entry.id },
+        data: { folioId: newFolio.id, folioWindowId: newWindow.id },
+      });
+    }
+
+    for (const p of targetPayments) {
+      await prisma.payment.update({
+        where: { id: p.id },
+        data: { folioId: newFolio.id },
+      });
+    }
+
+    // 6. Generate GST Tax Invoice for this room
+    const invSeq = await getNextDocumentNumber(stay.propertyId, "INVOICE");
+    const subtotal = targetEntries.reduce((sum, e) => sum + e.taxableAmount, 0);
+    const taxTotal = targetEntries.reduce((sum, e) => sum + (e.totalAmount - e.taxableAmount), 0);
+
+    const supplierSnapshot = JSON.stringify({
+      legalName: stay.property.legalName,
+      displayName: stay.property.displayName,
+      gstin: stay.property.gstin || "18AACCB2447F1ZX",
+      stateCode: stay.property.stateCode || "18",
+      address: stay.property.address || "Guwahati, Assam",
+    });
+
+    const recipientSnapshot = JSON.stringify({
+      name: stay.primaryGuest.name,
+      phone: stay.primaryGuest.phone,
+      email: stay.primaryGuest.email,
+      gstin: stay.primaryGuest.gstin,
+      companyName: stay.primaryGuest.companyName,
+      nationality: stay.primaryGuest.nationality,
+      roomNumber: targetRoomNo,
+    });
+
+    const invoice = await prisma.invoice.create({
+      data: {
+        organizationId: stay.organizationId,
+        propertyId: stay.propertyId,
+        invoiceNo: invSeq.formattedNumber,
+        invoiceSeries: invSeq.prefix.replace(/-$/, ""),
+        financialYear: invSeq.financialYear,
+        folioWindowId: newWindow.id,
+        businessDate: stay.property.businessDate || new Date().toISOString().split("T")[0],
+        supplierSnapshot,
+        recipientSnapshot,
+        subtotal: Math.round(subtotal * 100) / 100,
+        taxTotal: Math.round(taxTotal * 100) / 100,
+        totalAmount: Math.round(targetCharges * 100) / 100,
+        status: "ISSUED",
+        documentHash: `SHA256-${Date.now()}-${invSeq.formattedNumber}`,
+      },
+    });
+
+    for (const entry of targetEntries) {
+      await prisma.invoiceLine.create({
+        data: {
+          invoiceId: invoice.id,
+          sourceEntryIds: JSON.stringify([entry.id]),
+          description: entry.description,
+          sacHsn: entry.chargeCode.includes("FB") || entry.chargeCode.includes("RESTAURANT") ? "996331" : "996311",
+          qty: entry.qty,
+          taxableAmount: entry.taxableAmount,
+          componentTaxRatesJson: entry.taxComponentsJson,
+          totalAmount: entry.totalAmount,
+        },
+      });
+    }
+
+    // 7. Recalculate remaining parent group folio balance
+    const remainingEntries = await prisma.folioEntry.findMany({
+      where: { folioId: folio.id, status: "POSTED" },
+    });
+    const remainingPayments = await prisma.payment.findMany({
+      where: { folioId: folio.id, status: "SUCCEEDED" },
+    });
+    const remCharges = remainingEntries.reduce((s, e) => s + e.totalAmount, 0);
+    const remPaid = remainingPayments.reduce((s, p) => s + p.amount, 0);
+    const remBalance = Math.round((remCharges - remPaid) * 100) / 100;
+
+    await prisma.folio.update({
+      where: { id: folio.id },
+      data: { balance: remBalance },
+    });
+
+    // 8. If target had outstanding balance, save to Outstanding Ledger
+    if (targetBalance > 1.0 && allowOutstanding) {
+      saveOutstandingRecord({
+        id: newFolio.id,
+        propertyId: stay.propertyId,
+        stayId: checkedOutStay.id,
+        folioId: newFolio.id,
+        invoiceNo: invoice.invoiceNo,
+        roomNumber: targetRoomNo,
+        guestName: stay.primaryGuest.name,
+        phone: stay.primaryGuest.phone || "—",
+        email: stay.primaryGuest.email || undefined,
+        address: (stay.primaryGuest as any).addressJson || "",
+        companyName: stay.primaryGuest.companyName || undefined,
+        gstin: stay.primaryGuest.gstin || undefined,
+        totalCharges: targetCharges,
+        totalPayments: targetPaid,
+        outstandingAmount: targetBalance,
+        reason: outstandingReason || "GUEST_DUE",
+        remarks: outstandingRemarks,
+        settlementDueDate,
+        checkedOutAt: new Date().toISOString(),
+        status: "UNSETTLED",
+      });
+    }
+
+    // 9. Check if any active rooms remain in parent stay
+    const stillActive = await prisma.roomAssignment.findMany({
+      where: { stayId: stay.id, endsAt: null },
+    });
+    if (stillActive.length === 0) {
+      await prisma.folio.update({
+        where: { id: folio.id },
+        data: { status: "CLOSED", closedAt: new Date() },
+      });
+      await prisma.stay.update({
+        where: { id: stay.id },
+        data: { status: "CHECKED_OUT", actualDepartureAt: new Date() },
+      });
+    }
+
+    // 10. Audit Log
+    await logAuditEvent({
+      organizationId: stay.organizationId,
+      propertyId: stay.propertyId,
+      actorId: actorId || null,
+      actorName: "Front Desk Cashier",
+      action: "CHECKOUT_INDIVIDUAL_ROOM",
+      targetType: "STAY",
+      targetId: checkedOutStay.id,
+      reason: `Individual checkout of Room ${targetRoomNo} from group stay`,
+      afterJson: {
+        roomNumber: targetRoomNo,
+        parentStayId: stay.id,
+        invoiceNo: invoice.invoiceNo,
+        totalCharges: targetCharges,
+        totalPaid: targetPaid,
+        balance: targetBalance,
+        hasOutstanding: targetBalance > 1.0,
+      },
+    });
+
+    return {
+      success: true,
+      invoice,
+      folio: newFolio,
+      stay: checkedOutStay,
+      checkedOutRoom: targetRoomNo,
+      isIndividualCheckout: true,
+      remainingRooms: otherRoomNumbers,
+      outstandingAmount: targetBalance > 1.0 ? targetBalance : 0,
+      balance: targetBalance,
+    };
+  }
+
+  // STANDARD CHECKOUT (Entire Stay / Single Room Stay)
   const allEntries = folio.windows.flatMap((w) => w.entries);
   const totalCharges = allEntries.reduce((sum, e) => sum + e.totalAmount, 0);
   const totalPayments = folio.payments.reduce((sum, p) => sum + p.amount, 0);
   const balance = Math.round((totalCharges - totalPayments) * 100) / 100;
 
-  if (Math.abs(balance) > 1.0) {
-    throw new Error(`Cannot checkout with outstanding balance of ₹${balance.toFixed(2)}. Please settle folio.`);
+  if (balance > 1.0 && !allowOutstanding) {
+    throw new Error(`Cannot checkout with outstanding balance of ₹${balance.toFixed(2)}. Please settle folio or choose Check Out with Outstanding Balance.`);
   }
 
   const activeWindow = folioWindowId
@@ -430,11 +783,45 @@ export async function checkoutAndIssueInvoice({
     });
   }
 
-  // 2. Mark Folio & Stay as CHECKED_OUT
+  // 2. Mark Folio & Stay as CHECKED_OUT (or CLOSED_OUTSTANDING)
+  const folioFinalStatus = balance > 1.0 && allowOutstanding ? "CLOSED_OUTSTANDING" : "CLOSED";
   await prisma.folio.update({
     where: { id: folio.id },
-    data: { status: "CLOSED", closedAt: new Date() },
+    data: {
+      status: folioFinalStatus,
+      balance: balance,
+      closedAt: new Date(),
+    },
   });
+
+  if (activeWindow) {
+    let existingSnap: any = {};
+    try {
+      existingSnap = activeWindow.guestOrCompanySnapshot
+        ? JSON.parse(activeWindow.guestOrCompanySnapshot)
+        : {};
+    } catch {}
+
+    await prisma.folioWindow.update({
+      where: { id: activeWindow.id },
+      data: {
+        guestOrCompanySnapshot: JSON.stringify({
+          ...existingSnap,
+          name: stay.primaryGuest.name,
+          phone: stay.primaryGuest.phone,
+          email: stay.primaryGuest.email,
+          companyName: stay.primaryGuest.companyName || "",
+          gstin: stay.primaryGuest.gstin || "",
+          checkedOutWithOutstanding: balance > 1.0,
+          outstandingAmount: balance > 1.0 ? balance : 0,
+          outstandingReason: outstandingReason || "GUEST_DUE",
+          outstandingRemarks: outstandingRemarks || "",
+          settlementDueDate: settlementDueDate || "",
+          checkoutDate: new Date().toISOString(),
+        }),
+      },
+    });
+  }
 
   await prisma.stay.update({
     where: { id: stay.id },
@@ -494,27 +881,61 @@ export async function checkoutAndIssueInvoice({
         status: "OPEN",
         notes: `Guest ${stay.primaryGuest.name} checked out. Room ready for turnaround clean.`,
       },
+    }).catch((e) => console.error("HK task error:", e));
+  }
+
+  // 4. Save to Outstanding Ledger if balance > 1.0
+  if (balance > 1.0 && allowOutstanding) {
+    const primaryRoomNo = stay.roomAssignments.map((a) => a.room?.number).filter(Boolean).join(", ") || "—";
+    saveOutstandingRecord({
+      id: folio.id,
+      propertyId: stay.propertyId,
+      stayId: stay.id,
+      folioId: folio.id,
+      invoiceNo: invoice.invoiceNo,
+      roomNumber: primaryRoomNo,
+      guestName: stay.primaryGuest.name,
+      phone: stay.primaryGuest.phone || "—",
+      email: stay.primaryGuest.email || undefined,
+      address: (stay.primaryGuest as any).addressJson || "",
+      companyName: stay.primaryGuest.companyName || undefined,
+      gstin: stay.primaryGuest.gstin || undefined,
+      totalCharges,
+      totalPayments,
+      outstandingAmount: balance,
+      reason: outstandingReason || "GUEST_DUE",
+      remarks: outstandingRemarks,
+      settlementDueDate,
+      checkedOutAt: new Date().toISOString(),
+      status: "UNSETTLED",
     });
   }
 
-  // 4. Audit Log
-  await prisma.auditLog.create({
-    data: {
-      organizationId: stay.organizationId,
-      propertyId: stay.propertyId,
-      actorId,
-      action: "CHECK_OUT",
-      targetType: "STAY",
-      targetId: stay.id,
-      afterJson: JSON.stringify({
-        invoiceNo: invoice.invoiceNo,
-        totalAmount: invoice.totalAmount,
-        roomsReleased: stay.roomAssignments.map((a) => a.room.number),
-      }),
+  // 5. Audit Log
+  await logAuditEvent({
+    organizationId: stay.organizationId,
+    propertyId: stay.propertyId,
+    actorId: actorId || null,
+    actorName: "Front Desk Cashier",
+    action: balance > 1.0 ? "CHECKOUT_WITH_OUTSTANDING" : "CHECKOUT_GUEST",
+    targetType: "STAY",
+    targetId: stay.id,
+    reason: balance > 1.0
+      ? `Guest checked out with outstanding balance ₹${balance} (${outstandingReason || "GUEST_DUE"})`
+      : "Standard checkout and GST invoice issuance",
+    afterJson: {
+      stayId: stay.id,
+      invoiceNo: invoice.invoiceNo,
+      totalCharges,
+      totalPayments,
+      balance,
+      hasOutstanding: balance > 1.0,
+      outstandingReason,
+      settlementDueDate,
     },
   });
 
-  return { success: true, invoice, balance };
+  return { success: true, invoice, balance, outstandingAmount: balance > 1.0 ? balance : 0 };
 }
 
 import { calculate24HrBillableDays, calculateDynamicDepartureDate } from "./pms-service";

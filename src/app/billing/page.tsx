@@ -130,10 +130,16 @@ function BillingContent() {
   const [folioData, setFolioData] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Main Folio View Tabs: In-House Active Rooms vs. Settled & Departed Folios Archive
-  const [activeMainTab, setActiveMainTab] = useState<"IN_HOUSE" | "SETTLED_ARCHIVE">(
-    searchParams.get("tab") === "settled" ? "SETTLED_ARCHIVE" : "IN_HOUSE"
+  // Main Folio View Tabs: In-House Active Rooms vs. Outstanding Dues vs. Settled & Departed Folios Archive
+  const [activeMainTab, setActiveMainTab] = useState<"IN_HOUSE" | "OUTSTANDING_DUES" | "SETTLED_ARCHIVE">(
+    searchParams.get("tab") === "outstanding" ? "OUTSTANDING_DUES" : searchParams.get("tab") === "settled" ? "SETTLED_ARCHIVE" : "IN_HOUSE"
   );
+  const [showOutstandingModal, setShowOutstandingModal] = useState(false);
+  const [outstandingForm, setOutstandingForm] = useState({
+    reason: "Corporate Direct Billing / Bill to Company",
+    dueDate: new Date(Date.now() + 7 * 86400000).toISOString().split("T")[0],
+    remarks: "",
+  });
 
   // Search & Filter States for Stays / Folios
   const [staySearchQuery, setStaySearchQuery] = useState<string>("");
@@ -225,6 +231,7 @@ function BillingContent() {
         setShowDiscountModal(false);
         setShowInvoiceModal(false);
         setShowGroupPaymentModal(false);
+        setShowOutstandingModal(false);
       }
     };
     window.addEventListener("keydown", handleKeyDown);
@@ -493,21 +500,31 @@ function BillingContent() {
     return items;
   }, [stays]);
 
-  // Filtered Directory Items based on Active Main Tab (In-House vs Settled Archive) + Search + Sub-filters
+  // Filtered Directory Items based on Active Main Tab (In-House vs Outstanding Dues vs Settled Archive) + Search + Sub-filters
   const filteredDirectoryItems = useMemo(() => {
     return directoryItems.filter((item) => {
-      // 1. Main Tab Filter (Isolates In-House active rooms from Settled/Departed guests)
+      // 1. Main Tab Filter
       if (activeMainTab === "IN_HOUSE" && item.status !== "IN_HOUSE") {
         return false;
       }
-      if (activeMainTab === "SETTLED_ARCHIVE" && item.status !== "CHECKED_OUT" && item.status !== "COMPLETED") {
-        return false;
+      if (activeMainTab === "OUTSTANDING_DUES") {
+        const isCheckedOut = item.status === "CHECKED_OUT" || item.status === "COMPLETED";
+        const hasDue = item.stay?.folio?.status === "CLOSED_OUTSTANDING" || item.roomBalance > 0.5;
+        if (!isCheckedOut || !hasDue) return false;
+      }
+      if (activeMainTab === "SETTLED_ARCHIVE") {
+        const isCheckedOut = item.status === "CHECKED_OUT" || item.status === "COMPLETED";
+        const isOutstanding = item.stay?.folio?.status === "CLOSED_OUTSTANDING" || item.roomBalance > 0.5;
+        if (!isCheckedOut || isOutstanding) return false;
       }
 
       // 2. Sub-status Filter within tab
       if (activeMainTab === "IN_HOUSE") {
         if (stayStatusFilter === "WITH_BALANCE" && item.roomBalance <= 0.5) return false;
         if (stayStatusFilter === "SETTLED" && item.roomBalance > 0.5) return false;
+      } else if (activeMainTab === "OUTSTANDING_DUES") {
+        if (stayStatusFilter === "WITH_BALANCE" && !item.companyName) return false; // Corporate Debtors
+        if (stayStatusFilter === "SETTLED" && item.companyName) return false; // Individual Guests
       } else {
         if (stayStatusFilter === "WITH_BALANCE" && !item.companyName) return false; // Corporate Accounts
       }
@@ -531,16 +548,26 @@ function BillingContent() {
 
   // Counts for Top Tab Badges
   const inHouseCount = useMemo(() => directoryItems.filter((d) => d.status === "IN_HOUSE").length, [directoryItems]);
-  const settledArchiveCount = useMemo(() => directoryItems.filter((d) => d.status === "CHECKED_OUT" || d.status === "COMPLETED").length, [directoryItems]);
+  const outstandingCount = useMemo(() => directoryItems.filter((d) => (d.status === "CHECKED_OUT" || d.status === "COMPLETED") && (d.stay?.folio?.status === "CLOSED_OUTSTANDING" || d.roomBalance > 0.5)).length, [directoryItems]);
+  const settledArchiveCount = useMemo(() => directoryItems.filter((d) => (d.status === "CHECKED_OUT" || d.status === "COMPLETED") && d.stay?.folio?.status !== "CLOSED_OUTSTANDING" && d.roomBalance <= 0.5).length, [directoryItems]);
 
-  // Respond immediately when sidebar sub-tabs are clicked (/billing?tab=settled or /billing?tab=in-house)
+  // Respond immediately when sidebar sub-tabs are clicked (/billing?tab=settled, /billing?tab=outstanding, or /billing?tab=in-house)
   useEffect(() => {
     const tabParam = searchParams.get("tab");
-    if (tabParam === "settled" && activeMainTab !== "SETTLED_ARCHIVE") {
+    if (tabParam === "outstanding" && activeMainTab !== "OUTSTANDING_DUES") {
+      setActiveMainTab("OUTSTANDING_DUES");
+      setStayStatusFilter("ALL");
+      setStaySearchQuery("");
+      const dueItems = directoryItems.filter((d) => (d.status === "CHECKED_OUT" || d.status === "COMPLETED") && (d.stay?.folio?.status === "CLOSED_OUTSTANDING" || d.roomBalance > 0.5));
+      if (dueItems.length > 0) {
+        setSelectedStayId(dueItems[0].stayId);
+        setSelectedRoomNumber(dueItems[0].roomNumber);
+      }
+    } else if (tabParam === "settled" && activeMainTab !== "SETTLED_ARCHIVE") {
       setActiveMainTab("SETTLED_ARCHIVE");
       setStayStatusFilter("ALL");
       setStaySearchQuery("");
-      const settledItems = directoryItems.filter((d) => d.status === "CHECKED_OUT" || d.status === "COMPLETED");
+      const settledItems = directoryItems.filter((d) => (d.status === "CHECKED_OUT" || d.status === "COMPLETED") && d.stay?.folio?.status !== "CLOSED_OUTSTANDING" && d.roomBalance <= 0.5);
       if (settledItems.length > 0) {
         setSelectedStayId(settledItems[0].stayId);
         setSelectedRoomNumber(settledItems[0].roomNumber);
@@ -557,19 +584,21 @@ function BillingContent() {
     }
   }, [searchParams, directoryItems]);
 
-  const handleSwitchMainTab = (tab: "IN_HOUSE" | "SETTLED_ARCHIVE") => {
+  const handleSwitchMainTab = (tab: "IN_HOUSE" | "OUTSTANDING_DUES" | "SETTLED_ARCHIVE") => {
     setActiveMainTab(tab);
     setStayStatusFilter("ALL");
     setStaySearchQuery("");
 
     // Keep URL parameter synchronized for sidebar & browser history
-    const targetTab = tab === "SETTLED_ARCHIVE" ? "settled" : "in-house";
+    const targetTab = tab === "OUTSTANDING_DUES" ? "outstanding" : tab === "SETTLED_ARCHIVE" ? "settled" : "in-house";
     router.replace(`/billing?tab=${targetTab}`, { scroll: false });
 
     // Auto-select first item in the selected tab
-    const targetItems = directoryItems.filter((d) =>
-      tab === "IN_HOUSE" ? d.status === "IN_HOUSE" : (d.status === "CHECKED_OUT" || d.status === "COMPLETED")
-    );
+    const targetItems = directoryItems.filter((d) => {
+      if (tab === "IN_HOUSE") return d.status === "IN_HOUSE";
+      if (tab === "OUTSTANDING_DUES") return (d.status === "CHECKED_OUT" || d.status === "COMPLETED") && (d.stay?.folio?.status === "CLOSED_OUTSTANDING" || d.roomBalance > 0.5);
+      return (d.status === "CHECKED_OUT" || d.status === "COMPLETED") && d.stay?.folio?.status !== "CLOSED_OUTSTANDING" && d.roomBalance <= 0.5;
+    });
     if (targetItems.length > 0) {
       setSelectedStayId(targetItems[0].stayId);
       setSelectedRoomNumber(targetItems[0].roomNumber);
@@ -1145,21 +1174,62 @@ function BillingContent() {
     }
   };
 
+  // Core Checkout Performer (Supports single room of group stay & outstanding checkout)
+  const handlePerformCheckout = async (allowOutstanding = false) => {
+    if (!activeStay) return;
+    setActionLoading(true);
+    try {
+      const isSingleRoomOfGroup = isMultiRoomGroup && groupBillingMode === "NO";
+      const payload: any = {
+        allowOutstanding,
+        outstandingReason: allowOutstanding ? outstandingForm.reason : undefined,
+        outstandingRemarks: allowOutstanding ? outstandingForm.remarks : undefined,
+        settlementDueDate: allowOutstanding ? outstandingForm.dueDate : undefined,
+      };
+
+      if (isSingleRoomOfGroup && activeDirectoryItem?.roomId) {
+        payload.roomId = activeDirectoryItem.roomId;
+        payload.roomNumber = activeRoomNumber;
+      }
+
+      const res = await fetch(`/api/v1/stays/${activeStay.id}/checkout`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || "Checkout failed");
+      }
+
+      const invoiceData = await res.json();
+      const invoiceNo = invoiceData.invoice?.invoiceNo || invoiceData.invoiceNo || "";
+
+      if (allowOutstanding) {
+        alert(`Room ${activeRoomNumber} checked out with an outstanding balance of ${formatINR(currentBalance)}.\nRecorded in Debtors Ledger. Tax Invoice #${invoiceNo} generated.`);
+      } else {
+        alert(`Check-out successful for Room ${activeRoomNumber}! Tax Invoice #${invoiceNo} generated.`);
+      }
+
+      setShowOutstandingModal(false);
+      await loadStays(true);
+      if (folioData?.id) await loadFolio(folioData.id);
+      await refreshData();
+    } catch (err: any) {
+      alert(`Error checking out: ${err.message}`);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   // Execute Check-out and Issue Invoice
   const handleExecuteCheckout = async () => {
     if (!activeStay) return;
+
+    // If balance remains, prompt with options to pay now or check out with outstanding balance
     if (currentBalance > 0.5) {
-      setPaymentForm({
-        amount: String(currentBalance),
-        method: activeStay?.primaryGuest?.companyName ? "DIRECT_BILL" : "UPI",
-        reference: "",
-        payerName: formatGuestDisplayName(activeStay?.primaryGuest?.name) || "Guest",
-        companyName: activeStay?.primaryGuest?.companyName || "",
-        gstin: activeStay?.primaryGuest?.gstin || "",
-        creditPeriod: "30_DAYS",
-        billingRemarks: "",
-      });
-      setShowPaymentModal(true);
+      setShowOutstandingModal(true);
       return;
     }
 
@@ -1173,29 +1243,7 @@ function BillingContent() {
       }
     }
 
-    setActionLoading(true);
-    try {
-      const res = await fetch(`/api/v1/stays/${activeStay.id}/checkout`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-      });
-
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.error || "Checkout failed");
-      }
-
-      const invoiceData = await res.json();
-      const invoiceNo = invoiceData.invoice?.invoiceNo || invoiceData.invoiceNo || "";
-      alert(`Check-out successful! Tax Invoice #${invoiceNo} generated.`);
-      await loadStays();
-      await loadFolio(folioData.id);
-      await refreshData();
-    } catch (err: any) {
-      alert(`Error checking out: ${err.message}`);
-    } finally {
-      setActionLoading(false);
-    }
+    await handlePerformCheckout(false);
   };
 
   return (
@@ -1231,7 +1279,7 @@ function BillingContent() {
             </div>
           </div>
 
-          {/* Top Main Tab Navigation: In-House vs Settled Archive */}
+          {/* Top Main Tab Navigation: In-House vs Outstanding Dues vs Settled Archive */}
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-1.5 p-1 rounded-2xl bg-zinc-100/90 dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800/80 w-full lg:w-auto">
             <button
               type="button"
@@ -1252,6 +1300,28 @@ function BillingContent() {
                   : "bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400"
               }`}>
                 {inHouseCount}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleSwitchMainTab("OUTSTANDING_DUES")}
+              className={`flex items-center justify-between sm:justify-start gap-2 px-3.5 py-2 sm:py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                activeMainTab === "OUTSTANDING_DUES"
+                  ? "bg-white dark:bg-zinc-800 text-rose-600 dark:text-rose-400 shadow-xs border border-zinc-200/60 dark:border-zinc-700"
+                  : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
+              }`}
+            >
+              <div className="flex items-center gap-1.5">
+                <AlertCircle className="h-3.5 w-3.5" />
+                <span>⚠️ Outstanding Dues</span>
+              </div>
+              <span className={`px-2 py-0.2 rounded-md text-[10.5px] font-mono font-bold ${
+                activeMainTab === "OUTSTANDING_DUES"
+                  ? "bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800"
+                  : "bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400"
+              }`}>
+                {outstandingCount}
               </span>
             </button>
 
@@ -1393,6 +1463,47 @@ function BillingContent() {
           </div>
         )}
 
+        {/* Action Toolbar for Outstanding Dues */}
+        {activeMainTab === "OUTSTANDING_DUES" && (
+          <div className="flex items-center justify-between gap-2 pt-2 border-t border-rose-100 dark:border-rose-950/80 flex-wrap">
+            <div className="text-xs font-semibold text-rose-700 dark:text-rose-400 flex items-center gap-1.5">
+              <AlertCircle className="h-4 w-4 text-rose-600 dark:text-rose-400" />
+              <span>Checked-out rooms with pending receivables / debtor balances ({filteredDirectoryItems.length} records)</span>
+            </div>
+
+            {folioData && (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleOpenLiveTaxBill}
+                  className="h-8.5 px-3.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-800 dark:text-zinc-200 hover:bg-zinc-100 font-bold text-xs flex items-center gap-1.5 transition shadow-xs cursor-pointer"
+                >
+                  <Printer className="h-3.5 w-3.5" />
+                  <span>Print Invoice</span>
+                </button>
+                <button
+                  onClick={() => {
+                    setPaymentForm({
+                      amount: String(Math.max(0, currentBalance)),
+                      method: activeStay?.primaryGuest?.companyName ? "DIRECT_BILL" : "UPI",
+                      reference: `Outstanding Settlement for Room ${activeRoomNumber}`,
+                      payerName: formatGuestDisplayName(activeStay?.primaryGuest?.name) || "Guest",
+                      companyName: activeStay?.primaryGuest?.companyName || "",
+                      gstin: activeStay?.primaryGuest?.gstin || "",
+                      creditPeriod: "30_DAYS",
+                      billingRemarks: `Settling outstanding balance for Room ${activeRoomNumber}`,
+                    });
+                    setShowPaymentModal(true);
+                  }}
+                  className="h-8.5 px-4 rounded-xl bg-emerald-600 text-white hover:bg-emerald-500 font-bold text-xs flex items-center gap-1.5 transition shadow-xs cursor-pointer"
+                >
+                  <CreditCard className="h-3.5 w-3.5" />
+                  <span>Collect Outstanding ({formatINR(currentBalance)})</span>
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Action Toolbar for Settled Archive */}
         {activeMainTab === "SETTLED_ARCHIVE" && (
           <div className="flex items-center justify-between gap-2 pt-2 border-t border-zinc-100 dark:border-zinc-800/80 flex-wrap">
@@ -1427,6 +1538,11 @@ function BillingContent() {
                   <BedDouble className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
                   In-House Rooms
                 </>
+              ) : activeMainTab === "OUTSTANDING_DUES" ? (
+                <>
+                  <AlertCircle className="h-3.5 w-3.5 text-rose-600 dark:text-rose-400" />
+                  Outstanding Dues
+                </>
               ) : (
                 <>
                   <Archive className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
@@ -1451,7 +1567,7 @@ function BillingContent() {
                 </button>
               )}
               <span className="text-[10.5px] text-zinc-500 dark:text-zinc-400 font-semibold bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 rounded-md">
-                {filteredDirectoryItems.length} {activeMainTab === "IN_HOUSE" ? "Occupied" : "Settled"}
+                {filteredDirectoryItems.length} {activeMainTab === "IN_HOUSE" ? "Occupied" : activeMainTab === "OUTSTANDING_DUES" ? "Debtors" : "Settled"}
               </span>
             </div>
           </div>
@@ -1508,6 +1624,39 @@ function BillingContent() {
                 }`}
               >
                 Paid ({directoryItems.filter((d) => d.status === "IN_HOUSE" && d.roomBalance <= 0.5).length})
+              </button>
+            </div>
+          ) : activeMainTab === "OUTSTANDING_DUES" ? (
+            <div className="grid grid-cols-3 gap-1 p-1 rounded-xl bg-zinc-100/80 dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 text-[11px] font-semibold text-center">
+              <button
+                onClick={() => setStayStatusFilter("ALL")}
+                className={`rounded-lg py-1.5 transition cursor-pointer ${
+                  stayStatusFilter === "ALL"
+                    ? "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-xs font-bold"
+                    : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200"
+                }`}
+              >
+                All ({outstandingCount})
+              </button>
+              <button
+                onClick={() => setStayStatusFilter("WITH_BALANCE")}
+                className={`rounded-lg py-1.5 transition cursor-pointer ${
+                  stayStatusFilter === "WITH_BALANCE"
+                    ? "bg-amber-600 text-white shadow-xs font-bold"
+                    : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200"
+                }`}
+              >
+                Corporate ({directoryItems.filter((d) => (d.status === "CHECKED_OUT" || d.status === "COMPLETED") && (d.stay?.folio?.status === "CLOSED_OUTSTANDING" || d.roomBalance > 0.5) && d.companyName).length})
+              </button>
+              <button
+                onClick={() => setStayStatusFilter("SETTLED")}
+                className={`rounded-lg py-1.5 transition cursor-pointer ${
+                  stayStatusFilter === "SETTLED"
+                    ? "bg-blue-600 text-white shadow-xs font-bold"
+                    : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200"
+                }`}
+              >
+                Guest ({directoryItems.filter((d) => (d.status === "CHECKED_OUT" || d.status === "COMPLETED") && (d.stay?.folio?.status === "CLOSED_OUTSTANDING" || d.roomBalance > 0.5) && !d.companyName).length})
               </button>
             </div>
           ) : (
@@ -1685,7 +1834,7 @@ function BillingContent() {
                     </div>
 
                     {/* Action Button */}
-                    <div className="flex items-center gap-3 shrink-0">
+                    <div className="flex items-center gap-2 sm:gap-3 shrink-0">
                       {activeStay?.status === "IN_HOUSE" ? (
                         currentBalance <= 0.5 ? (
                           <button
@@ -1697,37 +1846,84 @@ function BillingContent() {
                             <span>{actionLoading ? "Checking Out..." : groupBillingMode === "YES" && isMultiRoomGroup ? "Check Out Group & Invoice" : `Check Out Room ${activeRoomNumber}`}</span>
                           </button>
                         ) : (
-                          <button
-                            onClick={() => {
-                              setPaymentForm({
-                                amount: String(currentBalance),
-                                method: activeStay?.primaryGuest?.companyName ? "DIRECT_BILL" : "UPI",
-                                reference: groupBillingMode === "YES" && isMultiRoomGroup ? `Group Settlement (Rooms ${allGroupRooms.join(", ")})` : `Room ${activeRoomNumber} Settlement`,
-                                payerName: formatGuestDisplayName(activeStay?.primaryGuest?.name) || "Guest",
-                                companyName: activeStay?.primaryGuest?.companyName || "",
-                                gstin: activeStay?.primaryGuest?.gstin || "",
-                                creditPeriod: "30_DAYS",
-                                billingRemarks: groupBillingMode === "YES" ? `Group billing settlement` : `Settlement for Room ${activeRoomNumber}`,
-                              });
-                              setShowPaymentModal(true);
-                            }}
-                            className="h-9 px-4 sm:h-10 sm:px-5 rounded-xl bg-rose-600 hover:bg-rose-500 active:scale-[0.98] text-white text-xs font-bold transition shadow-xs flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
-                          >
-                            <CreditCard className="h-4 w-4" />
-                            <span>Settle {formatINR(currentBalance)} & Check Out</span>
-                          </button>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => {
+                                setPaymentForm({
+                                  amount: String(currentBalance),
+                                  method: activeStay?.primaryGuest?.companyName ? "DIRECT_BILL" : "UPI",
+                                  reference: groupBillingMode === "YES" && isMultiRoomGroup ? `Group Settlement (Rooms ${allGroupRooms.join(", ")})` : `Room ${activeRoomNumber} Settlement`,
+                                  payerName: formatGuestDisplayName(activeStay?.primaryGuest?.name) || "Guest",
+                                  companyName: activeStay?.primaryGuest?.companyName || "",
+                                  gstin: activeStay?.primaryGuest?.gstin || "",
+                                  creditPeriod: "30_DAYS",
+                                  billingRemarks: groupBillingMode === "YES" ? `Group billing settlement` : `Settlement for Room ${activeRoomNumber}`,
+                                });
+                                setShowPaymentModal(true);
+                              }}
+                              className="h-9 px-3 sm:h-10 sm:px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-[0.98] text-white text-xs font-bold transition shadow-xs flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
+                            >
+                              <CreditCard className="h-4 w-4" />
+                              <span>Settle {formatINR(currentBalance)}</span>
+                            </button>
+                            <button
+                              onClick={() => setShowOutstandingModal(true)}
+                              className="h-9 px-3 sm:h-10 sm:px-4 rounded-xl bg-rose-600 hover:bg-rose-500 active:scale-[0.98] text-white text-xs font-bold transition shadow-xs flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
+                            >
+                              <AlertCircle className="h-4 w-4" />
+                              <span>Check Out with Due</span>
+                            </button>
+                          </div>
                         )
                       ) : (
-                        <button
-                          onClick={handleOpenLiveTaxBill}
-                          className="h-9 px-4 sm:h-10 sm:px-5 rounded-xl bg-zinc-900 text-white hover:bg-zinc-800 dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-200 active:scale-[0.98] font-bold text-xs transition shadow-xs flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
-                        >
-                          <Printer className="h-4 w-4" />
-                          <span>Print Final Invoice</span>
-                        </button>
+                        <div className="flex items-center gap-2">
+                          {(currentBalance > 0.5 || folioData?.status === "CLOSED_OUTSTANDING") && (
+                            <button
+                              onClick={() => {
+                                setPaymentForm({
+                                  amount: String(Math.max(0, currentBalance)),
+                                  method: activeStay?.primaryGuest?.companyName ? "DIRECT_BILL" : "UPI",
+                                  reference: `Outstanding Settlement for Room ${activeRoomNumber}`,
+                                  payerName: formatGuestDisplayName(activeStay?.primaryGuest?.name) || "Guest",
+                                  companyName: activeStay?.primaryGuest?.companyName || "",
+                                  gstin: activeStay?.primaryGuest?.gstin || "",
+                                  creditPeriod: "30_DAYS",
+                                  billingRemarks: `Settling outstanding debtor balance for Room ${activeRoomNumber}`,
+                                });
+                                setShowPaymentModal(true);
+                              }}
+                              className="h-9 px-3.5 sm:h-10 sm:px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-[0.98] text-white text-xs font-bold transition shadow-xs flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
+                            >
+                              <CreditCard className="h-4 w-4" />
+                              <span>Collect Due ({formatINR(currentBalance)})</span>
+                            </button>
+                          )}
+                          <button
+                            onClick={handleOpenLiveTaxBill}
+                            className="h-9 px-4 sm:h-10 sm:px-5 rounded-xl bg-zinc-900 text-white hover:bg-zinc-800 dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-200 active:scale-[0.98] font-bold text-xs transition shadow-xs flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
+                          >
+                            <Printer className="h-4 w-4" />
+                            <span>Print Final Invoice</span>
+                          </button>
+                        </div>
                       )}
                     </div>
                   </div>
+
+                  {/* Outstanding Ledger Alert Banner */}
+                  {(folioData?.status === "CLOSED_OUTSTANDING" || (activeStay?.status !== "IN_HOUSE" && currentBalance > 0.5)) && (
+                    <div className="w-full p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs">
+                      <div className="flex items-center gap-2 text-rose-800 dark:text-rose-300">
+                        <AlertCircle className="h-4 w-4 text-rose-600 dark:text-rose-400 shrink-0" />
+                        <span>
+                          <strong>Debtors Ledger Record:</strong> Room {activeRoomNumber} was checked out with an unpaid balance of <strong>{formatINR(currentBalance)}</strong>.
+                        </span>
+                      </div>
+                      <span className="font-mono text-[11px] font-bold text-rose-700 dark:text-rose-400 bg-white dark:bg-zinc-900 px-2.5 py-1 rounded-lg border border-rose-200 dark:border-rose-800 shrink-0">
+                        Status: CLOSED_OUTSTANDING
+                      </span>
+                    </div>
+                  )}
 
                   {/* Secondary Row: Guest Meta & Rate/Stay Summary */}
                   <div className="flex flex-col md:flex-row md:items-center justify-between gap-2.5 pt-0.5">
@@ -3195,6 +3391,174 @@ function BillingContent() {
         </div>
       )}
       </div>
+
+      {/* ========================================================================= */}
+      {/* ⚠️ CHECKOUT WITH OUTSTANDING BALANCE MODAL                                */}
+      {/* ========================================================================= */}
+      {showOutstandingModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in">
+          <div className="w-full max-w-lg rounded-3xl border border-rose-300 dark:border-rose-900 bg-white dark:bg-[#121215] p-5 sm:p-6 shadow-2xl space-y-4 text-zinc-900 dark:text-white">
+            <div className="flex items-center justify-between pb-3 border-b border-zinc-200 dark:border-zinc-800">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-xl bg-rose-100 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400">
+                  <AlertCircle className="h-5 w-5" />
+                </div>
+                <div>
+                  <h2 className="text-base font-bold text-zinc-900 dark:text-white">
+                    Check Out with Outstanding Balance
+                  </h2>
+                  <p className="text-xs text-zinc-500 font-mono">
+                    Room {activeRoomNumber} {isMultiRoomGroup && groupBillingMode === "NO" ? "(Individual Room Checkout)" : ""}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowOutstandingModal(false)}
+                className="text-zinc-400 hover:text-zinc-700 dark:hover:text-white cursor-pointer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Outstanding Summary Banner */}
+            <div className="p-4 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-rose-800 dark:text-rose-300">Remaining Unsettled Balance:</span>
+                <span className="text-xl font-black font-mono text-rose-600 dark:text-rose-400">
+                  {formatINR(currentBalance)}
+                </span>
+              </div>
+              <div className="text-xs text-rose-700/80 dark:text-rose-400/80 leading-relaxed">
+                Checking out with an outstanding balance will release Room <strong>{activeRoomNumber}</strong> for housekeeping while safely logging the guest&apos;s personal profile, contact info, and receivables into the <strong>Hotel Debtors Ledger</strong>.
+              </div>
+            </div>
+
+            {/* Guest Details Summary */}
+            <div className="grid grid-cols-2 gap-2 p-3 rounded-xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 text-xs">
+              <div>
+                <span className="text-[10px] uppercase font-bold text-zinc-400 block">Guest Name</span>
+                <span className="font-semibold text-zinc-800 dark:text-zinc-200 truncate block">
+                  {formatGuestDisplayName(activeStay?.primaryGuest?.name) || "Guest"}
+                </span>
+              </div>
+              <div>
+                <span className="text-[10px] uppercase font-bold text-zinc-400 block">Phone</span>
+                <span className="font-mono text-zinc-800 dark:text-zinc-200 block">
+                  {activeStay?.primaryGuest?.phone || "—"}
+                </span>
+              </div>
+              {activeStay?.primaryGuest?.companyName && (
+                <div className="col-span-2">
+                  <span className="text-[10px] uppercase font-bold text-zinc-400 block">Company (Bill To)</span>
+                  <span className="font-medium text-amber-700 dark:text-amber-400 truncate block">
+                    {activeStay.primaryGuest.companyName} {activeStay?.primaryGuest?.gstin ? `(${activeStay.primaryGuest.gstin})` : ""}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {/* Form Fields */}
+            <div className="space-y-3 text-xs sm:text-sm">
+              <div>
+                <label className="text-xs font-bold font-mono text-zinc-500 uppercase tracking-wider block mb-1">
+                  Reason for Outstanding Check-Out *
+                </label>
+                <select
+                  value={outstandingForm.reason}
+                  onChange={(e) => setOutstandingForm({ ...outstandingForm, reason: e.target.value })}
+                  className="w-full h-10 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 px-3 text-xs sm:text-sm font-semibold text-zinc-900 dark:text-white focus:outline-none focus:border-rose-500 transition cursor-pointer"
+                >
+                  <option value="Corporate Direct Billing / Bill to Company">🏢 Corporate Direct Billing / Bill to Company</option>
+                  <option value="Guest Promised Online / Bank Transfer">💳 Guest Promised Online / Bank Transfer</option>
+                  <option value="Delayed Settlement on Departure">⏱️ Delayed Settlement on Departure</option>
+                  <option value="Disputed Charge Under Audit Hold">⚖️ Disputed Charge Under Audit Hold</option>
+                  <option value="Management Approved Credit">👔 Management Approved Credit</option>
+                </select>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-bold font-mono text-zinc-500 uppercase tracking-wider block mb-1">
+                    Settlement Due Date *
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={outstandingForm.dueDate}
+                    onChange={(e) => setOutstandingForm({ ...outstandingForm, dueDate: e.target.value })}
+                    className="w-full h-10 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 px-3 text-xs sm:text-sm font-mono font-bold text-zinc-900 dark:text-white focus:outline-none focus:border-rose-500 transition"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold font-mono text-zinc-500 uppercase tracking-wider block mb-1">
+                    Payer Category
+                  </label>
+                  <div className="h-10 px-3 rounded-xl bg-zinc-100 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700/60 flex items-center text-xs font-semibold text-zinc-700 dark:text-zinc-300 truncate">
+                    {activeStay?.primaryGuest?.companyName ? "Corporate Master" : "Individual Guest"}
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-bold font-mono text-zinc-500 uppercase tracking-wider block mb-1">
+                  Manager Remarks & Authorization Notes
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder="e.g. Approved by Duty Manager; bill copy emailed to accounts department"
+                  value={outstandingForm.remarks}
+                  onChange={(e) => setOutstandingForm({ ...outstandingForm, remarks: e.target.value })}
+                  className="w-full rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 p-2.5 text-xs text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:border-rose-500 transition"
+                />
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="pt-2 border-t border-zinc-200 dark:border-zinc-800 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowOutstandingModal(false);
+                  setPaymentForm({
+                    amount: String(currentBalance),
+                    method: activeStay?.primaryGuest?.companyName ? "DIRECT_BILL" : "UPI",
+                    reference: `Settlement for Room ${activeRoomNumber}`,
+                    payerName: formatGuestDisplayName(activeStay?.primaryGuest?.name) || "Guest",
+                    companyName: activeStay?.primaryGuest?.companyName || "",
+                    gstin: activeStay?.primaryGuest?.gstin || "",
+                    creditPeriod: "30_DAYS",
+                    billingRemarks: `Settlement for Room ${activeRoomNumber}`,
+                  });
+                  setShowPaymentModal(true);
+                }}
+                className="h-10 px-4 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                <CreditCard className="h-4 w-4 text-emerald-600" />
+                <span>Settle Now Instead</span>
+              </button>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowOutstandingModal(false)}
+                  className="h-10 px-4 rounded-xl text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 text-xs font-semibold cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={actionLoading}
+                  onClick={() => handlePerformCheckout(true)}
+                  className="h-10 px-5 rounded-xl bg-rose-600 hover:bg-rose-500 active:scale-[0.98] text-white text-xs font-black transition disabled:opacity-50 shadow-md flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <CheckCircle2 className="h-4 w-4" />
+                  <span>{actionLoading ? "Processing..." : "Confirm Outstanding Check-Out"}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ========================================================================= */}
       {/* 📄 HIGH-FIDELITY PRINTABLE TAX INVOICE MODAL (1-PAGE A4 GUARANTEE)         */}

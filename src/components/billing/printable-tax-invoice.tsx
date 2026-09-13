@@ -146,9 +146,11 @@ export function PrintableTaxInvoiceModal({
   const companyName = primaryGuest.companyName || btcSnapshot?.companyName || null;
   const guestGstin = primaryGuest.gstin || btcSnapshot?.gstin || null;
 
-  // Address
+  // Address: Prefer corporate address if billing to company, otherwise guest personal address
   let addressText = "MD Shah Road, Paltan Bazar, Guwahati, Assam - 781008";
-  if (primaryGuest.addressJson) {
+  if (companyName && (btcSnapshot?.companyAddress || btcSnapshot?.address)) {
+    addressText = btcSnapshot.companyAddress || btcSnapshot.address;
+  } else if (primaryGuest.addressJson) {
     try {
       const addr = JSON.parse(primaryGuest.addressJson);
       addressText = [addr.street, addr.city, addr.state, addr.postalCode, addr.country || "India"]

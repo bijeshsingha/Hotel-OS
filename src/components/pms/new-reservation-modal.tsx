@@ -349,7 +349,6 @@ export function NewReservationModal({
                           ...prev,
                           agencyName: comp.accountName,
                           agencyPhone: comp.mobile || comp.phone || "",
-                          guestCity: comp.city || prev.guestCity,
                           notes: comp.remarks ? `Agency terms: ${comp.remarks}` : prev.notes,
                         }));
                       }}
@@ -410,8 +409,6 @@ export function NewReservationModal({
                           ...prev,
                           companyName: comp.accountName,
                           guestGstin: comp.gstin || "",
-                          guestPhone: comp.mobile || comp.phone || prev.guestPhone || "",
-                          guestCity: comp.city || prev.guestCity,
                           notes: comp.remarks ? `Company terms: ${comp.remarks}` : prev.notes,
                         }));
                       }}

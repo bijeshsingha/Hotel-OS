@@ -46,6 +46,7 @@ import {
   ArrowUpDown,
   Tag,
   Globe,
+  LogOut,
 } from "lucide-react";
 
 import { useSearchParams, useRouter } from "next/navigation";
@@ -287,20 +288,82 @@ function PMSFrontDeskContent() {
     }
   };
 
-  // Quick Direct Checkout Handler
-  const handleDirectCheckout = async (stayId: string, e: React.MouseEvent) => {
+  // Quick Direct Checkout Handler with Individual Room & Outstanding Balance support
+  const handleDirectCheckout = async (
+    stayId: string,
+    e: React.MouseEvent,
+    roomId?: string,
+    roomNumber?: string
+  ) => {
     e.stopPropagation();
-    if (!confirm("Confirm guest checkout and issue GST Rule 46 Tax Invoice?")) return;
+    const stay = stays.find((s) => s.id === stayId);
+    const activeRooms = stay?.roomAssignments?.filter((a: any) => !a.endsAt) || [];
+    const isGroup = activeRooms.length > 1;
+
+    let checkoutTargetRoomId = roomId;
+    let checkoutTargetRoomNo = roomNumber;
+
+    if (isGroup && roomId) {
+      const confirmSingle = window.confirm(
+        `Room ${roomNumber} is part of a multi-room group stay (${activeRooms.map((a: any) => a.room?.number).join(", ")}).\n\n` +
+        `Click OK to check out Room ${roomNumber} ONLY (leaving companion rooms in-house).\n` +
+        `Click CANCEL to check out ALL rooms in the group together.`
+      );
+      if (!confirmSingle) {
+        checkoutTargetRoomId = undefined;
+        checkoutTargetRoomNo = undefined;
+      }
+    } else {
+      const promptText = checkoutTargetRoomNo
+        ? `Confirm checkout for Room ${checkoutTargetRoomNo} and issue GST Rule 46 Tax Invoice?`
+        : "Confirm guest checkout and issue GST Rule 46 Tax Invoice?";
+      if (!confirm(promptText)) return;
+    }
+
     try {
       setActionLoading(true);
-      const res = await fetch(`/api/v1/stays/${stayId}/checkout`, {
+      let res = await fetch(`/api/v1/stays/${stayId}/checkout`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ paymentMethod: "CASH" }),
+        body: JSON.stringify({
+          roomId: checkoutTargetRoomId,
+          roomNumber: checkoutTargetRoomNo,
+        }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Checkout failed");
-      alert(`Checkout successful! Invoice ${data.invoice?.invoiceNo || ""} generated.`);
+
+      let data = await res.json();
+      if (!res.ok && data.error && data.error.includes("outstanding balance")) {
+        const allowOut = window.confirm(
+          `${data.error}\n\nDo you want to check out this guest with an OUTSTANDING BALANCE (City Ledger / Due)?`
+        );
+        if (allowOut) {
+          const reason =
+            window.prompt(
+              "Enter reason for Outstanding Checkout (e.g. Guest Due / Promise to Pay, BTC Corporate, Disputed):",
+              "Guest Due"
+            ) || "Guest Due";
+          res = await fetch(`/api/v1/stays/${stayId}/checkout`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              roomId: checkoutTargetRoomId,
+              roomNumber: checkoutTargetRoomNo,
+              allowOutstanding: true,
+              outstandingReason: reason,
+            }),
+          });
+          data = await res.json();
+          if (!res.ok) throw new Error(data.error || "Checkout failed");
+        } else {
+          return;
+        }
+      } else if (!res.ok) {
+        throw new Error(data.error || "Checkout failed");
+      }
+
+      const invNo = data.invoice?.invoiceNo || data.invoiceNo || "";
+      const outMsg = data.outstandingAmount > 0 ? ` (Recorded with Outstanding Due: ₹${data.outstandingAmount})` : "";
+      alert(`Checkout successful! Invoice ${invNo} generated.${outMsg}`);
       await loadData();
       await refreshData();
       setSelectedRoomForInspect(null);
@@ -782,7 +845,7 @@ function PMSFrontDeskContent() {
               </button>
 
               <button
-                onClick={(e) => handleDirectCheckout(activeStay.id, e)}
+                onClick={(e) => handleDirectCheckout(activeStay.id, e, room.id, room.number)}
                 className="h-8 px-2.5 rounded-xl bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/50 dark:hover:bg-rose-900/50 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 font-semibold text-xs flex items-center justify-center gap-1 transition"
                 title="Checkout Guest"
               >
@@ -2822,6 +2885,15 @@ function PMSFrontDeskContent() {
                       >
                         <ArrowRightLeft className="h-3.5 w-3.5" />
                         <span>Move</span>
+                      </button>
+
+                      <button
+                        onClick={(e) => handleDirectCheckout(activeStay.id, e, room.id, room.number)}
+                        className="px-3 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 border border-rose-200 dark:border-rose-800/60 text-rose-700 dark:text-rose-300 font-bold text-xs transition flex items-center gap-1.5 cursor-pointer"
+                        title="Check Out Guest / Room"
+                      >
+                        <LogOut className="h-3.5 w-3.5" />
+                        <span>Check Out</span>
                       </button>
                     </div>
                   </div>

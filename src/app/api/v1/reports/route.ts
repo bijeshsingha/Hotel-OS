@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { getMidnightDayBoundaries } from "@/lib/domain/daily-report-service";
 import { calculateGST } from "@/lib/gst/calculator";
+import { isEntryForRoom } from "@/lib/domain/folio-service";
 
 export async function GET(request: Request) {
   try {
@@ -1125,6 +1126,172 @@ export async function GET(request: Request) {
         generatedAt: new Date().toISOString(),
         summary,
         bills,
+      });
+    }
+
+    // 7. DAILY CURRENT IN-HOUSE GUEST OUTSTANDING / DUE REPORT
+    if (reportType === "INHOUSE_GUEST_OUTSTANDING" || reportType === "INHOUSE_OUTSTANDING") {
+      const property = await prisma.property.findUnique({
+        where: { id: propertyId },
+        select: { displayName: true, code: true, gstin: true, businessDate: true, address: true, phone: true },
+      });
+
+      const stayWhere: any = {
+        propertyId,
+        status: "IN_HOUSE",
+      };
+
+      if (dateFilter) {
+        stayWhere.status = { in: ["IN_HOUSE", "CHECKED_OUT"] };
+        stayWhere.arrivalAt = { lte: dateFilter.lte };
+        stayWhere.OR = [
+          { actualDepartureAt: null },
+          { actualDepartureAt: { gte: dateFilter.gte } },
+        ];
+      }
+
+      const stays = await prisma.stay.findMany({
+        where: stayWhere,
+        include: {
+          primaryGuest: true,
+          roomAssignments: {
+            include: { room: { include: { roomType: true } } },
+          },
+          folio: {
+            include: {
+              windows: {
+                include: {
+                  entries: { where: { status: "POSTED" } },
+                },
+              },
+              payments: { where: { status: "SUCCEEDED" } },
+            },
+          },
+        },
+        orderBy: { arrivalAt: "desc" },
+      });
+
+      const guestRows: any[] = [];
+      let totalBilledSum = 0;
+      let totalPaidSum = 0;
+      let totalDueSum = 0;
+      let totalSurplusSum = 0;
+      let clearedCount = 0;
+      let dueCount = 0;
+      let surplusCount = 0;
+
+      for (const stay of stays) {
+        const assignments = stay.roomAssignments || [];
+        const activeAssignments = assignments.filter((a) => !a.endsAt || (dateFilter && (!stay.actualDepartureAt || new Date(stay.actualDepartureAt) >= dateFilter.gte)));
+        const targetAssignments = activeAssignments.length > 0 ? activeAssignments : [assignments[0]];
+
+        const allEntries = stay.folio?.windows?.flatMap((w) => w.entries) || [];
+        const allPayments = stay.folio?.payments || [];
+        const totalCharges = allEntries.reduce((s, e) => s + e.totalAmount, 0);
+        const totalPayments = allPayments.reduce((s, p) => s + p.amount, 0);
+
+        const allRoomNumbers = targetAssignments.map((a) => a?.room?.number || "Unassigned");
+        const isMultiRoom = allRoomNumbers.length > 1;
+
+        for (const assignment of targetAssignments) {
+          const roomNo = assignment?.room?.number || "Unassigned";
+          const roomTypeName = assignment?.room?.roomType?.name || "Standard";
+
+          // If multi-room, isolate room charges
+          const roomEntries = isMultiRoom
+            ? allEntries.filter((e) => isEntryForRoom(e, roomNo, allRoomNumbers))
+            : allEntries;
+          const roomCharges = roomEntries.length > 0 ? roomEntries.reduce((s, e) => s + e.totalAmount, 0) : (isMultiRoom ? totalCharges / targetAssignments.length : totalCharges);
+
+          // Room payments
+          let roomPaid = 0;
+          if (isMultiRoom) {
+            allPayments.forEach((p) => {
+              const text = `${p.reference || ""} ${p.payerSnapshot || ""}`;
+              if (new RegExp(`\\b(?:Room|Rm)\\s*#?\\s*${roomNo}\\b`, "i").test(text)) {
+                roomPaid += p.amount;
+              }
+            });
+            if (roomPaid === 0 && allPayments.length > 0) {
+              roomPaid = totalPayments / targetAssignments.length;
+            }
+          } else {
+            roomPaid = totalPayments;
+          }
+
+          const roomBalance = Math.round((roomCharges - roomPaid) * 100) / 100;
+          let status: "CLEARED" | "DUE_REMAINING" | "SURPLUS_CREDIT" = "CLEARED";
+          if (roomBalance > 1.0) {
+            status = "DUE_REMAINING";
+            dueCount++;
+            totalDueSum += roomBalance;
+          } else if (roomBalance < -1.0) {
+            status = "SURPLUS_CREDIT";
+            surplusCount++;
+            totalSurplusSum += Math.abs(roomBalance);
+          } else {
+            status = "CLEARED";
+            clearedCount++;
+          }
+
+          totalBilledSum += roomCharges;
+          totalPaidSum += roomPaid;
+
+          // Parse guest address
+          let addressStr = "";
+          if ((stay.primaryGuest as any).addressJson) {
+            try {
+              const parsedAddr = JSON.parse((stay.primaryGuest as any).addressJson);
+              addressStr = [parsedAddr.street, parsedAddr.city, parsedAddr.state, parsedAddr.postalCode, parsedAddr.country]
+                .filter(Boolean)
+                .join(", ");
+            } catch {}
+          }
+
+          guestRows.push({
+            stayId: stay.id,
+            folioId: stay.folio?.id || null,
+            roomNumber: roomNo,
+            roomType: roomTypeName,
+            guestName: stay.primaryGuest.name,
+            phone: stay.primaryGuest.phone || "—",
+            email: stay.primaryGuest.email || "",
+            residentialAddress: addressStr,
+            companyName: stay.primaryGuest.companyName || "",
+            gstin: stay.primaryGuest.gstin || "",
+            arrivalDate: stay.arrivalAt.toISOString(),
+            expectedDepartureDate: stay.expectedDepartureAt.toISOString(),
+            actualDepartureDate: stay.actualDepartureAt?.toISOString() || null,
+            totalCharges: Math.round(roomCharges * 100) / 100,
+            totalPayments: Math.round(roomPaid * 100) / 100,
+            balanceDue: roomBalance,
+            status,
+            stayStatus: stay.status,
+            isGroup: isMultiRoom,
+            groupRooms: allRoomNumbers,
+          });
+        }
+      }
+
+      const totalOccupied = guestRows.length;
+      const clearedPercentage = totalOccupied > 0 ? Math.round((clearedCount / totalOccupied) * 100) : 0;
+
+      return NextResponse.json({
+        reportType: "INHOUSE_GUEST_OUTSTANDING",
+        property,
+        filterDate: date || property?.businessDate || new Date().toISOString().split("T")[0],
+        summary: {
+          totalOccupied,
+          clearedCount,
+          clearedPercentage,
+          dueCount,
+          totalDueAmount: Math.round(totalDueSum * 100) / 100,
+          surplusCount,
+          totalSurplusAmount: Math.round(totalSurplusSum * 100) / 100,
+          totalBilledAmount: Math.round(totalBilledSum * 100) / 100,
+          totalCollectedAmount: Math.round(totalPaidSum * 100) / 100,
+        },
+        records: guestRows,
       });
     }
 

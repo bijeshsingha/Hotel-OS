@@ -59,13 +59,18 @@ import { PageHeader, StatCard, SegmentedControl } from "@/components/ui";
 export default function ReportsPage() {
   const { activeProperty, refreshKey, refreshData } = useHotel();
   const [reportType, setReportType] = useState<
-    "ROOM_TRANSFERS" | "FINAL_BILLS" | "EXPENSES" | "REVENUE" | "FNB"
-  >("ROOM_TRANSFERS");
+    "INHOUSE_OUTSTANDING" | "ROOM_TRANSFERS" | "FINAL_BILLS" | "EXPENSES" | "REVENUE" | "FNB"
+  >("INHOUSE_OUTSTANDING");
 
   // Date Filter State for 12 AM - 12 AM Cycle
   const [selectedDate, setSelectedDate] = useState<string>("");
   const [data, setData] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // Filters for In-House Guest Outstanding Tab
+  const [inhouseSearch, setInhouseSearch] = useState("");
+  const [inhouseStatusFilter, setInhouseStatusFilter] = useState<"ALL" | "DUE_REMAINING" | "CLEARED" | "SURPLUS_CREDIT">("ALL");
+  const [showInhousePrintModal, setShowInhousePrintModal] = useState(false);
 
   // Filters for Dedicated Expense Register Tab
   const [expenseSearch, setExpenseSearch] = useState("");
@@ -190,6 +195,7 @@ export default function ReportsPage() {
         setShowFinalBillsPrintModal(false);
         setShowKotPrintModal(false);
         setShowRevenuePrintModal(false);
+        setShowInhousePrintModal(false);
       }
     };
     window.addEventListener("keydown", handleKeyDown);
@@ -805,6 +811,77 @@ export default function ReportsPage() {
     return Array.from(set).sort();
   }, [data]);
 
+  // Filtered In-House Guest Rooms
+  const filteredInhouseRooms = useMemo(() => {
+    if (!data?.rooms || reportType !== "INHOUSE_OUTSTANDING") return [];
+    return data.rooms.filter((r: any) => {
+      if (inhouseStatusFilter === "DUE_REMAINING" && r.status !== "DUE_REMAINING") return false;
+      if (inhouseStatusFilter === "CLEARED" && r.status !== "CLEARED") return false;
+      if (inhouseStatusFilter === "SURPLUS_CREDIT" && r.status !== "SURPLUS_CREDIT") return false;
+
+      if (inhouseSearch.trim()) {
+        const q = inhouseSearch.toLowerCase();
+        const roomMatch = r.roomNumber?.toLowerCase().includes(q);
+        const guestMatch = r.guestName?.toLowerCase().includes(q);
+        const phoneMatch = r.phone?.toLowerCase().includes(q);
+        const addressMatch = r.residentialAddress?.toLowerCase().includes(q);
+        const companyMatch = r.companyName?.toLowerCase().includes(q);
+        return roomMatch || guestMatch || phoneMatch || addressMatch || companyMatch;
+      }
+      return true;
+    });
+  }, [data?.rooms, reportType, inhouseStatusFilter, inhouseSearch]);
+
+  const exportInhouseOutstandingCSV = () => {
+    if (!filteredInhouseRooms.length) {
+      alert("No in-house guest records to export.");
+      return;
+    }
+    const headers = [
+      "Room Number",
+      "Room Type",
+      "Guest Name",
+      "Mobile Phone",
+      "Personal Residential Address",
+      "Billing Company",
+      "Check-In Date",
+      "Expected Departure",
+      "Rate Handling",
+      "Total Charges Posted (INR)",
+      "Total Payments Recorded (INR)",
+      "Balance Due Remaining (INR)",
+      "Advance Surplus (INR)",
+      "Status",
+      "As Of Date",
+    ];
+
+    const rows = filteredInhouseRooms.map((r: any) => [
+      `"${r.roomNumber}"`,
+      `"${r.roomType || ""}"`,
+      `"${(r.guestName || "").replace(/"/g, '""')}"`,
+      `"${r.phone || ""}"`,
+      `"${(r.residentialAddress || "").replace(/"/g, '""')}"`,
+      `"${(r.companyName || "").replace(/"/g, '""')}"`,
+      `"${r.checkIn}"`,
+      `"${r.expectedDeparture}"`,
+      `"${r.rateHandling}"`,
+      r.totalCharges,
+      r.totalPaid,
+      r.balanceDue,
+      r.surplusCredit,
+      `"${r.status}"`,
+      `"${data?.asOfDate || selectedDate || activeProperty?.businessDate || ""}"`,
+    ]);
+
+    const csvContent = [headers.join(","), ...rows.map((row: any[]) => row.join(","))].join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${activeProperty?.code || "HOTEL"}_InHouse_Guest_Outstanding_Report_${selectedDate || new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+  };
+
   // Export CSV Handlers
   const exportRoomTransfersCSV = () => {
     if (!filteredTransfers.length) {
@@ -1097,6 +1174,23 @@ export default function ReportsPage() {
         businessDate={activeProperty?.businessDate}
         actions={
           <div className="flex items-center gap-2 flex-wrap">
+            {reportType === "INHOUSE_OUTSTANDING" && (
+              <>
+                <button
+                  onClick={() => setShowInhousePrintModal(true)}
+                  className="h-9 flex items-center gap-1.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 border border-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 dark:border-zinc-700 px-3.5 text-xs font-semibold text-zinc-800 dark:text-zinc-200 transition shadow-xs cursor-pointer"
+                >
+                  <Printer className="h-4 w-4 text-zinc-500 dark:text-zinc-400" /> Print Outstanding Report
+                </button>
+                <button
+                  onClick={exportInhouseOutstandingCSV}
+                  className="h-9 flex items-center gap-1.5 rounded-xl bg-emerald-700 hover:bg-emerald-600 text-white px-4 text-xs font-semibold transition shadow-xs cursor-pointer"
+                >
+                  <FileSpreadsheet className="h-4 w-4" /> Export In-House CSV
+                </button>
+              </>
+            )}
+
             {reportType === "ROOM_TRANSFERS" && (
               <>
                 <button
@@ -1228,6 +1322,7 @@ export default function ReportsPage() {
           value={reportType}
           onChange={(val) => setReportType(val as any)}
           options={[
+            { value: "INHOUSE_OUTSTANDING", label: "In-House Guest Outstanding", icon: Users },
             { value: "ROOM_TRANSFERS", label: "Room Transfers & Moves", icon: ArrowRightLeft },
             { value: "FINAL_BILLS", label: "Final Bills & Invoices", icon: Receipt },
             { value: "EXPENSES", label: "Expense Register", icon: ArrowUpRight },
@@ -1236,6 +1331,331 @@ export default function ReportsPage() {
           ]}
         />
       </div>
+
+      {/* ========================================================================= */}
+      {/* TAB 0: IN-HOUSE GUEST OUTSTANDING & DUE STATUS DAILY REPORT               */}
+      {/* ========================================================================= */}
+      {reportType === "INHOUSE_OUTSTANDING" && (
+        <div className="space-y-4 animate-in fade-in">
+          {/* Date Selector & Shift Controls */}
+          <div className="p-3 sm:p-4 rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs font-bold uppercase tracking-wider text-zinc-500 font-mono flex items-center gap-1.5">
+                <Calendar className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                As Of Date:
+              </span>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => shiftDate(-1)}
+                  className="h-8 w-8 flex items-center justify-center rounded-lg bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 transition cursor-pointer"
+                  title="Previous Day"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
+                <input
+                  type="date"
+                  value={selectedDate || activeProperty?.businessDate || ""}
+                  onChange={(e) => setSelectedDate(e.target.value)}
+                  className="h-8 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 px-2.5 text-xs font-mono font-bold text-zinc-900 dark:text-white focus:outline-none focus:border-blue-500"
+                />
+                <button
+                  type="button"
+                  onClick={() => shiftDate(1)}
+                  className="h-8 w-8 flex items-center justify-center rounded-lg bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 transition cursor-pointer"
+                  title="Next Day"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              </div>
+              <button
+                type="button"
+                onClick={handleSetToday}
+                className={`h-8 px-2.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                  isToday
+                    ? "bg-blue-600 text-white shadow-xs"
+                    : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200"
+                }`}
+              >
+                Current Business Date
+              </button>
+              <button
+                type="button"
+                onClick={handleSetYesterday}
+                className="h-8 px-2.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 text-xs font-semibold transition cursor-pointer"
+              >
+                Yesterday
+              </button>
+            </div>
+
+            <div className="flex items-center gap-2 text-xs font-medium text-zinc-500">
+              <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span>
+                Live Ledger As of: <strong className="font-mono text-zinc-800 dark:text-zinc-200">{data?.asOfDate || selectedDate || activeProperty?.businessDate}</strong>
+              </span>
+            </div>
+          </div>
+
+          {/* 4 Summary Stat Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            {/* Card 1: Total Occupied */}
+            <div className="p-4 rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">Occupied In-House</span>
+                <BedDouble className="h-4 w-4 text-blue-500" />
+              </div>
+              <div className="text-2xl font-black font-mono text-zinc-900 dark:text-zinc-100">
+                {data?.summary?.totalOccupiedRooms ?? 0} Rooms
+              </div>
+              <div className="text-[11px] text-zinc-500">Currently in-house guest rooms</div>
+            </div>
+
+            {/* Card 2: Dues Cleared */}
+            <div className="p-4 rounded-2xl bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800/50 shadow-xs space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-emerald-800 dark:text-emerald-400 uppercase tracking-wider">Dues Cleared</span>
+                <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+              </div>
+              <div className="text-2xl font-black font-mono text-emerald-700 dark:text-emerald-300">
+                {data?.summary?.clearedCount ?? 0} Rooms
+              </div>
+              <div className="text-[11px] text-emerald-700/80 dark:text-emerald-400/80 font-medium">
+                {data?.summary?.clearedPercentage ?? 0}% of in-house guests fully settled
+              </div>
+            </div>
+
+            {/* Card 3: Due Remaining */}
+            <div className="p-4 rounded-2xl bg-rose-50/60 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-800/50 shadow-xs space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-rose-800 dark:text-rose-400 uppercase tracking-wider">Due Remaining</span>
+                <AlertCircle className="h-4 w-4 text-rose-600 dark:text-rose-400" />
+              </div>
+              <div className="text-2xl font-black font-mono text-rose-700 dark:text-rose-300">
+                {formatINR(data?.summary?.totalDueRemaining ?? 0)}
+              </div>
+              <div className="text-[11px] text-rose-700/80 dark:text-rose-400/80 font-medium">
+                Across {data?.summary?.dueCount ?? 0} room{data?.summary?.dueCount === 1 ? "" : "s"} with pending dues
+              </div>
+            </div>
+
+            {/* Card 4: Advance Surplus */}
+            <div className="p-4 rounded-2xl bg-blue-50/60 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800/50 shadow-xs space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-blue-800 dark:text-blue-400 uppercase tracking-wider">Advance Surplus</span>
+                <Wallet className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+              </div>
+              <div className="text-2xl font-black font-mono text-blue-700 dark:text-blue-300">
+                {formatINR(data?.summary?.totalSurplusCredit ?? 0)}
+              </div>
+              <div className="text-[11px] text-blue-700/80 dark:text-blue-400/80 font-medium">
+                Held across {data?.summary?.surplusCount ?? 0} guest account{data?.summary?.surplusCount === 1 ? "" : "s"}
+              </div>
+            </div>
+          </div>
+
+          {/* Search & Filter Toolbar */}
+          <div className="p-3 sm:p-4 rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+            <div className="relative flex-1 max-w-md">
+              <Search className="absolute left-3 top-2.5 h-4 w-4 text-zinc-400" />
+              <input
+                type="text"
+                placeholder="Search room #, guest name, phone, residential address, company..."
+                value={inhouseSearch}
+                onChange={(e) => setInhouseSearch(e.target.value)}
+                className="w-full h-9 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 pl-9 pr-8 text-xs text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:border-blue-500 font-medium transition"
+              />
+              {inhouseSearch && (
+                <button
+                  onClick={() => setInhouseSearch("")}
+                  className="absolute right-2.5 top-2.5 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 cursor-pointer"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+
+            {/* Quick Status Segmented Tabs */}
+            <div className="flex items-center gap-1 p-1 rounded-xl bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs font-semibold">
+              <button
+                type="button"
+                onClick={() => setInhouseStatusFilter("ALL")}
+                className={`px-3 py-1.5 rounded-lg transition cursor-pointer ${
+                  inhouseStatusFilter === "ALL"
+                    ? "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-xs font-bold"
+                    : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-800"
+                }`}
+              >
+                All ({data?.summary?.totalOccupiedRooms ?? 0})
+              </button>
+              <button
+                type="button"
+                onClick={() => setInhouseStatusFilter("DUE_REMAINING")}
+                className={`px-3 py-1.5 rounded-lg transition cursor-pointer ${
+                  inhouseStatusFilter === "DUE_REMAINING"
+                    ? "bg-rose-600 text-white shadow-xs font-bold"
+                    : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-800"
+                }`}
+              >
+                ⚠️ Due Remaining ({data?.summary?.dueCount ?? 0})
+              </button>
+              <button
+                type="button"
+                onClick={() => setInhouseStatusFilter("CLEARED")}
+                className={`px-3 py-1.5 rounded-lg transition cursor-pointer ${
+                  inhouseStatusFilter === "CLEARED"
+                    ? "bg-emerald-600 text-white shadow-xs font-bold"
+                    : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-800"
+                }`}
+              >
+                ✓ Cleared ({data?.summary?.clearedCount ?? 0})
+              </button>
+              <button
+                type="button"
+                onClick={() => setInhouseStatusFilter("SURPLUS_CREDIT")}
+                className={`px-3 py-1.5 rounded-lg transition cursor-pointer ${
+                  inhouseStatusFilter === "SURPLUS_CREDIT"
+                    ? "bg-blue-600 text-white shadow-xs font-bold"
+                    : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-800"
+                }`}
+              >
+                💰 Surplus ({data?.summary?.surplusCount ?? 0})
+              </button>
+            </div>
+          </div>
+
+          {/* Master In-House Outstanding Ledger Table */}
+          <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#111114] shadow-xs overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-zinc-50/80 dark:bg-zinc-900/60 text-zinc-500 dark:text-zinc-400 text-[10.5px] uppercase font-semibold tracking-wider border-b border-zinc-200 dark:border-zinc-800">
+                  <tr>
+                    <th className="py-3 px-4">Room & Type</th>
+                    <th className="py-3 px-4">Guest Name & Phone</th>
+                    <th className="py-3 px-4">Personal Residential Address</th>
+                    <th className="py-3 px-4">Billing Company</th>
+                    <th className="py-3 px-4">Stay Dates</th>
+                    <th className="py-3 px-4 text-right">Total Charges</th>
+                    <th className="py-3 px-4 text-right">Total Paid</th>
+                    <th className="py-3 px-4 text-right">Balance Due</th>
+                    <th className="py-3 px-4 text-center">Status</th>
+                    <th className="py-3 px-4 text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/60">
+                  {filteredInhouseRooms.map((r: any) => {
+                    const isDue = r.status === "DUE_REMAINING";
+                    const isSurplus = r.status === "SURPLUS_CREDIT";
+
+                    return (
+                      <tr key={`${r.stayId}-${r.roomNumber}`} className="hover:bg-zinc-50/60 dark:hover:bg-zinc-900/40 transition-colors">
+                        <td className="py-3 px-4">
+                          <div className="font-bold text-sm text-zinc-900 dark:text-white font-mono">
+                            Room {r.roomNumber}
+                          </div>
+                          <div className="text-[11px] text-zinc-500 truncate max-w-[120px]">
+                            {r.roomType}
+                          </div>
+                        </td>
+
+                        <td className="py-3 px-4">
+                          <div className="font-semibold text-zinc-900 dark:text-zinc-100">
+                            {r.guestName}
+                          </div>
+                          <div className="font-mono text-[11px] text-zinc-500">
+                            {r.phone}
+                          </div>
+                        </td>
+
+                        <td className="py-3 px-4 max-w-[220px]">
+                          <div className="text-zinc-800 dark:text-zinc-200 text-xs truncate" title={r.residentialAddress}>
+                            {r.residentialAddress}
+                          </div>
+                          <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">
+                            Personal Residential
+                          </div>
+                        </td>
+
+                        <td className="py-3 px-4 max-w-[160px]">
+                          {r.companyName && r.companyName !== "—" ? (
+                            <div className="text-amber-800 dark:text-amber-300 font-medium truncate text-xs" title={r.companyName}>
+                              🏢 {r.companyName}
+                            </div>
+                          ) : (
+                            <span className="text-zinc-400 text-xs">—</span>
+                          )}
+                        </td>
+
+                        <td className="py-3 px-4 font-mono text-[11px] text-zinc-600 dark:text-zinc-400 whitespace-nowrap">
+                          <div>In: {r.checkIn}</div>
+                          <div>Out: {r.expectedDeparture}</div>
+                        </td>
+
+                        <td className="py-3 px-4 text-right font-mono font-medium text-zinc-800 dark:text-zinc-200 tabular-nums">
+                          {formatINR(r.totalCharges)}
+                        </td>
+
+                        <td className="py-3 px-4 text-right font-mono font-medium text-emerald-700 dark:text-emerald-400 tabular-nums">
+                          {formatINR(r.totalPaid)}
+                        </td>
+
+                        <td className="py-3 px-4 text-right font-mono font-bold tabular-nums">
+                          {isDue ? (
+                            <span className="text-rose-600 dark:text-rose-400 text-sm">
+                              {formatINR(r.balanceDue)}
+                            </span>
+                          ) : isSurplus ? (
+                            <span className="text-blue-600 dark:text-blue-400 text-xs font-semibold">
+                              + {formatINR(r.surplusCredit)} (Surplus)
+                            </span>
+                          ) : (
+                            <span className="text-emerald-600 dark:text-emerald-400 text-xs font-semibold">
+                              ₹0.00 (Cleared)
+                            </span>
+                          )}
+                        </td>
+
+                        <td className="py-3 px-4 text-center whitespace-nowrap">
+                          {isDue ? (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10.5px] font-bold bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800/60">
+                              <AlertCircle className="h-3 w-3" /> Due Remaining
+                            </span>
+                          ) : isSurplus ? (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10.5px] font-bold bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800/60">
+                              <Wallet className="h-3 w-3" /> Advance Surplus
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10.5px] font-bold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60">
+                              <CheckCircle2 className="h-3 w-3" /> Cleared in Full
+                            </span>
+                          )}
+                        </td>
+
+                        <td className="py-3 px-4 text-right">
+                          <Link
+                            href={`/billing?stayId=${r.stayId}`}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 font-semibold text-xs transition cursor-pointer shadow-2xs"
+                          >
+                            <span>Open Bill</span>
+                            <ExternalLink className="h-3 w-3" />
+                          </Link>
+                        </td>
+                      </tr>
+                    );
+                  })}
+
+                  {filteredInhouseRooms.length === 0 && (
+                    <tr>
+                      <td colSpan={10} className="py-12 px-4 text-center text-zinc-400 dark:text-zinc-500 italic text-xs">
+                        {loading ? "Loading in-house guest data..." : "No in-house guest records match your search or filter criteria."}
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ========================================================================= */}
       {/* TAB 1: ROOM TRANSFERS & MOVES AUDIT REPORT */}
@@ -3472,6 +3892,113 @@ export default function ReportsPage() {
                 </div>
                 <div className="text-center">
                   <div className="w-40 border-b border-zinc-400 pb-6 text-zinc-400 italic">Chartered Accountant / GM</div>
+                  <span className="font-bold">Audited & Approved By</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL 6: PRINTABLE IN-HOUSE GUEST OUTSTANDING AUDIT REPORT                */}
+      {/* ========================================================================= */}
+      {showInhousePrintModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4 overflow-y-auto">
+          <div className="w-full max-w-5xl rounded-2xl border border-zinc-700 bg-white text-zinc-950 p-6 shadow-2xl space-y-4 font-sans text-xs">
+            <div className="flex items-center justify-between pb-3 border-b border-zinc-200">
+              <span className="text-xs font-bold uppercase font-mono text-zinc-600">
+                Official In-House Guest Outstanding Ledger & Audit Register
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => window.print()}
+                  className="flex items-center gap-1.5 rounded-lg bg-zinc-950 px-3 py-1.5 text-xs font-bold text-white hover:bg-zinc-800 transition shadow-sm cursor-pointer"
+                >
+                  <Printer className="h-3.5 w-3.5" /> Print Sheet
+                </button>
+                <button onClick={() => setShowInhousePrintModal(false)} className="text-zinc-500 hover:text-zinc-900 cursor-pointer">
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div className="flex justify-between items-start border-b border-zinc-300 pb-3">
+                <div>
+                  <h1 className="text-base font-black uppercase text-zinc-950">{activeProperty?.displayName || "Hotel Ambarish Grand Residency"}</h1>
+                  <p className="text-[11px] text-zinc-600">{activeProperty?.legalName}</p>
+                  <p className="font-mono text-[11px] text-zinc-700">
+                    GSTIN: {activeProperty?.gstin || "N/A"} | State: {activeProperty?.stateCode || "18"}
+                  </p>
+                </div>
+                <div className="text-right font-mono">
+                  <div className="font-bold text-zinc-950">DAILY IN-HOUSE GUEST OUTSTANDING REPORT</div>
+                  <div className="text-zinc-600 text-[11px]">As Of Date: {data?.asOfDate || selectedDate || activeProperty?.businessDate}</div>
+                  <div className="text-zinc-600 text-[11px]">Printed: {new Date().toLocaleString()}</div>
+                </div>
+              </div>
+
+              {/* KPI Summary Strip */}
+              <div className="grid grid-cols-4 gap-2 text-center p-2.5 bg-zinc-100 border border-zinc-200 font-mono text-xs">
+                <div>
+                  <span className="text-[10px] text-zinc-500 block uppercase">Total Occupied</span>
+                  <span className="font-bold text-zinc-900 text-sm">{data?.summary?.totalOccupiedRooms ?? 0} Rooms</span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-emerald-700 block uppercase">Dues Cleared</span>
+                  <span className="font-bold text-emerald-700 text-sm">{data?.summary?.clearedCount ?? 0} Rooms ({data?.summary?.clearedPercentage ?? 0}%)</span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-rose-700 block uppercase">Pending Dues</span>
+                  <span className="font-bold text-rose-700 text-sm">{data?.summary?.dueCount ?? 0} Rooms ({formatINR(data?.summary?.totalDueRemaining ?? 0)})</span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-blue-700 block uppercase">Surplus Advance</span>
+                  <span className="font-bold text-blue-700 text-sm">{formatINR(data?.summary?.totalSurplusCredit ?? 0)}</span>
+                </div>
+              </div>
+
+              <table className="w-full text-left text-xs border border-zinc-200">
+                <thead>
+                  <tr className="bg-zinc-100 border-b border-zinc-200 text-[10px] font-bold text-zinc-600 uppercase font-mono">
+                    <th className="p-2">Room</th>
+                    <th className="p-2">Guest Name & Phone</th>
+                    <th className="p-2">Personal Residential Address</th>
+                    <th className="p-2">Bill To Company</th>
+                    <th className="p-2 text-right">Charges</th>
+                    <th className="p-2 text-right">Paid</th>
+                    <th className="p-2 text-right">Due / Surplus</th>
+                    <th className="p-2 text-center">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-zinc-200 font-mono text-[11px]">
+                  {filteredInhouseRooms.map((r: any) => (
+                    <tr key={`${r.stayId}-${r.roomNumber}`}>
+                      <td className="p-2 font-bold">Room {r.roomNumber}</td>
+                      <td className="p-2 font-sans font-medium">{r.guestName} ({r.phone})</td>
+                      <td className="p-2 font-sans text-[10.5px]">{r.residentialAddress}</td>
+                      <td className="p-2 font-sans text-[10.5px]">{r.companyName !== "—" ? r.companyName : "—"}</td>
+                      <td className="p-2 text-right">{formatINR(r.totalCharges)}</td>
+                      <td className="p-2 text-right text-emerald-700">{formatINR(r.totalPaid)}</td>
+                      <td className={`p-2 text-right font-bold ${r.balanceDue > 0 ? "text-rose-700" : "text-emerald-700"}`}>
+                        {r.balanceDue > 0 ? formatINR(r.balanceDue) : r.surplusCredit > 0 ? `+${formatINR(r.surplusCredit)}` : "₹0.00"}
+                      </td>
+                      <td className="p-2 text-center font-sans">
+                        {r.status === "DUE_REMAINING" ? "Due Remaining" : r.status === "SURPLUS_CREDIT" ? "Advance Surplus" : "Cleared in Full"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+
+              <div className="pt-8 flex justify-between items-end text-[11px]">
+                <div className="text-center">
+                  <div className="w-40 border-b border-zinc-400 pb-6 text-zinc-400 italic">Front Desk Cashier</div>
+                  <span className="font-bold">Prepared By</span>
+                </div>
+                <div className="text-center">
+                  <div className="w-40 border-b border-zinc-400 pb-6 text-zinc-400 italic">Duty Manager / Auditor</div>
                   <span className="font-bold">Audited & Approved By</span>
                 </div>
               </div>
