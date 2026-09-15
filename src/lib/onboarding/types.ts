@@ -81,6 +81,10 @@ export interface OnboardingPropertyData {
 
   // 8. Optional Legacy Backup Path to auto-import
   legacyBackupPath?: string;
+  sourceBackup?: string;
+
+  // 9. Multi-Tenancy Scoping (Strict Access Isolation)
+  restrictToBijeshOnly?: boolean; // When true, only user Bijesh Singha receives access grants
 }
 
 export interface OnboardingResult {

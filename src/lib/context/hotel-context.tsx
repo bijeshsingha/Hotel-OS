@@ -1,6 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
+import { apiCache } from "@/lib/cache/api-cache";
 
 export interface PropertyInfo {
   id: string;
@@ -158,6 +159,7 @@ export function HotelProvider({ children }: { children: React.ReactNode }) {
     if (typeof window !== "undefined") {
       localStorage.setItem("hotel_os_property", propertyId);
     }
+    apiCache.invalidate();
     fetchSession(user?.username || user?.email, propertyId);
     setRefreshKey((k) => k + 1);
   };
@@ -166,6 +168,7 @@ export function HotelProvider({ children }: { children: React.ReactNode }) {
     if (typeof window !== "undefined") {
       localStorage.setItem("hotel_os_user", identifier);
     }
+    apiCache.invalidate();
     const savedProp = typeof window !== "undefined" ? localStorage.getItem("hotel_os_property") : null;
     fetchSession(identifier, savedProp || undefined);
     setRefreshKey((k) => k + 1);

@@ -368,72 +368,74 @@ export class OnboardingService {
       }
     }
 
-    // 11. Create Initial Staff Users
+    // 11. Create Initial Staff Users (Skipped if restricted exclusively to Bijesh Singha)
     let usersCreated = 0;
-    const defaultStaff = data.staffUsers && data.staffUsers.length > 0 ? data.staffUsers : [
-      {
-        name: `${data.displayName} Admin`,
-        email: `admin.${cleanCode.toLowerCase()}@hotelos.in`,
-        phone: data.phone,
-        roleCode: "ORG_OWNER" as const
-      },
-      {
-        name: `${data.displayName} Front Desk`,
-        email: `reception.${cleanCode.toLowerCase()}@hotelos.in`,
-        phone: data.phone,
-        roleCode: "FD_MGR" as const
-      }
-    ];
-
-    for (const staff of defaultStaff) {
-      const user = await prisma.user.upsert({
-        where: { email: staff.email },
-        update: { name: staff.name, phone: staff.phone || null },
-        create: {
-          name: staff.name,
-          email: staff.email,
-          phone: staff.phone || null,
-          status: "ACTIVE"
-        }
-      });
-
-      const membership = await prisma.membership.upsert({
-        where: {
-          userId_organizationId: {
-            userId: user.id,
-            organizationId: org.id
-          }
+    if (!data.restrictToBijeshOnly) {
+      const defaultStaff = data.staffUsers && data.staffUsers.length > 0 ? data.staffUsers : [
+        {
+          name: `${data.displayName} Admin`,
+          email: `admin.${cleanCode.toLowerCase()}@hotelos.in`,
+          phone: data.phone,
+          roleCode: "ORG_OWNER" as const
         },
-        update: { status: "ACTIVE" },
-        create: {
-          userId: user.id,
-          organizationId: org.id,
-          status: "ACTIVE"
+        {
+          name: `${data.displayName} Front Desk`,
+          email: `reception.${cleanCode.toLowerCase()}@hotelos.in`,
+          phone: data.phone,
+          roleCode: "FD_MGR" as const
         }
-      });
+      ];
 
-      const targetRole = await prisma.role.findUnique({
-        where: { code: staff.roleCode }
-      }) || await prisma.role.findUnique({ where: { code: "ORG_OWNER" } });
+      for (const staff of defaultStaff) {
+        const user = await prisma.user.upsert({
+          where: { email: staff.email },
+          update: { name: staff.name, phone: staff.phone || null },
+          create: {
+            name: staff.name,
+            email: staff.email,
+            phone: staff.phone || null,
+            status: "ACTIVE"
+          }
+        });
 
-      if (targetRole) {
-        await prisma.propertyGrant.upsert({
+        const membership = await prisma.membership.upsert({
           where: {
-            membershipId_propertyId_roleId: {
+            userId_organizationId: {
+              userId: user.id,
+              organizationId: org.id
+            }
+          },
+          update: { status: "ACTIVE" },
+          create: {
+            userId: user.id,
+            organizationId: org.id,
+            status: "ACTIVE"
+          }
+        });
+
+        const targetRole = await prisma.role.findUnique({
+          where: { code: staff.roleCode }
+        }) || await prisma.role.findUnique({ where: { code: "ORG_OWNER" } });
+
+        if (targetRole) {
+          await prisma.propertyGrant.upsert({
+            where: {
+              membershipId_propertyId_roleId: {
+                membershipId: membership.id,
+                propertyId: property.id,
+                roleId: targetRole.id
+              }
+            },
+            update: {},
+            create: {
               membershipId: membership.id,
               propertyId: property.id,
               roleId: targetRole.id
             }
-          },
-          update: {},
-          create: {
-            membershipId: membership.id,
-            propertyId: property.id,
-            roleId: targetRole.id
-          }
-        });
+          });
+        }
+        usersCreated++;
       }
-      usersCreated++;
     }
 
     // Automatically grant Bijesh Singha (Multi-Property Super Admin) access to this new property

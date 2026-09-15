@@ -98,17 +98,17 @@ export function calculate24HrBillableDays(
     let earlyGraceApplied = false;
 
     if (start < arrNoon.getTime()) {
-      // Arrived before 12:00 PM Noon on arrival date
-      if (isEarlyBird) {
-        // Early Bird Offer (5:00 AM – 11:00 AM): Complimentary early check-in for TODAY's cycle!
-        // Does NOT count as a prior night occupation.
+      // Arrived before 12:00 PM Noon on arrival date.
+      // Morning check-ins (5:00 AM – 12:00 PM) are check-ins for TODAY's cycle (Night 1).
+      // They do NOT count as a prior night occupation.
+      if (arrHour >= 5 || isEarlyBird) {
         earlyNights = 0;
         earlyGraceApplied = true;
       } else if (start >= earlyCheckInCutoffMs) {
-        // Within early check-in grace window (e.g., 1-7h before 12 PM)
+        // Within early check-in grace window
         earlyGraceApplied = effectiveGraceMinutes > 0;
       } else {
-        // Arrived before early check-in grace cutoff (counts as prior night occupation)
+        // Arrived in dead of night (midnight to 4:59 AM) before morning cycle begins
         const earlyDiffMs = earlyCheckInCutoffMs - start;
         earlyNights = Math.max(1, Math.ceil(earlyDiffMs / (24 * 60 * 60 * 1000)));
       }

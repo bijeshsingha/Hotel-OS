@@ -328,34 +328,62 @@ function PMSFrontDeskContent() {
         body: JSON.stringify({
           roomId: checkoutTargetRoomId,
           roomNumber: checkoutTargetRoomNo,
+          applyGroupAdvance: true,
         }),
       });
 
       let data = await res.json();
       if (!res.ok && data.error && data.error.includes("outstanding balance")) {
-        const allowOut = window.confirm(
-          `${data.error}\n\nDo you want to check out this guest with an OUTSTANDING BALANCE (City Ledger / Due)?`
-        );
-        if (allowOut) {
-          const reason =
-            window.prompt(
-              "Enter reason for Outstanding Checkout (e.g. Guest Due / Promise to Pay, BTC Corporate, Disputed):",
-              "Guest Due"
-            ) || "Guest Due";
-          res = await fetch(`/api/v1/stays/${stayId}/checkout`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              roomId: checkoutTargetRoomId,
-              roomNumber: checkoutTargetRoomNo,
-              allowOutstanding: true,
-              outstandingReason: reason,
-            }),
-          });
-          data = await res.json();
-          if (!res.ok) throw new Error(data.error || "Checkout failed");
-        } else {
-          return;
+        const isGroupRoom = Boolean(checkoutTargetRoomNo);
+        let handled = false;
+
+        if (isGroupRoom) {
+          const transferChoice = window.confirm(
+            `${data.error}\n\n[RECOMMENDED FOR GROUP STAYS]\nClick OK to TRANSFER this balance to the Group Master Folio (Remaining Rooms) and complete checkout at ₹0.00.\n\nClick CANCEL to choose City Ledger / Debtors Checkout instead.`
+          );
+
+          if (transferChoice) {
+            res = await fetch(`/api/v1/stays/${stayId}/checkout`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                roomId: checkoutTargetRoomId,
+                roomNumber: checkoutTargetRoomNo,
+                transferBalanceToGroup: true,
+                transferRemarks: "Transferred to Group Master at PMS checkout",
+              }),
+            });
+            data = await res.json();
+            if (!res.ok) throw new Error(data.error || "Checkout failed");
+            handled = true;
+          }
+        }
+
+        if (!handled) {
+          const allowOut = window.confirm(
+            `Do you want to check out this guest with an OUTSTANDING BALANCE (City Ledger / Debtors Ledger)?`
+          );
+          if (allowOut) {
+            const reason =
+              window.prompt(
+                "Enter reason for Outstanding Checkout (e.g. Guest Due / Promise to Pay, BTC Corporate, Disputed):",
+                "Guest Due"
+              ) || "Guest Due";
+            res = await fetch(`/api/v1/stays/${stayId}/checkout`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                roomId: checkoutTargetRoomId,
+                roomNumber: checkoutTargetRoomNo,
+                allowOutstanding: true,
+                outstandingReason: reason,
+              }),
+            });
+            data = await res.json();
+            if (!res.ok) throw new Error(data.error || "Checkout failed");
+          } else {
+            return;
+          }
         }
       } else if (!res.ok) {
         throw new Error(data.error || "Checkout failed");
@@ -567,6 +595,19 @@ function PMSFrontDeskContent() {
     });
     return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
   }, [rooms]);
+
+  // Available floors dynamically detected from active property inventory
+  const availableFloors = useMemo(() => {
+    return Array.from(new Set(rooms.map((r) => r.floor)))
+      .filter((f): f is number => f !== undefined && f !== null)
+      .sort((a, b) => Number(a) - Number(b));
+  }, [rooms]);
+
+  const floorsSummary = useMemo(() => {
+    if (availableFloors.length === 0) return "";
+    if (availableFloors.length === 1) return `Floor ${availableFloors[0]}`;
+    return `Floors ${availableFloors[0]} to ${availableFloors[availableFloors.length - 1]}`;
+  }, [availableFloors]);
 
   const todayStr = activeProperty?.businessDate || (typeof window !== "undefined" ? new Date().toLocaleDateString("en-CA") : new Date().toISOString().split("T")[0]);
 
@@ -1039,7 +1080,7 @@ function PMSFrontDeskContent() {
           <div className="rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 p-2.5 space-y-0.5 shadow-xs">
             <div className="text-[10px] uppercase font-semibold tracking-wider text-zinc-500">Total Rooms</div>
             <div className="text-xl sm:text-2xl font-bold text-zinc-900 dark:text-white tabular-nums leading-none">{metrics.total}</div>
-            <div className="text-[10px] text-zinc-500">Floors 1 to 5</div>
+            <div className="text-[10px] text-zinc-500">{floorsSummary ? `${floorsSummary} (${availableFloors.length} Floors)` : "All Inventory"}</div>
           </div>
 
           <div
@@ -1217,6 +1258,41 @@ function PMSFrontDeskContent() {
                 Unified
               </button>
             </div>
+
+            {/* Quick Floor Filter Pills */}
+            {availableFloors.length > 1 && (
+              <div className="flex items-center gap-1 bg-white dark:bg-zinc-900 p-1 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-xs text-xs">
+                <button
+                  type="button"
+                  onClick={() => setFloorFilter("ALL")}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-medium transition ${
+                    floorFilter === "ALL"
+                      ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 font-bold"
+                      : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
+                  }`}
+                >
+                  All Floors
+                </button>
+                {availableFloors.map((flr) => {
+                  const count = rooms.filter((r) => r.floor === flr).length;
+                  const isSelected = floorFilter === String(flr);
+                  return (
+                    <button
+                      key={flr}
+                      type="button"
+                      onClick={() => setFloorFilter(isSelected ? "ALL" : String(flr))}
+                      className={`px-2 py-1 rounded-lg text-xs font-medium transition whitespace-nowrap ${
+                        isSelected
+                          ? "bg-blue-600 text-white font-bold shadow-xs"
+                          : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
+                      }`}
+                    >
+                      F{flr} <span className="opacity-75 text-[10px]">({count})</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
 
             <div className="relative">
               <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-zinc-400" />

@@ -374,6 +374,11 @@ export async function checkoutAndIssueInvoice({
   outstandingReason,
   outstandingRemarks,
   settlementDueDate,
+  transferBalanceToGroup = false,
+  transferRemarks,
+  paymentNow,
+  applyGroupAdvance = false,
+  groupAdvanceAmount,
 }: {
   stayId: string;
   roomId?: string;
@@ -384,6 +389,15 @@ export async function checkoutAndIssueInvoice({
   outstandingReason?: string;
   outstandingRemarks?: string;
   settlementDueDate?: string;
+  transferBalanceToGroup?: boolean;
+  transferRemarks?: string;
+  paymentNow?: {
+    amount: number;
+    method: string;
+    reference?: string;
+  };
+  applyGroupAdvance?: boolean;
+  groupAdvanceAmount?: number;
 }) {
   const stay = await prisma.stay.findUniqueOrThrow({
     where: { id: stayId },
@@ -439,11 +453,56 @@ export async function checkoutAndIssueInvoice({
       const isOther = otherRoomNumbers.some((o) => new RegExp(`\\b(?:Room|Rm)\\s*#?\\s*${o}\\b`, "i").test(text));
       return isThis && !isOther;
     });
-    const targetPaid = targetPayments.reduce((sum, p) => sum + p.amount, 0);
-    const targetBalance = Math.round((targetCharges - targetPaid) * 100) / 100;
+    let targetPaid = targetPayments.reduce((sum, p) => sum + p.amount, 0);
 
-    if (targetBalance > 1.0 && !allowOutstanding) {
-      throw new Error(`Cannot checkout Room ${targetRoomNo} with outstanding balance of ₹${targetBalance.toFixed(2)}. Please settle folio or choose Check Out with Outstanding Balance.`);
+    // 1. Check if guest is paying right now at checkout
+    let immediatePaymentAmount = 0;
+    if (paymentNow && paymentNow.amount > 0) {
+      immediatePaymentAmount = paymentNow.amount;
+      targetPaid += immediatePaymentAmount;
+    }
+
+    // 2. Check if applying advance from Group Advance Deposit Pool (auto-apply under Master-Sub Folio standard)
+    let advanceToApply = 0;
+    const shouldCheckGroupAdvance = applyGroupAdvance || (!allowOutstanding && !transferBalanceToGroup && (targetCharges - targetPaid) > 0.05);
+    if (shouldCheckGroupAdvance) {
+      const currentDue = Math.max(0, Math.round((targetCharges - targetPaid) * 100) / 100);
+      if (currentDue > 0.05) {
+        // Calculate available unallocated advance in parent group
+        const parentUnallocatedPayments = folio.payments.filter((p) => {
+          const text = `${p.reference || ""} ${p.payerSnapshot || ""} ${(p as any).notes || ""}`;
+          const isOther = otherRoomNumbers.some((o) => new RegExp(`\\b(?:Room|Rm)\\s*#?\\s*${o}\\b`, "i").test(text));
+          const isThis = new RegExp(`\\b(?:Room|Rm)\\s*#?\\s*${targetRoomNo}\\b`, "i").test(text);
+          return !isOther && !isThis && p.status === "SUCCEEDED";
+        });
+        const totalUnallocatedAdvance = parentUnallocatedPayments.reduce((sum, p) => sum + p.amount, 0);
+        const parentEntries = folio.windows.flatMap((w) => w.entries);
+        const consumedAdvance = parentEntries
+          .filter((e) => e.chargeCode === "GROUP_ADVANCE_CONSUMPTION")
+          .reduce((sum, e) => sum + e.totalAmount, 0);
+        const availableAdvance = Math.max(0, totalUnallocatedAdvance - consumedAdvance);
+
+        const requested = groupAdvanceAmount !== undefined ? groupAdvanceAmount : currentDue;
+        advanceToApply = Math.max(0, Math.min(currentDue, requested, availableAdvance));
+        targetPaid += advanceToApply;
+      }
+    }
+
+    let targetBalance = Math.round((targetCharges - targetPaid) * 100) / 100;
+    if (Math.abs(targetBalance) <= 0.05) {
+      targetBalance = 0;
+    }
+
+    let isTransferredToGroup = false;
+    let transferredAmount = 0;
+
+    if (transferBalanceToGroup && Math.abs(targetBalance) > 0.05) {
+      isTransferredToGroup = true;
+      transferredAmount = targetBalance; // e.g. 153.73 (unpaid due) or negative (surplus credit)
+    }
+
+    if (targetBalance > 1.0 && !allowOutstanding && !isTransferredToGroup) {
+      throw new Error(`Cannot checkout Room ${targetRoomNo} with outstanding balance of ₹${targetBalance.toFixed(2)}. Please settle folio, apply group advance, transfer balance to Group Master, or choose Check Out with Outstanding Balance.`);
     }
 
     // 1. Close target room assignment
@@ -506,7 +565,8 @@ export async function checkoutAndIssueInvoice({
     });
 
     // 5. Create new Folio for the checked-out room
-    const newFolioStatus = targetBalance > 1.0 && allowOutstanding ? "CLOSED_OUTSTANDING" : "CLOSED";
+    const finalFolioBalance = isTransferredToGroup ? 0 : targetBalance;
+    const newFolioStatus = !isTransferredToGroup && targetBalance > 1.0 && allowOutstanding ? "CLOSED_OUTSTANDING" : "CLOSED";
     const newFolio = await prisma.folio.create({
       data: {
         organizationId: stay.organizationId,
@@ -514,7 +574,7 @@ export async function checkoutAndIssueInvoice({
         stayId: checkedOutStay.id,
         status: newFolioStatus,
         currency: stay.property.currency,
-        balance: targetBalance,
+        balance: finalFolioBalance,
         closedAt: new Date(),
       },
     });
@@ -538,10 +598,12 @@ export async function checkoutAndIssueInvoice({
           companyName: stay.primaryGuest.companyName || "",
           gstin: stay.primaryGuest.gstin || "",
           roomNumber: targetRoomNo,
-          checkedOutWithOutstanding: targetBalance > 1.0,
-          outstandingAmount: targetBalance > 1.0 ? targetBalance : 0,
-          outstandingReason: outstandingReason || "GUEST_DUE",
-          outstandingRemarks: outstandingRemarks || "",
+          checkedOutWithOutstanding: !isTransferredToGroup && targetBalance > 1.0,
+          outstandingAmount: !isTransferredToGroup && targetBalance > 1.0 ? targetBalance : 0,
+          transferredToGroupMaster: isTransferredToGroup,
+          transferredAmount: isTransferredToGroup ? transferredAmount : 0,
+          outstandingReason: isTransferredToGroup ? "TRANSFERRED_TO_GROUP_MASTER" : (outstandingReason || "GUEST_DUE"),
+          outstandingRemarks: outstandingRemarks || transferRemarks || "",
           settlementDueDate: settlementDueDate || "",
           checkoutDate: new Date().toISOString(),
         }),
@@ -562,6 +624,169 @@ export async function checkoutAndIssueInvoice({
         where: { id: p.id },
         data: { folioId: newFolio.id },
       });
+    }
+
+    // Record immediate payment collected at checkout if provided
+    if (immediatePaymentAmount > 0) {
+      await prisma.payment.create({
+        data: {
+          organizationId: stay.organizationId,
+          propertyId: stay.propertyId,
+          receiptNo: `REC-${Date.now().toString().slice(-6)}`,
+          folioId: newFolio.id,
+          amount: immediatePaymentAmount,
+          method: paymentNow?.method || "UPI",
+          reference: paymentNow?.reference || `Settlement at Checkout for Room ${targetRoomNo}`,
+          payerSnapshot: JSON.stringify({
+            name: stay.primaryGuest.name,
+            phone: stay.primaryGuest.phone,
+            roomNumber: targetRoomNo,
+          }),
+          status: "SUCCEEDED",
+        },
+      });
+    }
+
+    // Record Group Advance Allocation if applied from Group Advance Pool
+    if (advanceToApply > 0) {
+      // 1. Post settlement payment on Room's new folio
+      await prisma.payment.create({
+        data: {
+          organizationId: stay.organizationId,
+          propertyId: stay.propertyId,
+          receiptNo: `REC-ADV-${Date.now().toString().slice(-6)}`,
+          folioId: newFolio.id,
+          amount: advanceToApply,
+          method: "ADVANCE_ALLOCATION",
+          reference: `Allocated from Group Advance Pool`,
+          payerSnapshot: JSON.stringify({
+            name: stay.primaryGuest.name,
+            roomNumber: targetRoomNo,
+            groupFolioId: folio.id,
+          }),
+          status: "SUCCEEDED",
+        },
+      });
+
+      // 2. Post corresponding debit charge on parent group folio
+      const parentWindowId = folio.windows[0]?.id || (await prisma.folioWindow.findFirst({ where: { folioId: folio.id } }))?.id || "";
+      if (parentWindowId) {
+        await prisma.folioEntry.create({
+          data: {
+            organizationId: stay.organizationId,
+            propertyId: stay.propertyId,
+            folioId: folio.id,
+            folioWindowId: parentWindowId,
+            serviceDate: new Date().toISOString().split("T")[0],
+            type: "CHARGE",
+            chargeCode: "GROUP_ADVANCE_CONSUMPTION",
+            description: `Group Advance Applied to Room ${targetRoomNo} at Checkout`,
+            qty: 1,
+            unitAmount: advanceToApply,
+            taxableAmount: advanceToApply,
+            taxComponentsJson: JSON.stringify({ cgstRate: 0, cgstAmount: 0, sgstRate: 0, sgstAmount: 0, igstRate: 0, igstAmount: 0 }),
+            totalAmount: advanceToApply,
+            sourceType: "ADVANCE_ALLOCATION",
+            status: "POSTED",
+          },
+        });
+      }
+    }
+
+    // Process Balance Transfer to Parent Group Folio if requested
+    if (isTransferredToGroup && Math.abs(transferredAmount) > 0.05) {
+      const parentWindowId = folio.windows[0]?.id || (await prisma.folioWindow.findFirst({ where: { folioId: folio.id } }))?.id || "";
+
+      if (transferredAmount > 0) {
+        // Unpaid balance/due: Room owes ₹transferredAmount
+        // 1. Post balancing settlement payment on Room's new folio
+        await prisma.payment.create({
+          data: {
+            organizationId: stay.organizationId,
+            propertyId: stay.propertyId,
+            receiptNo: `REC-TRF-${Date.now().toString().slice(-6)}`,
+            folioId: newFolio.id,
+            amount: transferredAmount,
+            method: "TRANSFER",
+            reference: `Transferred Due to Group Master Folio`,
+            payerSnapshot: JSON.stringify({
+              name: stay.primaryGuest.name,
+              roomNumber: targetRoomNo,
+              transferredToFolioId: folio.id,
+              remarks: transferRemarks || "Transferred remaining balance to group master at checkout",
+            }),
+            status: "SUCCEEDED",
+          },
+        });
+
+        // 2. Post corresponding debit charge to parent group folio
+        if (parentWindowId) {
+          await prisma.folioEntry.create({
+            data: {
+              organizationId: stay.organizationId,
+              propertyId: stay.propertyId,
+              folioId: folio.id,
+              folioWindowId: parentWindowId,
+              serviceDate: new Date().toISOString().split("T")[0],
+              type: "CHARGE",
+              chargeCode: "ROOM_BALANCE_TRANSFER",
+              description: `Transferred Due from Room ${targetRoomNo} at Checkout${transferRemarks ? ` (${transferRemarks})` : ""}`,
+              qty: 1,
+              unitAmount: transferredAmount,
+              taxableAmount: transferredAmount,
+              taxComponentsJson: JSON.stringify([]),
+              totalAmount: transferredAmount,
+              sourceType: "FOLIO_TRANSFER",
+              sourceId: checkedOutStay.id,
+              status: "POSTED",
+            },
+          });
+        }
+        targetPaid += transferredAmount;
+      } else {
+        // Surplus credit: Room overpaid by ₹transferredAmount
+        const surplusAmount = Math.abs(transferredAmount);
+        // 1. Post balancing charge on Room's new folio
+        await prisma.folioEntry.create({
+          data: {
+            organizationId: stay.organizationId,
+            propertyId: stay.propertyId,
+            folioId: newFolio.id,
+            folioWindowId: newWindow.id,
+            serviceDate: new Date().toISOString().split("T")[0],
+            type: "CHARGE",
+            chargeCode: "ROOM_BALANCE_TRANSFER",
+            description: `Transferred Surplus Credit to Group Master at Checkout`,
+            qty: 1,
+            unitAmount: surplusAmount,
+            taxableAmount: surplusAmount,
+            taxComponentsJson: JSON.stringify([]),
+            totalAmount: surplusAmount,
+            sourceType: "FOLIO_TRANSFER",
+            sourceId: folio.id,
+            status: "POSTED",
+          },
+        });
+
+        // 2. Post credit payment to parent group folio
+        await prisma.payment.create({
+          data: {
+            organizationId: stay.organizationId,
+            propertyId: stay.propertyId,
+            receiptNo: `REC-TRF-${Date.now().toString().slice(-6)}`,
+            folioId: folio.id,
+            amount: surplusAmount,
+            method: "TRANSFER",
+            reference: `Credit Transferred from Room ${targetRoomNo} (${checkedOutStay.id})`,
+            payerSnapshot: JSON.stringify({
+              name: stay.primaryGuest.name,
+              roomNumber: targetRoomNo,
+              remarks: transferRemarks || "Transferred advance credit to group master at checkout",
+            }),
+            status: "SUCCEEDED",
+          },
+        });
+      }
     }
 
     // 6. Generate GST Tax Invoice for this room
@@ -638,7 +863,7 @@ export async function checkoutAndIssueInvoice({
     });
 
     // 8. If target had outstanding balance, save to Outstanding Ledger
-    if (targetBalance > 1.0 && allowOutstanding) {
+    if (!isTransferredToGroup && targetBalance > 1.0 && allowOutstanding) {
       saveOutstandingRecord({
         id: newFolio.id,
         propertyId: stay.propertyId,
@@ -684,18 +909,22 @@ export async function checkoutAndIssueInvoice({
       propertyId: stay.propertyId,
       actorId: actorId || null,
       actorName: "Front Desk Cashier",
-      action: "CHECKOUT_INDIVIDUAL_ROOM",
+      action: isTransferredToGroup ? "CHECKOUT_ROOM_TRANSFER_TO_GROUP" : "CHECKOUT_INDIVIDUAL_ROOM",
       targetType: "STAY",
       targetId: checkedOutStay.id,
-      reason: `Individual checkout of Room ${targetRoomNo} from group stay`,
+      reason: isTransferredToGroup
+        ? `Individual checkout of Room ${targetRoomNo} with balance transfer of ₹${transferredAmount} to Group Master`
+        : `Individual checkout of Room ${targetRoomNo} from group stay`,
       afterJson: {
         roomNumber: targetRoomNo,
         parentStayId: stay.id,
         invoiceNo: invoice.invoiceNo,
         totalCharges: targetCharges,
         totalPaid: targetPaid,
-        balance: targetBalance,
-        hasOutstanding: targetBalance > 1.0,
+        balance: isTransferredToGroup ? 0 : targetBalance,
+        hasOutstanding: !isTransferredToGroup && targetBalance > 1.0,
+        transferredToGroup: isTransferredToGroup,
+        transferredAmount: isTransferredToGroup ? transferredAmount : 0,
       },
     });
 
@@ -707,16 +936,44 @@ export async function checkoutAndIssueInvoice({
       checkedOutRoom: targetRoomNo,
       isIndividualCheckout: true,
       remainingRooms: otherRoomNumbers,
-      outstandingAmount: targetBalance > 1.0 ? targetBalance : 0,
-      balance: targetBalance,
+      outstandingAmount: !isTransferredToGroup && targetBalance > 1.0 ? targetBalance : 0,
+      balance: isTransferredToGroup ? 0 : targetBalance,
+      transferredToGroup: isTransferredToGroup,
+      transferredAmount: isTransferredToGroup ? transferredAmount : 0,
+      appliedAdvance: advanceToApply,
+      paymentNowAmount: immediatePaymentAmount,
     };
   }
 
   // STANDARD CHECKOUT (Entire Stay / Single Room Stay)
   const allEntries = folio.windows.flatMap((w) => w.entries);
   const totalCharges = allEntries.reduce((sum, e) => sum + e.totalAmount, 0);
-  const totalPayments = folio.payments.reduce((sum, p) => sum + p.amount, 0);
-  const balance = Math.round((totalCharges - totalPayments) * 100) / 100;
+  let totalPayments = folio.payments.reduce((sum, p) => sum + p.amount, 0);
+
+  if (paymentNow && paymentNow.amount > 0) {
+    await prisma.payment.create({
+      data: {
+        organizationId: stay.organizationId,
+        propertyId: stay.propertyId,
+        receiptNo: `REC-${Date.now().toString().slice(-6)}`,
+        folioId: folio.id,
+        amount: paymentNow.amount,
+        method: paymentNow.method || "UPI",
+        reference: paymentNow.reference || "Settlement at Checkout",
+        payerSnapshot: JSON.stringify({
+          name: stay.primaryGuest.name,
+          phone: stay.primaryGuest.phone,
+        }),
+        status: "SUCCEEDED",
+      },
+    });
+    totalPayments += paymentNow.amount;
+  }
+
+  let balance = Math.round((totalCharges - totalPayments) * 100) / 100;
+  if (Math.abs(balance) <= 0.05) {
+    balance = 0;
+  }
 
   if (balance > 1.0 && !allowOutstanding) {
     throw new Error(`Cannot checkout with outstanding balance of ₹${balance.toFixed(2)}. Please settle folio or choose Check Out with Outstanding Balance.`);
@@ -1356,3 +1613,164 @@ export async function updateStayGracePeriod({
   return { success: true, gracePeriodMinutes, cycleMetrics };
 }
 
+export async function transferRoomBalanceMidStay({
+  stayId,
+  fromRoomNumber,
+  toRoomNumber,
+  amount,
+  type = "DEBIT_TRANSFER",
+  remarks,
+  actorId,
+}: {
+  stayId: string;
+  fromRoomNumber: string;
+  toRoomNumber?: string;
+  amount: number;
+  type?: "DEBIT_TRANSFER" | "CREDIT_TRANSFER";
+  remarks?: string;
+  actorId?: string;
+}) {
+  if (!amount || amount <= 0) {
+    throw new Error("Transfer amount must be greater than 0");
+  }
+
+  const stay = await prisma.stay.findUniqueOrThrow({
+    where: { id: stayId },
+    include: {
+      folio: {
+        include: { windows: true },
+      },
+      roomAssignments: { where: { endsAt: null }, include: { room: true } },
+    },
+  });
+
+  const folio = stay.folio;
+  if (!folio || !folio.windows[0]) {
+    throw new Error("Active folio window not found for stay");
+  }
+  const windowId = folio.windows[0].id;
+  const today = new Date().toISOString().split("T")[0];
+  const targetLabel = toRoomNumber ? `Room ${toRoomNumber}` : "Group Master Folio";
+
+  if (type === "DEBIT_TRANSFER") {
+    // 1. Relieve fromRoom by posting negative entry tagged with fromRoom
+    await prisma.folioEntry.create({
+      data: {
+        organizationId: stay.organizationId,
+        propertyId: stay.propertyId,
+        folioId: folio.id,
+        folioWindowId: windowId,
+        serviceDate: today,
+        type: "ADJUSTMENT",
+        chargeCode: "ROOM_BALANCE_TRANSFER",
+        description: `Balance Transferred Out to ${targetLabel} (Room ${fromRoomNumber})${remarks ? ` - ${remarks}` : ""}`,
+        qty: 1,
+        unitAmount: -amount,
+        taxableAmount: -amount,
+        taxComponentsJson: JSON.stringify([]),
+        totalAmount: -amount,
+        sourceType: "ROOM_TRANSFER",
+        status: "POSTED",
+      },
+    });
+
+    // 2. Charge toRoom or Master Folio
+    await prisma.folioEntry.create({
+      data: {
+        organizationId: stay.organizationId,
+        propertyId: stay.propertyId,
+        folioId: folio.id,
+        folioWindowId: windowId,
+        serviceDate: today,
+        type: "CHARGE",
+        chargeCode: "ROOM_BALANCE_TRANSFER",
+        description: `Balance Transferred In from Room ${fromRoomNumber} (${targetLabel})${remarks ? ` - ${remarks}` : ""}`,
+        qty: 1,
+        unitAmount: amount,
+        taxableAmount: amount,
+        taxComponentsJson: JSON.stringify([]),
+        totalAmount: amount,
+        sourceType: "ROOM_TRANSFER",
+        status: "POSTED",
+      },
+    });
+  } else {
+    // CREDIT_TRANSFER
+    await prisma.folioEntry.create({
+      data: {
+        organizationId: stay.organizationId,
+        propertyId: stay.propertyId,
+        folioId: folio.id,
+        folioWindowId: windowId,
+        serviceDate: today,
+        type: "CHARGE",
+        chargeCode: "ROOM_BALANCE_TRANSFER",
+        description: `Credit Transferred Out to ${targetLabel} (Room ${fromRoomNumber})${remarks ? ` - ${remarks}` : ""}`,
+        qty: 1,
+        unitAmount: amount,
+        taxableAmount: amount,
+        taxComponentsJson: JSON.stringify([]),
+        totalAmount: amount,
+        sourceType: "ROOM_TRANSFER",
+        status: "POSTED",
+      },
+    });
+
+    await prisma.folioEntry.create({
+      data: {
+        organizationId: stay.organizationId,
+        propertyId: stay.propertyId,
+        folioId: folio.id,
+        folioWindowId: windowId,
+        serviceDate: today,
+        type: "ADJUSTMENT",
+        chargeCode: "ROOM_BALANCE_TRANSFER",
+        description: `Credit Transferred In from Room ${fromRoomNumber} (${targetLabel})${remarks ? ` - ${remarks}` : ""}`,
+        qty: 1,
+        unitAmount: -amount,
+        taxableAmount: -amount,
+        taxComponentsJson: JSON.stringify([]),
+        totalAmount: -amount,
+        sourceType: "ROOM_TRANSFER",
+        status: "POSTED",
+      },
+    });
+  }
+
+  // Recalculate folio balance
+  const allEntries = await prisma.folioEntry.findMany({
+    where: { folioId: folio.id, status: "POSTED" },
+  });
+  const allPayments = await prisma.payment.findMany({
+    where: { folioId: folio.id, status: "SUCCEEDED" },
+  });
+  const totalC = allEntries.reduce((s, e) => s + e.totalAmount, 0);
+  const totalP = allPayments.reduce((s, p) => s + p.amount, 0);
+  const newBal = Math.round((totalC - totalP) * 100) / 100;
+
+  await prisma.folio.update({
+    where: { id: folio.id },
+    data: { balance: newBal },
+  });
+
+  await logAuditEvent({
+    organizationId: stay.organizationId,
+    propertyId: stay.propertyId,
+    actorId: actorId || null,
+    actorName: "Front Desk Cashier",
+    action: "ROOM_BALANCE_TRANSFER_MIDSTAY",
+    targetType: "STAY",
+    targetId: stay.id,
+    reason: `Transferred ₹${amount} (${type}) from Room ${fromRoomNumber} to ${targetLabel}`,
+    afterJson: {
+      fromRoomNumber,
+      toRoomNumber: toRoomNumber || "GROUP_MASTER",
+      amount,
+      type,
+      remarks,
+      newFolioBalance: newBal,
+    },
+  });
+
+  return { success: true, fromRoomNumber, toRoomNumber: toRoomNumber || "GROUP_MASTER", amount, type };
+}

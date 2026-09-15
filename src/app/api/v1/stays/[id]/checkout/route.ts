@@ -17,6 +17,11 @@ export async function POST(
       outstandingReason,
       outstandingRemarks,
       settlementDueDate,
+      transferBalanceToGroup,
+      transferRemarks,
+      paymentNow,
+      applyGroupAdvance,
+      groupAdvanceAmount,
     } = body;
 
     const result = await checkoutAndIssueInvoice({
@@ -29,6 +34,11 @@ export async function POST(
       outstandingReason,
       outstandingRemarks,
       settlementDueDate,
+      transferBalanceToGroup: Boolean(transferBalanceToGroup),
+      transferRemarks,
+      paymentNow,
+      applyGroupAdvance: Boolean(applyGroupAdvance),
+      groupAdvanceAmount: groupAdvanceAmount !== undefined ? Number(groupAdvanceAmount) : undefined,
     });
 
     return NextResponse.json({

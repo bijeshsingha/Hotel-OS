@@ -21,11 +21,13 @@ export async function GET(request: Request) {
       "bijesh_singha": "bijesh.singha@hotelos.in",
       "atanu": "atanu.chowdhury@hotelambarish.com",
       "atanu_chowdhury": "atanu.chowdhury@hotelambarish.com",
-      "ambarish_frontdesk": "reception.ambarish@hotelos.in",
-      "ambarish_reception": "reception.ambarish@hotelos.in",
+      "ambarish_frontdesk": "reservation.ambarish@gmail.com",
+      "ambarish_reception": "reservation.ambarish@gmail.com",
+      "frontdesk": "reservation.ambarish@gmail.com",
+      "suraj": "reservation.ambarish@gmail.com",
       "divine_frontdesk": "reception.divine@hotelos.in",
       "divine_reception": "reception.divine@hotelos.in",
-      "general_manager": "gm@brahmaputra.com",
+      "general_manager": "atanu.chowdhury@hotelambarish.com",
       "admin": "bijesh.singha@hotelos.in",
     };
 
@@ -111,18 +113,21 @@ export async function GET(request: Request) {
       },
     });
 
-    // Select active property
+    const isBijesh = user.email.toLowerCase().includes("bijesh");
+
+    // Select active property strictly based on user's granted properties
     const grants = user.memberships[0]?.propertyGrants || [];
-    const availableProperties = grants.length > 0 ? grants.map((g) => g.property) : allProperties;
+    const availableProperties = grants.length > 0 
+      ? grants.map((g) => g.property) 
+      : (isBijesh ? allProperties : allProperties.filter(p => !p.code.startsWith("HDV")));
 
     const activeProperty =
       availableProperties.find((p) => p.id === requestedPropertyId) ||
       availableProperties[0] ||
-      allProperties[0] ||
       null;
 
     const activeGrant = activeProperty ? grants.find((g) => g.propertyId === activeProperty.id) : null;
-    const activeRole = activeGrant?.role?.code || "ORG_OWNER";
+    const activeRole = activeGrant?.role?.code || (isBijesh ? "ORG_OWNER" : "FD_MGR");
 
     const getUsername = (email: string) => {
       if (email.includes("bijesh")) return "bijesh_singha";
@@ -140,7 +145,7 @@ export async function GET(request: Request) {
         username: getUsername(user.email),
         email: user.email,
         activeRole,
-        roleName: activeGrant?.role?.name || "Organization Owner",
+        roleName: activeGrant?.role?.name || (isBijesh ? "Organization Owner & Super Admin" : "Front Desk Staff"),
       },
       activeProperty,
       availableProperties,
@@ -163,7 +168,7 @@ export async function GET(request: Request) {
           propertyScope,
         };
       }),
-      allProperties,
+      allProperties: isBijesh ? allProperties : availableProperties,
     });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
