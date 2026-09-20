@@ -43,7 +43,7 @@ export function BillingSidebar({
   formatShortDate,
 }: BillingSidebarProps) {
   return (
-    <div className="lg:col-span-3 xl:col-span-3 rounded-2xl bg-white dark:bg-[#121215] border border-zinc-200/80 dark:border-zinc-800/80 p-3 sm:p-3.5 shadow-xs flex flex-col space-y-2.5 h-fit">
+    <div className="lg:col-span-4 xl:col-span-4 2xl:col-span-3 rounded-2xl bg-white dark:bg-[#121215] border border-zinc-200/80 dark:border-zinc-800/80 p-3 sm:p-3.5 shadow-xs flex flex-col space-y-2.5 h-fit min-w-0">
       {/* Directory Title & Multi-room Controls */}
       <div className="flex items-center justify-between pb-2 border-b border-zinc-100 dark:border-zinc-800/80">
         <div className="flex items-center gap-1.5 font-bold text-xs uppercase tracking-wider text-zinc-700 dark:text-zinc-300 font-mono">
@@ -251,48 +251,26 @@ export function BillingSidebar({
                 title="Select for group settlement"
               />
 
-              <div className="flex-1 min-w-0 space-y-1">
-                {/* Top Row: Room Number & Settled/Due Badge */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-base font-bold text-zinc-900 dark:text-white">
-                      {item.roomNumber}
-                    </span>
-                    <span className="text-[11px] text-zinc-500 font-medium truncate">
-                      {item.roomType?.name || "Deluxe Room"}
-                    </span>
-                  </div>
-
-                  <div className="shrink-0">
-                    {item.roomBalance > 0.5 ? (
-                      <span className="text-[10.5px] font-bold text-rose-700 dark:text-rose-300 bg-rose-50 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-800/50 px-2 py-0.5 rounded-md">
-                        Due: {formatINR(item.roomBalance)}
-                      </span>
-                    ) : item.groupAdvanceCovered && item.groupAdvanceCovered > 0 ? (
-                      <span className="text-[10.5px] font-semibold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800/50 px-2 py-0.5 rounded-md" title="Tariff covered by Group Master Advance">
-                        ✓ Settled (Group)
-                      </span>
-                    ) : (
-                      <span className="text-[10.5px] font-semibold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800/50 px-2 py-0.5 rounded-md">
-                        ✓ Settled
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Middle Row: Guest Name & Status Tag */}
+              <div className="flex-1 min-w-0 space-y-1.5">
+                {/* Row 1: Room Number, Room Type & Status Tag */}
                 <div className="flex items-center justify-between gap-1.5">
-                  <span className="text-xs font-semibold text-zinc-800 dark:text-zinc-200 truncate">
-                    {item.guestName}
-                  </span>
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <span className="text-sm font-black text-zinc-900 dark:text-white shrink-0">
+                      Room {item.roomNumber}
+                    </span>
+                    <span className="text-[11px] text-zinc-500 dark:text-zinc-400 font-medium truncate">
+                      {item.roomType?.name || "Deluxe"}
+                    </span>
+                  </div>
+
                   <div className="flex items-center gap-1 shrink-0">
                     {item.isMultiRoom && (
-                      <span className="rounded-md px-1.5 py-0.2 text-[9px] font-bold bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/60">
-                        Group ({item.allRoomNumbers.length} Rooms)
+                      <span className="rounded px-1.5 py-0.2 text-[9px] font-bold bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/60">
+                        Group ({item.allRoomNumbers.length})
                       </span>
                     )}
                     <span
-                      className={`rounded-md px-1.5 py-0.2 text-[9.5px] font-semibold uppercase ${
+                      className={`rounded px-1.5 py-0.2 text-[9px] font-bold uppercase ${
                         item.status === "IN_HOUSE"
                           ? "bg-emerald-100/70 dark:bg-emerald-500/10 text-emerald-800 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20"
                           : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700"
@@ -303,7 +281,11 @@ export function BillingSidebar({
                   </div>
                 </div>
 
-                {/* Corporate Entity if present */}
+                {/* Row 2: Full Guest Name & Corporate Entity */}
+                <div className="text-xs font-bold text-zinc-900 dark:text-zinc-100 truncate">
+                  {item.guestName}
+                </div>
+
                 {hasCompany && (
                   <div className="flex items-center gap-1 text-[10.5px] text-amber-800 dark:text-amber-300 font-medium truncate bg-amber-50/80 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/40 px-1.5 py-0.5 rounded-md">
                     <Building2 className="h-3 w-3 shrink-0 text-amber-600 dark:text-amber-400" />
@@ -311,26 +293,32 @@ export function BillingSidebar({
                   </div>
                 )}
 
-                {/* Bottom Row: Dates & Phone */}
-                <div className="flex items-center justify-between text-[10.5px] text-zinc-400 dark:text-zinc-500">
-                  <span className="font-mono flex items-center gap-1.5">
-                    <span>
-                      {formatShortDate(item.arrivalAt)} → {formatShortDate(item.expectedDepartureAt)}
-                    </span>
+                {/* Row 3: Financial Balance & Stay Dates */}
+                <div className="flex items-center justify-between gap-1 text-[10.5px] pt-0.5">
+                  <span className="font-mono text-zinc-500 dark:text-zinc-400 flex items-center gap-1">
+                    <span>{formatShortDate(item.arrivalAt)} → {formatShortDate(item.expectedDepartureAt)}</span>
                     {item.isExtendedDeparture && (
-                      <span
-                        title={
-                          item.originalExpectedDepartureAt
-                            ? `Original departure: ${formatShortDate(item.originalExpectedDepartureAt)}`
-                            : "Auto-extended stay"
-                        }
-                        className="text-[9px] font-bold px-1 py-0.2 rounded bg-amber-100 text-amber-900 dark:bg-amber-950/80 dark:text-amber-300 border border-amber-300/80 dark:border-amber-800/60"
-                      >
+                      <span className="text-[9px] font-bold px-1 rounded bg-amber-100 text-amber-900 dark:bg-amber-950/80 dark:text-amber-300">
                         Ext
                       </span>
                     )}
                   </span>
-                  {item.phone && <span className="truncate font-mono">{item.phone}</span>}
+
+                  <div className="shrink-0">
+                    {item.roomBalance > 0.5 ? (
+                      <span className="text-[10px] font-bold text-rose-700 dark:text-rose-300 bg-rose-50 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-800/50 px-2 py-0.5 rounded-md">
+                        Due: {formatINR(item.roomBalance)}
+                      </span>
+                    ) : item.groupAdvanceCovered && item.groupAdvanceCovered > 0 ? (
+                      <span className="text-[10px] font-semibold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800/50 px-1.5 py-0.5 rounded-md">
+                        ✓ Group Covered
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-semibold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800/50 px-1.5 py-0.5 rounded-md">
+                        ✓ Settled
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>

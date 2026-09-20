@@ -87,12 +87,12 @@ interface UserManagementTabProps {
 
 // Module permission definitions for the RBAC Matrix
 const MODULE_PERMISSIONS = [
-  { key: "frontDesk", label: "Front Desk & GRC", desc: "Check-in, GRC register, room assignment", icon: BedDouble },
-  { key: "billing", label: "Billing & Folio", desc: "Charge posting, discounts, invoices, refunds", icon: Receipt },
-  { key: "cashier", label: "Cashier & Shifts", desc: "Shift open/close, cash handover, expense vouchers", icon: Wallet },
-  { key: "nightAudit", label: "12 AM Night Audit", desc: "Day rollover, automated room tariffs", icon: Moon },
-  { key: "housekeeping", label: "Housekeeping & Tasks", desc: "Room cleaning Kanban, defect logs", icon: Sparkles },
-  { key: "masterAdmin", label: "Master Database Admin", desc: "Rates, hotel taxes, staff & roles setup", icon: SlidersHorizontal },
+  { key: "frontDesk", label: "Front Desk & GRC", shortName: "Front Desk", desc: "Check-in, GRC register, room assignment", icon: BedDouble },
+  { key: "billing", label: "Billing & Folio", shortName: "Billing", desc: "Charge posting, discounts, invoices, refunds", icon: Receipt },
+  { key: "cashier", label: "Cashier & Shifts", shortName: "Cashier", desc: "Shift open/close, cash handover, expense vouchers", icon: Wallet },
+  { key: "nightAudit", label: "Night Audit", shortName: "Audit", desc: "Day rollover, automated room tariffs", icon: Moon },
+  { key: "housekeeping", label: "Housekeeping & Tasks", shortName: "Housekeeping", desc: "Room cleaning Kanban, defect logs", icon: Sparkles },
+  { key: "masterAdmin", label: "Master Database Admin", shortName: "Admin", desc: "Rates, hotel taxes, staff & roles setup", icon: SlidersHorizontal },
 ] as const;
 
 export type AccessLevel = "FULL" | "READ" | "NONE";
@@ -1187,13 +1187,13 @@ export function UserManagementTab({ onNotify }: UserManagementTabProps) {
             <div className="w-full overflow-x-auto">
               <table className="w-full text-left text-xs border-collapse">
                 <thead>
-                  <tr className="border-b border-zinc-200/80 dark:border-zinc-800/80 bg-zinc-50/70 dark:bg-zinc-900/40 text-zinc-500 dark:text-zinc-400 font-mono text-[11px] uppercase tracking-wider">
-                    <th className="py-3.5 px-4 font-bold min-w-[240px]">Staff Member & Handle</th>
-                    <th className="py-3.5 px-4 font-bold min-w-[170px]">Security Role</th>
-                    <th className="py-3.5 px-4 font-bold min-w-[200px]">Defined Property Scope</th>
-                    <th className="py-3.5 px-4 font-bold min-w-[190px]">Operational Capabilities</th>
-                    <th className="py-3.5 px-4 font-bold min-w-[110px]">Terminal Status</th>
-                    <th className="py-3.5 px-4 text-right font-bold min-w-[120px]">Actions</th>
+                  <tr className="border-b border-zinc-200/80 dark:border-zinc-800/80 bg-zinc-50/70 dark:bg-zinc-900/40 text-zinc-500 dark:text-zinc-400 font-mono text-[10.5px] uppercase tracking-wider">
+                    <th className="py-3 px-3.5 font-bold min-w-[200px]">Staff Member & Handle</th>
+                    <th className="py-3 px-3 font-bold min-w-[130px]">Security Role</th>
+                    <th className="py-3 px-3 font-bold min-w-[125px]">Defined Property Scope</th>
+                    <th className="py-3 px-3 font-bold min-w-[150px]">Operational Capabilities</th>
+                    <th className="py-3 px-3 font-bold min-w-[85px]">Status</th>
+                    <th className="py-3 px-3.5 text-right font-bold min-w-[95px]">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/60">
@@ -1231,7 +1231,7 @@ export function UserManagementTab({ onNotify }: UserManagementTabProps) {
                           className="hover:bg-zinc-50/60 dark:hover:bg-zinc-850/40 transition group"
                         >
                           {/* Staff Identity Column */}
-                          <td className="py-3.5 px-4">
+                          <td className="py-3 px-3.5">
                             <div className="flex items-center gap-3">
                               <div
                                 className={`h-10 w-10 rounded-xl flex items-center justify-center font-bold text-xs shrink-0 border ${
@@ -1268,7 +1268,7 @@ export function UserManagementTab({ onNotify }: UserManagementTabProps) {
                           </td>
 
                           {/* Role Column */}
-                          <td className="py-3.5 px-4">
+                          <td className="py-3 px-3.5">
                             <span
                               className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[11px] font-semibold border ${getRoleBadgeStyle(
                                 u.role
@@ -1280,7 +1280,7 @@ export function UserManagementTab({ onNotify }: UserManagementTabProps) {
                           </td>
 
                           {/* Property Access Scope */}
-                          <td className="py-3.5 px-4">
+                          <td className="py-3 px-3.5">
                             <div className="flex flex-wrap items-center gap-1.5 max-w-sm">
                               {u.propertyScope.includes("All") ? (
                                 <span className="rounded-md bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60 px-2 py-0.5 text-[10px] font-mono font-bold flex items-center gap-1">
@@ -1308,39 +1308,46 @@ export function UserManagementTab({ onNotify }: UserManagementTabProps) {
                           </td>
 
                           {/* Operational Capabilities Column */}
-                          <td className="py-3.5 px-4">
-                            <div className="flex items-center gap-1 flex-wrap">
-                              {MODULE_PERMISSIONS.map((mod) => {
-                                const level = (permissions as any)[mod.key] || "NONE";
-                                const Icon = mod.icon;
-                                if (level === "NONE") return null;
-                                return (
-                                  <span
-                                    key={mod.key}
-                                    title={`${mod.label}: ${level === "FULL" ? "Full Access" : "View Only"}`}
-                                    className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold border ${
-                                      level === "FULL"
-                                        ? "bg-zinc-100 dark:bg-zinc-800/80 text-zinc-800 dark:text-zinc-200 border-zinc-300/80 dark:border-zinc-700"
-                                        : "bg-blue-50/60 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800/50"
-                                    }`}
-                                  >
-                                    <Icon className="h-2.5 w-2.5" />
-                                    <span>{mod.label.split(" ")[0]}</span>
-                                  </span>
-                                );
-                              })}
-                            </div>
+                          <td className="py-3 px-3.5">
+                            {isOwner ? (
+                              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800/60">
+                                <Crown className="h-3 w-3 text-purple-600 dark:text-purple-400" />
+                                <span>Full System Access</span>
+                              </span>
+                            ) : (
+                              <div className="flex items-center gap-1 flex-wrap max-w-[220px]">
+                                {MODULE_PERMISSIONS.map((mod) => {
+                                  const level = (permissions as any)[mod.key] || "NONE";
+                                  const Icon = mod.icon;
+                                  if (level === "NONE") return null;
+                                  return (
+                                    <span
+                                      key={mod.key}
+                                      title={`${mod.label}: ${level === "FULL" ? "Full Access" : "View Only"}`}
+                                      className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9.5px] font-mono font-bold border ${
+                                        level === "FULL"
+                                          ? "bg-zinc-100 dark:bg-zinc-800/80 text-zinc-800 dark:text-zinc-200 border-zinc-300/80 dark:border-zinc-700"
+                                          : "bg-blue-50/60 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800/50"
+                                      }`}
+                                    >
+                                      <Icon className="h-2.5 w-2.5" />
+                                      <span>{mod.shortName}</span>
+                                    </span>
+                                  );
+                                })}
+                              </div>
+                            )}
                           </td>
 
                           {/* Status */}
-                          <td className="py-3.5 px-4">
+                          <td className="py-3 px-3">
                             {u.status === "ACTIVE" ? (
-                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-mono font-bold bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60">
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9.5px] font-mono font-bold bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60">
                                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
                                 <span>Active</span>
                               </span>
                             ) : (
-                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-mono font-bold bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800/60">
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9.5px] font-mono font-bold bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800/60">
                                 <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
                                 <span>Suspended</span>
                               </span>
@@ -1348,16 +1355,16 @@ export function UserManagementTab({ onNotify }: UserManagementTabProps) {
                           </td>
 
                           {/* Actions */}
-                          <td className="py-3.5 px-4 text-right">
+                          <td className="py-3 px-3.5 text-right">
                             <div className="flex items-center justify-end gap-1.5">
                               <button
                                 type="button"
                                 onClick={() => openEditModal(u)}
-                                className="p-2 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 transition cursor-pointer flex items-center gap-1 text-xs font-bold"
-                                title={isOwner ? "Edit credentials & profile details (portfolio scope is permanently locked)" : "Open full-page editor to define scope & details"}
+                                className="h-8 px-2.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 transition cursor-pointer flex items-center gap-1 text-[11px] font-bold"
+                                title={isOwner ? "Edit credentials & profile details" : "Open full-page editor to define scope & details"}
                               >
                                 <Edit3 className="h-3.5 w-3.5" />
-                                <span className="hidden xl:inline">{isOwner ? "Edit Details" : "Edit Scope"}</span>
+                                <span>{isOwner ? "Edit" : "Scope"}</span>
                               </button>
 
                               {!isOwner ? (

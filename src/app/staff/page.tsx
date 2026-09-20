@@ -64,7 +64,7 @@ export default function StaffRolesPage() {
   }
 
   return (
-    <div className="w-full min-h-[calc(100vh-53px)] flex flex-col space-y-4 text-zinc-900 dark:text-zinc-100 p-3 sm:p-5 lg:p-6 pb-20">
+    <div className="w-full min-h-[calc(100vh-53px)] flex flex-col space-y-4 text-zinc-900 dark:text-zinc-100 pb-12">
       {/* Toast Notification */}
       {toastMessage && (
         <div

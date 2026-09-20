@@ -466,12 +466,12 @@ export function BackupRestoreTab({ onNotify }: BackupRestoreTabProps) {
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs border-collapse">
             <thead>
-              <tr className="bg-zinc-50 dark:bg-[#18181b] border-b border-zinc-200/80 dark:border-zinc-800 text-zinc-500 dark:text-zinc-400 font-bold uppercase tracking-wider text-[10px]">
-                <th className="py-3 px-4">Backup Snapshot</th>
-                <th className="py-3 px-4">Category</th>
-                <th className="py-3 px-4">File Size</th>
-                <th className="py-3 px-4">Created Date</th>
-                <th className="py-3 px-4 text-right">Actions</th>
+              <tr className="bg-zinc-50 dark:bg-[#18181b] border-b border-zinc-200/80 dark:border-zinc-800 text-zinc-500 dark:text-zinc-400 font-mono font-bold uppercase tracking-wider text-[10px]">
+                <th className="py-3 px-4 min-w-[220px]">Backup Snapshot</th>
+                <th className="py-3 px-4 min-w-[120px]">Category</th>
+                <th className="py-3 px-4 min-w-[90px]">File Size</th>
+                <th className="py-3 px-4 min-w-[140px]">Created Date</th>
+                <th className="py-3 px-4 text-right min-w-[190px]">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-200/60 dark:divide-zinc-800/60 font-medium">

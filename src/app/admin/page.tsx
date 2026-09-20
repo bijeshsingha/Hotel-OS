@@ -1030,7 +1030,7 @@ export default function AdminPortalPage() {
   // SCREEN 2: AUTHENTICATED MASTER ADMIN PORTAL
   // ====================================================
   return (
-    <div className="space-y-4 max-w-[1600px] mx-auto w-full text-zinc-900 dark:text-zinc-100 pb-16 px-3 sm:px-4 lg:px-6">
+    <div className="space-y-4 w-full text-zinc-900 dark:text-zinc-100 pb-16">
       
       {/* Toast Notification */}
       {toastMessage && (
@@ -1105,8 +1105,8 @@ export default function AdminPortalPage() {
           ))}
         </div>
 
-        {/* Desktop & Tablet View (>= 640px): Full horizontal segmented navigation pill strip */}
-        <div className="hidden sm:flex items-center gap-1.5 p-1.5 rounded-2xl bg-zinc-100 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 overflow-x-auto shadow-xs text-xs font-bold scrollbar-none">
+        {/* Desktop & Tablet View (>= 640px): 7-Column Responsive Navigation Pill Strip */}
+        <div className="hidden sm:grid sm:grid-cols-7 gap-1 p-1 rounded-2xl bg-zinc-100 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 text-xs font-bold shadow-xs">
           {ADMIN_SECTIONS.map((sec, idx) => {
             const Icon = sec.icon;
             const isSelected = activeTab === sec.id;
@@ -1115,14 +1115,18 @@ export default function AdminPortalPage() {
                 key={sec.id}
                 type="button"
                 onClick={() => setActiveTab(sec.id)}
-                className={`h-11 px-4.5 rounded-xl transition flex items-center gap-2.5 whitespace-nowrap cursor-pointer shrink-0 font-bold ${
+                className={`h-10 px-2 rounded-xl transition flex items-center justify-center gap-2 cursor-pointer font-bold truncate ${
                   isSelected
                     ? "bg-white dark:bg-[#18181b] text-blue-600 dark:text-blue-400 shadow-xs border border-zinc-200/90 dark:border-zinc-700 font-extrabold"
                     : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-white/50 dark:hover:bg-zinc-800/50 font-semibold"
                 }`}
+                title={sec.label}
               >
-                <Icon className={`h-4 w-4 shrink-0 ${isSelected ? "text-blue-600 dark:text-blue-400" : "text-zinc-400 dark:text-zinc-500"}`} />
-                <span>{idx + 1}. {sec.label}</span>
+                <Icon className={`h-3.5 w-3.5 shrink-0 ${isSelected ? "text-blue-600 dark:text-blue-400" : "text-zinc-400 dark:text-zinc-500"}`} />
+                <span className="truncate">
+                  <span className="hidden 2xl:inline">{idx + 1}. {sec.label}</span>
+                  <span className="2xl:hidden">{idx + 1}. {sec.shortLabel}</span>
+                </span>
               </button>
             );
           })}

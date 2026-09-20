@@ -1710,9 +1710,9 @@ function BillingContent() {
       </div>
 
       {/* 2. MAIN 2-COLUMN OPERATIONAL GRID */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 xl:gap-4 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 xl:gap-4 items-start w-full">
         
-        {/* LEFT COLUMN: ROOMS DIRECTORY & GROUP SELECTOR (3 COLS) */}
+        {/* LEFT COLUMN: ROOMS DIRECTORY & GROUP SELECTOR */}
         <BillingSidebar
           activeMainTab={activeMainTab}
           directoryItems={directoryItems}
@@ -1744,8 +1744,8 @@ function BillingContent() {
           formatShortDate={formatShortDate}
         />
 
-        {/* RIGHT COLUMN: FOLIO HERO, KPI CARDS & LEDGER (9 COLS) */}
-        <div className="lg:col-span-9 xl:col-span-9 space-y-3.5 xl:space-y-4">
+        {/* RIGHT COLUMN: FOLIO HERO, KPI CARDS & LEDGER */}
+        <div className="lg:col-span-8 xl:col-span-8 2xl:col-span-9 min-w-0 space-y-3.5 xl:space-y-4">
           {folioData && activeStay ? (
             <>
               {/* 1. ACTIVE STAY HERO OVERVIEW CARD */}
@@ -2061,53 +2061,53 @@ function BillingContent() {
 
               {/* 2. THREE FINANCIAL KPI STAT TILES */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 xl:gap-3.5">
-                <div className="p-4 rounded-2xl bg-white dark:bg-[#121215] border border-zinc-200/80 dark:border-zinc-800/80 shadow-xs space-y-1">
-                  <div className="text-[11px] text-zinc-500 dark:text-zinc-400 uppercase font-semibold tracking-wider">
+                <div className="p-3.5 rounded-2xl bg-white dark:bg-[#121215] border border-zinc-200/80 dark:border-zinc-800/80 shadow-xs space-y-1 min-w-0">
+                  <div className="text-[10.5px] text-zinc-500 dark:text-zinc-400 uppercase font-bold tracking-wider truncate">
                     Total Charges Posted
                   </div>
-                  <div className="text-xl sm:text-2xl font-bold text-zinc-900 dark:text-white tabular-nums">
+                  <div className="text-xl sm:text-2xl font-black text-zinc-900 dark:text-white tabular-nums truncate">
                     {formatINR(totalCharges)}
                   </div>
-                  <div className="text-[11px] text-zinc-400 font-mono">
+                  <div className="text-[11px] text-zinc-400 font-mono truncate">
                     Taxable: {formatINR(totalTaxable)} • Tax: {formatINR(totalTaxes)}
                   </div>
                 </div>
 
-                <div className="p-4 rounded-2xl bg-white dark:bg-[#121215] border border-zinc-200/80 dark:border-zinc-800/80 shadow-xs space-y-1">
-                  <div className="text-[11px] text-zinc-500 dark:text-zinc-400 uppercase font-semibold tracking-wider">
+                <div className="p-3.5 rounded-2xl bg-white dark:bg-[#121215] border border-zinc-200/80 dark:border-zinc-800/80 shadow-xs space-y-1 min-w-0">
+                  <div className="text-[10.5px] text-zinc-500 dark:text-zinc-400 uppercase font-bold tracking-wider truncate">
                     Payments Received
                   </div>
-                  <div className="text-xl sm:text-2xl font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">
+                  <div className="text-xl sm:text-2xl font-black text-emerald-600 dark:text-emerald-400 tabular-nums truncate">
                     {formatINR(totalPayments)}
                   </div>
-                  <div className="text-[11px] text-zinc-400 font-mono">
+                  <div className="text-[11px] text-zinc-400 font-mono truncate">
                     {payments.length} Transaction{payments.length === 1 ? "" : "s"}
                   </div>
                 </div>
 
-                <div className={`p-4 rounded-2xl border shadow-xs space-y-1 transition ${
+                <div className={`p-3.5 rounded-2xl border shadow-xs space-y-1 transition min-w-0 ${
                   surplusCredit > 0
                     ? "bg-amber-50/40 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800/60"
                     : currentBalance > 0
                     ? "bg-white dark:bg-[#121215] border-zinc-200/80 dark:border-zinc-800/80"
                     : "bg-emerald-50/40 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800/60"
                 }`}>
-                  <div className="flex items-center justify-between">
-                    <div className="text-[11px] uppercase font-semibold tracking-wider text-zinc-500 dark:text-zinc-400">
-                      {surplusCredit > 0 ? "Advance Surplus (Overpaid)" : "Outstanding Balance Due"}
+                  <div className="flex items-center justify-between gap-1">
+                    <div className="text-[10.5px] uppercase font-bold tracking-wider text-zinc-500 dark:text-zinc-400 truncate">
+                      {surplusCredit > 0 ? "Advance Surplus" : "Outstanding Balance"}
                     </div>
                     {surplusCredit > 0 && (
                       <button
                         onClick={() => handleOpenRefundModal(surplusCredit)}
-                        className="px-2 py-0.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-zinc-950 font-bold text-[10.5px] transition shadow-2xs flex items-center gap-1 cursor-pointer"
+                        className="px-2 py-0.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-zinc-950 font-bold text-[10px] transition shadow-2xs flex items-center gap-1 cursor-pointer shrink-0"
                         title="Issue refund return to guest"
                       >
-                        <span>↩️ Issue Refund</span>
+                        <span>↩️ Refund</span>
                       </button>
                     )}
                   </div>
                   <div
-                    className={`text-xl sm:text-2xl font-bold tabular-nums ${
+                    className={`text-xl sm:text-2xl font-black tabular-nums truncate ${
                       surplusCredit > 0
                         ? "text-amber-700 dark:text-amber-400"
                         : currentBalance > 0
@@ -2117,7 +2117,7 @@ function BillingContent() {
                   >
                     {surplusCredit > 0 ? `+ ${formatINR(surplusCredit)}` : formatINR(currentBalance)}
                   </div>
-                  <div className="text-[11px] font-medium text-zinc-400">
+                  <div className="text-[11px] font-medium text-zinc-400 truncate">
                     {surplusCredit > 0
                       ? "Refund Due at Checkout"
                       : currentBalance > 0
