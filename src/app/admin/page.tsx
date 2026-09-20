@@ -57,7 +57,7 @@ import { formatINR } from "@/lib/gst/calculator";
 import { CompanySelector, CompanyItem } from "@/components/pms/company-selector";
 import initialCompaniesJson from "@/data/initial-companies.json";
 import { UserManagementTab } from "@/components/admin/user-management-tab";
-
+import { BackupRestoreTab } from "@/components/admin/backup-restore-tab";
 
 const ADMIN_SECTIONS = [
   { id: "HOTEL" as const, label: "Hotel & Property", shortLabel: "Hotel", icon: Building2 },
@@ -65,6 +65,7 @@ const ADMIN_SECTIONS = [
   { id: "RATES" as const, label: "Room Rates & Tariffs", shortLabel: "Rates", icon: DollarSign },
   { id: "ROOMS" as const, label: "Rooms & Bedding", shortLabel: "Rooms", icon: BedDouble },
   { id: "EXPENSES" as const, label: "Expenses & Outflows", shortLabel: "Expenses", icon: Receipt },
+  { id: "BACKUPS" as const, label: "Database Backups & Recovery", shortLabel: "Backups", icon: Database },
   { id: "SECURITY" as const, label: "Admin Security & PIN", shortLabel: "Security", icon: Shield },
 ];
 
@@ -87,7 +88,7 @@ export default function AdminPortalPage() {
 
   // Active Tab
   const [activeTab, setActiveTab] = useState<
-    "HOTEL" | "GRC" | "RATES" | "ROOMS" | "EXPENSES" | "SECURITY"
+    "HOTEL" | "GRC" | "RATES" | "ROOMS" | "EXPENSES" | "BACKUPS" | "SECURITY"
   >("HOTEL");
 
   // Notifications
@@ -111,7 +112,7 @@ export default function AdminPortalPage() {
         window.location.replace("/staff");
         return;
       }
-      if (tabParam && ["HOTEL", "GRC", "RATES", "ROOMS", "EXPENSES", "SECURITY"].includes(tabParam)) {
+      if (tabParam && ["HOTEL", "GRC", "RATES", "ROOMS", "EXPENSES", "BACKUPS", "SECURITY"].includes(tabParam)) {
         setActiveTab(tabParam as any);
       }
     }
@@ -1084,8 +1085,8 @@ export default function AdminPortalPage() {
 
       {/* 2. ADMIN TOP NAVIGATION BAR */}
       <div className="w-full">
-        {/* Mobile View (< 640px): 6 numbered compact pill buttons */}
-        <div className="sm:hidden grid grid-cols-6 gap-1 p-1 rounded-2xl bg-zinc-100 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 text-xs font-bold shadow-xs">
+        {/* Mobile View (< 640px): 7 numbered compact pill buttons */}
+        <div className="sm:hidden grid grid-cols-7 gap-1 p-1 rounded-2xl bg-zinc-100 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 text-xs font-bold shadow-xs">
           {ADMIN_SECTIONS.map((sec, idx) => (
             <button
               key={sec.id}
@@ -4273,7 +4274,14 @@ export default function AdminPortalPage() {
       })()}
 
       {/* ====================================================
-          TAB CONTENT 6: SECURITY & ADMIN CREDENTIALS
+          TAB CONTENT 6: DATABASE BACKUPS & RECOVERY
+      ==================================================== */}
+      {activeTab === "BACKUPS" && (
+        <BackupRestoreTab onNotify={showToast} />
+      )}
+
+      {/* ====================================================
+          TAB CONTENT 7: SECURITY & ADMIN CREDENTIALS
       ==================================================== */}
       {activeTab === "SECURITY" && (
         <div className="bg-white dark:bg-[#111114] border border-zinc-200/90 dark:border-zinc-800 rounded-3xl p-6 space-y-6 shadow-xs">

@@ -109,7 +109,7 @@ export const NAV_ITEMS: NavItem[] = [
     href: "/admin",
     icon: SlidersHorizontal,
     badge: "ADM",
-    description: "Password-protected database editor for Hotel, GRC, Rates & Rooms",
+    description: "Database editor for Hotel, GRC, Rates, Rooms, Backups & Disaster Recovery",
     superAdminOnly: true,
   },
   {
