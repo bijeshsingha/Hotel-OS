@@ -243,7 +243,7 @@ export function NewReservationModal({
                 </span>
               </h2>
               <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5 font-mono">
-                {activeProperty?.displayName || "Hotel Ambarish Grand Residency"} • {activeProperty?.code || "GUW-01"}
+                {activeProperty?.displayName || "Hotel"} {activeProperty?.code ? `• ${activeProperty.code}` : ""}
               </p>
             </div>
           </div>

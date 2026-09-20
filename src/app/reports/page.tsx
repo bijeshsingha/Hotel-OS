@@ -3454,7 +3454,7 @@ export default function ReportsPage() {
             <div className="space-y-4">
               <div className="flex justify-between items-start border-b border-zinc-300 pb-3">
                 <div>
-                  <h1 className="text-base font-black uppercase text-zinc-950">{activeProperty?.displayName || "Hotel Ambarish Grand Residency"}</h1>
+                  <h1 className="text-base font-black uppercase text-zinc-950">{activeProperty?.displayName || "Hotel Report"}</h1>
                   <p className="text-[11px] text-zinc-600">{activeProperty?.legalName}</p>
                   <p className="font-mono text-[11px] text-zinc-700">
                     GSTIN: {activeProperty?.gstin || "N/A"} | State: {activeProperty?.stateCode || "18"}
@@ -3542,7 +3542,7 @@ export default function ReportsPage() {
             <div className="space-y-4">
               <div className="flex justify-between items-start border-b border-zinc-300 pb-3">
                 <div>
-                  <h1 className="text-base font-black uppercase text-zinc-950">{activeProperty?.displayName || "Hotel Ambarish Grand Residency"}</h1>
+                  <h1 className="text-base font-black uppercase text-zinc-950">{activeProperty?.displayName || "Hotel Report"}</h1>
                   <p className="text-[11px] text-zinc-600">{activeProperty?.legalName}</p>
                   <p className="font-mono text-[11px] text-zinc-700">
                     GSTIN: {activeProperty?.gstin || "N/A"} | State: {activeProperty?.stateCode || "18"}
@@ -3623,7 +3623,7 @@ export default function ReportsPage() {
             <div className="space-y-4">
               <div className="flex justify-between items-start border-b border-zinc-300 pb-3">
                 <div>
-                  <h1 className="text-base font-black uppercase text-zinc-950">{activeProperty?.displayName || "Hotel Ambarish Grand Residency"}</h1>
+                  <h1 className="text-base font-black uppercase text-zinc-950">{activeProperty?.displayName || "Hotel Report"}</h1>
                   <p className="text-[11px] text-zinc-600">{activeProperty?.legalName}</p>
                   <p className="font-mono text-[11px] text-zinc-700">
                     GSTIN: {activeProperty?.gstin || "N/A"} | State: {activeProperty?.stateCode || "18"}
@@ -3718,7 +3718,7 @@ export default function ReportsPage() {
             <div className="space-y-4">
               <div className="flex justify-between items-start border-b border-zinc-300 pb-3">
                 <div>
-                  <h1 className="text-base font-black uppercase text-zinc-950">{activeProperty?.displayName || "Hotel Ambarish Grand Residency"}</h1>
+                  <h1 className="text-base font-black uppercase text-zinc-950">{activeProperty?.displayName || "Hotel Report"}</h1>
                   <p className="text-[11px] text-zinc-600">{activeProperty?.legalName}</p>
                   <p className="font-mono text-[11px] text-zinc-700">
                     GSTIN: {activeProperty?.gstin || "N/A"} | State: {activeProperty?.stateCode || "18"}
@@ -3819,7 +3819,7 @@ export default function ReportsPage() {
               <div className="flex justify-between items-start border-b border-zinc-300 pb-3">
                 <div>
                   <h1 className="text-base font-black uppercase text-zinc-950">
-                    {activeProperty?.displayName || "Hotel Ambarish Grand Residency"}
+                    {activeProperty?.displayName || "Hotel Report"}
                   </h1>
                   <p className="text-[11px] text-zinc-600">{activeProperty?.legalName}</p>
                   <p className="font-mono text-[11px] text-zinc-700">
@@ -3926,7 +3926,7 @@ export default function ReportsPage() {
             <div className="space-y-4">
               <div className="flex justify-between items-start border-b border-zinc-300 pb-3">
                 <div>
-                  <h1 className="text-base font-black uppercase text-zinc-950">{activeProperty?.displayName || "Hotel Ambarish Grand Residency"}</h1>
+                  <h1 className="text-base font-black uppercase text-zinc-950">{activeProperty?.displayName || "Hotel Report"}</h1>
                   <p className="text-[11px] text-zinc-600">{activeProperty?.legalName}</p>
                   <p className="font-mono text-[11px] text-zinc-700">
                     GSTIN: {activeProperty?.gstin || "N/A"} | State: {activeProperty?.stateCode || "18"}

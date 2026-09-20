@@ -28,10 +28,11 @@ export async function GET(request: Request) {
       return NextResponse.json(filtered);
     }
 
-    const where: any = {};
-    if (propertyId) {
-      where.propertyId = propertyId;
+    if (!propertyId) {
+      return NextResponse.json({ error: "propertyId is required" }, { status: 400 });
     }
+
+    const where: any = { propertyId };
 
     if (query) {
       where.OR = [

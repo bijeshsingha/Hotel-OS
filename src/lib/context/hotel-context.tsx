@@ -39,6 +39,7 @@ interface HotelContextType {
     propertyScope?: string;
   }>;
   isLoading: boolean;
+  isInitialized: boolean | null;
   activeRole: string;
   sidebarCollapsed: boolean;
   toggleSidebar: () => void;
@@ -54,17 +55,6 @@ interface HotelContextType {
   refreshKey: number;
 }
 
-const INITIAL_PROPERTY: PropertyInfo = {
-  id: "prop_ambarish",
-  code: "GUW-01",
-  displayName: "Hotel Ambarish Grand Residency",
-  legalName: "AMBARISH RESIDENCY",
-  gstin: "18AACCB2447F1ZX",
-  stateCode: "18",
-  businessDate: "2026-08-31",
-  currency: "INR",
-};
-
 const INITIAL_USER: UserInfo = {
   id: "usr_bijesh",
   name: "Bijesh Singha",
@@ -78,10 +68,35 @@ const HotelContext = createContext<HotelContextType | undefined>(undefined);
 
 export function HotelProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<UserInfo | null>(INITIAL_USER);
-  const [activeProperty, setActiveProperty] = useState<PropertyInfo | null>(INITIAL_PROPERTY);
-  const [availableProperties, setAvailableProperties] = useState<PropertyInfo[]>([INITIAL_PROPERTY]);
+  const [activeProperty, setActiveProperty] = useState<PropertyInfo | null>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("hotel_os_active_property_data");
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (parsed && parsed.id) return parsed;
+        }
+      } catch (e) {
+        console.warn("Failed to parse saved property:", e);
+      }
+    }
+    return null;
+  });
+  const [availableProperties, setAvailableProperties] = useState<PropertyInfo[]>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("hotel_os_available_properties_data");
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        }
+      } catch (e) {}
+    }
+    return [];
+  });
   const [allUsers, setAllUsers] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isInitialized, setIsInitialized] = useState<boolean | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [sidebarCollapsed, setSidebarCollapsedState] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -124,9 +139,32 @@ export function HotelProvider({ children }: { children: React.ReactNode }) {
       if (identifier) params.set("username", identifier);
       if (propId) params.set("propertyId", propId);
 
-      const res = await fetch(`/api/v1/auth/session?${params.toString()}`);
+      const res = await fetch(`/api/v1/auth/session?${params.toString()}`, {
+        cache: "no-store",
+        headers: { "Cache-Control": "no-cache" },
+      });
       if (res.ok) {
         const data = await res.json();
+
+        if (data?.initialized === false) {
+          setIsInitialized(false);
+          setUser(null);
+          setActiveProperty(null);
+          setAvailableProperties([]);
+          setAllUsers([]);
+          if (typeof window !== "undefined") {
+            localStorage.removeItem("hotel_os_property");
+            localStorage.removeItem("hotel_os_active_property_data");
+            localStorage.removeItem("hotel_os_available_properties_data");
+            if (!window.location.pathname.startsWith("/onboarding")) {
+              window.location.href = "/onboarding";
+              return;
+            }
+          }
+        } else {
+          setIsInitialized(true);
+        }
+
         if (data?.user) {
           setUser(data.user);
           if (typeof window !== "undefined" && data.user.username) {
@@ -137,9 +175,15 @@ export function HotelProvider({ children }: { children: React.ReactNode }) {
           setActiveProperty(data.activeProperty);
           if (typeof window !== "undefined") {
             localStorage.setItem("hotel_os_property", data.activeProperty.id);
+            localStorage.setItem("hotel_os_active_property_data", JSON.stringify(data.activeProperty));
           }
         }
-        if (Array.isArray(data?.availableProperties)) setAvailableProperties(data.availableProperties);
+        if (Array.isArray(data?.availableProperties)) {
+          setAvailableProperties(data.availableProperties);
+          if (typeof window !== "undefined") {
+            localStorage.setItem("hotel_os_available_properties_data", JSON.stringify(data.availableProperties));
+          }
+        }
         if (Array.isArray(data?.allUsers)) setAllUsers(data.allUsers);
       }
     } catch {
@@ -160,6 +204,13 @@ export function HotelProvider({ children }: { children: React.ReactNode }) {
       localStorage.setItem("hotel_os_property", propertyId);
     }
     apiCache.invalidate();
+    const targetProp = availableProperties.find((p) => p.id === propertyId);
+    if (targetProp) {
+      setActiveProperty(targetProp);
+      if (typeof window !== "undefined") {
+        localStorage.setItem("hotel_os_active_property_data", JSON.stringify(targetProp));
+      }
+    }
     fetchSession(user?.username || user?.email, propertyId);
     setRefreshKey((k) => k + 1);
   };
@@ -187,10 +238,8 @@ export function HotelProvider({ children }: { children: React.ReactNode }) {
   };
 
   const refreshData = async () => {
-    if (activeProperty) {
-      await fetchSession(user?.username || user?.email, activeProperty.id);
-      setRefreshKey((k) => k + 1);
-    }
+    await fetchSession(user?.username || user?.email, activeProperty?.id);
+    setRefreshKey((k) => k + 1);
   };
 
   return (
@@ -201,6 +250,7 @@ export function HotelProvider({ children }: { children: React.ReactNode }) {
         availableProperties,
         allUsers,
         isLoading,
+        isInitialized,
         activeRole: user?.activeRole || "ORG_OWNER",
         sidebarCollapsed,
         toggleSidebar,

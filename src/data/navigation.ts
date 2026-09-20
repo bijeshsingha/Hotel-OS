@@ -12,6 +12,7 @@ import {
   Building2,
   SlidersHorizontal,
   UtensilsCrossed,
+  Users,
   LucideIcon,
 } from "lucide-react";
 
@@ -21,6 +22,7 @@ export interface NavItem {
   icon: LucideIcon;
   badge: string;
   description?: string;
+  superAdminOnly?: boolean;
 }
 
 export const NAV_ITEMS: NavItem[] = [
@@ -95,11 +97,20 @@ export const NAV_ITEMS: NavItem[] = [
     description: "Immutable compliance log of system operations",
   },
   {
+    label: "Staff & Roles",
+    href: "/staff",
+    icon: Users,
+    badge: "USR",
+    description: "Manage hotel terminal staff, access permissions & multi-property grants",
+    superAdminOnly: true,
+  },
+  {
     label: "Admin Editor",
     href: "/admin",
     icon: SlidersHorizontal,
     badge: "ADM",
     description: "Password-protected database editor for Hotel, GRC, Rates & Rooms",
+    superAdminOnly: true,
   },
   {
     label: "Onboarding",

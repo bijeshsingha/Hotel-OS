@@ -30,11 +30,16 @@ import {
 import { PageHeader, StatCard } from "@/components/ui";
 
 export default function DashboardPage() {
-  const { activeProperty, refreshKey } = useHotel();
+  const { activeProperty, refreshKey, isInitialized, isLoading: contextLoading } = useHotel();
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (isInitialized === false && typeof window !== "undefined") {
+      window.location.href = "/onboarding";
+      return;
+    }
+
     if (!activeProperty) return;
     setLoading(true);
     fetch(`/api/v1/dashboard?propertyId=${activeProperty.id}`)
@@ -42,7 +47,25 @@ export default function DashboardPage() {
       .then((d) => setData(d))
       .catch((err) => console.error("Dashboard error:", err))
       .finally(() => setLoading(false));
-  }, [activeProperty, refreshKey]);
+  }, [activeProperty, refreshKey, isInitialized]);
+
+  if (isInitialized === false) {
+    return (
+      <div className="flex min-h-[400px] flex-col items-center justify-center p-6 text-center">
+        <Building2 className="h-12 w-12 text-blue-500 mb-3" />
+        <h2 className="text-lg font-bold text-zinc-900 dark:text-white">Welcome to ROVESTA OS</h2>
+        <p className="text-xs text-zinc-500 max-w-sm mt-1 mb-4">
+          No hotel property is configured yet. Redirecting to Hotel Onboarding Studio...
+        </p>
+        <a
+          href="/onboarding"
+          className="rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-bold text-white hover:bg-blue-500 transition shadow-lg"
+        >
+          Launch Hotel Onboarding Studio
+        </a>
+      </div>
+    );
+  }
 
   if (loading || !data) {
     return (

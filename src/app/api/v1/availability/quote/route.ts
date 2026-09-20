@@ -17,8 +17,7 @@ export async function GET(request: Request) {
       new Date(Date.now() + 86400000).toISOString().split("T")[0];
 
     if (!propertyId) {
-      const prop = await prisma.property.findFirst();
-      propertyId = prop?.id || "prop_ambarish";
+      return NextResponse.json({ error: "propertyId is required" }, { status: 400 });
     }
 
     if (roomTypeId) {

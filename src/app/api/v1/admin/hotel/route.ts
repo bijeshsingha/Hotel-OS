@@ -5,15 +5,14 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const propertyId = searchParams.get("propertyId");
+    if (!propertyId) {
+      return NextResponse.json({ error: "propertyId is required" }, { status: 400 });
+    }
 
-    const property = propertyId
-      ? await prisma.property.findUnique({
-          where: { id: propertyId },
-          include: { organization: true },
-        })
-      : await prisma.property.findFirst({
-          include: { organization: true },
-        });
+    const property = await prisma.property.findUnique({
+      where: { id: propertyId },
+      include: { organization: true },
+    });
 
     if (!property) {
       return NextResponse.json({ error: "Property not found" }, { status: 404 });

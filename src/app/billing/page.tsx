@@ -254,7 +254,14 @@ function BillingContent() {
 
   // Load in-house and past stays for current property
   const loadStays = async (forceFresh = false) => {
-    if (!activeProperty?.id) return;
+    if (!activeProperty?.id) {
+      setStays([]);
+      setSelectedStayId("");
+      setSelectedRoomNumber("");
+      setFolioData(null);
+      setLoading(false);
+      return;
+    }
     const staysUrl = `/api/v1/stays?propertyId=${activeProperty.id}`;
 
     // Instant SWR cache lookup (0ms render)
@@ -262,13 +269,19 @@ function BillingContent() {
       const cached = apiCache.get(staysUrl);
       if (cached && Array.isArray(cached)) {
         setStays(cached);
-        if (cached.length > 0 && !selectedStayId) {
-          const inHouse = cached.find((s: any) => s.status === "IN_HOUSE");
-          const targetStay = inHouse || cached[0];
-          setSelectedStayId(targetStay.id);
-          const activeAssign = targetStay.roomAssignments?.find((a: any) => !a.endsAt) || targetStay.roomAssignments?.[0];
-          const firstRoom = activeAssign?.room?.number || "";
-          setSelectedRoomNumber(firstRoom);
+        if (cached.length > 0) {
+          if (!selectedStayId || !cached.some((s: any) => s.id === selectedStayId)) {
+            const inHouse = cached.find((s: any) => s.status === "IN_HOUSE");
+            const targetStay = inHouse || cached[0];
+            setSelectedStayId(targetStay.id);
+            const activeAssign = targetStay.roomAssignments?.find((a: any) => !a.endsAt) || targetStay.roomAssignments?.[0];
+            const firstRoom = activeAssign?.room?.number || "";
+            setSelectedRoomNumber(firstRoom);
+          }
+        } else {
+          setSelectedStayId("");
+          setSelectedRoomNumber("");
+          setFolioData(null);
         }
       } else {
         setLoading(true);
@@ -277,18 +290,32 @@ function BillingContent() {
 
     try {
       const data = await apiCache.swrFetch(staysUrl, undefined, (cached) => {
-        if (Array.isArray(cached)) setStays(cached);
+        if (Array.isArray(cached)) {
+          setStays(cached);
+          if (cached.length === 0) {
+            setSelectedStayId("");
+            setSelectedRoomNumber("");
+            setFolioData(null);
+          }
+        }
       });
 
       if (Array.isArray(data)) {
         setStays(data);
-        if (data.length > 0 && !selectedStayId) {
-          const inHouse = data.find((s: any) => s.status === "IN_HOUSE");
-          const targetStay = inHouse || data[0];
-          setSelectedStayId(targetStay.id);
-          const activeAssign = targetStay.roomAssignments?.find((a: any) => !a.endsAt) || targetStay.roomAssignments?.[0];
-          const firstRoom = activeAssign?.room?.number || "";
-          setSelectedRoomNumber(firstRoom);
+        if (data.length > 0) {
+          if (!selectedStayId || !data.some((s: any) => s.id === selectedStayId)) {
+            const inHouse = data.find((s: any) => s.status === "IN_HOUSE");
+            const targetStay = inHouse || data[0];
+            setSelectedStayId(targetStay.id);
+            const activeAssign = targetStay.roomAssignments?.find((a: any) => !a.endsAt) || targetStay.roomAssignments?.[0];
+            const firstRoom = activeAssign?.room?.number || "";
+            setSelectedRoomNumber(firstRoom);
+          }
+        } else {
+          // Zero stays for this property: strictly wipe folio data
+          setSelectedStayId("");
+          setSelectedRoomNumber("");
+          setFolioData(null);
         }
       }
     } catch (e) {
@@ -335,27 +362,40 @@ function BillingContent() {
   };
 
   useEffect(() => {
+    // When active property changes, immediately reset stay/folio state to prevent cross-hotel leakage
+    setStays([]);
+    setSelectedStayId("");
+    setSelectedRoomNumber("");
+    setFolioData(null);
+    setSelectedInvoice(null);
+    setSelectedRoomKeys([]);
     loadStays();
   }, [activeProperty?.id, refreshKey]);
 
   // When selected stay changes, fetch its live folio and sync saved grace period
   useEffect(() => {
-    if (selectedStayId && stays.length > 0) {
-      const activeStay = stays.find((s) => s.id === selectedStayId);
-      let stayGrace = 0;
-      const rh = activeStay?.roomAssignments?.[0]?.rateHandling;
-      if (rh?.includes("24_HOURS:")) {
-        stayGrace = Number(rh.split(":")[1]) || 0;
-      } else if (rh?.includes("FIXED_TIME:")) {
-        stayGrace = Number(rh.split(":")[1]) || 0;
-      }
-      setGracePeriodMinutes(stayGrace);
+    if (!selectedStayId || stays.length === 0) {
+      setFolioData(null);
+      return;
+    }
+    const activeStay = stays.find((s) => s.id === selectedStayId);
+    if (!activeStay) {
+      setFolioData(null);
+      return;
+    }
+    let stayGrace = 0;
+    const rh = activeStay?.roomAssignments?.[0]?.rateHandling;
+    if (rh?.includes("24_HOURS:")) {
+      stayGrace = Number(rh.split(":")[1]) || 0;
+    } else if (rh?.includes("FIXED_TIME:")) {
+      stayGrace = Number(rh.split(":")[1]) || 0;
+    }
+    setGracePeriodMinutes(stayGrace);
 
-      if (activeStay?.folio?.id) {
-        loadFolio(activeStay.folio.id, stayGrace);
-      } else {
-        setFolioData(null);
-      }
+    if (activeStay?.folio?.id) {
+      loadFolio(activeStay.folio.id, stayGrace);
+    } else {
+      setFolioData(null);
     }
   }, [selectedStayId, stays]);
 
@@ -1409,12 +1449,12 @@ function BillingContent() {
               <div className="flex items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400 mt-0.5 flex-wrap">
                 <span className="text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
                   <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                  {activeProperty?.displayName || "Hotel Ambarish Grand Residency"}
+                  {activeProperty?.displayName || "Hotel Folio & Billing"}
                 </span>
                 <span>•</span>
-                <span className="font-mono">GSTIN: {activeProperty?.gstin || "18AACCB2447F1ZX"}</span>
+                <span className="font-mono">GSTIN: {activeProperty?.gstin || "—"}</span>
                 <span>•</span>
-                <span>Date: <strong className="font-mono text-zinc-700 dark:text-zinc-300">{activeProperty?.businessDate || new Date().toISOString().split("T")[0]}</strong></span>
+                <span>Date: <strong className="font-mono text-zinc-700 dark:text-zinc-300">{activeProperty?.businessDate || (typeof window !== "undefined" ? new Date().toLocaleDateString("en-CA") : "")}</strong></span>
               </div>
             </div>
           </div>
@@ -1706,7 +1746,7 @@ function BillingContent() {
 
         {/* RIGHT COLUMN: FOLIO HERO, KPI CARDS & LEDGER (9 COLS) */}
         <div className="lg:col-span-9 xl:col-span-9 space-y-3.5 xl:space-y-4">
-          {folioData ? (
+          {folioData && activeStay ? (
             <>
               {/* 1. ACTIVE STAY HERO OVERVIEW CARD */}
               <div className="rounded-2xl bg-white dark:bg-[#121215] border border-zinc-200/80 dark:border-zinc-800/80 shadow-xs overflow-hidden">
@@ -2412,10 +2452,10 @@ function BillingContent() {
             <div className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-[#121215] p-16 text-center text-zinc-500 dark:text-zinc-400 space-y-3 shadow-xs">
               <Receipt className="h-10 w-10 text-zinc-400 dark:text-zinc-600 mx-auto" />
               <p className="font-bold text-sm text-zinc-800 dark:text-zinc-200">
-                Select a room from the directory to manage billing
+                {stays.length === 0 ? "No active folios found for this property" : "Select a room from the directory to manage billing"}
               </p>
               <p className="text-xs text-zinc-400 max-w-sm mx-auto">
-                Use the directory on the left or select multiple rooms for group payment settlements.
+                {stays.length === 0 ? "Currently there are no in-house guests or pending folios for this property." : "Use the directory on the left or select multiple rooms for group payment settlements."}
               </p>
             </div>
           )}

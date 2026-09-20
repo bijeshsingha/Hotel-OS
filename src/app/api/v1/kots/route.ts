@@ -11,27 +11,23 @@ export async function GET(request: Request) {
       searchParams.get("code");
     const stationId = searchParams.get("stationId");
 
+    if (!rawProp) {
+      return NextResponse.json([]);
+    }
+
     let targetPropertyId = rawProp;
 
-    if (rawProp) {
-      const prop = await prisma.property.findFirst({
-        where: {
-          OR: [
-            { id: rawProp },
-            { code: { equals: rawProp } },
-            { displayName: { contains: rawProp } },
-          ],
-        },
-      });
-      if (prop) {
-        targetPropertyId = prop.id;
-      }
-    } else {
-      const defaultProp = await prisma.property.findFirst({
-        where: { status: "ACTIVE" },
-        orderBy: { createdAt: "asc" },
-      });
-      targetPropertyId = defaultProp?.id || null;
+    const prop = await prisma.property.findFirst({
+      where: {
+        OR: [
+          { id: rawProp },
+          { code: { equals: rawProp } },
+          { displayName: { contains: rawProp } },
+        ],
+      },
+    });
+    if (prop) {
+      targetPropertyId = prop.id;
     }
 
     if (!targetPropertyId) {

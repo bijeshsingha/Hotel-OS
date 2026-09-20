@@ -1,18 +1,21 @@
 /**
  * Hotel OS - Clean Property Configuration for Hotel Divine View
- * Source: DV_Today.bak & Verified PMS Master
+ * Source: Physical Room & Inventory Master (Verified 5 Floors)
  *
- * FULL INVENTORY: EXACT 76 ROOMS ACROSS 4 FLOORS
- * - Floor 1: 101 to 120 (20 Double Deluxe, Paltan Wing)
- * - Floor 2: 201 to 220 (20 Double Deluxe, Paltan Wing)
- * - Floor 3: 301 to 321 (21 Double Deluxe, City View Wing)
- * - Floor 4: 401 to 407 (7 Double Executive, Executive Floor)
- * - Floor 4: 408 to 415 (8 Family Executive, Executive Floor)
- * Total: 61 Deluxe + 7 Executive + 8 Family Executive = 76 Rooms
+ * FULL INVENTORY: EXACT 75 GUEST ROOMS ACROSS 5 FLOORS
+ * Separate Room Types based on Bed Configurations:
+ * - DLX_QUEEN: Deluxe Room (Queen Bed)
+ * - DLX_TWIN: Deluxe Room (Twin Bed)
+ * - STD_QUEEN: Standard Room Non-AC (Queen Bed)
+ * - STD_TWIN: Standard Room Non-AC (Twin Bed)
+ * - EXEC_KING: Executive Room (King Bed)
+ * - EXEC_QUEEN: Executive Room (Queen Bed)
+ * - FAM_2DBL: Family Executive (2 Double Beds)
+ * - FAM_KINGSGL: Family Executive (1 King + 1 Single)
  *
- * STRICT COMPLIANCE:
- * - Clean hotel master configuration only.
- * - ZERO guest records, booking transactions, or personal data.
+ * Back of House / Operational Units:
+ * - Room 30 (Common Washroom, 1st Floor)
+ * - Rooms 61, 62 (Staff Rooms, 3rd Floor)
  */
 
 import { OnboardingPropertyData } from "./types";
@@ -37,17 +40,17 @@ export const HOTEL_DIVINE_VIEW_PRESET: OnboardingPropertyData = {
   sourceBackup: "DV_Today.bak",
   restrictToBijeshOnly: true,
 
-  // 3 Master Room Categories (61 Deluxe, 7 Executive, 8 Family Executive)
+  // 8 Specific Master Room Categories separated by Bed Type
   roomTypes: [
     {
-      code: "DELUXE",
-      name: "Double Deluxe (AC)",
+      code: "DLX_QUEEN",
+      name: "Deluxe Room (Queen Bed)",
       capacity: 2,
       extraCapacity: 1,
       baseRate: 2000,
       extraAdultRate: 500,
       extraChildRate: 250,
-      bedType: "Queen / Twin AC",
+      bedType: "Queen Size Bed",
       amenities: [
         "Split AC",
         "Free High-Speed Wi-Fi",
@@ -58,14 +61,66 @@ export const HOTEL_DIVINE_VIEW_PRESET: OnboardingPropertyData = {
       ]
     },
     {
-      code: "EXECUTIVE",
-      name: "Double Executive (AC)",
+      code: "DLX_TWIN",
+      name: "Deluxe Room (Twin Bed)",
+      capacity: 2,
+      extraCapacity: 1,
+      baseRate: 2000,
+      extraAdultRate: 500,
+      extraChildRate: 250,
+      bedType: "Twin Bed",
+      amenities: [
+        "Split AC",
+        "Free High-Speed Wi-Fi",
+        "Smart LED TV",
+        "Electric Kettle",
+        "Attached Bath with Geyser",
+        "Intercom Facility"
+      ]
+    },
+    {
+      code: "STD_QUEEN",
+      name: "Standard Room Non-AC (Queen Bed)",
+      capacity: 2,
+      extraCapacity: 1,
+      baseRate: 1500,
+      extraAdultRate: 400,
+      extraChildRate: 200,
+      bedType: "Queen Size Bed",
+      amenities: [
+        "Ceiling Fan",
+        "Free High-Speed Wi-Fi",
+        "LED TV",
+        "Attached Bath with Hot Water",
+        "Intercom Facility"
+      ]
+    },
+    {
+      code: "STD_TWIN",
+      name: "Standard Room Non-AC (Twin Bed)",
+      capacity: 2,
+      extraCapacity: 1,
+      baseRate: 1500,
+      extraAdultRate: 400,
+      extraChildRate: 200,
+      bedType: "Twin Bed",
+      amenities: [
+        "Ceiling Fan",
+        "Free High-Speed Wi-Fi",
+        "LED TV",
+        "Attached Bath with Hot Water",
+        "Intercom Facility"
+      ]
+    },
+    {
+      code: "EXEC_KING",
+      name: "Executive Room (King Bed)",
       capacity: 2,
       extraCapacity: 1,
       baseRate: 2500,
       extraAdultRate: 500,
       extraChildRate: 250,
-      bedType: "King Bed AC",
+      bedType: "King Size Bed",
       amenities: [
         "Split AC",
         "Smart TV",
@@ -78,14 +133,54 @@ export const HOTEL_DIVINE_VIEW_PRESET: OnboardingPropertyData = {
       ]
     },
     {
-      code: "FAMILY_EXECUTIVE",
-      name: "Family Executive (AC)",
+      code: "EXEC_QUEEN",
+      name: "Executive Room (Queen Bed)",
+      capacity: 2,
+      extraCapacity: 1,
+      baseRate: 2500,
+      extraAdultRate: 500,
+      extraChildRate: 250,
+      bedType: "Queen Size Bed",
+      amenities: [
+        "Split AC",
+        "Smart TV",
+        "High-Speed Wi-Fi",
+        "Work Desk",
+        "Sofa Seating",
+        "Minibar Fridge",
+        "Electric Kettle",
+        "Attached Luxury Bathroom with Geyser"
+      ]
+    },
+    {
+      code: "FAM_2DBL",
+      name: "Family Executive (2 Double Beds)",
       capacity: 4,
       extraCapacity: 2,
       baseRate: 3000,
       extraAdultRate: 600,
       extraChildRate: 300,
-      bedType: "2 King Beds / Quad AC",
+      bedType: "2 Double Beds",
+      amenities: [
+        "Large Family Suite",
+        "Dual AC",
+        "55\" Smart TV",
+        "High-Speed Wi-Fi",
+        "Spacious Lounge",
+        "Attached Luxury Bathroom with Geyser",
+        "Tea/Coffee Bar",
+        "24hr In-Room Dining"
+      ]
+    },
+    {
+      code: "FAM_KINGSGL",
+      name: "Family Executive (1 King + 1 Single)",
+      capacity: 3,
+      extraCapacity: 2,
+      baseRate: 3000,
+      extraAdultRate: 600,
+      extraChildRate: 300,
+      bedType: "1 King Bed 1 Single Bed",
       amenities: [
         "Large Family Suite",
         "Dual AC",
@@ -99,465 +194,93 @@ export const HOTEL_DIVINE_VIEW_PRESET: OnboardingPropertyData = {
     }
   ],
 
-  // Exact 76 Physical Rooms Across 4 Floors
+  // Exact 75 Physical Guest Rooms Across 5 Floors
   rooms: [
-    {
-        "number": "101",
-        "floor": 1,
-        "roomTypeCode": "DELUXE",
-        "wing": "Paltan Wing"
-    },
-    {
-        "number": "102",
-        "floor": 1,
-        "roomTypeCode": "DELUXE",
-        "wing": "Paltan Wing"
-    },
-    {
-        "number": "103",
-        "floor": 1,
-        "roomTypeCode": "DELUXE",
-        "wing": "Paltan Wing"
-    },
-    {
-        "number": "104",
-        "floor": 1,
-        "roomTypeCode": "DELUXE",
-        "wing": "Paltan Wing"
-    },
-    {
-        "number": "105",
-        "floor": 1,
-        "roomTypeCode": "DELUXE",
-        "wing": "Paltan Wing"
-    },
-    {
-        "number": "106",
-        "floor": 1,
-        "roomTypeCode": "DELUXE",
-        "wing": "Paltan Wing"
-    },
-    {
-        "number": "107",
-        "floor": 1,
-        "roomTypeCode": "DELUXE",
-        "wing": "Paltan Wing"
-    },
-    {
-        "number": "108",
-        "floor": 1,
-        "roomTypeCode": "DELUXE",
-        "wing": "Paltan Wing"
-    },
-    {
-        "number": "109",
-        "floor": 1,
-        "roomTypeCode": "DELUXE",
-        "wing": "Paltan Wing"
-    },
-    {
-        "number": "110",
-        "floor": 1,
-        "roomTypeCode": "DELUXE",
-        "wing": "Paltan Wing"
-    },
-    {
-        "number": "111",
-        "floor": 1,
-        "roomTypeCode": "DELUXE",
-        "wing": "Paltan Wing"
-    },
-    {
-        "number": "112",
-        "floor": 1,
-        "roomTypeCode": "DELUXE",
-        "wing": "Paltan Wing"
-    },
-    {
-        "number": "113",
-        "floor": 1,
-        "roomTypeCode": "DELUXE",
-        "wing": "Paltan Wing"
-    },
-    {
-        "number": "114",
-        "floor": 1,
-        "roomTypeCode": "DELUXE",
-        "wing": "Paltan Wing"
-    },
-    {
-        "number": "115",
-        "floor": 1,
-        "roomTypeCode": "DELUXE",
-        "wing": "Paltan Wing"
-    },
-    {
-        "number": "116",
-        "floor": 1,
-        "roomTypeCode": "DELUXE",
-        "wing": "Paltan Wing"
-    },
-    {
-        "number": "117",
-        "floor": 1,
-        "roomTypeCode": "DELUXE",
-        "wing": "Paltan Wing"
-    },
-    {
-        "number": "118",
-        "floor": 1,
-        "roomTypeCode": "DELUXE",
-        "wing": "Paltan Wing"
-    },
-    {
-        "number": "119",
-        "floor": 1,
-        "roomTypeCode": "DELUXE",
-        "wing": "Paltan Wing"
-    },
-    {
-        "number": "120",
-        "floor": 1,
-        "roomTypeCode": "DELUXE",
-        "wing": "Paltan Wing"
-    },
-    {
-        "number": "201",
-        "floor": 2,
-        "roomTypeCode": "DELUXE",
-        "wing": "Paltan Wing"
-    },
-    {
-        "number": "202",
-        "floor": 2,
-        "roomTypeCode": "DELUXE",
-        "wing": "Paltan Wing"
-    },
-    {
-        "number": "203",
-        "floor": 2,
-        "roomTypeCode": "DELUXE",
-        "wing": "Paltan Wing"
-    },
-    {
-        "number": "204",
-        "floor": 2,
-        "roomTypeCode": "DELUXE",
-        "wing": "Paltan Wing"
-    },
-    {
-        "number": "205",
-        "floor": 2,
-        "roomTypeCode": "DELUXE",
-        "wing": "Paltan Wing"
-    },
-    {
-        "number": "206",
-        "floor": 2,
-        "roomTypeCode": "DELUXE",
-        "wing": "Paltan Wing"
-    },
-    {
-        "number": "207",
-        "floor": 2,
-        "roomTypeCode": "DELUXE",
-        "wing": "Paltan Wing"
-    },
-    {
-        "number": "208",
-        "floor": 2,
-        "roomTypeCode": "DELUXE",
-        "wing": "Paltan Wing"
-    },
-    {
-        "number": "209",
-        "floor": 2,
-        "roomTypeCode": "DELUXE",
-        "wing": "Paltan Wing"
-    },
-    {
-        "number": "210",
-        "floor": 2,
-        "roomTypeCode": "DELUXE",
-        "wing": "Paltan Wing"
-    },
-    {
-        "number": "211",
-        "floor": 2,
-        "roomTypeCode": "DELUXE",
-        "wing": "Paltan Wing"
-    },
-    {
-        "number": "212",
-        "floor": 2,
-        "roomTypeCode": "DELUXE",
-        "wing": "Paltan Wing"
-    },
-    {
-        "number": "213",
-        "floor": 2,
-        "roomTypeCode": "DELUXE",
-        "wing": "Paltan Wing"
-    },
-    {
-        "number": "214",
-        "floor": 2,
-        "roomTypeCode": "DELUXE",
-        "wing": "Paltan Wing"
-    },
-    {
-        "number": "215",
-        "floor": 2,
-        "roomTypeCode": "DELUXE",
-        "wing": "Paltan Wing"
-    },
-    {
-        "number": "216",
-        "floor": 2,
-        "roomTypeCode": "DELUXE",
-        "wing": "Paltan Wing"
-    },
-    {
-        "number": "217",
-        "floor": 2,
-        "roomTypeCode": "DELUXE",
-        "wing": "Paltan Wing"
-    },
-    {
-        "number": "218",
-        "floor": 2,
-        "roomTypeCode": "DELUXE",
-        "wing": "Paltan Wing"
-    },
-    {
-        "number": "219",
-        "floor": 2,
-        "roomTypeCode": "DELUXE",
-        "wing": "Paltan Wing"
-    },
-    {
-        "number": "220",
-        "floor": 2,
-        "roomTypeCode": "DELUXE",
-        "wing": "Paltan Wing"
-    },
-    {
-        "number": "301",
-        "floor": 3,
-        "roomTypeCode": "DELUXE",
-        "wing": "City View Wing"
-    },
-    {
-        "number": "302",
-        "floor": 3,
-        "roomTypeCode": "DELUXE",
-        "wing": "City View Wing"
-    },
-    {
-        "number": "303",
-        "floor": 3,
-        "roomTypeCode": "DELUXE",
-        "wing": "City View Wing"
-    },
-    {
-        "number": "304",
-        "floor": 3,
-        "roomTypeCode": "DELUXE",
-        "wing": "City View Wing"
-    },
-    {
-        "number": "305",
-        "floor": 3,
-        "roomTypeCode": "DELUXE",
-        "wing": "City View Wing"
-    },
-    {
-        "number": "306",
-        "floor": 3,
-        "roomTypeCode": "DELUXE",
-        "wing": "City View Wing"
-    },
-    {
-        "number": "307",
-        "floor": 3,
-        "roomTypeCode": "DELUXE",
-        "wing": "City View Wing"
-    },
-    {
-        "number": "308",
-        "floor": 3,
-        "roomTypeCode": "DELUXE",
-        "wing": "City View Wing"
-    },
-    {
-        "number": "309",
-        "floor": 3,
-        "roomTypeCode": "DELUXE",
-        "wing": "City View Wing"
-    },
-    {
-        "number": "310",
-        "floor": 3,
-        "roomTypeCode": "DELUXE",
-        "wing": "City View Wing"
-    },
-    {
-        "number": "311",
-        "floor": 3,
-        "roomTypeCode": "DELUXE",
-        "wing": "City View Wing"
-    },
-    {
-        "number": "312",
-        "floor": 3,
-        "roomTypeCode": "DELUXE",
-        "wing": "City View Wing"
-    },
-    {
-        "number": "313",
-        "floor": 3,
-        "roomTypeCode": "DELUXE",
-        "wing": "City View Wing"
-    },
-    {
-        "number": "314",
-        "floor": 3,
-        "roomTypeCode": "DELUXE",
-        "wing": "City View Wing"
-    },
-    {
-        "number": "315",
-        "floor": 3,
-        "roomTypeCode": "DELUXE",
-        "wing": "City View Wing"
-    },
-    {
-        "number": "316",
-        "floor": 3,
-        "roomTypeCode": "DELUXE",
-        "wing": "City View Wing"
-    },
-    {
-        "number": "317",
-        "floor": 3,
-        "roomTypeCode": "DELUXE",
-        "wing": "City View Wing"
-    },
-    {
-        "number": "318",
-        "floor": 3,
-        "roomTypeCode": "DELUXE",
-        "wing": "City View Wing"
-    },
-    {
-        "number": "319",
-        "floor": 3,
-        "roomTypeCode": "DELUXE",
-        "wing": "City View Wing"
-    },
-    {
-        "number": "320",
-        "floor": 3,
-        "roomTypeCode": "DELUXE",
-        "wing": "City View Wing"
-    },
-    {
-        "number": "321",
-        "floor": 3,
-        "roomTypeCode": "DELUXE",
-        "wing": "City View Wing"
-    },
-    {
-        "number": "401",
-        "floor": 4,
-        "roomTypeCode": "EXECUTIVE",
-        "wing": "Executive Floor"
-    },
-    {
-        "number": "402",
-        "floor": 4,
-        "roomTypeCode": "EXECUTIVE",
-        "wing": "Executive Floor"
-    },
-    {
-        "number": "403",
-        "floor": 4,
-        "roomTypeCode": "EXECUTIVE",
-        "wing": "Executive Floor"
-    },
-    {
-        "number": "404",
-        "floor": 4,
-        "roomTypeCode": "EXECUTIVE",
-        "wing": "Executive Floor"
-    },
-    {
-        "number": "405",
-        "floor": 4,
-        "roomTypeCode": "EXECUTIVE",
-        "wing": "Executive Floor"
-    },
-    {
-        "number": "406",
-        "floor": 4,
-        "roomTypeCode": "EXECUTIVE",
-        "wing": "Executive Floor"
-    },
-    {
-        "number": "407",
-        "floor": 4,
-        "roomTypeCode": "EXECUTIVE",
-        "wing": "Executive Floor"
-    },
-    {
-        "number": "408",
-        "floor": 4,
-        "roomTypeCode": "FAMILY_EXECUTIVE",
-        "wing": "Executive Floor"
-    },
-    {
-        "number": "409",
-        "floor": 4,
-        "roomTypeCode": "FAMILY_EXECUTIVE",
-        "wing": "Executive Floor"
-    },
-    {
-        "number": "410",
-        "floor": 4,
-        "roomTypeCode": "FAMILY_EXECUTIVE",
-        "wing": "Executive Floor"
-    },
-    {
-        "number": "411",
-        "floor": 4,
-        "roomTypeCode": "FAMILY_EXECUTIVE",
-        "wing": "Executive Floor"
-    },
-    {
-        "number": "412",
-        "floor": 4,
-        "roomTypeCode": "FAMILY_EXECUTIVE",
-        "wing": "Executive Floor"
-    },
-    {
-        "number": "413",
-        "floor": 4,
-        "roomTypeCode": "FAMILY_EXECUTIVE",
-        "wing": "Executive Floor"
-    },
-    {
-        "number": "414",
-        "floor": 4,
-        "roomTypeCode": "FAMILY_EXECUTIVE",
-        "wing": "Executive Floor"
-    },
-    {
-        "number": "415",
-        "floor": 4,
-        "roomTypeCode": "FAMILY_EXECUTIVE",
-        "wing": "Executive Floor"
-    }
-],
+    // --- 1ST FLOOR (12 Guest Rooms) ---
+    { number: "22", floor: 1, roomTypeCode: "DLX_QUEEN", wing: "Paltan Wing" },
+    { number: "23", floor: 1, roomTypeCode: "EXEC_KING", wing: "View Site Room" },
+    { number: "24", floor: 1, roomTypeCode: "EXEC_KING", wing: "View Site Room" },
+    { number: "25", floor: 1, roomTypeCode: "DLX_TWIN", wing: "Paltan Wing" },
+    { number: "26", floor: 1, roomTypeCode: "DLX_QUEEN", wing: "Paltan Wing" },
+    { number: "27", floor: 1, roomTypeCode: "DLX_QUEEN", wing: "Paltan Wing" },
+    { number: "28", floor: 1, roomTypeCode: "DLX_QUEEN", wing: "Paltan Wing" },
+    { number: "29", floor: 1, roomTypeCode: "FAM_2DBL", wing: "Paltan Wing" },
+    { number: "31", floor: 1, roomTypeCode: "FAM_2DBL", wing: "Paltan Wing" },
+    { number: "32", floor: 1, roomTypeCode: "DLX_QUEEN", wing: "Paltan Wing" },
+    { number: "33", floor: 1, roomTypeCode: "DLX_QUEEN", wing: "Paltan Wing" },
+    { number: "34", floor: 1, roomTypeCode: "DLX_QUEEN", wing: "Paltan Wing" },
+
+    // --- 2ND FLOOR (16 Guest Rooms) ---
+    { number: "35", floor: 2, roomTypeCode: "STD_QUEEN", wing: "Paltan Wing" },
+    { number: "36", floor: 2, roomTypeCode: "DLX_QUEEN", wing: "Paltan Wing" },
+    { number: "37", floor: 2, roomTypeCode: "DLX_QUEEN", wing: "Paltan Wing" },
+    { number: "38", floor: 2, roomTypeCode: "EXEC_KING", wing: "View Site Room" },
+    { number: "39", floor: 2, roomTypeCode: "DLX_QUEEN", wing: "Paltan Wing" },
+    { number: "40", floor: 2, roomTypeCode: "FAM_2DBL", wing: "Paltan Wing" },
+    { number: "41", floor: 2, roomTypeCode: "DLX_QUEEN", wing: "Paltan Wing" },
+    { number: "42", floor: 2, roomTypeCode: "DLX_QUEEN", wing: "Paltan Wing" },
+    { number: "43", floor: 2, roomTypeCode: "DLX_QUEEN", wing: "Paltan Wing" },
+    { number: "44", floor: 2, roomTypeCode: "DLX_QUEEN", wing: "Paltan Wing" },
+    { number: "45", floor: 2, roomTypeCode: "FAM_2DBL", wing: "Paltan Wing" },
+    { number: "46", floor: 2, roomTypeCode: "DLX_QUEEN", wing: "Paltan Wing" },
+    { number: "47", floor: 2, roomTypeCode: "DLX_QUEEN", wing: "Paltan Wing" },
+    { number: "48", floor: 2, roomTypeCode: "DLX_QUEEN", wing: "Paltan Wing" },
+    { number: "49", floor: 2, roomTypeCode: "DLX_QUEEN", wing: "Paltan Wing" },
+    { number: "50", floor: 2, roomTypeCode: "DLX_QUEEN", wing: "Paltan Wing" },
+
+    // --- 3RD FLOOR (15 Guest Rooms) ---
+    { number: "51", floor: 3, roomTypeCode: "STD_QUEEN", wing: "City View Wing" },
+    { number: "52", floor: 3, roomTypeCode: "STD_QUEEN", wing: "City View Wing" },
+    { number: "53", floor: 3, roomTypeCode: "STD_QUEEN", wing: "City View Wing" },
+    { number: "54", floor: 3, roomTypeCode: "DLX_QUEEN", wing: "City View Wing" },
+    { number: "55", floor: 3, roomTypeCode: "DLX_QUEEN", wing: "City View Wing" },
+    { number: "56", floor: 3, roomTypeCode: "STD_TWIN", wing: "City View Wing" },
+    { number: "57", floor: 3, roomTypeCode: "STD_QUEEN", wing: "City View Wing" },
+    { number: "58", floor: 3, roomTypeCode: "STD_QUEEN", wing: "City View Wing" },
+    { number: "59", floor: 3, roomTypeCode: "STD_QUEEN", wing: "City View Wing" },
+    { number: "60", floor: 3, roomTypeCode: "STD_TWIN", wing: "City View Wing" },
+    { number: "63", floor: 3, roomTypeCode: "STD_QUEEN", wing: "City View Wing" },
+    { number: "64", floor: 3, roomTypeCode: "STD_QUEEN", wing: "City View Wing" },
+    { number: "65", floor: 3, roomTypeCode: "FAM_2DBL", wing: "City View Wing" },
+    { number: "66", floor: 3, roomTypeCode: "STD_QUEEN", wing: "City View Wing" },
+    { number: "67", floor: 3, roomTypeCode: "STD_QUEEN", wing: "City View Wing" },
+
+    // --- 4TH FLOOR (18 Guest Rooms) ---
+    { number: "215", floor: 4, roomTypeCode: "DLX_QUEEN", wing: "Upper Wing" },
+    { number: "216", floor: 4, roomTypeCode: "DLX_QUEEN", wing: "Upper Wing" },
+    { number: "217", floor: 4, roomTypeCode: "DLX_QUEEN", wing: "Upper Wing" },
+    { number: "218", floor: 4, roomTypeCode: "DLX_QUEEN", wing: "Upper Wing" },
+    { number: "219", floor: 4, roomTypeCode: "DLX_QUEEN", wing: "Upper Wing" },
+    { number: "220", floor: 4, roomTypeCode: "STD_QUEEN", wing: "Upper Wing" },
+    { number: "221", floor: 4, roomTypeCode: "DLX_QUEEN", wing: "Upper Wing" },
+    { number: "222", floor: 4, roomTypeCode: "DLX_QUEEN", wing: "Upper Wing" },
+    { number: "223", floor: 4, roomTypeCode: "DLX_QUEEN", wing: "Upper Wing" },
+    { number: "224", floor: 4, roomTypeCode: "DLX_QUEEN", wing: "Upper Wing" },
+    { number: "225", floor: 4, roomTypeCode: "DLX_QUEEN", wing: "Upper Wing" },
+    { number: "226", floor: 4, roomTypeCode: "DLX_QUEEN", wing: "Upper Wing" },
+    { number: "227", floor: 4, roomTypeCode: "EXEC_QUEEN", wing: "View Site Room" },
+    { number: "228", floor: 4, roomTypeCode: "FAM_KINGSGL", wing: "View Site Room" },
+    { number: "229", floor: 4, roomTypeCode: "DLX_QUEEN", wing: "Upper Wing" },
+    { number: "230", floor: 4, roomTypeCode: "DLX_QUEEN", wing: "Upper Wing" },
+    { number: "231", floor: 4, roomTypeCode: "DLX_QUEEN", wing: "Upper Wing" },
+    { number: "232", floor: 4, roomTypeCode: "DLX_TWIN", wing: "Upper Wing" },
+
+    // --- 5TH FLOOR (14 Guest Rooms) ---
+    { number: "201", floor: 5, roomTypeCode: "DLX_QUEEN", wing: "Executive Floor" },
+    { number: "202", floor: 5, roomTypeCode: "DLX_QUEEN", wing: "Executive Floor" },
+    { number: "203", floor: 5, roomTypeCode: "DLX_QUEEN", wing: "Executive Floor" },
+    { number: "204", floor: 5, roomTypeCode: "EXEC_KING", wing: "Executive Floor" },
+    { number: "205", floor: 5, roomTypeCode: "EXEC_KING", wing: "Executive Floor" },
+    { number: "206", floor: 5, roomTypeCode: "DLX_TWIN", wing: "Executive Floor" },
+    { number: "207", floor: 5, roomTypeCode: "DLX_QUEEN", wing: "Executive Floor" },
+    { number: "208", floor: 5, roomTypeCode: "DLX_QUEEN", wing: "Executive Floor" },
+    { number: "209", floor: 5, roomTypeCode: "DLX_QUEEN", wing: "Executive Floor" },
+    { number: "210", floor: 5, roomTypeCode: "FAM_KINGSGL", wing: "Executive Floor" },
+    { number: "211", floor: 5, roomTypeCode: "FAM_KINGSGL", wing: "Executive Floor" },
+    { number: "212", floor: 5, roomTypeCode: "EXEC_KING", wing: "Executive Floor" },
+    { number: "213", floor: 5, roomTypeCode: "DLX_QUEEN", wing: "Executive Floor" },
+    { number: "214", floor: 5, roomTypeCode: "DLX_QUEEN", wing: "Executive Floor" }
+  ],
 
   // Document Number Sequences with HDV branding
   documentSequences: {

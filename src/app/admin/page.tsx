@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
+import Link from "next/link";
 import { useHotel } from "@/lib/context/hotel-context";
 import {
   Shield,
@@ -55,6 +56,7 @@ import {
 import { formatINR } from "@/lib/gst/calculator";
 import { CompanySelector, CompanyItem } from "@/components/pms/company-selector";
 import initialCompaniesJson from "@/data/initial-companies.json";
+import { UserManagementTab } from "@/components/admin/user-management-tab";
 
 
 const ADMIN_SECTIONS = [
@@ -67,8 +69,13 @@ const ADMIN_SECTIONS = [
 ];
 
 export default function AdminPortalPage() {
+  const { activeProperty, refreshData, refreshKey, user } = useHotel();
 
-  const { activeProperty, refreshData, refreshKey } = useHotel();
+  const isSuperAdmin =
+    user?.activeRole === "ORG_OWNER" ||
+    user?.username === "bijesh_singha" ||
+    user?.email?.toLowerCase().includes("bijesh") ||
+    user?.username === "admin";
 
   // Authentication State
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -83,7 +90,6 @@ export default function AdminPortalPage() {
     "HOTEL" | "GRC" | "RATES" | "ROOMS" | "EXPENSES" | "SECURITY"
   >("HOTEL");
 
-
   // Notifications
   const [toastMessage, setToastMessage] = useState<{ text: string; type: "success" | "error" } | null>(null);
 
@@ -92,11 +98,22 @@ export default function AdminPortalPage() {
     setTimeout(() => setToastMessage(null), 3500);
   };
 
-  // Check existing session
+  // Check existing session & URL tab query
   useEffect(() => {
     const token = sessionStorage.getItem("hotelos_admin_token");
     if (token) {
       setIsAuthenticated(true);
+    }
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const tabParam = params.get("tab")?.toUpperCase();
+      if (tabParam === "USERS") {
+        window.location.replace("/staff");
+        return;
+      }
+      if (tabParam && ["HOTEL", "GRC", "RATES", "ROOMS", "EXPENSES", "SECURITY"].includes(tabParam)) {
+        setActiveTab(tabParam as any);
+      }
     }
   }, []);
 
@@ -157,9 +174,10 @@ export default function AdminPortalPage() {
   const [hotelSaving, setHotelSaving] = useState(false);
 
   const fetchHotelDetails = async () => {
+    if (!activeProperty?.id) return;
     setHotelLoading(true);
     try {
-      const res = await fetch(`/api/v1/admin/hotel?propertyId=${activeProperty?.id || ""}`);
+      const res = await fetch(`/api/v1/admin/hotel?propertyId=${activeProperty.id}`);
       if (res.ok) {
         const data = await res.json();
         setHotelForm({
@@ -221,11 +239,15 @@ export default function AdminPortalPage() {
   const [selectedArchiveSnapshot, setSelectedArchiveSnapshot] = useState<any | null>(null);
 
   const fetchGrcList = async () => {
+    if (!activeProperty?.id) {
+      setGrcList([]);
+      return;
+    }
     setGrcLoading(true);
     try {
       const isArchived = grcViewMode === "ARCHIVED";
       const res = await fetch(
-        `/api/v1/admin/grc?propertyId=${activeProperty?.id || ""}&query=${encodeURIComponent(grcSearch)}&archived=${isArchived}`
+        `/api/v1/admin/grc?propertyId=${activeProperty.id}&query=${encodeURIComponent(grcSearch)}&archived=${isArchived}`
       );
       if (res.ok) {
         const data = await res.json();
@@ -524,9 +546,13 @@ export default function AdminPortalPage() {
   const [ratesSavingId, setRatesSavingId] = useState<string | null>(null);
 
   const fetchRates = async () => {
+    if (!activeProperty?.id) {
+      setRatesList([]);
+      return;
+    }
     setRatesLoading(true);
     try {
-      const res = await fetch(`/api/v1/admin/rates?propertyId=${activeProperty?.id || ""}`);
+      const res = await fetch(`/api/v1/admin/rates?propertyId=${activeProperty.id}`);
       if (res.ok) {
         const data = await res.json();
         setRatesList(Array.isArray(data) ? data : []);
@@ -583,9 +609,14 @@ export default function AdminPortalPage() {
   });
 
   const fetchRooms = async () => {
+    if (!activeProperty?.id) {
+      setRoomsList([]);
+      setRoomTypes([]);
+      return;
+    }
     setRoomsLoading(true);
     try {
-      const res = await fetch(`/api/v1/admin/rooms?propertyId=${activeProperty?.id || ""}`);
+      const res = await fetch(`/api/v1/admin/rooms?propertyId=${activeProperty.id}`);
       if (res.ok) {
         const data = await res.json();
         setRoomsList(data.rooms || []);
@@ -819,7 +850,7 @@ export default function AdminPortalPage() {
 
   // Initial tab loading
   useEffect(() => {
-    if (!isAuthenticated) return;
+    if (!isAuthenticated || !activeProperty?.id) return;
     fetchRooms();
     fetchRates();
     if (activeTab === "HOTEL") fetchHotelDetails();
@@ -835,6 +866,36 @@ export default function AdminPortalPage() {
     return () => clearTimeout(timer);
   }, [grcSearch]);
 
+
+  // Super Admin Authorization Gate
+  if (!isSuperAdmin) {
+    return (
+      <div className="min-h-[70vh] flex flex-col items-center justify-center p-6 text-center">
+        <div className="w-full max-w-md rounded-3xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 p-8 shadow-xl space-y-4">
+          <div className="h-14 w-14 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400 flex items-center justify-center mx-auto">
+            <Lock className="h-7 w-7" />
+          </div>
+          <div className="space-y-1">
+            <h2 className="text-lg font-bold text-zinc-900 dark:text-white">Super Admin Access Required</h2>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400">
+              The Master Admin Suite is strictly restricted to Organization Owners & Super Administrators.
+            </p>
+          </div>
+          <div className="p-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs font-mono text-zinc-600 dark:text-zinc-400">
+            Active Account: <span className="font-bold text-zinc-900 dark:text-white">@{user?.username || "staff"}</span> ({user?.activeRole || "STAFF"})
+          </div>
+          <div className="pt-2">
+            <Link
+              href="/pms"
+              className="inline-flex items-center justify-center w-full px-4 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 dark:bg-white dark:hover:bg-zinc-200 text-white dark:text-zinc-950 font-bold text-xs transition"
+            >
+              Return to Front Desk
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // ====================================================
   // SCREEN 1: LOCKED AUTHENTICATION GATE
@@ -929,6 +990,36 @@ export default function AdminPortalPage() {
             </button>
           </form>
 
+        </div>
+      </div>
+    );
+  }
+
+  // Super Admin Role Guard
+  if (!isSuperAdmin) {
+    return (
+      <div className="min-h-[70vh] flex flex-col items-center justify-center p-6 text-center">
+        <div className="w-full max-w-md rounded-3xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 p-8 shadow-xl space-y-4">
+          <div className="h-14 w-14 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400 flex items-center justify-center mx-auto">
+            <Lock className="h-7 w-7" />
+          </div>
+          <div className="space-y-1">
+            <h2 className="text-lg font-bold text-zinc-900 dark:text-white">Super Admin Access Required</h2>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400">
+              The Master Database & Admin Suite is restricted to Organization Owners & Super Administrators.
+            </p>
+          </div>
+          <div className="p-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs font-mono text-zinc-600 dark:text-zinc-400">
+            Active User: <span className="font-bold text-zinc-900 dark:text-white">@{user?.username || "staff"}</span> ({user?.activeRole || "STAFF"})
+          </div>
+          <div className="pt-2">
+            <a
+              href="/pms"
+              className="inline-flex items-center justify-center w-full px-4 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 dark:bg-white dark:hover:bg-zinc-200 text-white dark:text-zinc-950 font-bold text-xs transition"
+            >
+              Return to Front Desk
+            </a>
+          </div>
         </div>
       </div>
     );
@@ -1312,6 +1403,8 @@ export default function AdminPortalPage() {
           )}
 
 
+
+
       {/* ====================================================
           TAB CONTENT 2: GRC & REGISTRATIONS EDITOR
       ==================================================== */}
@@ -1637,7 +1730,7 @@ export default function AdminPortalPage() {
                         </span>
                       </div>
                       <p className="text-xs text-zinc-500 dark:text-zinc-400 font-mono">
-                        {hotelForm.displayName || activeProperty?.displayName || "Hotel Ambarish Grand Residency"} • {hotelForm.code || activeProperty?.code || "GUW-01"}
+                        {hotelForm.displayName || activeProperty?.displayName || "Hotel"} • {hotelForm.code || activeProperty?.code || ""}
                       </p>
                     </div>
                   </div>
@@ -1803,7 +1896,7 @@ export default function AdminPortalPage() {
                             (r) => r.number === editingGrc.preAssignedRoom || r.id === editingGrc.preAssignedRoom
                           );
                           const primaryRoomNumber = primaryRoomObj?.number || editingGrc.preAssignedRoom || "—";
-                          const primaryRoomType = primaryRoomObj?.roomType?.name || (primaryRoomObj?.wing === "TWIN" ? "Deluxe Twin Room" : "Deluxe King Room");
+                          const primaryRoomType = primaryRoomObj?.roomType?.name || primaryRoomObj?.name || "Standard Room";
                           const primaryPaxCount = Number(editingGrc.extraPaxCount) || 0;
                           const primaryRate = editingGrc.isComplimentary ? 0 : (editingGrc.agreedRoomTariff !== undefined ? editingGrc.agreedRoomTariff : 3200);
 
@@ -1911,7 +2004,7 @@ export default function AdminPortalPage() {
                                     Room {r?.number || id}
                                   </span>
                                   <span className="text-xs text-zinc-800 dark:text-zinc-300 font-medium truncate">
-                                    {r?.roomType?.name || (r?.wing === "TWIN" ? "Deluxe Twin Room" : "Deluxe King Room")}
+                                    {r?.roomType?.name || r?.name || "Standard Room"}
                                   </span>
                                 </div>
 

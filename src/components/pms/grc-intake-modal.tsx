@@ -430,7 +430,8 @@ export function GrcIntakeModal({
   };
 
   const handleCopyKioskLink = () => {
-    const link = `${window.location.origin}/checkin?property=${activeProperty?.code || "GUW-01"}`;
+    const propParam = activeProperty?.code ? `?property=${encodeURIComponent(activeProperty.code)}` : activeProperty?.id ? `?propertyId=${activeProperty.id}` : "";
+    const link = `${window.location.origin}/checkin${propParam}`;
     navigator.clipboard.writeText(link);
     setCopiedLink(true);
     setTimeout(() => setCopiedLink(false), 2000);
@@ -464,7 +465,7 @@ export function GrcIntakeModal({
                 <span>Guest Check-In & GRC Intake</span>
               </h2>
               <p className="text-xs text-zinc-500 dark:text-zinc-400 font-mono">
-                {activeProperty?.displayName || "Hotel Ambarish Grand Residency"} • {activeProperty?.code || "GUW-01"}
+                {activeProperty?.displayName || "Hotel"} {activeProperty?.code ? `• ${activeProperty.code}` : ""}
               </p>
             </div>
           </div>
@@ -2024,7 +2025,7 @@ export function GrcIntakeModal({
                 </button>
 
                 <a
-                  href={`/checkin?property=${activeProperty?.code || "GUW-01"}`}
+                  href={activeProperty?.code ? `/checkin?property=${encodeURIComponent(activeProperty.code)}` : activeProperty?.id ? `/checkin?propertyId=${activeProperty.id}` : "/checkin"}
                   target="_blank"
                   rel="noreferrer"
                   className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-xs font-bold text-white inline-flex items-center gap-1.5 transition shadow"

@@ -16,7 +16,15 @@ import {
 function SidebarNav({ isExpanded, onLinkClick }: { isExpanded: boolean; onLinkClick?: () => void }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const navItems = NAV_ITEMS;
+  const { user } = useHotel();
+
+  const isSuperAdmin =
+    user?.activeRole === "ORG_OWNER" ||
+    user?.username === "bijesh_singha" ||
+    user?.email?.toLowerCase().includes("bijesh") ||
+    user?.username === "admin";
+
+  const navItems = NAV_ITEMS.filter((item) => !item.superAdminOnly || isSuperAdmin);
 
   return (
     <div className="space-y-0.5">

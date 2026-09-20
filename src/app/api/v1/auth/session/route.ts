@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { ensurePropertyDateSynchronized } from "@/lib/domain/night-audit-service";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -10,6 +13,19 @@ export async function GET(request: Request) {
 
     // Auto-sync all properties to today's date and rollover if needed
     const rawProps = await prisma.property.findMany({ select: { id: true } });
+    if (rawProps.length === 0) {
+      return NextResponse.json({
+        initialized: false,
+        redirect: "/onboarding",
+        message: "No properties configured. Redirecting to onboarding studio.",
+        user: null,
+        activeProperty: null,
+        availableProperties: [],
+        allUsers: [],
+        allProperties: [],
+      });
+    }
+
     for (const p of rawProps) {
       await ensurePropertyDateSynchronized(p.id);
     }
@@ -25,8 +41,10 @@ export async function GET(request: Request) {
       "ambarish_reception": "reservation.ambarish@gmail.com",
       "frontdesk": "reservation.ambarish@gmail.com",
       "suraj": "reservation.ambarish@gmail.com",
-      "divine_frontdesk": "reception.divine@hotelos.in",
-      "divine_reception": "reception.divine@hotelos.in",
+      "reception.divine": "reception.divine@hotelos.internal",
+      "divine_frontdesk": "reception.divine@hotelos.internal",
+      "divine_reception": "reception.divine@hotelos.internal",
+      "das": "reception.divine@hotelos.internal",
       "general_manager": "atanu.chowdhury@hotelambarish.com",
       "admin": "bijesh.singha@hotelos.in",
     };
@@ -40,7 +58,9 @@ export async function GET(request: Request) {
         where: {
           OR: [
             { email: targetEmail },
+            { email: targetEmail + "@hotelos.internal" },
             { email: { startsWith: targetEmail + "@" } },
+            { name: { contains: targetEmail } },
           ],
         },
         include: {
@@ -130,15 +150,18 @@ export async function GET(request: Request) {
     const activeRole = activeGrant?.role?.code || (isBijesh ? "ORG_OWNER" : "FD_MGR");
 
     const getUsername = (email: string) => {
+      if (email.endsWith("@hotelos.internal")) return email.replace("@hotelos.internal", "");
       if (email.includes("bijesh")) return "bijesh_singha";
       if (email.includes("atanu")) return "atanu_chowdhury";
-      if (email.includes("reception.ambarish")) return "ambarish_frontdesk";
-      if (email.includes("reception.divine")) return "divine_frontdesk";
+      if (email.includes("reception.ambarish") || email.includes("reservation.ambarish")) return "ambarish_frontdesk";
+      if (email.includes("reception.divine")) return "reception.divine";
+      if (email.includes("divine")) return "divine_frontdesk";
       if (email.includes("gm@")) return "general_manager";
       return email.split("@")[0];
     };
 
     return NextResponse.json({
+      initialized: true,
       user: {
         id: user.id,
         name: user.name,

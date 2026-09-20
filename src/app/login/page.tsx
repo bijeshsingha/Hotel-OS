@@ -15,6 +15,8 @@ import {
   AlertCircle,
   KeyRound,
   Layers,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 
 export default function LoginPage() {
@@ -27,22 +29,92 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [profiles, setProfiles] = useState<any[]>([]);
+  const [loadingProfiles, setLoadingProfiles] = useState(true);
+
+  React.useEffect(() => {
+    async function loadProfiles() {
+      try {
+        const res = await fetch("/api/v1/auth/session");
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data?.allUsers)) {
+            setProfiles(data.allUsers);
+          }
+        }
+      } catch (e) {
+        console.error("Failed to load profiles:", e);
+      } finally {
+        setLoadingProfiles(false);
+      }
+    }
+    loadProfiles();
+  }, []);
+
+  const getProfileTheme = (scope: string) => {
+    const s = (scope || "").toLowerCase();
+
+    if (s.includes("ambarish")) {
+      return {
+        badge: "AMBARISH",
+        badgeClass: "bg-amber-500/10 text-amber-300 border-amber-500/30",
+        borderClass: "border-amber-900/40 hover:border-amber-600/60",
+        hoverTitle: "group-hover:text-amber-300",
+        indicatorColor: "text-amber-400",
+        scopeLabel: "● Hotel Ambarish Grand Residency ONLY",
+      };
+    }
+
+    if (s.includes("divine")) {
+      return {
+        badge: "DIVINE VIEW",
+        badgeClass: "bg-blue-500/10 text-blue-300 border-blue-500/30",
+        borderClass: "border-blue-900/40 hover:border-blue-600/60",
+        hoverTitle: "group-hover:text-blue-300",
+        indicatorColor: "text-blue-400",
+        scopeLabel: "● Hotel Divine View ONLY",
+      };
+    }
+
+    return {
+      badge: "ALL HOTELS",
+      badgeClass: "bg-emerald-500/10 text-emerald-300 border-emerald-500/30",
+      borderClass: "border-emerald-900/40 hover:border-emerald-600/60",
+      hoverTitle: "group-hover:text-emerald-300",
+      indicatorColor: "text-emerald-400",
+      scopeLabel: "● Multi-Property Access (All Properties)",
+    };
+  };
+
+  const [showPassword, setShowPassword] = useState(false);
+
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!username.trim()) {
       setError("Please enter your username.");
       return;
     }
+    if (!password.trim()) {
+      setError("Please enter your password or security PIN.");
+      return;
+    }
 
     setLoading(true);
     setError(null);
     try {
-      // Authenticate via session API
-      const res = await fetch(`/api/v1/auth/session?username=${encodeURIComponent(username.trim())}`);
+      // Verify credentials via auth verify endpoint
+      const res = await fetch("/api/v1/auth/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          identifier: username.trim(),
+          password: password.trim(),
+        }),
+      });
       const data = await res.json();
 
-      if (!res.ok || !data?.user) {
-        throw new Error(data?.error || "Invalid username or account not found.");
+      if (!res.ok) {
+        throw new Error(data?.error || "Invalid username or password / PIN.");
       }
 
       switchUser(username.trim());
@@ -54,15 +126,14 @@ export default function LoginPage() {
     }
   };
 
-  const handleQuickLogin = (userIdentifier: string) => {
+  const handleSelectProfile = (userIdentifier: string) => {
     setUsername(userIdentifier);
-    setPassword("••••••••");
-    setLoading(true);
+    setPassword("");
     setError(null);
-    switchUser(userIdentifier);
-    setTimeout(() => {
-      router.push("/pms");
-    }, 400);
+    const input = document.getElementById("login-password-input");
+    if (input) {
+      input.focus();
+    }
   };
 
   return (
@@ -119,7 +190,7 @@ export default function LoginPage() {
                 <input
                   type="text"
                   required
-                  placeholder="e.g. ambarish_frontdesk"
+                  placeholder="e.g. ambarish_frontdesk or bijesh_singha"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   className="w-full rounded-xl bg-zinc-900/90 border border-zinc-700/80 pl-9 pr-3 py-2.5 text-white font-mono placeholder-zinc-500 focus:outline-none focus:border-white transition"
@@ -129,18 +200,38 @@ export default function LoginPage() {
 
             {/* Password Input */}
             <div className="space-y-1.5">
-              <label className="text-zinc-300 font-bold block">Password / Security PIN</label>
+              <div className="flex items-center justify-between">
+                <label className="text-zinc-300 font-bold block">Password / Security PIN</label>
+                <button
+                  type="button"
+                  onClick={() => setPassword("hotelos@2026")}
+                  className="text-[10px] text-blue-400 hover:text-blue-300 font-mono underline"
+                >
+                  Use Demo Password
+                </button>
+              </div>
               <div className="relative">
                 <KeyRound className="absolute left-3 top-3 h-4 w-4 text-zinc-500" />
                 <input
-                  type="password"
+                  id="login-password-input"
+                  type={showPassword ? "text" : "password"}
                   required
-                  placeholder="••••••••"
+                  placeholder="Enter password or staff PIN"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full rounded-xl bg-zinc-900/90 border border-zinc-700/80 pl-9 pr-3 py-2.5 text-white font-mono placeholder-zinc-500 focus:outline-none focus:border-white transition"
+                  className="w-full rounded-xl bg-zinc-900/90 border border-zinc-700/80 pl-9 pr-10 py-2.5 text-white font-mono placeholder-zinc-500 focus:outline-none focus:border-white transition"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-3 text-zinc-400 hover:text-zinc-200"
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
               </div>
+              <p className="text-[10px] text-zinc-500 font-mono">
+                Default credentials: <code className="text-zinc-400 bg-zinc-800 px-1 py-0.5 rounded">hotelos@2026</code> or configured staff PIN
+              </p>
             </div>
 
             {/* Remember Me */}
@@ -171,70 +262,63 @@ export default function LoginPage() {
           {/* Quick Demo Access Buttons */}
           <div className="pt-4 border-t border-zinc-800/80 space-y-2.5">
             <div className="text-[10px] font-mono uppercase font-bold text-zinc-500 flex items-center justify-between">
-              <span>Quick Login Demo Profiles</span>
-              <span className="text-zinc-600">1-Click Test</span>
+              <span>Staff Accounts Directory</span>
+              <span className="text-zinc-600">Click to Select</span>
             </div>
 
             <div className="space-y-2">
-              {/* 1. Ambarish Front Desk */}
-              <button
-                type="button"
-                onClick={() => handleQuickLogin("ambarish_frontdesk")}
-                className="w-full rounded-2xl bg-zinc-900/80 hover:bg-zinc-800/90 border border-amber-900/40 hover:border-amber-600/60 p-3 text-left transition flex items-center justify-between group shadow-sm"
-              >
-                <div>
-                  <div className="font-bold text-white text-xs group-hover:text-amber-300 transition flex items-center gap-1.5">
-                    <span>Rupjyoti Sarma</span>
-                    <span className="text-[10px] font-mono text-zinc-400 font-normal">(@ambarish_frontdesk)</span>
-                  </div>
-                  <div className="text-[10px] text-amber-400 font-mono mt-0.5">
-                    ● Hotel Ambarish Grand Residency ONLY
-                  </div>
+              {loadingProfiles ? (
+                <div className="space-y-2 py-1">
+                  <div className="h-14 rounded-2xl bg-zinc-900/60 animate-pulse border border-zinc-800/60" />
+                  <div className="h-14 rounded-2xl bg-zinc-900/60 animate-pulse border border-zinc-800/60" />
+                  <div className="h-14 rounded-2xl bg-zinc-900/60 animate-pulse border border-zinc-800/60" />
                 </div>
-                <span className="rounded-md bg-amber-500/10 text-amber-300 border border-amber-500/30 px-2 py-0.5 text-[9px] font-mono font-bold">
-                  AMBARISH
-                </span>
-              </button>
-
-              {/* 2. Divine View Front Desk */}
-              <button
-                type="button"
-                onClick={() => handleQuickLogin("divine_frontdesk")}
-                className="w-full rounded-2xl bg-zinc-900/80 hover:bg-zinc-800/90 border border-blue-900/40 hover:border-blue-600/60 p-3 text-left transition flex items-center justify-between group shadow-sm"
-              >
-                <div>
-                  <div className="font-bold text-white text-xs group-hover:text-blue-300 transition flex items-center gap-1.5">
-                    <span>Bhaskar Bora</span>
-                    <span className="text-[10px] font-mono text-zinc-400 font-normal">(@divine_frontdesk)</span>
+              ) : profiles.length > 0 ? (
+                profiles.map((p) => {
+                  const theme = getProfileTheme(p.propertyScope);
+                  const displayUsername = p.username || (p.email ? p.email.split("@")[0] : "user");
+                  return (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => handleSelectProfile(displayUsername)}
+                      className={`w-full rounded-2xl bg-zinc-900/80 hover:bg-zinc-800/90 border ${theme.borderClass} p-3 text-left transition flex items-center justify-between group shadow-sm`}
+                    >
+                      <div>
+                        <div className={`font-bold text-white text-xs ${theme.hoverTitle} transition flex items-center gap-1.5`}>
+                          <span>{p.name}</span>
+                          <span className="text-[10px] font-mono text-zinc-400 font-normal">(@{displayUsername})</span>
+                        </div>
+                        <div className={`text-[10px] ${theme.indicatorColor} font-mono mt-0.5`}>
+                          {theme.scopeLabel}
+                        </div>
+                      </div>
+                      <span className={`rounded-md px-2 py-0.5 text-[9px] font-mono font-bold border ${theme.badgeClass}`}>
+                        {theme.badge}
+                      </span>
+                    </button>
+                  );
+                })
+              ) : (
+                <div className="rounded-2xl border border-blue-500/20 bg-blue-950/20 p-4 text-center space-y-2.5">
+                  <div className="h-8 w-8 rounded-xl bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-400 mx-auto">
+                    <Building2 className="h-4 w-4" />
                   </div>
-                  <div className="text-[10px] text-blue-400 font-mono mt-0.5">
-                    ● HOTEL DIVINE VIEW ONLY
+                  <div>
+                    <div className="text-xs font-bold text-white">First Time Setup Required</div>
+                    <div className="text-[11px] text-zinc-400 mt-0.5">
+                      No hotel property or staff accounts found in the database.
+                    </div>
                   </div>
+                  <a
+                    href="/onboarding"
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs px-4 py-2 transition shadow-md"
+                  >
+                    <span>Start Hotel Onboarding</span>
+                    <ArrowRight className="h-3.5 w-3.5" />
+                  </a>
                 </div>
-                <span className="rounded-md bg-blue-500/10 text-blue-300 border border-blue-500/30 px-2 py-0.5 text-[9px] font-mono font-bold">
-                  DIVINE VIEW
-                </span>
-              </button>
-
-              {/* 3. General Manager */}
-              <button
-                type="button"
-                onClick={() => handleQuickLogin("general_manager")}
-                className="w-full rounded-2xl bg-zinc-900/80 hover:bg-zinc-800/90 border border-zinc-700/60 hover:border-zinc-500 p-3 text-left transition flex items-center justify-between group shadow-sm"
-              >
-                <div>
-                  <div className="font-bold text-white text-xs group-hover:text-emerald-300 transition flex items-center gap-1.5">
-                    <span>General Manager</span>
-                    <span className="text-[10px] font-mono text-zinc-400 font-normal">(@general_manager)</span>
-                  </div>
-                  <div className="text-[10px] text-emerald-400 font-mono mt-0.5">
-                    ● Multi-Property Access (Both Hotels)
-                  </div>
-                </div>
-                <span className="rounded-md bg-emerald-500/10 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 text-[9px] font-mono font-bold">
-                  ALL HOTELS
-                </span>
-              </button>
+              )}
             </div>
           </div>
         </div>

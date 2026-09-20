@@ -160,13 +160,15 @@ export function ReservationVoucherModal({
               />
               <div>
                 <h1 className="text-xl sm:text-2xl font-black tracking-tight text-zinc-950 uppercase">
-                  {activeProperty?.displayName || "Hotel Ambarish Grand Residency"}
+                  {activeProperty?.displayName || "Hotel Reservation Voucher"}
                 </h1>
-                <p className="text-[11px] text-zinc-600 font-medium">
-                  {activeProperty?.address || "MD Shah Road, Paltan Bazar, Guwahati, Assam - 781008"}
-                </p>
+                {activeProperty?.address && (
+                  <p className="text-[11px] text-zinc-600 font-medium">
+                    {activeProperty.address}
+                  </p>
+                )}
                 <p className="text-[11px] text-zinc-600 font-mono">
-                  Phone: {activeProperty?.phone || "+91 9864341211"} • GSTIN: <strong>{activeProperty?.gstin || "18AACCB2447F1ZX"}</strong>
+                  Phone: {activeProperty?.phone || "—"} • GSTIN: <strong>{activeProperty?.gstin || "—"}</strong>
                 </p>
               </div>
             </div>

@@ -245,12 +245,6 @@ export async function POST(request: Request) {
       });
     }
     if (!prop) {
-      prop = await prisma.property.findFirst({
-        where: { code: "GUW-01" },
-        include: { outlets: true },
-      });
-    }
-    if (!prop) {
       return NextResponse.json({ error: "Property not found" }, { status: 404 });
     }
 

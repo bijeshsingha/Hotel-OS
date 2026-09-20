@@ -5,10 +5,11 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const propertyId = searchParams.get("propertyId");
+    if (!propertyId) {
+      return NextResponse.json({ error: "propertyId is required" }, { status: 400 });
+    }
 
-    const property = propertyId
-      ? await prisma.property.findUnique({ where: { id: propertyId } })
-      : await prisma.property.findFirst();
+    const property = await prisma.property.findUnique({ where: { id: propertyId } });
 
     if (!property) {
       return NextResponse.json({ error: "Property not found" }, { status: 404 });
@@ -121,9 +122,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Room number and Room Type are required." }, { status: 400 });
     }
 
-    const prop = propertyId
-      ? await prisma.property.findUnique({ where: { id: propertyId } })
-      : await prisma.property.findFirst();
+    if (!propertyId) {
+      return NextResponse.json({ error: "propertyId is required." }, { status: 400 });
+    }
+
+    const prop = await prisma.property.findUnique({ where: { id: propertyId } });
 
     if (!prop) {
       return NextResponse.json({ error: "Property not found." }, { status: 404 });

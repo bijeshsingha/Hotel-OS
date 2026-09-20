@@ -136,8 +136,10 @@ export async function POST(request: Request) {
     const effectiveNotes = notes || specialRequests || "";
 
     if (!propertyId) {
-      const prop = await prisma.property.findFirst();
-      propertyId = prop?.id || "prop_ambarish";
+      return NextResponse.json(
+        { error: "propertyId is required." },
+        { status: 400 }
+      );
     }
 
     if (!effectiveArrival || !effectiveDeparture || !guestName) {

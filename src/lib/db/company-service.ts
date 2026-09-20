@@ -40,10 +40,10 @@ export async function ensureDefaultCompanies(organizationId?: string) {
         let orgId = organizationId;
         if (!orgId) {
           const org = await prisma.organization.findFirst();
-          orgId = org?.id || "org_ambarish";
+          orgId = org?.id || "";
         }
         const prop = await prisma.property.findFirst();
-        const propertyId = prop?.id || "prop_ambarish";
+        const propertyId = prop?.id || "";
 
         for (const item of initialCompaniesJson) {
           await (prisma as any).companyMaster.create({
@@ -163,10 +163,22 @@ export async function addCompanyToMaster(data: any): Promise<CompanyMasterItem> 
 
   try {
     if ((prisma as any)?.companyMaster?.create) {
+      let targetOrgId = data.organizationId;
+      let targetPropId = data.propertyId;
+      if (!targetOrgId || !targetPropId) {
+        const prop = targetPropId
+          ? await prisma.property.findUnique({ where: { id: targetPropId } })
+          : await prisma.property.findFirst();
+        if (prop) {
+          targetPropId = targetPropId || prop.id;
+          targetOrgId = targetOrgId || prop.organizationId;
+        }
+      }
+
       const created = await (prisma as any).companyMaster.create({
         data: {
-          organizationId: data.organizationId || "org_ambarish",
-          propertyId: data.propertyId || "prop_ambarish",
+          organizationId: targetOrgId || "",
+          propertyId: targetPropId || "",
           ...newComp,
         },
       });

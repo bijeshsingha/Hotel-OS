@@ -12,29 +12,24 @@ export async function GET(request: Request) {
       searchParams.get("code");
     const status = searchParams.get("status"); // IN_HOUSE, CHECKED_OUT, DUE_IN, DUE_OUT
 
+    if (!rawProp) {
+      return NextResponse.json([]);
+    }
+
     let targetPropertyId = rawProp;
 
     // Resolve property if ID or Code is provided
-    if (rawProp) {
-      const prop = await prisma.property.findFirst({
-        where: {
-          OR: [
-            { id: rawProp },
-            { code: { equals: rawProp } },
-            { displayName: { contains: rawProp } },
-          ],
-        },
-      });
-      if (prop) {
-        targetPropertyId = prop.id;
-      }
-    } else {
-      // Default to the first active property
-      const defaultProp = await prisma.property.findFirst({
-        where: { status: "ACTIVE" },
-        orderBy: { createdAt: "asc" },
-      });
-      targetPropertyId = defaultProp?.id || null;
+    const prop = await prisma.property.findFirst({
+      where: {
+        OR: [
+          { id: rawProp },
+          { code: { equals: rawProp } },
+          { displayName: { contains: rawProp } },
+        ],
+      },
+    });
+    if (prop) {
+      targetPropertyId = prop.id;
     }
 
     if (!targetPropertyId) {

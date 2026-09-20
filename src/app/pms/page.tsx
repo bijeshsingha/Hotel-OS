@@ -176,7 +176,8 @@ function PMSFrontDeskContent() {
   ]);
 
   const loadData = async (forceFresh = false) => {
-    const propId = activeProperty?.id || "prop_ambarish";
+    if (!activeProperty?.id) return;
+    const propId = activeProperty.id;
     const roomsUrl = `/api/v1/rooms?propertyId=${propId}`;
     const staysUrl = `/api/v1/stays?propertyId=${propId}`;
     const resUrl = `/api/v1/reservations?propertyId=${propId}`;
@@ -226,7 +227,13 @@ function PMSFrontDeskContent() {
   };
 
   useEffect(() => {
-    loadData();
+    if (activeProperty?.id) {
+      setRooms([]);
+      setStays([]);
+      setReservations([]);
+      setRegistrations([]);
+      loadData();
+    }
   }, [activeProperty?.id, refreshKey]);
 
 
@@ -544,10 +551,29 @@ function PMSFrontDeskContent() {
     };
   }, [rooms, stays]);
 
-  // Helper to categorize bed type of a room
+  // Dynamic helper to categorize and label bed type of a room from database
+  const getRoomBedInfo = (room: any) => {
+    const rawBed = room?.roomType?.bedType || "";
+    const bedLower = rawBed.toLowerCase();
+    const wingLower = (room?.wing || "").toLowerCase();
+    const codeLower = (room?.roomType?.code || "").toLowerCase();
+
+    let kind: "TWIN" | "QUEEN" | "KING" | "FAMILY" | "SUITE" | "OTHER" = "OTHER";
+    if (bedLower.includes("twin") || wingLower.includes("twin") || codeLower.includes("twin")) kind = "TWIN";
+    else if (bedLower.includes("queen") || wingLower.includes("queen") || codeLower.includes("queen")) kind = "QUEEN";
+    else if (bedLower.includes("king") || wingLower.includes("king") || codeLower.includes("king")) kind = "KING";
+    else if (bedLower.includes("double") || bedLower.includes("family") || wingLower.includes("family") || codeLower.includes("fam")) kind = "FAMILY";
+    else if (bedLower.includes("suite") || wingLower.includes("suite") || codeLower.includes("suite")) kind = "SUITE";
+
+    const label = rawBed || (kind === "TWIN" ? "Twin Beds" : kind === "QUEEN" ? "Queen Bed" : kind === "KING" ? "King Bed" : kind === "FAMILY" ? "Family Bed" : kind === "SUITE" ? "Suite" : "Standard Bed");
+
+    return { kind, label };
+  };
+
   const getBedCategory = (room: any): "TWIN" | "KING" | "SUITE" => {
-    if (room.wing === "SUITE" || room.roomType?.code?.includes("SUITE")) return "SUITE";
-    if (room.wing === "TWIN" || (room.roomType?.bedType || "").toLowerCase().includes("twin") || room.roomType?.code?.includes("TWIN")) return "TWIN";
+    const info = getRoomBedInfo(room);
+    if (info.kind === "TWIN") return "TWIN";
+    if (info.kind === "SUITE") return "SUITE";
     return "KING";
   };
 
@@ -716,7 +742,7 @@ function PMSFrontDeskContent() {
       room.roomState?.sellabilityStatus === "OUT_OF_ORDER" ||
       (room.blocks && room.blocks.length > 0) ||
       Boolean(activeIssue);
-    const bedCat = getBedCategory(room);
+    const bedInfo = getRoomBedInfo(room);
 
     // Find active in-house stay for this room (strictly active assignment where endsAt is null)
     const activeStay = stays.find(s => 
@@ -727,7 +753,7 @@ function PMSFrontDeskContent() {
     const isOccupied = Boolean(activeStay);
     const baseTariff = room.roomType?.ratePlans?.[0]?.versions?.[0]?.pricingJson 
       ? JSON.parse(room.roomType.ratePlans[0].versions[0].pricingJson).basePrice 
-      : (bedCat === "SUITE" ? 5000 : (room.roomType?.code?.includes("EXEC") ? 2500 : 2000));
+      : (room.roomType?.baseRate || 2000);
 
     return (
       <div
@@ -752,26 +778,45 @@ function PMSFrontDeskContent() {
                   {room.number}
                 </span>
 
-                {/* VISIBLE BED CONFIGURATION BADGE */}
-                {bedCat === "TWIN" ? (
-                  <span className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-md bg-cyan-50 dark:bg-cyan-950/50 border border-cyan-200 dark:border-cyan-800/60 text-cyan-800 dark:text-cyan-300 uppercase tracking-wide">
-                    <span>Twin Bed</span>
+                {/* DYNAMIC BED CONFIGURATION BADGE */}
+                {bedInfo.label && (
+                  <span className={`flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-md border uppercase tracking-wide ${
+                    bedInfo.kind === "TWIN"
+                      ? "bg-purple-50 dark:bg-purple-950/50 border-purple-200 dark:border-purple-800/60 text-purple-800 dark:text-purple-300"
+                      : bedInfo.kind === "QUEEN"
+                      ? "bg-emerald-50 dark:bg-emerald-950/50 border-emerald-200 dark:border-emerald-800/60 text-emerald-800 dark:text-emerald-300"
+                      : bedInfo.kind === "KING"
+                      ? "bg-blue-50 dark:bg-blue-950/50 border-blue-200 dark:border-blue-800/60 text-blue-800 dark:text-blue-300"
+                      : bedInfo.kind === "FAMILY"
+                      ? "bg-amber-50 dark:bg-amber-950/50 border-amber-200 dark:border-amber-800/60 text-amber-800 dark:text-amber-300"
+                      : bedInfo.kind === "SUITE"
+                      ? "bg-indigo-50 dark:bg-indigo-950/50 border-indigo-200 dark:border-indigo-800/60 text-indigo-800 dark:text-indigo-300"
+                      : "bg-zinc-100 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-800 dark:text-zinc-200"
+                  }`}>
+                    {bedInfo.kind === "TWIN" ? (
+                      <BedDouble className="h-3 w-3 shrink-0" />
+                    ) : bedInfo.kind === "FAMILY" ? (
+                      <Users className="h-3 w-3 shrink-0" />
+                    ) : bedInfo.kind === "SUITE" ? (
+                      <Crown className="h-3 w-3 shrink-0" />
+                    ) : (
+                      <Bed className="h-3 w-3 shrink-0" />
+                    )}
+                    <span>{bedInfo.label}</span>
                   </span>
-                ) : bedCat === "SUITE" ? (
-                  <span className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-md bg-amber-50 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-800/60 text-amber-800 dark:text-amber-300 uppercase tracking-wide">
-                    <Crown className="h-3 w-3 text-amber-600 dark:text-amber-400" />
-                    <span>Suite</span>
-                  </span>
-                ) : (
-                  <span className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-md bg-blue-50 dark:bg-blue-950/50 border border-blue-200 dark:border-blue-800/60 text-blue-800 dark:text-blue-300 uppercase tracking-wide">
-                    <Bed className="h-3 w-3 text-blue-600 dark:text-blue-400" />
-                    <span>King Bed</span>
+                )}
+
+                {/* DYNAMIC WING / VIEW BADGE */}
+                {room.wing && (
+                  <span className="flex items-center gap-1 text-[9.5px] font-medium px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800/80 text-zinc-600 dark:text-zinc-400 border border-zinc-200/60 dark:border-zinc-700/60">
+                    {room.wing.toLowerCase().includes("view") ? "🌄 " : ""}
+                    <span>{room.wing}</span>
                   </span>
                 )}
               </div>
 
-              <div className="text-xs text-zinc-500 dark:text-zinc-400 truncate max-w-[150px] mt-1">
-                {room.roomType?.name || (bedCat === "TWIN" ? "Deluxe Twin Room" : "Deluxe King Room")}
+              <div className="text-xs text-zinc-500 dark:text-zinc-400 truncate max-w-[170px] mt-1" title={room.roomType?.name || room.name}>
+                {room.roomType?.name || room.name || "Room"}
               </div>
             </div>
 
@@ -852,8 +897,8 @@ function PMSFrontDeskContent() {
                 </div>
                 <div className="flex items-center justify-between text-xs text-zinc-500">
                   <span>Bed Setup:</span>
-                  <span className="text-zinc-700 dark:text-zinc-300 font-medium truncate max-w-[130px]">
-                    {bedCat === "TWIN" ? "2x Single (Twin)" : bedCat === "SUITE" ? "1x King + Lounge" : "1x King (Double)"}
+                  <span className="text-zinc-700 dark:text-zinc-300 font-medium truncate max-w-[130px]" title={room.roomType?.bedType || bedInfo.label}>
+                    {room.roomType?.bedType || bedInfo.label || "Standard"}
                   </span>
                 </div>
               </div>
@@ -1008,12 +1053,12 @@ function PMSFrontDeskContent() {
                 <div className="flex items-center gap-2 text-xs text-zinc-500 mt-0.5">
                   <span className="text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1.5">
                     <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                    {activeProperty?.displayName || "Hotel Ambarish Grand Residency"}
+                    {activeProperty?.displayName || "Hotel PMS"}
                   </span>
                   <span>•</span>
-                  <span>GSTIN: <span className="font-mono">{activeProperty?.gstin || "18AACCB2447F1ZX"}</span></span>
+                  <span>GSTIN: <span className="font-mono">{activeProperty?.gstin || "—"}</span></span>
                   <span>•</span>
-                  <span>Date: <span className="font-mono">{activeProperty?.businessDate || new Date().toISOString().split("T")[0]}</span></span>
+                  <span>Date: <span className="font-mono">{activeProperty?.businessDate || (typeof window !== "undefined" ? new Date().toLocaleDateString("en-CA") : "")}</span></span>
                 </div>
               </div>
             </div>
@@ -1480,7 +1525,7 @@ function PMSFrontDeskContent() {
                 {stays.filter(s => s.status === "IN_HOUSE").map((stay) => {
                   const roomAssignment = stay.roomAssignments?.[0]?.room;
                   const roomNumber = roomAssignment?.number || "—";
-                  const bedCat = roomAssignment ? getBedCategory(roomAssignment) : "KING";
+                  const roomBed = roomAssignment?.roomType?.bedType || roomAssignment?.roomType?.name || "—";
                   const guestName = formatGuestDisplayName(stay.primaryGuest?.name) || "Valued Guest";
                   const guestPhone = stay.primaryGuest?.phone || "—";
                   const arrival = stay.arrivalAt ? new Date(stay.arrivalAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—";
@@ -1494,13 +1539,9 @@ function PMSFrontDeskContent() {
                         </span>
                       </td>
                       <td className="px-4 py-3 text-xs">
-                        {bedCat === "TWIN" ? (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-cyan-50 dark:bg-cyan-950/40 text-cyan-700 dark:text-cyan-300 border border-cyan-200/80 dark:border-cyan-800/60">Twin Bed</span>
-                        ) : bedCat === "SUITE" ? (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border border-purple-200/80 dark:border-purple-800/60">Suite</span>
-                        ) : (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200/80 dark:border-amber-800/60">King Bed</span>
-                        )}
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-zinc-100 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 border border-zinc-200 dark:border-zinc-700">
+                          {roomBed}
+                        </span>
                       </td>
                       <td className="px-4 py-3 font-semibold text-zinc-900 dark:text-white text-xs">{guestName}</td>
                       <td className="px-4 py-3 font-mono text-zinc-600 dark:text-zinc-400">{guestPhone}</td>
@@ -2337,12 +2378,12 @@ function PMSFrontDeskContent() {
         <PrintableGrcModal
           isOpen={showGrcModal}
           property={{
-            displayName: activeProperty?.displayName || "Hotel Ambarish Grand Residency",
-            legalName: activeProperty?.legalName || "AMBARISH RESIDENCY",
-            address: activeProperty?.address || "MD SHAH ROAD, PALTAN BAZAR, GUWAHATI, ASSAM - 781008",
-            phone: activeProperty?.phone || "9864341211",
-            code: activeProperty?.code || "GUW-01",
-            gstin: activeProperty?.gstin || "18AACCB2447F1ZX",
+            displayName: activeProperty?.displayName || "Hotel",
+            legalName: activeProperty?.legalName || activeProperty?.displayName || "Hotel",
+            address: activeProperty?.address || "",
+            phone: activeProperty?.phone || "",
+            code: activeProperty?.code || "",
+            gstin: activeProperty?.gstin || "",
           }}
           data={{
             grcNo: selectedRegForPrint.registrationNo || selectedRegForPrint.grcNo,
@@ -2411,7 +2452,7 @@ function PMSFrontDeskContent() {
             </p>
             <div className="flex justify-center gap-3 pt-2">
               <a
-                href={`/order?property=${activeProperty?.code || "GUW-01"}`}
+                href={activeProperty?.code ? `/order?property=${encodeURIComponent(activeProperty.code)}` : activeProperty?.id ? `/order?propertyId=${activeProperty.id}` : "/order"}
                 target="_blank"
                 rel="noreferrer"
                 className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 font-bold text-xs text-zinc-950 transition shadow-sm"
@@ -2548,10 +2589,10 @@ function PMSFrontDeskContent() {
                     {rooms
                       .filter((r) => r.roomState?.occupancyStatus === "VACANT" && r.roomState?.housekeepingStatus === "CLEAN" && r.id !== moveForm.fromRoomId)
                       .map((r) => {
-                        const bedCat = getBedCategory(r);
+                        const bedLabel = r.roomType?.bedType || getRoomBedInfo(r).label;
                         return (
                           <option key={r.id} value={r.id}>
-                            Room {r.number} — {r.roomType?.name || "Room"} [{bedCat === "TWIN" ? "Twin Beds" : "King Bed"}] (Floor {r.floor})
+                            Room {r.number} — {r.roomType?.name || "Room"} [{bedLabel}] (Floor {r.floor})
                           </option>
                         );
                       })}
@@ -2775,9 +2816,15 @@ function PMSFrontDeskContent() {
                     </span>
                   </div>
                   <p className="text-xs font-semibold text-zinc-600 dark:text-zinc-400 flex items-center gap-2 flex-wrap">
-                    <span>{room.roomType?.name || (bedCat === "TWIN" ? "Deluxe Twin Room" : "Deluxe King Room")}</span>
+                    <span>{room.roomType?.name || room.name || "Room"}</span>
                     <span>•</span>
-                    <span>{bedCat === "TWIN" ? "🛏️🛏️ Twin Beds" : bedCat === "SUITE" ? "👑 King + Lounge" : "🛏️ King Bed (Double)"}</span>
+                    <span>🛏️ {room.roomType?.bedType || getRoomBedInfo(room).label}</span>
+                    {room.wing && (
+                      <>
+                        <span>•</span>
+                        <span>{room.wing}</span>
+                      </>
+                    )}
                     <span>•</span>
                     <span className="text-zinc-500 font-mono">Max {room.roomType?.capacity || 2} Pax</span>
                   </p>
@@ -3241,7 +3288,7 @@ function PMSFrontDeskContent() {
                     .filter((r) => r.roomState?.occupancyStatus === "VACANT" && r.roomState?.sellabilityStatus !== "OUT_OF_ORDER")
                     .map((r) => (
                       <option key={r.id} value={r.id}>
-                        Room {r.number} — {r.roomType?.name} [{getBedCategory(r) === "TWIN" ? "Twin Beds" : "King Bed"}] (Floor {r.floor} • {r.roomState?.housekeepingStatus || "CLEAN"})
+                        Room {r.number} — {r.roomType?.name || "Room"} [{r.roomType?.bedType || getRoomBedInfo(r).label}] (Floor {r.floor} • {r.roomState?.housekeepingStatus || "CLEAN"})
                       </option>
                     ))}
                 </select>
