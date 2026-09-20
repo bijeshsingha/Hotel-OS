@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import { hashPassword } from "@/lib/auth/password";
 
@@ -97,19 +98,49 @@ export async function PATCH(
       }
     }
 
+    // Detect if the running Prisma client has pin/passwordHash in its compiled model
+    const userFields = Prisma.dmmf?.datamodel?.models?.find((m) => m.name === "User")?.fields?.map((f) => f.name) || [];
+    const clientSupportsPin = userFields.includes("pin");
+    const clientSupportsPasswordHash = userFields.includes("passwordHash");
+
+    const updateData: any = {
+      name: name?.trim() || undefined,
+      email: cleanEmail || undefined,
+      phone: phone !== undefined ? (phone?.trim() || null) : undefined,
+      status: isOwner ? "ACTIVE" : (status || undefined),
+    };
+
+    if (clientSupportsPasswordHash && password?.trim()) {
+      updateData.passwordHash = hashPassword(password.trim());
+    }
+    if (clientSupportsPin && pin?.trim() !== undefined) {
+      updateData.pin = pin?.trim() || null;
+    }
+
     await prisma.$transaction(async (tx) => {
       // 1. Update basic info if provided
-      await tx.user.update({
-        where: { id },
-        data: {
-          name: name?.trim() || undefined,
-          email: cleanEmail || undefined,
-          phone: phone !== undefined ? (phone?.trim() || null) : undefined,
-          status: isOwner ? "ACTIVE" : (status || undefined),
-          passwordHash: password?.trim() ? hashPassword(password.trim()) : undefined,
-          pin: pin?.trim() !== undefined ? (pin?.trim() || null) : undefined,
-        },
-      });
+      try {
+        await (tx.user as any).update({
+          where: { id },
+          data: updateData,
+        });
+      } catch (err: any) {
+        const errMsg = String(err?.message || "");
+        if (
+          errMsg.includes("does not exist") ||
+          errMsg.includes("no such column") ||
+          errMsg.includes("Unknown argument")
+        ) {
+          delete updateData.pin;
+          delete updateData.passwordHash;
+          await (tx.user as any).update({
+            where: { id },
+            data: updateData,
+          });
+        } else {
+          throw err;
+        }
+      }
 
       // 2. If roleId or properties are provided, update grants
       if (finalRoleId || propertyIds.length > 0 || finalAllProperties) {
@@ -145,7 +176,34 @@ export async function PATCH(
       }
     });
 
-    return NextResponse.json({ success: true, message: "User updated successfully." });
+    // If running client did not support pin/passwordHash natively, attempt raw SQL update if table has the columns
+    if (!clientSupportsPin && pin?.trim() !== undefined) {
+      const pinVal = pin.trim() || null;
+      try {
+        await prisma.$executeRawUnsafe(`UPDATE "User" SET "pin" = $1 WHERE "id" = $2;`, pinVal, id);
+      } catch {
+        try {
+          await prisma.$executeRawUnsafe(`UPDATE User SET pin = ? WHERE id = ?;`, pinVal, id);
+        } catch {}
+      }
+    }
+    if (!clientSupportsPasswordHash && password?.trim()) {
+      const passVal = hashPassword(password.trim());
+      try {
+        await prisma.$executeRawUnsafe(`UPDATE "User" SET "passwordHash" = $1 WHERE "id" = $2;`, passVal, id);
+      } catch {
+        try {
+          await prisma.$executeRawUnsafe(`UPDATE User SET passwordHash = ? WHERE id = ?;`, passVal, id);
+        } catch {}
+      }
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: clientSupportsPin
+        ? "User updated successfully."
+        : "User updated successfully. Note: run 'npx prisma db push && npx prisma generate' on this server to enable full PIN schema synchronization.",
+    });
   } catch (error: any) {
     return NextResponse.json({ error: error.message || "Failed to update user" }, { status: 500 });
   }

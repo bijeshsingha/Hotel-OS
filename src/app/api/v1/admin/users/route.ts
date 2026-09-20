@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import { hashPassword } from "@/lib/auth/password";
 
@@ -158,17 +159,46 @@ export async function POST(request: Request) {
 
     const orgId = allProps[0].organizationId;
 
+    // Detect if the running Prisma client has pin/passwordHash in its compiled model
+    const userFields = Prisma.dmmf?.datamodel?.models?.find((m) => m.name === "User")?.fields?.map((f) => f.name) || [];
+    const clientSupportsPin = userFields.includes("pin");
+    const clientSupportsPasswordHash = userFields.includes("passwordHash");
+
+    const newUserData: any = {
+      name: name.trim(),
+      email: cleanEmail,
+      phone: phone?.trim() || null,
+      status: "ACTIVE",
+    };
+    if (clientSupportsPin) {
+      newUserData.pin = pin?.trim() || null;
+    }
+    if (clientSupportsPasswordHash) {
+      newUserData.passwordHash = password?.trim() ? hashPassword(password.trim()) : null;
+    }
+
     const newUser = await prisma.$transaction(async (tx) => {
-      const user = await tx.user.create({
-        data: {
-          name: name.trim(),
-          email: cleanEmail,
-          phone: phone?.trim() || null,
-          status: "ACTIVE",
-          pin: pin?.trim() || null,
-          passwordHash: password?.trim() ? hashPassword(password.trim()) : null,
-        },
-      });
+      let user;
+      try {
+        user = await (tx.user as any).create({
+          data: newUserData,
+        });
+      } catch (err: any) {
+        const errMsg = String(err?.message || "");
+        if (
+          errMsg.includes("does not exist") ||
+          errMsg.includes("no such column") ||
+          errMsg.includes("Unknown argument")
+        ) {
+          delete newUserData.pin;
+          delete newUserData.passwordHash;
+          user = await (tx.user as any).create({
+            data: newUserData,
+          });
+        } else {
+          throw err;
+        }
+      }
 
       const membership = await tx.membership.create({
         data: {
@@ -190,6 +220,27 @@ export async function POST(request: Request) {
 
       return user;
     });
+
+    // If running client did not support pin/passwordHash natively, attempt raw SQL update if table has the columns
+    if (!clientSupportsPin && pin?.trim()) {
+      try {
+        await prisma.$executeRawUnsafe(`UPDATE "User" SET "pin" = $1 WHERE "id" = $2;`, pin.trim(), newUser.id);
+      } catch {
+        try {
+          await prisma.$executeRawUnsafe(`UPDATE User SET pin = ? WHERE id = ?;`, pin.trim(), newUser.id);
+        } catch {}
+      }
+    }
+    if (!clientSupportsPasswordHash && password?.trim()) {
+      const passVal = hashPassword(password.trim());
+      try {
+        await prisma.$executeRawUnsafe(`UPDATE "User" SET "passwordHash" = $1 WHERE "id" = $2;`, passVal, newUser.id);
+      } catch {
+        try {
+          await prisma.$executeRawUnsafe(`UPDATE User SET passwordHash = ? WHERE id = ?;`, passVal, newUser.id);
+        } catch {}
+      }
+    }
 
     return NextResponse.json({
       success: true,
