@@ -12,6 +12,7 @@ export interface InvoiceLineItem {
   sacHsn?: string;
   qty?: number;
   rate?: number;
+  unitAmount?: number;
   totalAmount: number;
   taxableAmount: number;
   taxAmount?: number;
@@ -254,9 +255,13 @@ export function PrintableTaxInvoiceModal({
   let totalDiscount = 0;
 
   lines.forEach((l) => {
-    const taxable = Number(l.taxableAmount || 0);
     const total = Number(l.totalAmount || 0);
-    const tax = total - taxable;
+    const taxable = Number(
+      l.taxableAmount !== undefined && l.taxableAmount !== null && l.taxableAmount > 0
+        ? l.taxableAmount
+        : total
+    );
+    const tax = Math.max(0, total - taxable);
     const cgst = Number(l.cgstAmount !== undefined ? l.cgstAmount : tax / 2);
     const sgst = Number(l.sgstAmount !== undefined ? l.sgstAmount : tax / 2);
     const igst = Number(l.igstAmount || 0);
@@ -287,11 +292,19 @@ export function PrintableTaxInvoiceModal({
     }
 
     const linesHtml = lines.map((item, idx) => {
-      const taxable = Number(item.taxableAmount || 0);
       const total = Number(item.totalAmount || 0);
-      const taxHalf = (total - taxable) / 2;
+      const taxable = Number(
+        item.taxableAmount !== undefined && item.taxableAmount !== null && item.taxableAmount > 0
+          ? item.taxableAmount
+          : total
+      );
+      const taxHalf = Math.max(0, (total - taxable) / 2);
       const discount = Number(item.discountAmount || 0);
-      const rateVal = item.rate || (item.qty ? taxable / item.qty : taxable);
+      const rateVal = Number(
+        item.rate ??
+        (item as any).unitAmount ??
+        (item.qty && taxable ? taxable / item.qty : (total ? total / (item.qty || 1) : 0))
+      );
 
       return `
         <tr>
@@ -936,11 +949,19 @@ export function PrintableTaxInvoiceModal({
               </thead>
               <tbody className="divide-y divide-zinc-300">
                 {lines.map((item, idx) => {
-                  const taxable = Number(item.taxableAmount || 0);
                   const total = Number(item.totalAmount || 0);
-                  const taxHalf = (total - taxable) / 2;
+                  const taxable = Number(
+                    item.taxableAmount !== undefined && item.taxableAmount !== null && item.taxableAmount > 0
+                      ? item.taxableAmount
+                      : total
+                  );
+                  const taxHalf = Math.max(0, (total - taxable) / 2);
                   const discount = Number(item.discountAmount || 0);
-                  const rateVal = item.rate || (item.qty ? taxable / item.qty : taxable);
+                  const rateVal = Number(
+                    item.rate ??
+                    (item as any).unitAmount ??
+                    (item.qty && taxable ? taxable / item.qty : (total ? total / (item.qty || 1) : 0))
+                  );
 
                   return (
                     <tr key={idx} className="divide-x divide-zinc-300 hover:bg-zinc-50/50">

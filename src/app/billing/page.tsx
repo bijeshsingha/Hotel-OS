@@ -850,7 +850,8 @@ function BillingContent() {
     }
     // "NO" mode: Separate billing for activeRoomNumber only
     const otherRooms = allGroupRooms.filter((r) => r !== activeRoomNumber);
-    return rawEntries.filter((e: any) => isEntryForRoom(e, activeRoomNumber, otherRooms));
+    const filtered = rawEntries.filter((e: any) => isEntryForRoom(e, activeRoomNumber, otherRooms));
+    return filtered.length > 0 ? filtered : rawEntries;
   }, [rawEntries, groupBillingMode, isMultiRoomGroup, activeRoomNumber, allGroupRooms]);
 
   // Filtered charges ledger items (search and category)
@@ -871,7 +872,11 @@ function BillingContent() {
   }, [modeFilteredEntries, ledgerTypeFilter, ledgerSearchQuery]);
 
   const payments = folioData?.payments || [];
-  const invoices = folioData?.invoices || [];
+  const invoices = useMemo(() => {
+    if (!folioData) return [];
+    if (Array.isArray(folioData.invoices) && folioData.invoices.length > 0) return folioData.invoices;
+    return folioData.windows?.flatMap((w: any) => w.invoices || []) || [];
+  }, [folioData]);
 
   // Financial calculations for active mode
   const totalCharges = modeFilteredEntries.reduce((acc: number, e: any) => acc + (e.totalAmount || 0), 0);
@@ -1189,10 +1194,22 @@ function BillingContent() {
     }
   };
 
-  // Open Live Tax Bill Print Modal
+  // Open Live Tax Bill Print Modal (for In-House pre-checkout estimated bill)
   const handleOpenLiveTaxBill = () => {
     setSelectedInvoice(null);
     setIsLiveTaxBillView(true);
+    setShowInvoiceModal(true);
+  };
+
+  // Open Official Tax Invoice Print Modal (for Checked-out / Outstanding / Settled folios)
+  const handleOpenPrintInvoice = () => {
+    if (invoices.length > 0) {
+      setSelectedInvoice(invoices[0]);
+      setIsLiveTaxBillView(false);
+    } else {
+      setSelectedInvoice(null);
+      setIsLiveTaxBillView(true);
+    }
     setShowInvoiceModal(true);
   };
 
@@ -1656,7 +1673,7 @@ function BillingContent() {
             {folioData && (
               <div className="flex items-center gap-2">
                 <button
-                  onClick={handleOpenLiveTaxBill}
+                  onClick={handleOpenPrintInvoice}
                   className="h-8.5 px-3.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-800 dark:text-zinc-200 hover:bg-zinc-100 font-bold text-xs flex items-center gap-1.5 transition shadow-xs cursor-pointer"
                 >
                   <Printer className="h-3.5 w-3.5" />
@@ -1698,7 +1715,7 @@ function BillingContent() {
 
             {folioData && (
               <button
-                onClick={handleOpenLiveTaxBill}
+                onClick={handleOpenPrintInvoice}
                 className="h-8.5 px-4 rounded-xl bg-zinc-900 text-white hover:bg-zinc-800 dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-200 font-bold text-xs flex items-center gap-1.5 transition shadow-xs cursor-pointer"
               >
                 <Printer className="h-3.5 w-3.5" />
@@ -1820,7 +1837,7 @@ function BillingContent() {
                             </button>
                           )}
                           <button
-                            onClick={handleOpenLiveTaxBill}
+                            onClick={handleOpenPrintInvoice}
                             className="h-9 px-4 sm:h-10 sm:px-5 rounded-xl bg-zinc-900 text-white hover:bg-zinc-800 dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-200 active:scale-[0.98] font-bold text-xs transition shadow-xs flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
                           >
                             <Printer className="h-4 w-4" />

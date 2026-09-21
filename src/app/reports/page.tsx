@@ -55,6 +55,7 @@ import {
 } from "lucide-react";
 import { apiCache } from "@/lib/cache/api-cache";
 import { PageHeader, StatCard, SegmentedControl } from "@/components/ui";
+import { PrintableTaxInvoiceModal } from "@/components/billing/printable-tax-invoice";
 
 export default function ReportsPage() {
   const { activeProperty, refreshKey, refreshData } = useHotel();
@@ -90,8 +91,11 @@ export default function ReportsPage() {
   const [billDateRange, setBillDateRange] = useState<"ALL_TIME" | "TODAY" | "YESTERDAY" | "LAST_7_DAYS" | "THIS_MONTH" | "CUSTOM">("ALL_TIME");
   const [billCustomStart, setBillCustomStart] = useState("");
   const [billCustomEnd, setBillCustomEnd] = useState("");
-  const [billStatusFilter, setBillStatusFilter] = useState<"ALL" | "SETTLED" | "IN_HOUSE" | "OPEN">("ALL");
+  const [billStatusFilter, setBillStatusFilter] = useState<"ALL" | "SETTLED" | "OUTSTANDING" | "IN_HOUSE">("ALL");
   const [billMethodFilter, setBillMethodFilter] = useState<string>("ALL");
+  const [selectedBillForModal, setSelectedBillForModal] = useState<any | null>(null);
+  const [selectedInvoiceForModal, setSelectedInvoiceForModal] = useState<any | null>(null);
+  const [showTaxInvoiceModal, setShowTaxInvoiceModal] = useState(false);
 
   // Filters for Kitchen & Dining Orders Tab
   const [kotSearch, setKotSearch] = useState("");
@@ -571,9 +575,9 @@ export default function ReportsPage() {
     return list.filter((b) => {
       // 1. Status Filter
       if (billStatusFilter !== "ALL") {
-        if (billStatusFilter === "SETTLED" && b.settlementStatus !== "SETTLED") return false;
+        if (billStatusFilter === "SETTLED" && (b.balance > 0.5 || b.stayStatus === "IN_HOUSE")) return false;
+        if (billStatusFilter === "OUTSTANDING" && b.balance <= 0.5) return false;
         if (billStatusFilter === "IN_HOUSE" && b.stayStatus !== "IN_HOUSE") return false;
-        if (billStatusFilter === "OPEN" && b.balance <= 0) return false;
       }
 
       // 2. Payment Method Filter
@@ -645,6 +649,17 @@ export default function ReportsPage() {
       return true;
     });
   }, [data, billStatusFilter, billMethodFilter, billDateRange, billCustomStart, billCustomEnd, billSearch, activeProperty?.businessDate]);
+
+  // Counts for Final Bills Sub-Tabs
+  const finalBillCounts = useMemo(() => {
+    const list: any[] = data?.bills || [];
+    return {
+      all: list.length,
+      settled: list.filter((b) => b.balance <= 0.5 && b.stayStatus !== "IN_HOUSE").length,
+      outstanding: list.filter((b) => b.balance > 0.5).length,
+      inHouse: list.filter((b) => b.stayStatus === "IN_HOUSE").length,
+    };
+  }, [data?.bills]);
 
   // Filtered Kitchen Orders & Dining Sales
   const filteredKitchenOrders = useMemo(() => {
@@ -2006,6 +2021,77 @@ export default function ReportsPage() {
             </div>
           </div>
 
+          {/* Quick Sub-Tab Selector to Separate Out Outstanding Balances */}
+          <div className="flex items-center gap-2 overflow-x-auto pb-1">
+            <button
+              onClick={() => setBillStatusFilter("ALL")}
+              className={`h-9 px-3.5 rounded-xl font-bold text-xs flex items-center gap-2 transition cursor-pointer shrink-0 ${
+                billStatusFilter === "ALL"
+                  ? "bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 shadow-xs"
+                  : "bg-white dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/60"
+              }`}
+            >
+              <Receipt className="h-3.5 w-3.5" />
+              <span>All Master Bills</span>
+              <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-mono ${
+                billStatusFilter === "ALL" ? "bg-zinc-700 text-white dark:bg-zinc-200 dark:text-zinc-900" : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400"
+              }`}>
+                {finalBillCounts.all}
+              </span>
+            </button>
+
+            <button
+              onClick={() => setBillStatusFilter("SETTLED")}
+              className={`h-9 px-3.5 rounded-xl font-bold text-xs flex items-center gap-2 transition cursor-pointer shrink-0 ${
+                billStatusFilter === "SETTLED"
+                  ? "bg-emerald-600 text-white shadow-xs"
+                  : "bg-white dark:bg-zinc-900 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/60 hover:bg-emerald-50/50 dark:hover:bg-emerald-950/30"
+              }`}
+            >
+              <CheckCircle2 className="h-3.5 w-3.5" />
+              <span>Settled Invoices (Paid)</span>
+              <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-mono ${
+                billStatusFilter === "SETTLED" ? "bg-emerald-700 text-white" : "bg-emerald-100 dark:bg-emerald-900/50 text-emerald-800 dark:text-emerald-300"
+              }`}>
+                {finalBillCounts.settled}
+              </span>
+            </button>
+
+            <button
+              onClick={() => setBillStatusFilter("OUTSTANDING")}
+              className={`h-9 px-3.5 rounded-xl font-bold text-xs flex items-center gap-2 transition cursor-pointer shrink-0 ${
+                billStatusFilter === "OUTSTANDING"
+                  ? "bg-rose-600 text-white shadow-xs"
+                  : "bg-white dark:bg-zinc-900 text-rose-700 dark:text-rose-400 border border-rose-200 dark:border-rose-900/60 hover:bg-rose-50/50 dark:hover:bg-rose-950/30"
+              }`}
+            >
+              <AlertCircle className="h-3.5 w-3.5" />
+              <span>Outstanding Balances (Receivables)</span>
+              <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-mono ${
+                billStatusFilter === "OUTSTANDING" ? "bg-rose-700 text-white" : "bg-rose-100 dark:bg-rose-900/50 text-rose-800 dark:text-rose-300"
+              }`}>
+                {finalBillCounts.outstanding}
+              </span>
+            </button>
+
+            <button
+              onClick={() => setBillStatusFilter("IN_HOUSE")}
+              className={`h-9 px-3.5 rounded-xl font-bold text-xs flex items-center gap-2 transition cursor-pointer shrink-0 ${
+                billStatusFilter === "IN_HOUSE"
+                  ? "bg-blue-600 text-white shadow-xs"
+                  : "bg-white dark:bg-zinc-900 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-900/60 hover:bg-blue-50/50 dark:hover:bg-blue-950/30"
+              }`}
+            >
+              <BedDouble className="h-3.5 w-3.5" />
+              <span>In-House Guests</span>
+              <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-mono ${
+                billStatusFilter === "IN_HOUSE" ? "bg-blue-700 text-white" : "bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-300"
+              }`}>
+                {finalBillCounts.inHouse}
+              </span>
+            </button>
+          </div>
+
           {/* Filters Bar for Final Bills */}
           <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 p-3.5 rounded-xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs">
             {/* Search Box */}
@@ -2067,9 +2153,9 @@ export default function ReportsPage() {
                   className="text-xs h-9 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 pl-3 pr-7 font-medium text-zinc-900 dark:text-zinc-100 cursor-pointer appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                 >
                   <option value="ALL">All Bill Statuses</option>
-                  <option value="SETTLED">Settled / Closed</option>
+                  <option value="SETTLED">Settled Invoices (Paid)</option>
+                  <option value="OUTSTANDING">Outstanding Receivables</option>
                   <option value="IN_HOUSE">In-House Active</option>
-                  <option value="OPEN">Open Balance</option>
                 </select>
                 <ChevronDown className="h-3.5 w-3.5 absolute right-2.5 text-zinc-400 pointer-events-none" />
               </div>
@@ -2154,10 +2240,25 @@ export default function ReportsPage() {
                     filteredFinalBills.map((b) => (
                       <tr key={b.stayId} className="hover:bg-zinc-50/80 dark:hover:bg-zinc-900/40 transition-colors">
                         <td className="px-4 py-3 whitespace-nowrap">
-                          <span className="font-semibold font-mono text-zinc-900 dark:text-white block text-xs">
-                            {b.invoiceNo}
-                          </span>
-                          <span className="text-[10px] text-zinc-400 dark:text-zinc-500 font-mono">
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              onClick={() => {
+                                setSelectedBillForModal(b);
+                                setSelectedInvoiceForModal(b.primaryInvoice || null);
+                                setShowTaxInvoiceModal(true);
+                              }}
+                              className="font-bold font-mono text-blue-600 dark:text-blue-400 hover:underline block text-xs cursor-pointer text-left"
+                              title="Click to view & print official tax invoice"
+                            >
+                              {b.invoiceNo}
+                            </button>
+                            {b.allInvoices && b.allInvoices.length > 1 && (
+                              <span className="px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300 text-[10px] font-mono font-bold" title={`${b.allInvoices.length} invoices linked`}>
+                                +{b.allInvoices.length - 1}
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-[10px] text-zinc-400 dark:text-zinc-500 font-mono block">
                             {new Date(b.checkOutDate).toLocaleDateString()}
                           </span>
                         </td>
@@ -2215,16 +2316,16 @@ export default function ReportsPage() {
                         </td>
 
                         <td className="px-4 py-3 text-right font-mono tabular-nums font-semibold whitespace-nowrap">
-                          <span className={b.balance > 0 ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400"}>
+                          <span className={b.balance > 0.5 ? "text-rose-600 dark:text-rose-400 font-bold" : "text-emerald-600 dark:text-emerald-400"}>
                             {formatINR(b.balance)}
                           </span>
                         </td>
 
                         <td className="px-4 py-3 whitespace-nowrap font-sans">
-                          {b.settlementStatus === "SETTLED" ? (
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50/80 text-emerald-700 border border-emerald-200/80 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-900/50 font-medium text-[11px]">
-                              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                              SETTLED
+                          {b.balance > 0.5 ? (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-rose-50/90 text-rose-700 border border-rose-200/90 dark:bg-rose-950/50 dark:text-rose-300 dark:border-rose-900/60 font-bold text-[11px]">
+                              <span className="h-1.5 w-1.5 rounded-full bg-rose-500 animate-pulse" />
+                              OUTSTANDING DUE
                             </span>
                           ) : b.stayStatus === "IN_HOUSE" ? (
                             <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-blue-50/80 text-blue-700 border border-blue-200/80 dark:bg-blue-950/40 dark:text-blue-400 dark:border-blue-900/50 font-medium text-[11px]">
@@ -2232,21 +2333,36 @@ export default function ReportsPage() {
                               IN-HOUSE
                             </span>
                           ) : (
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-50/80 text-amber-700 border border-amber-200/80 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-900/50 font-medium text-[11px]">
-                              <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
-                              OPEN BALANCE
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50/80 text-emerald-700 border border-emerald-200/80 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-900/50 font-medium text-[11px]">
+                              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                              SETTLED
                             </span>
                           )}
                         </td>
 
                         <td className="px-4 py-3 text-right whitespace-nowrap">
-                          <Link
-                            href={`/billing?stayId=${b.stayId}`}
-                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-emerald-50/80 hover:bg-emerald-100 dark:bg-emerald-950/50 dark:hover:bg-emerald-900/60 border border-emerald-300 dark:border-emerald-700 font-medium text-[11px] text-emerald-800 dark:text-emerald-300 transition font-sans shadow-xs"
-                          >
-                            <Eye className="h-3 w-3" />
-                            <span>View Bill / Folio</span>
-                          </Link>
+                          <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              onClick={() => {
+                                setSelectedBillForModal(b);
+                                setSelectedInvoiceForModal(b.primaryInvoice || null);
+                                setShowTaxInvoiceModal(true);
+                              }}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-zinc-900 hover:bg-zinc-800 dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-200 text-white font-bold text-[11px] transition shadow-xs cursor-pointer font-sans"
+                              title="View & Print Official Tax Invoice"
+                            >
+                              <Printer className="h-3 w-3" />
+                              <span>View Tax Invoice</span>
+                            </button>
+                            <Link
+                              href={`/billing?stayId=${b.stayId}`}
+                              className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 font-medium text-[11px] text-zinc-700 dark:text-zinc-300 transition font-sans shadow-xs"
+                              title="Open Stay Folio"
+                            >
+                              <Eye className="h-3 w-3" />
+                              <span>Folio</span>
+                            </Link>
+                          </div>
                         </td>
                       </tr>
                     ))
@@ -4013,6 +4129,38 @@ export default function ReportsPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Printable Tax Invoice Modal */}
+      {showTaxInvoiceModal && selectedBillForModal && (
+        <PrintableTaxInvoiceModal
+          isOpen={showTaxInvoiceModal}
+          onClose={() => {
+            setShowTaxInvoiceModal(false);
+            setSelectedBillForModal(null);
+            setSelectedInvoiceForModal(null);
+          }}
+          isLiveTaxBillView={!selectedInvoiceForModal && !selectedBillForModal.primaryInvoice}
+          property={{
+            displayName: activeProperty?.displayName || activeProperty?.legalName || "HOTEL OS",
+            legalName: activeProperty?.legalName || activeProperty?.displayName || "HOTEL OS",
+            address: activeProperty?.address || "",
+            phone: activeProperty?.phone || "",
+            email: activeProperty?.email || "",
+            website: activeProperty?.website || "",
+            gstin: activeProperty?.gstin || "",
+            stateCode: activeProperty?.stateCode || "",
+            logoUrl: activeProperty?.logoUrl || undefined,
+          }}
+          stay={selectedBillForModal.stayData}
+          roomNumber={selectedBillForModal.roomDisplay}
+          allRooms={selectedBillForModal.allRooms || [selectedBillForModal.roomDisplay]}
+          invoiceData={selectedInvoiceForModal || selectedBillForModal.primaryInvoice || null}
+          ledgerEntries={selectedBillForModal.stayData?.folio?.entries || []}
+          payments={selectedBillForModal.stayData?.folio?.payments || []}
+          cashierName="Front Desk Cashier"
+          receptionistName="Gobin Tamang"
+        />
       )}
     </div>
   );

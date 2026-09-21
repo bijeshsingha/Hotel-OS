@@ -18,7 +18,44 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Property not found" }, { status: 404 });
     }
 
-    return NextResponse.json(property);
+    // Fetch active GRC sequence
+    const grcSeq = await prisma.documentSequence.findFirst({
+      where: { propertyId, documentType: "GRC" },
+      orderBy: { createdAt: "desc" },
+    });
+
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth() + 1;
+    const fyStart = month >= 4 ? year : year - 1;
+    const fyEnd = fyStart + 1;
+    const fyShort = `${String(fyStart).slice(2)}${String(fyEnd).slice(2)}`;
+    const defaultPrefix = `GRC-${fyShort}-`;
+
+    const nextVal = grcSeq ? grcSeq.nextValue : 1;
+    const prefix = grcSeq?.prefix || defaultPrefix;
+    const padding = grcSeq?.padding || 4;
+    const formattedPreview = `${prefix}${String(nextVal).padStart(padding, "0")}`;
+
+    let parsedOwners: string[] = [];
+    if ((property as any).ownersJson) {
+      try {
+        parsedOwners = JSON.parse((property as any).ownersJson);
+      } catch (e) {
+        parsedOwners = [];
+      }
+    }
+
+    return NextResponse.json({
+      ...property,
+      grcSequence: {
+        nextValue: nextVal,
+        prefix,
+        padding,
+        formattedPreview,
+      },
+      owners: parsedOwners,
+    });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
@@ -44,6 +81,9 @@ export async function PATCH(request: Request) {
       currency,
       orgLegalName,
       orgPan,
+      startingGrcNumber,
+      grcPrefix,
+      owners,
     } = body;
 
     if (!id) {
@@ -51,6 +91,10 @@ export async function PATCH(request: Request) {
     }
 
     const updated = await prisma.$transaction(async (tx) => {
+      const ownersJsonValue = owners !== undefined
+        ? (Array.isArray(owners) ? JSON.stringify(owners.filter(Boolean)) : String(owners))
+        : undefined;
+
       const prop = await tx.property.update({
         where: { id },
         data: {
@@ -67,9 +111,50 @@ export async function PATCH(request: Request) {
           auditCutoff: auditCutoff || undefined,
           businessDate: businessDate || undefined,
           currency: currency || undefined,
+          ...(ownersJsonValue !== undefined ? { ownersJson: ownersJsonValue } : {}),
         },
         include: { organization: true },
       });
+
+      // Update or Upsert GRC sequence if startingGrcNumber is provided
+      if (startingGrcNumber !== undefined && startingGrcNumber !== null && String(startingGrcNumber).trim() !== "") {
+        const nextVal = parseInt(String(startingGrcNumber), 10);
+        if (!isNaN(nextVal) && nextVal > 0) {
+          const now = new Date();
+          const year = now.getFullYear();
+          const month = now.getMonth() + 1;
+          const fyStart = month >= 4 ? year : year - 1;
+          const fyEnd = fyStart + 1;
+          const fyShort = `${String(fyStart).slice(2)}${String(fyEnd).slice(2)}`;
+          const financialYear = `${fyStart}-${fyEnd}`;
+          const prefixToUse = grcPrefix || `GRC-${fyShort}-`;
+
+          await tx.documentSequence.upsert({
+            where: {
+              propertyId_documentType_scopeKey_financialYear: {
+                propertyId: id,
+                documentType: "GRC",
+                scopeKey: "PROPERTY",
+                financialYear,
+              },
+            },
+            create: {
+              organizationId: prop.organizationId,
+              propertyId: id,
+              documentType: "GRC",
+              scopeKey: "PROPERTY",
+              financialYear,
+              prefix: prefixToUse,
+              nextValue: nextVal,
+              padding: 4,
+            },
+            update: {
+              nextValue: nextVal,
+              prefix: grcPrefix || undefined,
+            },
+          });
+        }
+      }
 
       if (orgLegalName || orgPan) {
         await tx.organization.update({

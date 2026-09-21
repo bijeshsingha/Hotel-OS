@@ -172,7 +172,12 @@ export default function AdminPortalPage() {
     currency: "INR",
     orgLegalName: "",
     orgPan: "",
+    startingGrcNumber: "",
+    grcPrefix: "GRC-2627-",
+    grcPreview: "",
+    owners: [] as string[],
   });
+  const [newOwnerName, setNewOwnerName] = useState("");
   const [hotelLoading, setHotelLoading] = useState(false);
   const [hotelSaving, setHotelSaving] = useState(false);
 
@@ -183,6 +188,7 @@ export default function AdminPortalPage() {
       const res = await fetch(`/api/v1/admin/hotel?propertyId=${activeProperty.id}`);
       if (res.ok) {
         const data = await res.json();
+        const grcSeq = data.grcSequence || {};
         setHotelForm({
           id: data.id || "",
           displayName: data.displayName || "",
@@ -200,6 +206,10 @@ export default function AdminPortalPage() {
           currency: data.currency || "INR",
           orgLegalName: data.organization?.legalName || "",
           orgPan: data.organization?.pan || "",
+          startingGrcNumber: grcSeq.nextValue ? String(grcSeq.nextValue) : "1",
+          grcPrefix: grcSeq.prefix || "GRC-2627-",
+          grcPreview: grcSeq.formattedPreview || "",
+          owners: Array.isArray(data.owners) ? data.owners : [],
         });
       }
     } catch (e) {
@@ -220,8 +230,10 @@ export default function AdminPortalPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to save hotel details");
+      apiCache.invalidate("hotel");
       showToast("Hotel & Property master details updated successfully!");
       refreshData();
+      fetchHotelDetails();
     } catch (err: any) {
       showToast(err.message || "Failed to save changes", "error");
     } finally {
@@ -1434,6 +1446,194 @@ export default function AdminPortalPage() {
                           onChange={(e) => setHotelForm({ ...hotelForm, auditCutoff: e.target.value })}
                           className="w-full h-11 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-base sm:text-xs font-mono font-bold text-zinc-900 dark:text-white focus:border-blue-600 focus:outline-none transition"
                         />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* GROUP 4: Physical GRC Book & Sequence Sync */}
+                  <div className="space-y-3 pt-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="h-2 w-2 rounded-full bg-emerald-600" />
+                        <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">
+                          4. Physical GRC Book & Sequence Sync
+                        </h3>
+                      </div>
+                      <span className="text-[11px] font-mono text-emerald-600 dark:text-emerald-400 font-semibold bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded-md border border-emerald-200 dark:border-emerald-800">
+                        Active Front Desk Sync
+                      </span>
+                    </div>
+
+                    <div className="p-4 rounded-xl bg-emerald-50/30 dark:bg-emerald-950/20 border border-emerald-200/60 dark:border-emerald-900/40 space-y-3">
+                      <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed">
+                        Connect digital check-in registrations directly with your physical GRC book in place at the front desk. Setting the starting number will ensure the next guest checked in receives this sequential number.
+                      </p>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-1">
+                        {/* Starting GRC Number */}
+                        <div className="space-y-1.5">
+                          <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                            Starting GRC Sequence Number <span className="text-rose-500">*</span>
+                          </label>
+                          <input
+                            type="number"
+                            min="1"
+                            value={hotelForm.startingGrcNumber}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              const numVal = parseInt(val, 10) || 1;
+                              const pref = hotelForm.grcPrefix || "GRC-2627-";
+                              setHotelForm({
+                                ...hotelForm,
+                                startingGrcNumber: val,
+                                grcPreview: `${pref}${String(numVal).padStart(4, "0")}`,
+                              });
+                            }}
+                            className="w-full h-11 px-3.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-base sm:text-xs font-mono font-bold text-zinc-900 dark:text-white focus:border-emerald-600 focus:outline-none transition"
+                            placeholder="e.g. 501"
+                          />
+                          <p className="text-[11px] text-zinc-500">Number matching your current physical GRC slip</p>
+                        </div>
+
+                        {/* GRC Prefix */}
+                        <div className="space-y-1.5">
+                          <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                            GRC Document Prefix
+                          </label>
+                          <input
+                            type="text"
+                            value={hotelForm.grcPrefix}
+                            onChange={(e) => {
+                              const pref = e.target.value;
+                              const numVal = parseInt(hotelForm.startingGrcNumber, 10) || 1;
+                              setHotelForm({
+                                ...hotelForm,
+                                grcPrefix: pref,
+                                grcPreview: `${pref}${String(numVal).padStart(4, "0")}`,
+                              });
+                            }}
+                            className="w-full h-11 px-3.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-base sm:text-xs font-mono font-bold text-zinc-900 dark:text-white focus:border-emerald-600 focus:outline-none transition"
+                            placeholder="GRC-2627-"
+                          />
+                          <p className="text-[11px] text-zinc-500">Document series prefix (e.g. GRC-2627- or GRC-)</p>
+                        </div>
+
+                        {/* Live Preview */}
+                        <div className="space-y-1.5">
+                          <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                            Next Generated GRC Preview
+                          </label>
+                          <div className="h-11 px-3.5 rounded-xl bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 flex items-center justify-between">
+                            <span className="font-mono font-black text-emerald-700 dark:text-emerald-400 text-sm">
+                              {hotelForm.grcPreview || `${hotelForm.grcPrefix || "GRC-2627-"}${String(parseInt(hotelForm.startingGrcNumber, 10) || 1).padStart(4, "0")}`}
+                            </span>
+                            <span className="text-[10px] uppercase font-bold text-zinc-400 bg-white dark:bg-zinc-900 px-2 py-0.5 rounded border border-zinc-200 dark:border-zinc-800">
+                              Next In Line
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-zinc-500">Assigned upon next Front Desk guest check-in</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* GROUP 5: Hotel Owners & Stakeholders (for Owner Payouts) */}
+                  <div className="space-y-3 pt-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="h-2 w-2 rounded-full bg-purple-600" />
+                        <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">
+                          5. Hotel Owners & Equity Partners
+                        </h3>
+                      </div>
+                      <span className="text-[11px] font-mono text-purple-600 dark:text-purple-400 font-semibold bg-purple-50 dark:bg-purple-950/60 px-2 py-0.5 rounded-md border border-purple-200 dark:border-purple-800">
+                        Cashier Shift Payout Dropdown
+                      </span>
+                    </div>
+
+                    <div className="p-4 rounded-xl bg-purple-50/20 dark:bg-purple-950/10 border border-purple-200/60 dark:border-purple-900/40 space-y-4">
+                      <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed">
+                        Configure the legal owners and managing partners who are authorized to withdraw cash profit drawings from the till. These names will populate the <strong className="text-zinc-900 dark:text-white">Owner Payout</strong> dropdown in Cashier Shift and Expense vouchers.
+                      </p>
+
+                      {/* Add Owner Input */}
+                      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 max-w-xl">
+                        <input
+                          type="text"
+                          value={newOwnerName}
+                          onChange={(e) => setNewOwnerName(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              const trimmed = newOwnerName.trim();
+                              if (trimmed && !hotelForm.owners.includes(trimmed)) {
+                                setHotelForm({
+                                  ...hotelForm,
+                                  owners: [...hotelForm.owners, trimmed],
+                                });
+                                setNewOwnerName("");
+                              }
+                            }
+                          }}
+                          placeholder="Enter owner / partner full name (e.g. Ambarish Sharma)"
+                          className="flex-1 h-11 px-3.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-base sm:text-xs font-medium text-zinc-900 dark:text-white focus:border-purple-600 focus:outline-none transition"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const trimmed = newOwnerName.trim();
+                            if (trimmed && !hotelForm.owners.includes(trimmed)) {
+                              setHotelForm({
+                                ...hotelForm,
+                                owners: [...hotelForm.owners, trimmed],
+                              });
+                              setNewOwnerName("");
+                            }
+                          }}
+                          className="h-11 px-4 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition shadow-xs cursor-pointer active:scale-98 shrink-0"
+                        >
+                          <Plus className="h-4 w-4" />
+                          <span>Add Owner</span>
+                        </button>
+                      </div>
+
+                      {/* Current Owners Badges */}
+                      <div className="space-y-1.5">
+                        <label className="block text-[11px] font-semibold text-zinc-500 uppercase tracking-wider">
+                          Current Registered Owners ({hotelForm.owners.length})
+                        </label>
+                        {hotelForm.owners.length === 0 ? (
+                          <div className="p-3 rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 text-xs text-zinc-400 dark:text-zinc-500 font-medium">
+                            No property owners configured yet. Add names above to display them in the cashier payout modal.
+                          </div>
+                        ) : (
+                          <div className="flex flex-wrap gap-2 pt-1">
+                            {hotelForm.owners.map((owner, idx) => (
+                              <div
+                                key={idx}
+                                className="inline-flex items-center gap-2 pl-3 pr-2 py-1.5 rounded-xl bg-white dark:bg-zinc-900 border border-purple-200 dark:border-purple-800 shadow-xs"
+                              >
+                                <span className="h-2 w-2 rounded-full bg-purple-600" />
+                                <span className="text-xs font-bold text-zinc-900 dark:text-white">
+                                  {owner}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setHotelForm({
+                                      ...hotelForm,
+                                      owners: hotelForm.owners.filter((_, i) => i !== idx),
+                                    });
+                                  }}
+                                  className="h-5 w-5 rounded-md text-zinc-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 flex items-center justify-center transition cursor-pointer"
+                                  title={`Remove ${owner}`}
+                                >
+                                  <X className="h-3 w-3" />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>

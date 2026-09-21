@@ -48,6 +48,7 @@ export interface DailyReportResult {
     expensesCount: number;
     netCashFlow: number;
     cashDrawerPosition: {
+      openingBalance?: number;
       cashIn: number;
       cashOut: number;
       netCashInHand: number;
@@ -359,10 +360,35 @@ export async function getDailyMidnightReport(
     };
   });
 
-  // 7. Cash Drawer Position
+  // 7. Cash Drawer Position & Opening Balance Carry-Forward
+  const priorCutoff = localStart < startUtc ? localStart : startUtc;
+  const priorCashPayments = await prisma.payment.findMany({
+    where: {
+      propertyId,
+      method: "CASH",
+      status: "SUCCEEDED",
+      receivedAt: { lt: priorCutoff },
+    },
+    select: { amount: true },
+  });
+
+  const priorCashExpenses = await prisma.expense.findMany({
+    where: {
+      propertyId,
+      status: "PAID",
+      paymentMethod: "CASH",
+      paidAt: { lt: priorCutoff },
+    },
+    select: { totalAmount: true },
+  });
+
+  const priorCashIn = priorCashPayments.reduce((sum, p) => sum + p.amount, 0);
+  const priorCashOut = priorCashExpenses.reduce((sum, e) => sum + e.totalAmount, 0);
+  const openingBalance = Math.max(0, Math.round((priorCashIn - priorCashOut) * 100) / 100);
+
   const cashIn = collectionsByMethod["CASH"] || 0;
   const cashOut = expensesByMethod["CASH"] || 0;
-  const netCashInHand = cashIn - cashOut;
+  const netCashInHand = Math.round((openingBalance + cashIn - cashOut) * 100) / 100;
   const netCashFlow = totalCollections - totalExpenses;
 
   // 8. Revenue & Tax Calculations
@@ -511,6 +537,7 @@ export async function getDailyMidnightReport(
       expensesCount: formattedExpenses.length,
       netCashFlow: Math.round(netCashFlow * 100) / 100,
       cashDrawerPosition: {
+        openingBalance: Math.round(openingBalance * 100) / 100,
         cashIn: Math.round(cashIn * 100) / 100,
         cashOut: Math.round(cashOut * 100) / 100,
         netCashInHand: Math.round(netCashInHand * 100) / 100,

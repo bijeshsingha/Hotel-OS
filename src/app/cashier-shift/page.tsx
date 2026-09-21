@@ -111,6 +111,9 @@ export default function CashierShiftPage() {
     reference: "",
     notes: "",
   });
+  const [configuredOwners, setConfiguredOwners] = useState<string[]>([]);
+  const [isCustomOwner, setIsCustomOwner] = useState(false);
+  const [customOwnerName, setCustomOwnerName] = useState("");
   const [ownerPayoutSubmitting, setOwnerPayoutSubmitting] = useState(false);
   const [ownerPayoutError, setOwnerPayoutError] = useState<string | null>(null);
   const [ownerPayoutSuccess, setOwnerPayoutSuccess] = useState<string | null>(null);
@@ -118,6 +121,22 @@ export default function CashierShiftPage() {
   const [datePreset, setDatePreset] = useState<string>("TODAY");
   const [customStartDate, setCustomStartDate] = useState("");
   const [customEndDate, setCustomEndDate] = useState("");
+
+  // Sync configured owners from admin hotel master
+  useEffect(() => {
+    if (!activeProperty?.id) return;
+    fetch(`/api/v1/admin/hotel?propertyId=${activeProperty.id}`)
+      .then((r) => r.json())
+      .then((d) => {
+        if (Array.isArray(d.owners)) {
+          setConfiguredOwners(d.owners);
+          if (d.owners.length > 0 && !ownerPayoutForm.ownerName) {
+            setOwnerPayoutForm((prev) => ({ ...prev, ownerName: d.owners[0] }));
+          }
+        }
+      })
+      .catch(() => {});
+  }, [activeProperty?.id, refreshKey]);
 
   // Initialize selectedDate
   useEffect(() => {
@@ -177,6 +196,7 @@ export default function CashierShiftPage() {
         expensesCount: summary.expensesCount ?? json.expensesCount ?? 0,
         netCashFlow: summary.netCashFlow ?? json.netCashFlow ?? 0,
         cashDrawer: {
+          openingBalance: cashDrawer.openingBalance ?? 0,
           netCashHandover: cashDrawer.netCashInHand ?? 0,
           cashIn: cashDrawer.cashIn ?? 0,
           cashOut: cashDrawer.cashOut ?? 0,
@@ -431,8 +451,12 @@ export default function CashierShiftPage() {
     setOwnerPayoutError(null);
     setOwnerPayoutSuccess(null);
 
-    if (!ownerPayoutForm.ownerName.trim()) {
-      setOwnerPayoutError("Please enter the Owner / Partner name.");
+    const finalOwnerName = isCustomOwner
+      ? customOwnerName.trim()
+      : (ownerPayoutForm.ownerName || customOwnerName).trim();
+
+    if (!finalOwnerName) {
+      setOwnerPayoutError("Please select or enter the owner / partner name.");
       return;
     }
     if (!ownerPayoutForm.amount || isNaN(Number(ownerPayoutForm.amount)) || Number(ownerPayoutForm.amount) <= 0) {
@@ -448,7 +472,7 @@ export default function CashierShiftPage() {
         body: JSON.stringify({
           propertyId: activeProperty?.id,
           category: "OWNER_PAYOUT",
-          payeeName: ownerPayoutForm.ownerName,
+          payeeName: finalOwnerName,
           description: ownerPayoutForm.description || "Owner Payout / Cash Drawing",
           amount: Number(ownerPayoutForm.amount),
           taxAmount: 0,
@@ -741,16 +765,24 @@ export default function CashierShiftPage() {
             {formatINR(data?.cashDrawer?.netCashHandover || 0)}
           </div>
           <div
-            className={`text-[11px] mt-1 flex items-center justify-between font-mono ${
+            className={`text-[11px] mt-1.5 pt-1.5 border-t border-emerald-200/50 dark:border-emerald-800/50 space-y-0.5 font-mono ${
               onlyCashDrawer ? "text-emerald-100" : "text-emerald-700/80 dark:text-emerald-400"
             }`}
           >
-            <span>In: {formatINR(data?.cashDrawer?.cashIn || 0)}</span>
-            <span>Out: {formatINR(data?.cashDrawer?.cashOut || 0)}</span>
+            {(data?.cashDrawer?.openingBalance || 0) > 0 && (
+              <div className="flex items-center justify-between text-[10.5px]">
+                <span className="opacity-85">Opening Float (Brought Fwd):</span>
+                <span>{formatINR(data?.cashDrawer?.openingBalance || 0)}</span>
+              </div>
+            )}
+            <div className="flex items-center justify-between text-[10.5px]">
+              <span>Collections (In): +{formatINR(data?.cashDrawer?.cashIn || 0)}</span>
+              <span>Paid Out: -{formatINR(data?.cashDrawer?.cashOut || 0)}</span>
+            </div>
           </div>
           <div className="text-[10px] mt-1.5 opacity-80 flex items-center gap-1">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-            {onlyCashDrawer ? "Filtering Cash in Drawer (Click to reset)" : "Click to isolate physical cash entries"}
+            {onlyCashDrawer ? "Filtering Cash in Drawer (Click to reset)" : "Carries forward until banked or withdrawn"}
           </div>
         </div>
 
@@ -1718,14 +1750,70 @@ export default function CashierShiftPage() {
                   <label className="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-1">
                     Owner / Partner / Entity Name *
                   </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Bijesh Singha (Owner) / Managing Partner"
-                    value={ownerPayoutForm.ownerName}
-                    onChange={(e) => setOwnerPayoutForm({ ...ownerPayoutForm, ownerName: e.target.value })}
-                    required
-                    className="w-full h-9 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 text-xs text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
-                  />
+                  {configuredOwners.length > 0 && !isCustomOwner ? (
+                    <div className="space-y-1">
+                      <select
+                        value={ownerPayoutForm.ownerName}
+                        onChange={(e) => {
+                          if (e.target.value === "__CUSTOM__") {
+                            setIsCustomOwner(true);
+                            setCustomOwnerName("");
+                          } else {
+                            setOwnerPayoutForm({ ...ownerPayoutForm, ownerName: e.target.value });
+                          }
+                        }}
+                        required
+                        className="w-full h-9 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 text-xs font-semibold text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 cursor-pointer"
+                      >
+                        <option value="">-- Select Registered Owner --</option>
+                        {configuredOwners.map((owner, idx) => (
+                          <option key={idx} value={owner}>
+                            {owner}
+                          </option>
+                        ))}
+                        <option value="__CUSTOM__">+ Other / Enter Custom Name...</option>
+                      </select>
+                      <div className="text-[10px] text-zinc-500 dark:text-zinc-400">
+                        Configured in Admin &gt; Hotel &amp; Property
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-1">
+                      <div className="relative">
+                        <input
+                          type="text"
+                          placeholder="e.g. Bijesh Singha (Owner) / Managing Partner"
+                          value={isCustomOwner ? customOwnerName : ownerPayoutForm.ownerName}
+                          onChange={(e) => {
+                            if (isCustomOwner) {
+                              setCustomOwnerName(e.target.value);
+                            } else {
+                              setOwnerPayoutForm({ ...ownerPayoutForm, ownerName: e.target.value });
+                            }
+                          }}
+                          required
+                          className="w-full h-9 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 text-xs text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
+                        />
+                        {isCustomOwner && configuredOwners.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setIsCustomOwner(false);
+                              setOwnerPayoutForm({ ...ownerPayoutForm, ownerName: configuredOwners[0] });
+                            }}
+                            className="absolute right-2 top-2 text-[10px] text-purple-600 hover:text-purple-700 dark:text-purple-400 font-semibold cursor-pointer underline"
+                          >
+                            Select from list
+                          </button>
+                        )}
+                      </div>
+                      {configuredOwners.length === 0 && (
+                        <div className="text-[10px] text-zinc-500 dark:text-zinc-400">
+                          Tip: Add owners in Admin Portal &gt; Hotel &amp; Property to display them in this dropdown.
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 <div>

@@ -934,6 +934,14 @@ export async function GET(request: Request) {
             include: {
               entries: true,
               payments: true,
+              windows: {
+                include: {
+                  invoices: {
+                    include: { lines: true, creditNotes: true },
+                    orderBy: { issuedAt: "desc" },
+                  },
+                },
+              },
             },
           },
         },
@@ -1068,18 +1076,25 @@ export async function GET(request: Request) {
             ? methods[0]
             : `SPLIT (${methods.join(", ")})`;
 
-        const balance = folio?.balance ?? (grossTotal - totalPaid);
+        const invoices = folio?.windows?.flatMap((w) => w.invoices || []) || [];
+        const primaryInvoice = invoices[0] || null;
+        const invoiceNo = primaryInvoice?.invoiceNo || `INV-2627-${stay.id.slice(-4).toUpperCase()}`;
+
+        const balance = Math.round((folio?.balance ?? (grossTotal - totalPaid)) * 100) / 100;
+        const isOutstanding = balance > 0.5;
         const settlementStatus =
-          stay.status === "CHECKED_OUT" || (balance === 0 && totalPaid > 0)
-            ? "SETTLED"
+          isOutstanding
+            ? "OUTSTANDING"
             : stay.status === "IN_HOUSE"
             ? "IN_HOUSE"
-            : "OPEN";
+            : "SETTLED";
 
         return {
           stayId: stay.id,
           folioId: folio?.id || "—",
-          invoiceNo: `INV-2627-${stay.id.slice(-4).toUpperCase()}`,
+          invoiceNo,
+          allInvoices: invoices,
+          primaryInvoice,
           grcNo: grc?.registrationNo || "—",
           guestName: stay.primaryGuest?.name || grc?.fullName || "—",
           phone: stay.primaryGuest?.phone || grc?.mobilePhone || "—",
@@ -1087,6 +1102,7 @@ export async function GET(request: Request) {
           gstin: stay.primaryGuest?.gstin || "—",
           roomDisplay,
           roomsCount: uniqueRooms.length,
+          allRooms: uniqueRooms,
           checkInDate: stay.arrivalAt.toISOString(),
           checkOutDate: (stay.actualDepartureAt || stay.expectedDepartureAt).toISOString(),
           nights,
@@ -1102,6 +1118,7 @@ export async function GET(request: Request) {
           grossTotal,
           totalPaid,
           balance,
+          isOutstanding,
           settlementStatus,
           paymentMethod: methodDisplay,
           paymentsList: payments.map((p) => ({
@@ -1110,13 +1127,18 @@ export async function GET(request: Request) {
             receiptNo: p.receiptNo,
             receivedAt: p.receivedAt,
           })),
+          stayData: {
+            ...stay,
+            guestRegistration: grc || null,
+          },
         };
       });
 
       const summary = {
         totalBills: bills.length,
         settledCount: bills.filter((b) => b.settlementStatus === "SETTLED").length,
-        inHouseCount: bills.filter((b) => b.stayStatus === "IN_HOUSE").length,
+        outstandingCount: bills.filter((b) => b.settlementStatus === "OUTSTANDING").length,
+        inHouseCount: bills.filter((b) => b.settlementStatus === "IN_HOUSE").length,
         totalGrossRevenue: bills.reduce((sum, b) => sum + b.grossTotal, 0),
         totalCollected: bills.reduce((sum, b) => sum + b.totalPaid, 0),
         totalOutstandingBalance: bills.reduce((sum, b) => sum + Math.max(0, b.balance), 0),
