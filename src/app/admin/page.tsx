@@ -43,8 +43,6 @@ import {
   Calendar,
   Car,
   Check,
-  Maximize2,
-  Minimize2,
 } from "lucide-react";
 import {
 
@@ -241,7 +239,6 @@ export default function AdminPortalPage() {
   const [grcViewMode, setGrcViewMode] = useState<"ACTIVE" | "ARCHIVED">("ACTIVE");
   const [grcStatusFilter, setGrcStatusFilter] = useState<"ALL" | "IN_HOUSE" | "CHECKED_OUT">("ALL");
   const [selectedArchiveSnapshot, setSelectedArchiveSnapshot] = useState<any | null>(null);
-  const [isGrcFullScreen, setIsGrcFullScreen] = useState(true);
 
   // Keyboard shortcut to close GRC editor on Escape
   useEffect(() => {
@@ -1768,64 +1765,129 @@ export default function AdminPortalPage() {
                 </table>
               </div>
             </div>
+          {/* COMPREHENSIVE CHECK-IN GRC EDIT WINDOW (DEDICATED FULL SCREEN WORKSPACE) */}
+          {editingGrc && (() => {
+            // 1. Resolve room inventory objects for primary and additional rooms
+            const primaryRoomObj = roomsList.find(
+              (r) =>
+                r.number === editingGrc.preAssignedRoom ||
+                r.id === editingGrc.preAssignedRoom ||
+                String(r.number) === String(editingGrc.preAssignedRoom).replace(/^Room\s*/i, "")
+            );
+            const additionalRoomObjs = (editingGrc.additionalRoomIds || []).map((rid: string) =>
+              roomsList.find(
+                (r) =>
+                  r.id === rid ||
+                  r.number === rid ||
+                  String(r.number) === String(rid).replace(/^Room\s*/i, "")
+              )
+            );
+            const allSelectedRooms = [primaryRoomObj, ...additionalRoomObjs].filter(Boolean);
+            const totalRoomsCount = Math.max(1, 1 + (editingGrc.additionalRoomIds?.length || 0));
 
-          {/* COMPREHENSIVE CHECK-IN GRC EDIT WINDOW (FULL SCREEN VIEW) */}
-          {editingGrc && (
-            <div
-              className={`fixed inset-0 z-50 flex animate-in fade-in ${
-                isGrcFullScreen
-                  ? "flex-col bg-white dark:bg-[#0c0c0e] text-zinc-900 dark:text-zinc-100 overflow-hidden"
-                  : "items-center justify-center bg-black/80 backdrop-blur-md p-2 sm:p-4 overflow-y-auto"
-              }`}
-            >
-              <div
-                className={`w-full flex flex-col bg-white dark:bg-[#0c0c0e] text-zinc-900 dark:text-zinc-100 overflow-hidden shadow-2xl transition-all ${
-                  isGrcFullScreen
-                    ? "h-full rounded-none"
-                    : "max-w-5xl max-h-[94vh] rounded-2xl border border-zinc-200 dark:border-zinc-700"
-                }`}
-              >
+            // 2. Base standard bed capacity summed from actual roomType categories (Deluxe 2 + Family 4 = 6 Pax)
+            const baseStandardCapacity = allSelectedRooms.length > 0
+              ? allSelectedRooms.reduce(
+                  (acc, r) => acc + (r?.roomType?.capacity || r?.roomType?.baseOccupancy || 2),
+                  0
+                )
+              : totalRoomsCount * 2;
+
+            // 3. Extra Pax calculation across all rooms
+            const additionalExtraPax = (editingGrc.additionalRoomIds || []).reduce(
+              (sum: number, rid: string) => sum + (Number(editingGrc.roomExtraPax?.[rid]) || 0),
+              0
+            );
+            const primaryExtraPax = Number(editingGrc.extraPaxCount) || 0;
+            const currentExtraPax = primaryExtraPax + additionalExtraPax;
+            const totalCapacity = baseStandardCapacity + currentExtraPax;
+
+            // 4. Absolute physical bed capacity limit
+            const absoluteMaxRoomCapacity = allSelectedRooms.length > 0
+              ? allSelectedRooms.reduce(
+                  (acc, r) =>
+                    acc +
+                    (r?.roomType?.capacity || r?.roomType?.baseOccupancy || 2) +
+                    (r?.roomType?.extraCapacity ?? 1),
+                  0
+                )
+              : totalRoomsCount * 4;
+
+            // 5. Guest headcounts
+            const totalAdultsCount =
+              Number(editingGrc.adults) ||
+              (Number(editingGrc.paxM || 0) + Number(editingGrc.paxF || 0)) ||
+              0;
+            const totalChildrenCount = Number(editingGrc.children || 0);
+            const totalGuests = totalAdultsCount + totalChildrenCount;
+
+            const hasGuestsEntered = totalGuests > 0;
+            const isOverCapacity =
+              hasGuestsEntered && (totalAdultsCount > totalCapacity || totalGuests > absoluteMaxRoomCapacity);
+            const isBeyondMax =
+              hasGuestsEntered &&
+              (totalAdultsCount > absoluteMaxRoomCapacity || totalGuests > absoluteMaxRoomCapacity + totalRoomsCount);
+
+            // 6. Live daily tariff aggregation
+            const primaryRate = editingGrc.isComplimentary ? 0 : (editingGrc.agreedRoomTariff !== undefined ? Number(editingGrc.agreedRoomTariff) : 3200);
+            const additionalDailyTariff = (editingGrc.additionalRoomIds || []).reduce((sum: number, rid: string) => {
+              const rObj = roomsList.find((r) => r.id === rid || r.number === rid);
+              const rRate = Number(editingGrc.roomRates?.[rid] ?? (rObj?.roomType?.basePrice || 3200));
+              return sum + (isNaN(rRate) ? 0 : rRate);
+            }, 0);
+            const primaryExtraPaxRate = primaryRoomObj?.roomType?.extraAdult || 500;
+            const extraPaxTotalRate =
+              primaryExtraPax * primaryExtraPaxRate +
+              (editingGrc.additionalRoomIds || []).reduce((sum: number, rid: string) => {
+                const rObj = roomsList.find((r) => r.id === rid || r.number === rid);
+                const rExtraRate = rObj?.roomType?.extraAdult || 500;
+                const rPax = Number(editingGrc.roomExtraPax?.[rid]) || 0;
+                return sum + rPax * rExtraRate;
+              }, 0);
+            const totalDailyTariffCombined = primaryRate + additionalDailyTariff + extraPaxTotalRate;
+
+            return (
+              <div className="fixed inset-0 z-50 flex flex-col bg-zinc-100/95 dark:bg-[#0c0c0e] text-zinc-900 dark:text-zinc-100 overflow-hidden animate-in fade-in">
                 
-                {/* Modal Top Header */}
-                <div className="flex items-center justify-between gap-3 px-4 sm:px-8 py-3.5 border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121215] shrink-0 shadow-xs">
-                  <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-xl bg-blue-50 dark:bg-blue-600/20 border border-blue-200 dark:border-blue-500/30 flex items-center justify-center text-blue-600 dark:text-blue-400 shrink-0">
+                {/* 1. ENTERPRISE HEADER BAR (FULL WIDTH) */}
+                <header className="shrink-0 h-16 px-4 sm:px-6 lg:px-8 bg-white dark:bg-[#121215] border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between z-20 shadow-xs">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="h-10 w-10 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold shrink-0 shadow-sm">
                       <UserPlus className="h-5 w-5" />
                     </div>
-                    <div>
+                    <div className="min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <h2 className="text-base sm:text-lg font-black text-zinc-900 dark:text-white tracking-tight">
                           Guest Registration Card (GRC) Editor
                         </h2>
-                        <span className="px-2 py-0.5 rounded-lg bg-blue-100 dark:bg-blue-950 text-blue-800 dark:text-blue-300 font-mono font-black text-xs">
+                        <span className="px-2.5 py-0.5 rounded-md bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800/60 text-blue-700 dark:text-blue-300 font-mono font-bold text-xs">
                           {editingGrc.registrationNo}
                         </span>
-                        <span className={`px-2 py-0.5 rounded-lg text-[10.5px] font-mono font-bold ${
-                          editingGrc.status === "CHECKED_IN"
-                            ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300"
-                            : "bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300"
-                        }`}>
+                        <span
+                          className={`px-2.5 py-0.5 rounded-md text-xs font-bold ${
+                            editingGrc.status === "CHECKED_IN"
+                              ? "bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800/60"
+                              : "bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800/60"
+                          }`}
+                        >
                           {editingGrc.status}
                         </span>
-                        <span className="hidden md:inline-flex items-center gap-1 text-[10.5px] font-mono font-semibold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/50 px-2 py-0.5 rounded-md border border-blue-200 dark:border-blue-800/60">
-                          {isGrcFullScreen ? "Full Screen Active" : "Windowed View"}
+                        <span className="hidden sm:inline-flex px-2 py-0.5 rounded-md bg-zinc-100 dark:bg-zinc-800/80 text-zinc-700 dark:text-zinc-300 font-mono text-xs font-bold">
+                          Room {editingGrc.preAssignedRoom || "Unassigned"}
+                          {(editingGrc.additionalRoomIds || []).length > 0 &&
+                            ` + ${(editingGrc.additionalRoomIds || []).length} more`}
                         </span>
                       </div>
-                      <p className="text-xs text-zinc-500 dark:text-zinc-400 font-mono">
-                        {hotelForm.displayName || activeProperty?.displayName || "Hotel"} • {hotelForm.code || activeProperty?.code || ""}
+                      <p className="text-xs text-zinc-500 dark:text-zinc-400 font-mono truncate">
+                        {hotelForm.displayName || activeProperty?.displayName || "Hotel"} ({hotelForm.code || activeProperty?.code || ""}) • {editingGrc.fullName || "Guest Profile"}
                       </p>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => setIsGrcFullScreen((prev) => !prev)}
-                      className="p-2 rounded-xl text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition cursor-pointer"
-                      title={isGrcFullScreen ? "Restore Windowed Size" : "Expand to Full Screen"}
-                    >
-                      {isGrcFullScreen ? <Minimize2 className="h-4.5 w-4.5" /> : <Maximize2 className="h-4.5 w-4.5" />}
-                    </button>
+                  <div className="flex items-center gap-3 shrink-0">
+                    <span className="hidden sm:inline-flex items-center px-2.5 py-1 text-[11px] font-mono font-medium text-zinc-500 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-800 rounded-md border border-zinc-200 dark:border-zinc-700">
+                      Esc to Close
+                    </span>
                     <button
                       type="button"
                       onClick={() => setEditingGrc(null)}
@@ -1835,642 +1897,562 @@ export default function AdminPortalPage() {
                       <X className="h-5 w-5" />
                     </button>
                   </div>
-                </div>
+                </header>
 
-                {/* PHYSICAL GRC DATA ENTRY & EDIT FORM */}
-                <form onSubmit={saveGrcEdit} className="flex-1 flex flex-col overflow-hidden">
-                  <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 space-y-6 text-xs max-w-6xl mx-auto w-full">
-                  
-                  {/* 1. ROOM & STAY PERIOD SECTION */}
-                  <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-[#09090b] p-4 space-y-3.5 shadow-xs">
-                    <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 pb-2 flex-wrap gap-2">
-                      <span className="font-bold text-zinc-900 dark:text-white uppercase tracking-wider flex items-center gap-2 text-xs">
-                        <Building2 className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                        1. Room Assignment & Stay Schedule
-                      </span>
-                      {editingGrc.preAssignedRoom && (
-                        <span className="text-[11px] font-mono text-emerald-700 dark:text-emerald-400 font-bold bg-emerald-50 dark:bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-200 dark:border-emerald-500/20">
-                          Room {editingGrc.preAssignedRoom}
-                          {(editingGrc.additionalRoomIds || []).length > 0 &&
-                            `, ${editingGrc.additionalRoomIds
-                              .map((id: string) => {
-                                const r = roomsList.find((rm) => rm.id === id || rm.number === id);
-                                return r?.number || id;
-                              })
-                              .join(", ")}`}
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Row 1: Room Assignment & Schedule */}
-                    <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-                      <div className="space-y-1 sm:col-span-1">
-                        <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">
-                          Allocated Room *
-                        </label>
-                        <select
-                          required
-                          value={
-                            roomsList.find(
-                              (r) => r.number === editingGrc.preAssignedRoom || r.id === editingGrc.preAssignedRoom
-                            )?.number || editingGrc.preAssignedRoom || ""
-                          }
-                          onChange={(e) => setEditingGrc({ ...editingGrc, preAssignedRoom: e.target.value })}
-                          className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs font-mono font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
-                        >
-                          <option value="">-- Choose Room --</option>
-                          {roomsList.map((r) => {
-                            const bedType = r.roomType?.bedType || (r.wing === "TWIN" ? "Twin Beds" : "King Bed");
-                            return (
-                              <option key={r.id} value={r.number}>
-                                Room {r.number} — {r.roomType?.name} [{bedType}]
-                              </option>
-                            );
-                          })}
-                        </select>
-                      </div>
-
-                      {/* Check-In Date */}
-                      <div className="space-y-1 sm:col-span-1">
-                        <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap flex items-center justify-between">
-                          <span>Check-In Date *</span>
-                          <span className="text-[10px] text-blue-600 dark:text-blue-400 font-mono font-bold">Editable</span>
-                        </label>
-                        <input
-                          type="date"
-                          required
-                          value={editingGrc.arrivalDate || ""}
-                          onChange={(e) => setEditingGrc({ ...editingGrc, arrivalDate: e.target.value })}
-                          className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer"
-                        />
-                      </div>
-
-                      {/* Check-In Time */}
-                      <div className="space-y-1 sm:col-span-1">
-                        <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap flex items-center justify-between">
-                          <span>Check-In Time *</span>
-                          <span className="text-[10px] text-blue-600 dark:text-blue-400 font-mono font-bold">Editable</span>
-                        </label>
-                        <input
-                          type="time"
-                          required
-                          value={editingGrc.arrivalTime || "14:00"}
-                          onChange={(e) => setEditingGrc({ ...editingGrc, arrivalTime: e.target.value })}
-                          className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer shadow-xs"
-                        />
-                      </div>
-
-                      {/* Expected Departure Date */}
-                      <div className="space-y-1 sm:col-span-1">
-                        <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">
-                          Expected Departure *
-                        </label>
-                        <input
-                          type="date"
-                          required
-                          value={editingGrc.expectedDepartureDate || ""}
-                          onChange={(e) => setEditingGrc({ ...editingGrc, expectedDepartureDate: e.target.value })}
-                          className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer"
-                        />
-                      </div>
-
-                      {/* Checkout Billing Model */}
-                      <div className="space-y-1 sm:col-span-2">
-                        <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">
-                          Checkout Billing Cycle *
-                        </label>
-                        <select
-                          value={editingGrc.checkoutType || "FIXED_TIME"}
-                          onChange={(e: any) => setEditingGrc({ ...editingGrc, checkoutType: e.target.value })}
-                          className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer"
-                        >
-                          <option value="FIXED_TIME">☀️ Standard 11:00 AM / 12:00 PM (Default)</option>
-                          <option value="24_HOURS">⏱️ 24-Hour Cycle from Check-In</option>
-                        </select>
-                      </div>
-
-                      {/* Grace Period Window (0 to 7 hr range) */}
-                      <div className="space-y-1 sm:col-span-2">
-                        <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">
-                          Grace Period Window *
-                        </label>
-                        <select
-                          value={editingGrc.gracePeriodMinutes || "0"}
-                          onChange={(e: any) => setEditingGrc({ ...editingGrc, gracePeriodMinutes: e.target.value })}
-                          className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer"
-                        >
-                          <option value="0">0 Hours / None</option>
-                          <option value="60">1 Hour Grace</option>
-                          <option value="120">2 Hours Grace</option>
-                          <option value="180">3 Hours Grace</option>
-                          <option value="240">4 Hours Grace</option>
-                          <option value="300">5 Hours Grace</option>
-                          <option value="360">6 Hours Grace</option>
-                          <option value="420">7 Hours Grace</option>
-                          <option value="1440">Waive Next Night</option>
-                        </select>
-                      </div>
-                    </div>
-
-                    {/* Room Rates & Extra Pax Configuration for ALL Allocated Rooms */}
-                    <div className="space-y-2.5 border-t border-zinc-200 dark:border-zinc-800 pt-3">
-                      <div className="flex items-center justify-between">
-                        <label className="block font-bold text-zinc-700 dark:text-zinc-300 uppercase text-[11px]">
-                          Rooms & Individual Tariff Rates ({(editingGrc.additionalRoomIds || []).length + 1} Rooms)
-                        </label>
-                        <span className="text-[10.5px] font-mono text-zinc-500">
-                          Edit rates & extra pax per room
-                        </span>
-                      </div>
+                {/* 2. FULL WIDTH SCROLLABLE WORKSPACE WITH RESPONSIVE 12-COLUMN GRID */}
+                <form onSubmit={saveGrcEdit} className="flex-1 flex flex-col min-h-0 overflow-hidden">
+                  <div className="flex-1 overflow-y-auto px-4 sm:px-6 lg:px-8 xl:px-10 py-6">
+                    <div className="w-full grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
                       
-                      <div className="flex flex-col gap-2.5">
-                        {/* 1. PRIMARY ALLOCATED ROOM CARD */}
-                        {(() => {
-                          const primaryRoomObj = roomsList.find(
-                            (r) => r.number === editingGrc.preAssignedRoom || r.id === editingGrc.preAssignedRoom
-                          );
-                          const primaryRoomNumber = primaryRoomObj?.number || editingGrc.preAssignedRoom || "Primary";
-                          const primaryRoomType = primaryRoomObj?.roomType?.name || primaryRoomObj?.name || "Standard Room";
-                          const primaryPaxCount = Number(editingGrc.extraPaxCount) || 0;
-                          const primaryExtraPaxRate = primaryRoomObj?.roomType?.extraAdult || 500;
-                          const primaryRate = editingGrc.isComplimentary ? 0 : (editingGrc.agreedRoomTariff !== undefined ? editingGrc.agreedRoomTariff : 3200);
-
-                          return (
-                            <div className="p-3 rounded-xl bg-blue-50/70 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800/50 space-y-2.5 shadow-xs">
-                              <div className="flex items-center justify-between gap-2 flex-wrap">
-                                <div className="flex items-center gap-2">
-                                  <span className="px-2.5 py-1 rounded-lg bg-blue-600 text-white font-bold font-mono text-xs shadow-xs">
-                                    Room {primaryRoomNumber}
-                                  </span>
-                                  <span className="px-2 py-0.5 rounded-md bg-blue-100 dark:bg-blue-900/60 text-blue-800 dark:text-blue-200 text-[10px] font-bold uppercase tracking-wider">
-                                    Primary Room
-                                  </span>
-                                  <span className="text-xs text-zinc-800 dark:text-zinc-300 font-medium truncate">
-                                    {primaryRoomType}
-                                  </span>
-                                </div>
-
-                                <div className="flex items-center gap-2">
-                                  <label className="text-[11px] font-bold text-zinc-600 dark:text-zinc-400 uppercase">Rate:</label>
-                                  <div className="relative flex items-center">
-                                    <span className="absolute left-2.5 text-xs text-zinc-400 font-bold font-mono">₹</span>
-                                    <input
-                                      type="number"
-                                      placeholder={editingGrc.isComplimentary ? "0 (Free)" : "Rate"}
-                                      disabled={editingGrc.isComplimentary}
-                                      value={primaryRate}
-                                      onChange={(e) => {
-                                        const val = Number(e.target.value);
-                                        setEditingGrc((prev: any) => ({
-                                          ...prev,
-                                          agreedRoomTariff: val,
-                                          roomRates: {
-                                            ...(prev.roomRates || {}),
-                                            [primaryRoomNumber]: val,
-                                            ...(primaryRoomObj?.id ? { [primaryRoomObj.id]: val } : {}),
-                                          },
-                                        }));
-                                      }}
-                                      className="w-28 h-8 pl-6 pr-2 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-blue-700 dark:text-blue-400 font-mono text-xs font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
-                                    />
-                                  </div>
-                                </div>
+                      {/* ========================================================================= */}
+                      {/* LEFT COLUMN: STAY, ROOMS, CAPACITY & GUEST PROFILE (7 Columns)            */}
+                      {/* ========================================================================= */}
+                      <div className="lg:col-span-7 xl:col-span-7 space-y-6">
+                        
+                        {/* CARD 1: STAY SCHEDULE & ROOM INVENTORY ALLOCATION */}
+                        <div className="rounded-2xl border border-zinc-200/90 dark:border-zinc-800 bg-white dark:bg-[#121215] p-5 lg:p-6 shadow-xs space-y-5">
+                          <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 pb-3 flex-wrap gap-2">
+                            <div className="flex items-center gap-2.5">
+                              <div className="p-1.5 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800/60">
+                                <Building2 className="h-4 w-4" />
                               </div>
-
-                              {/* Primary Room Extra Pax Stepper & Direct Input */}
-                              <div className="flex items-center justify-between p-2.5 rounded-xl bg-white dark:bg-zinc-900/90 border border-zinc-200 dark:border-zinc-800 text-xs shadow-xs gap-2 flex-wrap">
-                                <div className="flex items-center gap-2">
-                                  <span className="font-bold text-zinc-800 dark:text-zinc-200">
-                                    Extra Pax for Room {primaryRoomNumber}
-                                  </span>
-                                  <span className="text-[11px] font-mono font-semibold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/60 px-2 py-0.5 rounded-md border border-blue-200 dark:border-blue-800/60">
-                                    ₹{primaryExtraPaxRate}/Pax
-                                  </span>
-                                </div>
-                                <div className="flex items-center gap-2.5">
-                                  <div className="flex items-center bg-zinc-100 dark:bg-zinc-800 p-0.5 rounded-lg border border-zinc-200 dark:border-zinc-700">
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        const next = Math.max(0, primaryPaxCount - 1);
-                                        setEditingGrc((prev: any) => ({
-                                          ...prev,
-                                          extraPaxCount: next,
-                                          roomExtraPax: {
-                                            ...(prev.roomExtraPax || {}),
-                                            [primaryRoomNumber]: next,
-                                            ...(primaryRoomObj?.id ? { [primaryRoomObj.id]: next } : {}),
-                                          },
-                                        }));
-                                      }}
-                                      className="h-6 w-6 rounded-md bg-white dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-700 active:scale-90 text-zinc-700 dark:text-zinc-200 flex items-center justify-center transition shadow-xs cursor-pointer"
-                                      title="Decrease Extra Pax"
-                                    >
-                                      <Minus className="h-3 w-3 stroke-[2.5]" />
-                                    </button>
-                                    <input
-                                      type="number"
-                                      min="0"
-                                      max="10"
-                                      value={primaryPaxCount}
-                                      onChange={(e) => {
-                                        const next = Math.max(0, Math.min(10, Number(e.target.value) || 0));
-                                        setEditingGrc((prev: any) => ({
-                                          ...prev,
-                                          extraPaxCount: next,
-                                          roomExtraPax: {
-                                            ...(prev.roomExtraPax || {}),
-                                            [primaryRoomNumber]: next,
-                                            ...(primaryRoomObj?.id ? { [primaryRoomObj.id]: next } : {}),
-                                          },
-                                        }));
-                                      }}
-                                      className="w-10 h-6 text-center font-mono font-bold text-xs text-zinc-900 dark:text-white bg-transparent focus:outline-none focus:bg-white dark:focus:bg-zinc-900 rounded"
-                                      title="Type Extra Pax count"
-                                    />
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        const next = primaryPaxCount + 1;
-                                        setEditingGrc((prev: any) => ({
-                                          ...prev,
-                                          extraPaxCount: next,
-                                          roomExtraPax: {
-                                            ...(prev.roomExtraPax || {}),
-                                            [primaryRoomNumber]: next,
-                                            ...(primaryRoomObj?.id ? { [primaryRoomObj.id]: next } : {}),
-                                          },
-                                        }));
-                                      }}
-                                      className="h-6 w-6 rounded-md bg-white dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-700 active:scale-90 text-zinc-700 dark:text-zinc-200 flex items-center justify-center transition shadow-xs cursor-pointer"
-                                      title="Increase Extra Pax"
-                                    >
-                                      <Plus className="h-3 w-3 stroke-[2.5]" />
-                                    </button>
-                                  </div>
-                                  {primaryPaxCount > 0 ? (
-                                    <span className="text-[11px] font-mono font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/60 px-2 py-0.5 rounded-md border border-amber-200 dark:border-amber-800/60">
-                                      +₹{formatINR(primaryPaxCount * primaryExtraPaxRate)}/nt
-                                    </span>
-                                  ) : (
-                                    <span className="text-[10px] font-mono text-zinc-400 dark:text-zinc-500 pr-1">₹0</span>
-                                  )}
-                                </div>
-                              </div>
+                              <span className="font-bold text-zinc-900 dark:text-white uppercase tracking-wider text-xs">
+                                1. Room Assignment & Stay Schedule
+                              </span>
                             </div>
-                          );
-                        })()}
+                            <span className="text-[11px] font-mono text-blue-700 dark:text-blue-300 font-bold bg-blue-50 dark:bg-blue-950/60 px-2.5 py-1 rounded-md border border-blue-200 dark:border-blue-800/60">
+                              {totalRoomsCount} {totalRoomsCount === 1 ? "Room" : "Rooms"} Assigned
+                            </span>
+                          </div>
 
-                        {/* 2. ADDITIONAL ROOMS LIST */}
-                        {(editingGrc.additionalRoomIds || []).map((id: string) => {
-                          const r = roomsList.find((room) => room.id === id || room.number === id);
-                          const roomPaxCount = editingGrc.roomExtraPax?.[id] ?? editingGrc.roomExtraPax?.[r?.number || ""] ?? 0;
-                          const roomExtraPaxRate = r?.roomType?.extraAdult || 500;
-                          const currentRoomRate = editingGrc.roomRates?.[id] ?? editingGrc.roomRates?.[r?.number || ""] ?? (r?.roomType?.basePrice || 3200);
-                          return (
-                            <div
-                              key={id}
-                              className="p-3 rounded-xl bg-blue-50/70 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800/50 space-y-2.5 shadow-xs"
-                            >
-                              <div className="flex items-center justify-between gap-2 flex-wrap">
-                                <div className="flex items-center gap-2">
-                                  <span className="px-2.5 py-1 rounded-lg bg-blue-100 dark:bg-blue-500/20 text-blue-800 dark:text-blue-300 font-bold font-mono text-xs border border-blue-200 dark:border-blue-500/30">
-                                    Room {r?.number || id}
-                                  </span>
-                                  <span className="text-xs text-zinc-800 dark:text-zinc-300 font-medium truncate">
-                                    {r?.roomType?.name || r?.name || "Standard Room"}
-                                  </span>
-                                </div>
+                          {/* Row 1: Stay Dates & Timings (4-column grid) */}
+                          <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                            <div className="space-y-1 sm:col-span-1">
+                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">
+                                Primary Room *
+                              </label>
+                              <select
+                                required
+                                value={
+                                  roomsList.find(
+                                    (r) => r.number === editingGrc.preAssignedRoom || r.id === editingGrc.preAssignedRoom
+                                  )?.number || editingGrc.preAssignedRoom || ""
+                                }
+                                onChange={(e) => setEditingGrc({ ...editingGrc, preAssignedRoom: e.target.value })}
+                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs font-mono font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                              >
+                                <option value="">-- Choose Room --</option>
+                                {roomsList.map((r) => {
+                                  const bedType = r.roomType?.bedType || (r.wing === "TWIN" ? "Twin Beds" : "King Bed");
+                                  return (
+                                    <option key={r.id} value={r.number}>
+                                      Room {r.number} — {r.roomType?.name} [{bedType}]
+                                    </option>
+                                  );
+                                })}
+                              </select>
+                            </div>
 
-                                <div className="flex items-center gap-2">
-                                  <label className="text-[11px] font-bold text-zinc-600 dark:text-zinc-400 uppercase">Rate:</label>
-                                  <div className="relative flex items-center">
-                                    <span className="absolute left-2.5 text-xs text-zinc-400 font-bold font-mono">₹</span>
-                                    <input
-                                      type="number"
-                                      placeholder="Rate"
-                                      value={currentRoomRate}
-                                      onChange={(e) => {
-                                        const val = e.target.value;
-                                        setEditingGrc((prev: any) => ({
-                                          ...prev,
-                                          roomRates: {
-                                            ...prev.roomRates,
-                                            [id]: val,
-                                            ...(r?.number ? { [r.number]: val } : {}),
-                                          },
-                                        }));
-                                      }}
-                                      className="w-28 h-8 pl-6 pr-2 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white font-mono text-xs font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
-                                    />
+                            <div className="space-y-1 sm:col-span-1">
+                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap flex items-center justify-between">
+                                <span>Check-In Date *</span>
+                                <span className="text-[10px] text-blue-600 dark:text-blue-400 font-mono font-bold">Editable</span>
+                              </label>
+                              <input
+                                type="date"
+                                required
+                                value={editingGrc.arrivalDate || ""}
+                                onChange={(e) => setEditingGrc({ ...editingGrc, arrivalDate: e.target.value })}
+                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer"
+                              />
+                            </div>
+
+                            <div className="space-y-1 sm:col-span-1">
+                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap flex items-center justify-between">
+                                <span>Check-In Time *</span>
+                                <span className="text-[10px] text-blue-600 dark:text-blue-400 font-mono font-bold">Editable</span>
+                              </label>
+                              <input
+                                type="time"
+                                required
+                                value={editingGrc.arrivalTime || "14:00"}
+                                onChange={(e) => setEditingGrc({ ...editingGrc, arrivalTime: e.target.value })}
+                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer"
+                              />
+                            </div>
+
+                            <div className="space-y-1 sm:col-span-1">
+                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">
+                                Expected Departure *
+                              </label>
+                              <input
+                                type="date"
+                                required
+                                value={editingGrc.expectedDepartureDate || ""}
+                                onChange={(e) => setEditingGrc({ ...editingGrc, expectedDepartureDate: e.target.value })}
+                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer"
+                              />
+                            </div>
+
+                            <div className="space-y-1 sm:col-span-2">
+                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">
+                                Checkout Billing Cycle *
+                              </label>
+                              <select
+                                value={editingGrc.checkoutType || "FIXED_TIME"}
+                                onChange={(e: any) => setEditingGrc({ ...editingGrc, checkoutType: e.target.value })}
+                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer"
+                              >
+                                <option value="FIXED_TIME">Standard 11:00 AM / 12:00 PM (Default)</option>
+                                <option value="24_HOURS">24-Hour Cycle from Check-In</option>
+                              </select>
+                            </div>
+
+                            <div className="space-y-1 sm:col-span-2">
+                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">
+                                Grace Period Window *
+                              </label>
+                              <select
+                                value={editingGrc.gracePeriodMinutes || "0"}
+                                onChange={(e: any) => setEditingGrc({ ...editingGrc, gracePeriodMinutes: e.target.value })}
+                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer"
+                              >
+                                <option value="0">0 Hours / None</option>
+                                <option value="60">1 Hour Grace</option>
+                                <option value="120">2 Hours Grace</option>
+                                <option value="180">3 Hours Grace</option>
+                                <option value="240">4 Hours Grace</option>
+                                <option value="300">5 Hours Grace</option>
+                                <option value="360">6 Hours Grace</option>
+                                <option value="420">7 Hours Grace</option>
+                                <option value="1440">Waive Next Night</option>
+                              </select>
+                            </div>
+                          </div>
+
+                          {/* Row 2: Allocated Rooms Deck & Extra Pax Steppers */}
+                          <div className="space-y-3 border-t border-zinc-200 dark:border-zinc-800 pt-4">
+                            <div className="flex items-center justify-between">
+                              <label className="block font-bold text-zinc-800 dark:text-zinc-200 uppercase text-xs">
+                                Allocated Rooms & Tariff Rates ({totalRoomsCount} Rooms)
+                              </label>
+                              <span className="text-[11px] font-mono text-zinc-500">
+                                Configure rates & extra pax per room
+                              </span>
+                            </div>
+
+                            <div className="flex flex-col gap-3">
+                              {/* 1. PRIMARY ALLOCATED ROOM CARD */}
+                              {(() => {
+                                const primaryRoomNumber = primaryRoomObj?.number || editingGrc.preAssignedRoom || "Primary";
+                                const primaryRoomType = primaryRoomObj?.roomType?.name || primaryRoomObj?.name || "Standard Room";
+                                const primaryCapacity = primaryRoomObj?.roomType?.capacity || primaryRoomObj?.roomType?.baseOccupancy || 2;
+
+                                return (
+                                  <div className="p-3.5 rounded-xl bg-blue-50/60 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800/40 space-y-3">
+                                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                                      <div className="flex items-center gap-2">
+                                        <span className="px-2.5 py-1 rounded-lg bg-blue-600 text-white font-bold font-mono text-xs shadow-xs">
+                                          Room {primaryRoomNumber}
+                                        </span>
+                                        <span className="px-2 py-0.5 rounded-md bg-blue-100 dark:bg-blue-900/60 text-blue-800 dark:text-blue-200 text-[10px] font-bold uppercase tracking-wider">
+                                          Primary Room
+                                        </span>
+                                        <span className="text-xs text-zinc-800 dark:text-zinc-200 font-semibold truncate">
+                                          {primaryRoomType}
+                                        </span>
+                                        <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-zinc-200/80 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 font-medium">
+                                          Base: {primaryCapacity} Pax
+                                        </span>
+                                      </div>
+
+                                      <div className="flex items-center gap-2">
+                                        <label className="text-[11px] font-bold text-zinc-600 dark:text-zinc-400 uppercase">Rate:</label>
+                                        <div className="relative flex items-center">
+                                          <span className="absolute left-2.5 text-xs text-zinc-400 font-bold font-mono">₹</span>
+                                          <input
+                                            type="number"
+                                            placeholder={editingGrc.isComplimentary ? "0 (Free)" : "Rate"}
+                                            disabled={editingGrc.isComplimentary}
+                                            value={primaryRate}
+                                            onChange={(e) => {
+                                              const val = Number(e.target.value);
+                                              setEditingGrc((prev: any) => ({
+                                                ...prev,
+                                                agreedRoomTariff: val,
+                                                roomRates: {
+                                                  ...(prev.roomRates || {}),
+                                                  [primaryRoomNumber]: val,
+                                                  ...(primaryRoomObj?.id ? { [primaryRoomObj.id]: val } : {}),
+                                                },
+                                              }));
+                                            }}
+                                            className="w-28 h-8 pl-6 pr-2 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-blue-700 dark:text-blue-400 font-mono text-xs font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                                          />
+                                        </div>
+                                      </div>
+                                    </div>
+
+                                    {/* Primary Room Extra Pax Stepper */}
+                                    <div className="flex items-center justify-between border-t border-blue-200/60 dark:border-blue-900/40 pt-2.5 flex-wrap gap-2">
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-xs font-bold text-zinc-700 dark:text-zinc-300">
+                                          Extra Pax for Room {primaryRoomNumber}
+                                        </span>
+                                        <span className="text-[11px] font-mono font-semibold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/60 px-2 py-0.5 rounded-md border border-blue-200 dark:border-blue-800/60">
+                                          ₹{primaryExtraPaxRate}/Pax
+                                        </span>
+                                      </div>
+                                      <div className="flex items-center gap-2.5">
+                                        <div className="flex items-center bg-zinc-100 dark:bg-zinc-800 p-0.5 rounded-lg border border-zinc-200 dark:border-zinc-700">
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              const next = Math.max(0, primaryExtraPax - 1);
+                                              setEditingGrc((prev: any) => ({
+                                                ...prev,
+                                                extraPaxCount: next,
+                                                roomExtraPax: {
+                                                  ...(prev.roomExtraPax || {}),
+                                                  [primaryRoomNumber]: next,
+                                                  ...(primaryRoomObj?.id ? { [primaryRoomObj.id]: next } : {}),
+                                                },
+                                              }));
+                                            }}
+                                            className="h-6 w-6 rounded-md bg-white dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-700 active:scale-90 text-zinc-700 dark:text-zinc-200 flex items-center justify-center transition shadow-xs cursor-pointer"
+                                            title="Decrease Extra Pax"
+                                          >
+                                            <Minus className="h-3 w-3 stroke-[2.5]" />
+                                          </button>
+                                          <input
+                                            type="number"
+                                            min="0"
+                                            max="10"
+                                            value={primaryExtraPax}
+                                            onChange={(e) => {
+                                              const next = Math.max(0, Math.min(10, Number(e.target.value) || 0));
+                                              setEditingGrc((prev: any) => ({
+                                                ...prev,
+                                                extraPaxCount: next,
+                                                roomExtraPax: {
+                                                  ...(prev.roomExtraPax || {}),
+                                                  [primaryRoomNumber]: next,
+                                                  ...(primaryRoomObj?.id ? { [primaryRoomObj.id]: next } : {}),
+                                                },
+                                              }));
+                                            }}
+                                            className="w-10 h-6 text-center font-mono font-bold text-xs text-zinc-900 dark:text-white bg-transparent focus:outline-none focus:bg-white dark:focus:bg-zinc-900 rounded"
+                                            title="Type Extra Pax count"
+                                          />
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              const next = primaryExtraPax + 1;
+                                              setEditingGrc((prev: any) => ({
+                                                ...prev,
+                                                extraPaxCount: next,
+                                                roomExtraPax: {
+                                                  ...(prev.roomExtraPax || {}),
+                                                  [primaryRoomNumber]: next,
+                                                  ...(primaryRoomObj?.id ? { [primaryRoomObj.id]: next } : {}),
+                                                },
+                                              }));
+                                            }}
+                                            className="h-6 w-6 rounded-md bg-white dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-700 active:scale-90 text-zinc-700 dark:text-zinc-200 flex items-center justify-center transition shadow-xs cursor-pointer"
+                                            title="Increase Extra Pax"
+                                          >
+                                            <Plus className="h-3 w-3 stroke-[2.5]" />
+                                          </button>
+                                        </div>
+                                        {primaryExtraPax > 0 ? (
+                                          <span className="text-[11px] font-mono font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/60 px-2 py-0.5 rounded-md border border-amber-200 dark:border-amber-800/60">
+                                            +₹{formatINR(primaryExtraPax * primaryExtraPaxRate)}/nt
+                                          </span>
+                                        ) : (
+                                          <span className="text-[10px] font-mono text-zinc-400 dark:text-zinc-500 pr-1">₹0</span>
+                                        )}
+                                      </div>
+                                    </div>
                                   </div>
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      setEditingGrc((prev: any) => {
-                                        const nextPax = { ...(prev.roomExtraPax || {}) };
-                                        const nextRates = { ...(prev.roomRates || {}) };
-                                        delete nextPax[id];
-                                        delete nextRates[id];
-                                        if (r?.number) {
-                                          delete nextPax[r.number];
-                                          delete nextRates[r.number];
-                                        }
-                                        return {
-                                          ...prev,
-                                          additionalRoomIds: (prev.additionalRoomIds || []).filter((rid: string) => rid !== id && rid !== r?.number),
-                                          roomExtraPax: nextPax,
-                                          roomRates: nextRates,
-                                        };
-                                      })
-                                    }
-                                    className="p-1.5 text-zinc-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-colors cursor-pointer"
-                                    title="Remove Room"
+                                );
+                              })()}
+
+                              {/* 2. ADDITIONAL ROOMS CARDS */}
+                              {(editingGrc.additionalRoomIds || []).map((id: string) => {
+                                const r = roomsList.find((room) => room.id === id || room.number === id);
+                                const roomPaxCount = editingGrc.roomExtraPax?.[id] ?? editingGrc.roomExtraPax?.[r?.number || ""] ?? 0;
+                                const roomExtraPaxRate = r?.roomType?.extraAdult || 500;
+                                const currentRoomRate = editingGrc.roomRates?.[id] ?? editingGrc.roomRates?.[r?.number || ""] ?? (r?.roomType?.basePrice || 3200);
+                                const rCapacity = r?.roomType?.capacity || r?.roomType?.baseOccupancy || 2;
+
+                                return (
+                                  <div
+                                    key={id}
+                                    className="p-3.5 rounded-xl bg-blue-50/60 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800/40 space-y-3"
                                   >
-                                    <X className="w-4 h-4" />
-                                  </button>
-                                </div>
-                              </div>
+                                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                                      <div className="flex items-center gap-2">
+                                        <span className="px-2.5 py-1 rounded-lg bg-blue-100 dark:bg-blue-500/20 text-blue-800 dark:text-blue-300 font-bold font-mono text-xs border border-blue-200 dark:border-blue-500/30">
+                                          Room {r?.number || id}
+                                        </span>
+                                        <span className="text-xs text-zinc-800 dark:text-zinc-200 font-semibold truncate">
+                                          {r?.roomType?.name || r?.name || "Standard Room"}
+                                        </span>
+                                        <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-zinc-200/80 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 font-medium">
+                                          Base: {rCapacity} Pax
+                                        </span>
+                                      </div>
 
-                              {/* Per-Room Extra Pax Stepper & Direct Input */}
-                              <div className="flex items-center justify-between p-2.5 rounded-xl bg-white dark:bg-zinc-900/90 border border-zinc-200 dark:border-zinc-800 text-xs shadow-xs gap-2 flex-wrap">
-                                <div className="flex items-center gap-2">
-                                  <span className="font-bold text-zinc-800 dark:text-zinc-200">
-                                    Extra Pax for Room {r?.number || id}
-                                  </span>
-                                  <span className="text-[11px] font-mono font-semibold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/60 px-2 py-0.5 rounded-md border border-blue-200 dark:border-blue-800/60">
-                                    ₹{roomExtraPaxRate}/Pax
-                                  </span>
-                                </div>
-                                <div className="flex items-center gap-2.5">
-                                  <div className="flex items-center bg-zinc-100 dark:bg-zinc-800 p-0.5 rounded-lg border border-zinc-200 dark:border-zinc-700">
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        const cur = editingGrc.roomExtraPax?.[id] ?? editingGrc.roomExtraPax?.[r?.number || ""] ?? 0;
-                                        const next = Math.max(0, cur - 1);
-                                        setEditingGrc((prev: any) => ({
-                                          ...prev,
-                                          roomExtraPax: {
-                                            ...prev.roomExtraPax,
-                                            [id]: next,
-                                            ...(r?.number ? { [r.number]: next } : {}),
-                                          },
-                                        }));
-                                      }}
-                                      className="h-6 w-6 rounded-md bg-white dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-700 active:scale-90 text-zinc-700 dark:text-zinc-200 flex items-center justify-center transition shadow-xs cursor-pointer"
-                                      title="Decrease Extra Pax"
-                                    >
-                                      <Minus className="h-3 w-3 stroke-[2.5]" />
-                                    </button>
-                                    <input
-                                      type="number"
-                                      min="0"
-                                      max="10"
-                                      value={roomPaxCount}
-                                      onChange={(e) => {
-                                        const next = Math.max(0, Math.min(10, Number(e.target.value) || 0));
-                                        setEditingGrc((prev: any) => ({
-                                          ...prev,
-                                          roomExtraPax: {
-                                            ...prev.roomExtraPax,
-                                            [id]: next,
-                                            ...(r?.number ? { [r.number]: next } : {}),
-                                          },
-                                        }));
-                                      }}
-                                      className="w-10 h-6 text-center font-mono font-bold text-xs text-zinc-900 dark:text-white bg-transparent focus:outline-none focus:bg-white dark:focus:bg-zinc-900 rounded"
-                                      title="Type Extra Pax count"
-                                    />
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        const cur = editingGrc.roomExtraPax?.[id] ?? editingGrc.roomExtraPax?.[r?.number || ""] ?? 0;
-                                        const next = cur + 1;
-                                        setEditingGrc((prev: any) => ({
-                                          ...prev,
-                                          roomExtraPax: {
-                                            ...prev.roomExtraPax,
-                                            [id]: next,
-                                            ...(r?.number ? { [r.number]: next } : {}),
-                                          },
-                                        }));
-                                      }}
-                                      className="h-6 w-6 rounded-md bg-white dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-700 active:scale-90 text-zinc-700 dark:text-zinc-200 flex items-center justify-center transition shadow-xs cursor-pointer"
-                                      title="Increase Extra Pax"
-                                    >
-                                      <Plus className="h-3 w-3 stroke-[2.5]" />
-                                    </button>
+                                      <div className="flex items-center gap-2">
+                                        <label className="text-[11px] font-bold text-zinc-600 dark:text-zinc-400 uppercase">Rate:</label>
+                                        <div className="relative flex items-center">
+                                          <span className="absolute left-2.5 text-xs text-zinc-400 font-bold font-mono">₹</span>
+                                          <input
+                                            type="number"
+                                            placeholder="Rate"
+                                            value={currentRoomRate}
+                                            onChange={(e) => {
+                                              const val = e.target.value;
+                                              setEditingGrc((prev: any) => ({
+                                                ...prev,
+                                                roomRates: {
+                                                  ...prev.roomRates,
+                                                  [id]: val,
+                                                  ...(r?.number ? { [r.number]: val } : {}),
+                                                },
+                                              }));
+                                            }}
+                                            className="w-28 h-8 pl-6 pr-2 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-blue-700 dark:text-blue-400 font-mono text-xs font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                                          />
+                                        </div>
+
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setEditingGrc((prev: any) => ({
+                                              ...prev,
+                                              additionalRoomIds: (prev.additionalRoomIds || []).filter((x: string) => x !== id),
+                                            }));
+                                          }}
+                                          className="h-8 w-8 rounded-lg text-rose-500 hover:bg-rose-100 dark:hover:bg-rose-950/50 flex items-center justify-center transition cursor-pointer"
+                                          title="Remove this room"
+                                        >
+                                          <X className="h-4 w-4" />
+                                        </button>
+                                      </div>
+                                    </div>
+
+                                    {/* Additional Room Extra Pax Stepper */}
+                                    <div className="flex items-center justify-between border-t border-blue-200/60 dark:border-blue-900/40 pt-2.5 flex-wrap gap-2">
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-xs font-bold text-zinc-700 dark:text-zinc-300">
+                                          Extra Pax for Room {r?.number || id}
+                                        </span>
+                                        <span className="text-[11px] font-mono font-semibold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/60 px-2 py-0.5 rounded-md border border-blue-200 dark:border-blue-800/60">
+                                          ₹{roomExtraPaxRate}/Pax
+                                        </span>
+                                      </div>
+                                      <div className="flex items-center gap-2.5">
+                                        <div className="flex items-center bg-zinc-100 dark:bg-zinc-800 p-0.5 rounded-lg border border-zinc-200 dark:border-zinc-700">
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              const cur = editingGrc.roomExtraPax?.[id] ?? editingGrc.roomExtraPax?.[r?.number || ""] ?? 0;
+                                              const next = Math.max(0, cur - 1);
+                                              setEditingGrc((prev: any) => ({
+                                                ...prev,
+                                                roomExtraPax: {
+                                                  ...prev.roomExtraPax,
+                                                  [id]: next,
+                                                  ...(r?.number ? { [r.number]: next } : {}),
+                                                },
+                                              }));
+                                            }}
+                                            className="h-6 w-6 rounded-md bg-white dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-700 active:scale-90 text-zinc-700 dark:text-zinc-200 flex items-center justify-center transition shadow-xs cursor-pointer"
+                                            title="Decrease Extra Pax"
+                                          >
+                                            <Minus className="h-3 w-3 stroke-[2.5]" />
+                                          </button>
+                                          <input
+                                            type="number"
+                                            min="0"
+                                            max="10"
+                                            value={roomPaxCount}
+                                            onChange={(e) => {
+                                              const next = Math.max(0, Math.min(10, Number(e.target.value) || 0));
+                                              setEditingGrc((prev: any) => ({
+                                                ...prev,
+                                                roomExtraPax: {
+                                                  ...prev.roomExtraPax,
+                                                  [id]: next,
+                                                  ...(r?.number ? { [r.number]: next } : {}),
+                                                },
+                                              }));
+                                            }}
+                                            className="w-10 h-6 text-center font-mono font-bold text-xs text-zinc-900 dark:text-white bg-transparent focus:outline-none focus:bg-white dark:focus:bg-zinc-900 rounded"
+                                            title="Type Extra Pax count"
+                                          />
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              const cur = editingGrc.roomExtraPax?.[id] ?? editingGrc.roomExtraPax?.[r?.number || ""] ?? 0;
+                                              const next = cur + 1;
+                                              setEditingGrc((prev: any) => ({
+                                                ...prev,
+                                                roomExtraPax: {
+                                                  ...prev.roomExtraPax,
+                                                  [id]: next,
+                                                  ...(r?.number ? { [r.number]: next } : {}),
+                                                },
+                                              }));
+                                            }}
+                                            className="h-6 w-6 rounded-md bg-white dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-700 active:scale-90 text-zinc-700 dark:text-zinc-200 flex items-center justify-center transition shadow-xs cursor-pointer"
+                                            title="Increase Extra Pax"
+                                          >
+                                            <Plus className="h-3 w-3 stroke-[2.5]" />
+                                          </button>
+                                        </div>
+                                        {roomPaxCount > 0 ? (
+                                          <span className="text-[11px] font-mono font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/60 px-2 py-0.5 rounded-md border border-amber-200 dark:border-amber-800/60">
+                                            +₹{formatINR(roomPaxCount * roomExtraPaxRate)}/nt
+                                          </span>
+                                        ) : (
+                                          <span className="text-[10px] font-mono text-zinc-400 dark:text-zinc-500 pr-1">₹0</span>
+                                        )}
+                                      </div>
+                                    </div>
                                   </div>
-                                  {roomPaxCount > 0 ? (
-                                    <span className="text-[11px] font-mono font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/60 px-2 py-0.5 rounded-md border border-amber-200 dark:border-amber-800/60">
-                                      +₹{formatINR(roomPaxCount * roomExtraPaxRate)}/nt
-                                    </span>
-                                  ) : (
-                                    <span className="text-[10px] font-mono text-zinc-400 dark:text-zinc-500 pr-1">₹0</span>
-                                  )}
-                                </div>
-                              </div>
+                                );
+                              })}
                             </div>
-                          );
-                        })}
-                      </div>
 
-                      {/* Dropdown to add more rooms */}
-                      <div className="flex gap-2 pt-1">
-                        <select
-                          value=""
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            if (val) {
-                              const roomObj = roomsList.find((r) => r.id === val || r.number === val);
-                              const defaultPrice = roomObj?.roomType?.basePrice || 3200;
-                              setEditingGrc((prev: any) => ({
-                                ...prev,
-                                additionalRoomIds: [...(prev.additionalRoomIds || []), val],
-                                roomRates: {
-                                  ...(prev.roomRates || {}),
-                                  [val]: defaultPrice,
-                                  ...(roomObj?.number ? { [roomObj.number]: defaultPrice } : {}),
-                                },
-                                roomExtraPax: {
-                                  ...(prev.roomExtraPax || {}),
-                                  [val]: 0,
-                                  ...(roomObj?.number ? { [roomObj.number]: 0 } : {}),
-                                },
-                              }));
-                            }
-                          }}
-                          className="flex-1 h-9 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs font-mono focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer"
-                        >
-                          <option value="">-- Select Vacant Room to Add --</option>
-                          {roomsList
-                            .filter(
-                              (r) =>
-                                r.number !== editingGrc.preAssignedRoom &&
-                                r.id !== editingGrc.preAssignedRoom &&
-                                !(editingGrc.additionalRoomIds || []).includes(r.id) &&
-                                !(editingGrc.additionalRoomIds || []).includes(r.number)
-                            )
-                            .map((r) => (
-                              <option key={r.id} value={r.id}>
-                                Room {r.number} — {r.roomType?.name || (r.wing === "TWIN" ? "Twin Room" : "King Room")}
-                              </option>
-                            ))}
-                        </select>
-                      </div>
-                      
-                      {(editingGrc.additionalRoomIds || []).length > 0 && (
-                        <div className="flex items-center gap-2 mt-2 bg-blue-50 dark:bg-blue-950/20 p-2.5 rounded-lg border border-blue-200 dark:border-blue-900/50">
-                          <input
-                            type="checkbox"
-                            id="adminGroupBilling"
-                            checked={editingGrc.groupBilling !== false}
-                            onChange={(e) => setEditingGrc({ ...editingGrc, groupBilling: e.target.checked })}
-                            className="w-4 h-4 rounded bg-white dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700 text-blue-600 focus:ring-blue-500/50 cursor-pointer"
-                          />
-                          <label htmlFor="adminGroupBilling" className="text-xs font-bold text-blue-800 dark:text-blue-300 cursor-pointer">
-                            Consolidate Bill (Create a single Master Folio for all {(editingGrc.additionalRoomIds || []).length + 1} rooms)
-                          </label>
-                        </div>
-                      )}
-                    </div>
+                            {/* Dropdown to add more rooms */}
+                            <div className="flex gap-2 pt-1">
+                              <select
+                                value=""
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  if (val) {
+                                    const roomObj = roomsList.find((r) => r.id === val || r.number === val);
+                                    const defaultPrice = roomObj?.roomType?.basePrice || 3200;
+                                    setEditingGrc((prev: any) => ({
+                                      ...prev,
+                                      additionalRoomIds: [...(prev.additionalRoomIds || []), val],
+                                      roomRates: {
+                                        ...(prev.roomRates || {}),
+                                        [val]: defaultPrice,
+                                        ...(roomObj?.number ? { [roomObj.number]: defaultPrice } : {}),
+                                      },
+                                      roomExtraPax: {
+                                        ...(prev.roomExtraPax || {}),
+                                        [val]: 0,
+                                        ...(roomObj?.number ? { [roomObj.number]: 0 } : {}),
+                                      },
+                                    }));
+                                  }
+                                }}
+                                className="flex-1 h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs font-mono focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer"
+                              >
+                                <option value="">+ Add Additional Vacant Room to Booking</option>
+                                {roomsList
+                                  .filter(
+                                    (r) =>
+                                      r.number !== editingGrc.preAssignedRoom &&
+                                      r.id !== editingGrc.preAssignedRoom &&
+                                      !(editingGrc.additionalRoomIds || []).includes(r.id) &&
+                                      !(editingGrc.additionalRoomIds || []).includes(r.number)
+                                  )
+                                  .map((r) => (
+                                    <option key={r.id} value={r.id}>
+                                      Room {r.number} — {r.roomType?.name || (r.wing === "TWIN" ? "Twin Room" : "King Room")}
+                                    </option>
+                                  ))}
+                              </select>
+                            </div>
+                            
+                            {(editingGrc.additionalRoomIds || []).length > 0 && (
+                              <div className="flex items-center gap-2 mt-2 bg-blue-50 dark:bg-blue-950/20 p-2.5 rounded-lg border border-blue-200 dark:border-blue-900/50">
+                                <input
+                                  type="checkbox"
+                                  id="adminGroupBilling"
+                                  checked={editingGrc.groupBilling !== false}
+                                  onChange={(e) => setEditingGrc({ ...editingGrc, groupBilling: e.target.checked })}
+                                  className="w-4 h-4 rounded bg-white dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700 text-blue-600 focus:ring-blue-500/50 cursor-pointer"
+                                />
+                                <label htmlFor="adminGroupBilling" className="text-xs font-bold text-blue-800 dark:text-blue-300 cursor-pointer">
+                                  Consolidate Bill (Create a single Master Folio for all {totalRoomsCount} rooms)
+                                </label>
+                              </div>
+                            )}
+                          </div>
 
-                    {/* Row 2: Meal Plan & Pax Breakdown (5 Dedicated Columns) */}
-                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 pt-1">
-                      <div className="space-y-1">
-                        <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">Meal Plan</label>
-                        <select
-                          value={editingGrc.mealPlan || "EP"}
-                          onChange={(e) => setEditingGrc({ ...editingGrc, mealPlan: e.target.value })}
-                          className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
-                        >
-                          <option value="EP">EP (Room Only)</option>
-                          <option value="CP">CP (Breakfast)</option>
-                          <option value="MAP">MAP (Half Board)</option>
-                          <option value="AP">AP (Full Board)</option>
-                        </select>
-                      </div>
+                          {/* Row 3: Meal Plan & Pax Headcount */}
+                          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 pt-2 border-t border-zinc-200 dark:border-zinc-800">
+                            <div className="space-y-1">
+                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">Meal Plan</label>
+                              <select
+                                value={editingGrc.mealPlan || "EP"}
+                                onChange={(e) => setEditingGrc({ ...editingGrc, mealPlan: e.target.value })}
+                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                              >
+                                <option value="EP">EP (Room Only)</option>
+                                <option value="CP">CP (Breakfast)</option>
+                                <option value="MAP">MAP (Half Board)</option>
+                                <option value="AP">AP (Full Board)</option>
+                              </select>
+                            </div>
 
-                      <div className="space-y-1">
-                        <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">Total Adults *</label>
-                        <input
-                          type="number"
-                          required
-                          min="1"
-                          placeholder="e.g. 2"
-                          value={editingGrc.adults || "2"}
-                          onChange={(e) => setEditingGrc({ ...editingGrc, adults: e.target.value })}
-                          className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-bold"
-                        />
-                      </div>
+                            <div className="space-y-1">
+                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">Total Adults *</label>
+                              <input
+                                type="number"
+                                required
+                                min="1"
+                                placeholder="e.g. 2"
+                                value={editingGrc.adults || "2"}
+                                onChange={(e) => setEditingGrc({ ...editingGrc, adults: e.target.value })}
+                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-bold"
+                              />
+                            </div>
 
-                      <div className="space-y-1">
-                        <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">Male Pax</label>
-                        <input
-                          type="number"
-                          placeholder="e.g. 1"
-                          min="0"
-                          value={editingGrc.paxM || ""}
-                          onChange={(e) => setEditingGrc({ ...editingGrc, paxM: e.target.value })}
-                          className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
-                        />
-                      </div>
+                            <div className="space-y-1">
+                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">Male Pax</label>
+                              <input
+                                type="number"
+                                placeholder="e.g. 1"
+                                min="0"
+                                value={editingGrc.paxM || ""}
+                                onChange={(e) => setEditingGrc({ ...editingGrc, paxM: e.target.value })}
+                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                              />
+                            </div>
 
-                      <div className="space-y-1">
-                        <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">Female Pax</label>
-                        <input
-                          type="number"
-                          placeholder="e.g. 1"
-                          min="0"
-                          value={editingGrc.paxF || ""}
-                          onChange={(e) => setEditingGrc({ ...editingGrc, paxF: e.target.value })}
-                          className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
-                        />
-                      </div>
+                            <div className="space-y-1">
+                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">Female Pax</label>
+                              <input
+                                type="number"
+                                placeholder="e.g. 1"
+                                min="0"
+                                value={editingGrc.paxF || ""}
+                                onChange={(e) => setEditingGrc({ ...editingGrc, paxF: e.target.value })}
+                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                              />
+                            </div>
 
-                      <div className="space-y-1">
-                        <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">Children</label>
-                        <input
-                          type="number"
-                          placeholder="e.g. 0"
-                          min="0"
-                          value={editingGrc.children || "0"}
-                          onChange={(e) => setEditingGrc({ ...editingGrc, children: e.target.value })}
-                          className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
-                        />
-                      </div>
-                    </div>
+                            <div className="space-y-1">
+                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">Children</label>
+                              <input
+                                type="number"
+                                placeholder="e.g. 0"
+                                min="0"
+                                value={editingGrc.children || "0"}
+                                onChange={(e) => setEditingGrc({ ...editingGrc, children: e.target.value })}
+                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                              />
+                            </div>
+                          </div>
 
-                    {/* Row 3: Live Accommodation Math Calculator */}
-                    {(() => {
-                      // 1. Resolve room inventory objects for primary and additional rooms
-                      const primaryRoomObj = roomsList.find(
-                        (r) =>
-                          r.number === editingGrc.preAssignedRoom ||
-                          r.id === editingGrc.preAssignedRoom ||
-                          String(r.number) === String(editingGrc.preAssignedRoom).replace(/^Room\s*/i, "")
-                      );
-                      const additionalRoomObjs = (editingGrc.additionalRoomIds || []).map((rid: string) =>
-                        roomsList.find(
-                          (r) =>
-                            r.id === rid ||
-                            r.number === rid ||
-                            String(r.number) === String(rid).replace(/^Room\s*/i, "")
-                        )
-                      );
-                      const allSelectedRooms = [primaryRoomObj, ...additionalRoomObjs].filter(Boolean);
-                      const totalRoomsCount = Math.max(1, 1 + (editingGrc.additionalRoomIds?.length || 0));
-
-                      // 2. Base standard bed capacity summed from actual roomType categories
-                      // E.g. Deluxe Room (2) + Family Executive (4) = 6 Pax base standard capacity
-                      const baseStandardCapacity = allSelectedRooms.length > 0
-                        ? allSelectedRooms.reduce(
-                            (acc, r) => acc + (r?.roomType?.capacity || r?.roomType?.baseOccupancy || 2),
-                            0
-                          )
-                        : totalRoomsCount * 2;
-
-                      // 3. Extra Pax Count across all rooms
-                      const additionalExtraPax = (editingGrc.additionalRoomIds || []).reduce(
-                        (sum: number, rid: string) => sum + (Number(editingGrc.roomExtraPax?.[rid]) || 0),
-                        0
-                      );
-                      const currentExtraPax = (Number(editingGrc.extraPaxCount) || 0) + additionalExtraPax;
-                      const totalCapacity = baseStandardCapacity + currentExtraPax;
-
-                      // 4. Absolute maximum physical capacity (base capacity + maximum allowable extra beds per room)
-                      const absoluteMaxRoomCapacity = allSelectedRooms.length > 0
-                        ? allSelectedRooms.reduce(
-                            (acc, r) =>
-                              acc +
-                              (r?.roomType?.capacity || r?.roomType?.baseOccupancy || 2) +
-                              (r?.roomType?.extraCapacity ?? 1),
-                            0
-                          )
-                        : totalRoomsCount * 4;
-
-                      // 5. Total guest headcount (Adults & Children)
-                      const totalAdultsCount =
-                        Number(editingGrc.adults) ||
-                        (Number(editingGrc.paxM || 0) + Number(editingGrc.paxF || 0)) ||
-                        0;
-                      const totalChildrenCount = Number(editingGrc.children || 0);
-                      const totalGuests = totalAdultsCount + totalChildrenCount;
-
-                      const hasGuestsEntered = totalGuests > 0;
-                      // Overcapacity warning triggers ONLY if adults exceed total allocated capacity (base + extra pax),
-                      // or total headcount exceeds absolute physical bed limit
-                      const isOverCapacity =
-                        hasGuestsEntered && (totalAdultsCount > totalCapacity || totalGuests > absoluteMaxRoomCapacity);
-                      const isBeyondMax =
-                        hasGuestsEntered &&
-                        (totalAdultsCount > absoluteMaxRoomCapacity || totalGuests > absoluteMaxRoomCapacity + totalRoomsCount);
-
-                      const extraPaxTariffRef = primaryRoomObj?.roomType?.extraAdult || 500;
-
-                      return (
-                        <div className="pt-2 border-t border-zinc-200 dark:border-zinc-800/80 space-y-3">
+                          {/* Row 4: Live Capacity Verification Banner */}
                           <div
                             className={`rounded-xl p-3.5 border transition-all ${
                               isBeyondMax
@@ -2501,7 +2483,7 @@ export default function AdminPortalPage() {
                                     {isBeyondMax
                                       ? `${totalGuests} Guests entered, but physical capacity limit across ${totalRoomsCount} rooms is max ${absoluteMaxRoomCapacity} Pax.`
                                       : isOverCapacity
-                                      ? `${totalGuests} Guests entered, but standard capacity across ${totalRoomsCount} room(s) is ${totalCapacity} Pax. Increment Extra Pax (+₹${extraPaxTariffRef}/Pax).`
+                                      ? `${totalGuests} Guests entered, but standard capacity across ${totalRoomsCount} room(s) is ${totalCapacity} Pax. Increment Extra Pax (+₹${primaryExtraPaxRate}/Pax).`
                                       : hasGuestsEntered
                                       ? `${totalGuests} Guests fit comfortably across ${totalRoomsCount} Room(s) (Standard Capacity: ${baseStandardCapacity} Pax${currentExtraPax > 0 ? ` + ${currentExtraPax} Extra Pax` : ""}).`
                                       : `Standard Capacity: ${baseStandardCapacity} Pax across ${totalRoomsCount} room(s). Increment Extra Pax if adding extra guests.`}
@@ -2510,943 +2492,920 @@ export default function AdminPortalPage() {
                               </div>
 
                               <div className="flex items-center gap-2 font-mono text-xs font-bold shrink-0 self-end sm:self-auto">
-                                <span className="px-2.5 py-1 rounded-lg border bg-zinc-200 dark:bg-black/40 border-zinc-300 dark:border-white/10 text-zinc-900 dark:text-white">
+                                <span className="px-2.5 py-1 rounded-lg border bg-zinc-200/80 dark:bg-black/40 border-zinc-300 dark:border-white/10 text-zinc-900 dark:text-white">
                                   Pax: {totalGuests || "N/A"} / {totalCapacity} (Max {absoluteMaxRoomCapacity})
                                 </span>
                               </div>
                             </div>
                           </div>
                         </div>
-                      );
-                    })()}
-                  </div>
 
-                  {/* 2. PRIMARY GUEST DOSSIER */}
-                  <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-[#09090b] p-4 space-y-3.5 shadow-xs">
-                    <div className="border-b border-zinc-200 dark:border-zinc-800 pb-2 flex items-center justify-between">
-                      <span className="font-bold text-zinc-900 dark:text-white uppercase tracking-wider flex items-center gap-2 text-xs">
-                        <Users className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-                        2. Primary Guest Profile (From Physical GRC Card)
-                      </span>
-                    </div>
+                        {/* CARD 2: PRIMARY GUEST DOSSIER */}
+                        <div className="rounded-2xl border border-zinc-200/90 dark:border-zinc-800 bg-white dark:bg-[#121215] p-5 lg:p-6 shadow-xs space-y-5">
+                          <div className="border-b border-zinc-200 dark:border-zinc-800 pb-3 flex items-center justify-between">
+                            <div className="flex items-center gap-2.5">
+                              <div className="p-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60">
+                                <Users className="h-4 w-4" />
+                              </div>
+                              <span className="font-bold text-zinc-900 dark:text-white uppercase tracking-wider text-xs">
+                                2. Primary Guest Profile (From Physical GRC Card)
+                              </span>
+                            </div>
+                          </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-                      <div className="space-y-1">
-                        <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">Mobile Phone *</label>
-                        <input
-                          type="tel"
-                          required
-                          placeholder="e.g. 9864341211"
-                          value={editingGrc.mobilePhone || ""}
-                          onChange={(e) => setEditingGrc({ ...editingGrc, mobilePhone: e.target.value })}
-                          className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
-                        />
-                      </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                            <div className="space-y-1">
+                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">Mobile Phone *</label>
+                              <input
+                                type="tel"
+                                required
+                                placeholder="e.g. 9864341211"
+                                value={editingGrc.mobilePhone || ""}
+                                onChange={(e) => setEditingGrc({ ...editingGrc, mobilePhone: e.target.value })}
+                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                              />
+                            </div>
 
-                      <div className="space-y-1">
-                        <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">Title</label>
-                        <select
-                          value={editingGrc.title || "Mr."}
-                          onChange={(e) => setEditingGrc({ ...editingGrc, title: e.target.value })}
-                          className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
-                        >
-                          <option value="Mr.">Mr.</option>
-                          <option value="Mrs.">Mrs.</option>
-                          <option value="Ms.">Ms.</option>
-                          <option value="Dr.">Dr.</option>
-                          <option value="Prof.">Prof.</option>
-                        </select>
-                      </div>
+                            <div className="space-y-1">
+                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">Title</label>
+                              <select
+                                value={editingGrc.title || "Mr."}
+                                onChange={(e) => setEditingGrc({ ...editingGrc, title: e.target.value })}
+                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                              >
+                                <option value="Mr.">Mr.</option>
+                                <option value="Mrs.">Mrs.</option>
+                                <option value="Ms.">Ms.</option>
+                                <option value="Dr.">Dr.</option>
+                                <option value="Prof.">Prof.</option>
+                              </select>
+                            </div>
 
-                      <div className="space-y-1 sm:col-span-2">
-                        <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">Guest Full Name *</label>
-                        <input
-                          type="text"
-                          required
-                          placeholder="e.g. Suman Roy, Vikash Kumar"
-                          value={editingGrc.fullName || ""}
-                          onChange={(e) => setEditingGrc({ ...editingGrc, fullName: e.target.value.toUpperCase() })}
-                          className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-bold text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
-                        />
-                      </div>
-
-                      <div className="space-y-1 sm:col-span-2">
-                        <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">Father / Spouse Name</label>
-                        <input
-                          type="text"
-                          placeholder="S/O, D/O, W/O"
-                          value={editingGrc.fatherSpouseName || ""}
-                          onChange={(e) => setEditingGrc({ ...editingGrc, fatherSpouseName: e.target.value.toUpperCase() })}
-                          className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
-                        />
-                      </div>
-
-                      <div className="space-y-1 sm:col-span-2">
-                        <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">Alternate Phone</label>
-                        <input
-                          type="tel"
-                          placeholder="Optional phone"
-                          value={editingGrc.alternatePhone || ""}
-                          onChange={(e) => setEditingGrc({ ...editingGrc, alternatePhone: e.target.value })}
-                          className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
-                        />
-                      </div>
-
-                      <div className="space-y-1">
-                        <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">Age (Years) *</label>
-                        <input
-                          type="number"
-                          min="1"
-                          max="120"
-                          placeholder="Age"
-                          value={editingGrc.age || ""}
-                          onChange={(e) => setEditingGrc({ ...editingGrc, age: e.target.value })}
-                          className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
-                        />
-                      </div>
-
-                      <div className="space-y-1">
-                        <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">Gender *</label>
-                        <select
-                          value={editingGrc.gender || "Male"}
-                          onChange={(e) => setEditingGrc({ ...editingGrc, gender: e.target.value })}
-                          className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
-                        >
-                          <option value="Male">Male</option>
-                          <option value="Female">Female</option>
-                          <option value="Other">Other</option>
-                        </select>
-                      </div>
-
-                      <div className="space-y-1">
-                        <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">Nationality *</label>
-                        <select
-                          required
-                          value={editingGrc.nationality || "Indian"}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            setEditingGrc({
-                              ...editingGrc,
-                              nationality: val,
-                              country: val === "Indian" ? "India" : editingGrc.country,
-                              idDocumentType: val === "Indian" ? "AADHAAR" : "PASSPORT",
-                            });
-                          }}
-                          className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
-                        >
-                          <option value="Indian">Indian</option>
-                          <option value="Foreign">Foreign</option>
-                        </select>
-                      </div>
-
-                      <div className="space-y-1 sm:col-span-2">
-                        <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">Email Address</label>
-                        <input
-                          type="email"
-                          placeholder="guest@example.com"
-                          value={editingGrc.email || ""}
-                          onChange={(e) => setEditingGrc({ ...editingGrc, email: e.target.value })}
-                          className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
-                        />
-                      </div>
-
-                      <div className="space-y-1">
-                        <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">Profession / Occupation</label>
-                        <input
-                          type="text"
-                          placeholder="e.g. Business Executive"
-                          value={editingGrc.profession || ""}
-                          onChange={(e) => setEditingGrc({ ...editingGrc, profession: e.target.value })}
-                          className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* MANDATORY FOREIGN NATIONAL SECTION (FORM C) - SHOWN IF FOREIGN */}
-                  {editingGrc.nationality === "Foreign" && (
-                    <div className="rounded-xl border border-blue-200 dark:border-blue-500/30 bg-blue-50 dark:bg-blue-950/10 p-4 space-y-3.5 animate-in fade-in shadow-xs">
-                      <div className="flex items-center justify-between border-b border-blue-200 dark:border-zinc-800 pb-2">
-                        <div className="flex items-center gap-2">
-                          <Globe className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                          <span className="font-bold text-zinc-900 dark:text-white uppercase tracking-wider text-xs">
-                            Foreign National Form C Details (Mandatory for Foreign Guests)
-                          </span>
-                        </div>
-                        <span className="text-[10px] font-mono text-blue-800 dark:text-blue-400 bg-blue-100 dark:bg-blue-500/10 border border-blue-300 dark:border-blue-500/30 px-2 py-0.5 rounded font-bold">
-                          Govt Form C Compliance
-                        </span>
-                      </div>
-
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
-                        <div className="space-y-1">
-                          <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">
-                            Country of Citizenship *
-                          </label>
-                          <input
-                            type="text"
-                            required
-                            placeholder="e.g. United Kingdom / USA / Japan"
-                            value={editingGrc.foreignDetails?.countryOfCitizenship || ""}
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              setEditingGrc({
-                                ...editingGrc,
-                                country: val,
-                                foreignDetails: { ...(editingGrc.foreignDetails || {}), countryOfCitizenship: val },
-                              });
-                            }}
-                            className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
-                          />
-                        </div>
-
-                        <div className="space-y-1">
-                          <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">
-                            Passport Number *
-                          </label>
-                          <input
-                            type="text"
-                            required
-                            placeholder="e.g. Z1234567"
-                            value={editingGrc.foreignDetails?.passportNo || ""}
-                            onChange={(e) =>
-                              setEditingGrc({
-                                ...editingGrc,
-                                foreignDetails: { ...(editingGrc.foreignDetails || {}), passportNo: e.target.value },
-                              })
-                            }
-                            className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono font-bold text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
-                          />
-                        </div>
-
-                        <div className="space-y-1">
-                          <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">
-                            Passport Issue Place & Date *
-                          </label>
-                          <input
-                            type="text"
-                            required
-                            placeholder="e.g. London / 2022-05-10"
-                            value={editingGrc.foreignDetails?.datePlaceOfIssue || ""}
-                            onChange={(e) =>
-                              setEditingGrc({
-                                ...editingGrc,
-                                foreignDetails: { ...(editingGrc.foreignDetails || {}), datePlaceOfIssue: e.target.value },
-                              })
-                            }
-                            className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
-                          />
-                        </div>
-
-                        <div className="space-y-1">
-                          <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">
-                            Visa / Permit Number *
-                          </label>
-                          <input
-                            type="text"
-                            required
-                            placeholder="e.g. V9876543 / eVisa"
-                            value={editingGrc.foreignDetails?.restrictedPermitNo || ""}
-                            onChange={(e) =>
-                              setEditingGrc({
-                                ...editingGrc,
-                                foreignDetails: { ...(editingGrc.foreignDetails || {}), restrictedPermitNo: e.target.value },
-                              })
-                            }
-                            className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
-                          />
-                        </div>
-
-                        <div className="space-y-1">
-                          <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">
-                            Date of Arrival in India *
-                          </label>
-                          <input
-                            type="date"
-                            required
-                            value={editingGrc.foreignDetails?.dateOfArrivalInIndia || ""}
-                            onChange={(e) =>
-                              setEditingGrc({
-                                ...editingGrc,
-                                foreignDetails: { ...(editingGrc.foreignDetails || {}), dateOfArrivalInIndia: e.target.value },
-                              })
-                            }
-                            className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
-                          />
-                        </div>
-
-                        <div className="space-y-1">
-                          <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">
-                            Port / City of Entry in India
-                          </label>
-                          <input
-                            type="text"
-                            placeholder="e.g. Delhi / Kolkata / Mumbai"
-                            value={editingGrc.foreignDetails?.portOfEntry || ""}
-                            onChange={(e) =>
-                              setEditingGrc({
-                                ...editingGrc,
-                                foreignDetails: { ...(editingGrc.foreignDetails || {}), portOfEntry: e.target.value },
-                              })
-                            }
-                            className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
-                          />
-                        </div>
-
-                        <div className="space-y-1">
-                          <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">
-                            Stay Duration in India (Days)
-                          </label>
-                          <input
-                            type="number"
-                            min="1"
-                            placeholder="e.g. 15"
-                            value={editingGrc.foreignDetails?.proposedDurationOfStay || ""}
-                            onChange={(e) =>
-                              setEditingGrc({
-                                ...editingGrc,
-                                foreignDetails: { ...(editingGrc.foreignDetails || {}), proposedDurationOfStay: e.target.value },
-                              })
-                            }
-                            className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
-                          />
-                        </div>
-
-                        <div className="space-y-1">
-                          <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">
-                            Employed in India?
-                          </label>
-                          <select
-                            value={editingGrc.foreignDetails?.employedInIndia || "No"}
-                            onChange={(e) =>
-                              setEditingGrc({
-                                ...editingGrc,
-                                foreignDetails: { ...(editingGrc.foreignDetails || {}), employedInIndia: e.target.value },
-                              })
-                            }
-                            className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
-                          >
-                            <option value="No">No</option>
-                            <option value="Yes">Yes</option>
-                          </select>
-                        </div>
-
-                        <div className="space-y-1">
-                          <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">
-                            Next Destination
-                          </label>
-                          <input
-                            type="text"
-                            placeholder="e.g. Kaziranga / Bangkok"
-                            value={editingGrc.foreignDetails?.nextDestination || ""}
-                            onChange={(e) =>
-                              setEditingGrc({
-                                ...editingGrc,
-                                foreignDetails: { ...(editingGrc.foreignDetails || {}), nextDestination: e.target.value },
-                              })
-                            }
-                            className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* 3. RESIDENTIAL ADDRESS */}
-                  <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-[#09090b] p-4 space-y-3.5 shadow-xs">
-                    <div className="border-b border-zinc-200 dark:border-zinc-800 pb-2">
-                      <span className="font-bold text-zinc-900 dark:text-white uppercase tracking-wider flex items-center gap-2 text-xs">
-                        <MapPin className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-                        3. Residential Address
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
-                      <div className="space-y-1 sm:col-span-2">
-                        <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">Street / House Address</label>
-                        <input
-                          type="text"
-                          placeholder="Flat / Building / Road / Locality"
-                          value={editingGrc.streetAddress || ""}
-                          onChange={(e) => setEditingGrc({ ...editingGrc, streetAddress: e.target.value.toUpperCase() })}
-                          className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
-                        />
-                      </div>
-
-                      <div className="space-y-1">
-                        <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">Police Station</label>
-                        <input
-                          type="text"
-                          placeholder="Local P.S."
-                          value={editingGrc.policeStation || ""}
-                          onChange={(e) => setEditingGrc({ ...editingGrc, policeStation: e.target.value.toUpperCase() })}
-                          className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
-                        />
-                      </div>
-
-                      <div className="space-y-1">
-                        <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">City</label>
-                        <input
-                          type="text"
-                          placeholder="e.g. Guwahati / Kolkata"
-                          value={editingGrc.city || ""}
-                          onChange={(e) => setEditingGrc({ ...editingGrc, city: e.target.value.toUpperCase() })}
-                          className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
-                        />
-                      </div>
-
-                      <div className="space-y-1">
-                        <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">State</label>
-                        <input
-                          type="text"
-                          placeholder="e.g. Assam"
-                          value={editingGrc.state || ""}
-                          onChange={(e) => setEditingGrc({ ...editingGrc, state: e.target.value.toUpperCase() })}
-                          className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
-                        />
-                      </div>
-
-                      <div className="space-y-1">
-                        <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">PIN / Zip Code</label>
-                        <input
-                          type="text"
-                          placeholder="e.g. 781008"
-                          value={editingGrc.pinZipCode || ""}
-                          onChange={(e) => setEditingGrc({ ...editingGrc, pinZipCode: e.target.value })}
-                          className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
-                        />
-                      </div>
-
-                      <div className="space-y-1 sm:col-span-2">
-                        <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">Country</label>
-                        <input
-                          type="text"
-                          placeholder="e.g. India"
-                          value={editingGrc.country || "India"}
-                          onChange={(e) => setEditingGrc({ ...editingGrc, country: e.target.value })}
-                          className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* 4. TRAVEL & ID VERIFICATION */}
-                  <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-[#09090b] p-4 space-y-3.5 shadow-xs">
-                    <div className="border-b border-zinc-200 dark:border-zinc-800 pb-2">
-                      <span className="font-bold text-zinc-900 dark:text-white uppercase tracking-wider flex items-center gap-2 text-xs">
-                        <Compass className="h-4 w-4 text-cyan-600 dark:text-cyan-400" />
-                        4. Travel Details, ID Proof & Vehicle
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
-                      <div className="space-y-1">
-                        <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">Arrived From</label>
-                        <input
-                          type="text"
-                          placeholder="e.g. Kolkata, Delhi"
-                          value={editingGrc.arrivedFrom || ""}
-                          onChange={(e) => setEditingGrc({ ...editingGrc, arrivedFrom: e.target.value.toUpperCase() })}
-                          className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
-                        />
-                      </div>
-
-                      <div className="space-y-1">
-                        <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">Going To</label>
-                        <input
-                          type="text"
-                          placeholder="e.g. Shillong, Home"
-                          value={editingGrc.goingTo || ""}
-                          onChange={(e) => setEditingGrc({ ...editingGrc, goingTo: e.target.value.toUpperCase() })}
-                          className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
-                        />
-                      </div>
-
-                      <div className="space-y-1">
-                        <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">Purpose of Visit</label>
-                        <select
-                          value={editingGrc.purposeOfVisit || "Tourism / Holiday"}
-                          onChange={(e) => setEditingGrc({ ...editingGrc, purposeOfVisit: e.target.value })}
-                          className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer font-medium"
-                        >
-                          {PURPOSE_OF_VISIT_OPTIONS.map((opt) => (
-                            <option key={opt.id} value={opt.label}>
-                              {opt.label}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div className="space-y-1">
-                        <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">Vehicle Number</label>
-                        <input
-                          type="text"
-                          placeholder="e.g. AS 01 EX 1234"
-                          value={editingGrc.vehicleNumber || ""}
-                          onChange={(e) => setEditingGrc({ ...editingGrc, vehicleNumber: e.target.value.toUpperCase() })}
-                          className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
-                        />
-                      </div>
-
-                      <div className="space-y-1">
-                        <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">ID Document Type</label>
-                        <select
-                          value={editingGrc.idDocumentType || "AADHAAR"}
-                          onChange={(e) => setEditingGrc({ ...editingGrc, idDocumentType: e.target.value })}
-                          className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer"
-                        >
-                          {ID_PROOF_TYPES.map((id) => (
-                            <option key={id.id} value={id.id}>
-                              {id.label}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div className="space-y-1">
-                        <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">ID Number / Last 4</label>
-                        <input
-                          type="text"
-                          placeholder="e.g. 4521 or full ID"
-                          value={editingGrc.idDocumentNumber || ""}
-                          onChange={(e) => setEditingGrc({ ...editingGrc, idDocumentNumber: e.target.value.toUpperCase() })}
-                          className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
-                        />
-                      </div>
-
-                      <div className="space-y-1 sm:col-span-2">
-                        <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap flex items-center justify-between">
-                          <span>Company / Travel Agent Master</span>
-                          <span className="text-[10px] text-blue-600 dark:text-blue-400 font-mono font-bold">24+ Directory</span>
-                        </label>
-                        <CompanySelector
-                          value={editingGrc.companyName || ""}
-                          activeProperty={activeProperty}
-                          placeholder="Search corporate company (e.g. ABB, Asian Paints, MMT...)"
-                          onSelect={(comp) => {
-                            if (!comp) {
-                              setEditingGrc((prev: any) => ({
-                                ...prev,
-                                companyName: "",
-                                guestGstin: "",
-                              }));
-                              return;
-                            }
-                            setEditingGrc((prev: any) => ({
-                              ...prev,
-                              companyName: comp.accountName,
-                              guestGstin: comp.gstin || "",
-                              // Company address is for billing only; do not overwrite guest personal residential address
-                              email: prev.email || comp.email || "",
-                              alternatePhone: prev.alternatePhone || comp.phone || comp.mobile || "",
-                              referralChannel: comp.accountType === "TRAVEL_AGENT" ? (comp.shortName || comp.accountName) : prev.referralChannel,
-                            }));
-                          }}
-                        />
-                      </div>
-
-                      <div className="space-y-1">
-                        <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">Company GSTIN</label>
-                        <input
-                          type="text"
-                          placeholder="e.g. 18AAAAA0000A1Z5"
-                          value={editingGrc.guestGstin || ""}
-                          onChange={(e) => setEditingGrc({ ...editingGrc, guestGstin: e.target.value.toUpperCase() })}
-                          className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-semibold"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* 5. ACCOMPANYING CO-GUESTS */}
-                  <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-[#09090b] p-4 space-y-3.5 shadow-xs">
-                    <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 pb-2">
-                      <span className="font-bold text-zinc-900 dark:text-white uppercase tracking-wider flex items-center gap-2 text-xs">
-                        <Users className="h-4 w-4 text-cyan-600 dark:text-cyan-400" />
-                        5. Accompanying Co-Guests ({(editingGrc.coGuests || []).length})
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const list = Array.isArray(editingGrc.coGuests) ? [...editingGrc.coGuests] : [];
-                          list.push({ name: "", soDoWo: "", age: "", gender: "Male", relation: "Spouse" });
-                          setEditingGrc({ ...editingGrc, coGuests: list });
-                        }}
-                        className="px-3 py-1 rounded-lg bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 text-zinc-900 dark:text-white font-bold text-[11px] flex items-center gap-1 transition shadow-xs cursor-pointer"
-                      >
-                        <Plus className="h-3.5 w-3.5" />
-                        <span>Add Companion</span>
-                      </button>
-                    </div>
-
-                    {(editingGrc.coGuests || []).length > 0 ? (
-                      <div className="space-y-2">
-                        {editingGrc.coGuests.map((cg: any, idx: number) => (
-                          <div key={idx} className="grid grid-cols-1 sm:grid-cols-12 gap-2 bg-white dark:bg-zinc-900/60 p-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 items-center shadow-xs">
-                            <div className="sm:col-span-4">
+                            <div className="space-y-1 sm:col-span-2">
+                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">Guest Full Name *</label>
                               <input
                                 type="text"
                                 required
-                                placeholder="Companion Name *"
-                                value={cg.name || ""}
-                                onChange={(e) => {
-                                  const updated = [...editingGrc.coGuests];
-                                  updated[idx] = { ...updated[idx], name: e.target.value.toUpperCase() };
-                                  setEditingGrc({ ...editingGrc, coGuests: updated });
-                                }}
-                                className="w-full h-9 px-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                                placeholder="e.g. Suman Roy, Vikash Kumar"
+                                value={editingGrc.fullName || ""}
+                                onChange={(e) => setEditingGrc({ ...editingGrc, fullName: e.target.value.toUpperCase() })}
+                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-bold text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                               />
                             </div>
-                            <div className="sm:col-span-2">
+
+                            <div className="space-y-1 sm:col-span-2">
+                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">Father / Spouse Name</label>
+                              <input
+                                type="text"
+                                placeholder="S/O, D/O, W/O"
+                                value={editingGrc.fatherSpouseName || ""}
+                                onChange={(e) => setEditingGrc({ ...editingGrc, fatherSpouseName: e.target.value.toUpperCase() })}
+                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                              />
+                            </div>
+
+                            <div className="space-y-1 sm:col-span-2">
+                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">Alternate Phone</label>
+                              <input
+                                type="tel"
+                                placeholder="Optional phone"
+                                value={editingGrc.alternatePhone || ""}
+                                onChange={(e) => setEditingGrc({ ...editingGrc, alternatePhone: e.target.value })}
+                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                              />
+                            </div>
+
+                            <div className="space-y-1">
+                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">Age (Years) *</label>
                               <input
                                 type="number"
+                                min="1"
+                                max="120"
                                 placeholder="Age"
-                                value={cg.age || ""}
-                                onChange={(e) => {
-                                  const updated = [...editingGrc.coGuests];
-                                  updated[idx] = { ...updated[idx], age: e.target.value };
-                                  setEditingGrc({ ...editingGrc, coGuests: updated });
-                                }}
-                                className="w-full h-9 px-2 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                                value={editingGrc.age || ""}
+                                onChange={(e) => setEditingGrc({ ...editingGrc, age: e.target.value })}
+                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                               />
                             </div>
-                            <div className="sm:col-span-2">
+
+                            <div className="space-y-1">
+                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">Gender *</label>
                               <select
-                                value={cg.gender || "Male"}
-                                onChange={(e) => {
-                                  const updated = [...editingGrc.coGuests];
-                                  updated[idx] = { ...updated[idx], gender: e.target.value };
-                                  setEditingGrc({ ...editingGrc, coGuests: updated });
-                                }}
-                                className="w-full h-9 px-2 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                                value={editingGrc.gender || "Male"}
+                                onChange={(e) => setEditingGrc({ ...editingGrc, gender: e.target.value })}
+                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                               >
                                 <option value="Male">Male</option>
                                 <option value="Female">Female</option>
+                                <option value="Other">Other</option>
                               </select>
                             </div>
-                            <div className="sm:col-span-3">
+
+                            <div className="space-y-1">
+                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">Nationality *</label>
                               <select
-                                value={cg.relation || "Spouse"}
+                                required
+                                value={editingGrc.nationality || "Indian"}
                                 onChange={(e) => {
-                                  const updated = [...editingGrc.coGuests];
-                                  updated[idx] = { ...updated[idx], relation: e.target.value };
-                                  setEditingGrc({ ...editingGrc, coGuests: updated });
+                                  const val = e.target.value;
+                                  setEditingGrc({
+                                    ...editingGrc,
+                                    nationality: val,
+                                    country: val === "Indian" ? "India" : editingGrc.country,
+                                    idDocumentType: val === "Indian" ? "AADHAAR" : "PASSPORT",
+                                  });
                                 }}
-                                className="w-full h-9 px-2 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                               >
-                                <option value="Spouse">Spouse</option>
-                                <option value="Child">Child</option>
-                                <option value="Parent">Parent</option>
-                                <option value="Friend">Friend</option>
-                                <option value="Colleague">Colleague</option>
-                                <option value="Relative">Relative</option>
+                                <option value="Indian">Indian</option>
+                                <option value="Foreign">Foreign</option>
                               </select>
                             </div>
-                            <div className="sm:col-span-1 flex justify-end">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  const updated = editingGrc.coGuests.filter((_: any, i: number) => i !== idx);
-                                  setEditingGrc({ ...editingGrc, coGuests: updated });
-                                }}
-                                className="p-1.5 rounded-lg text-rose-500 hover:text-white hover:bg-rose-600 transition cursor-pointer"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </button>
+
+                            <div className="space-y-1 sm:col-span-2">
+                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">Email Address</label>
+                              <input
+                                type="email"
+                                placeholder="guest@example.com"
+                                value={editingGrc.email || ""}
+                                onChange={(e) => setEditingGrc({ ...editingGrc, email: e.target.value })}
+                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                              />
+                            </div>
+
+                            <div className="space-y-1">
+                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">Profession / Occupation</label>
+                              <input
+                                type="text"
+                                placeholder="e.g. Business Executive"
+                                value={editingGrc.profession || ""}
+                                onChange={(e) => setEditingGrc({ ...editingGrc, profession: e.target.value })}
+                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                              />
                             </div>
                           </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-zinc-500 italic text-[11px]">
-                        No co-guests added. Click "Add Companion" if the guest has family or colleagues sharing the room.
-                      </p>
-                    )}
-                  </div>
 
-                  {/* 6. ADVANCE PAYMENT & SETTLEMENT */}
-                  <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-[#09090b] p-4 space-y-3.5 shadow-xs">
-                    <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 pb-2">
-                      <span className="font-bold text-zinc-900 dark:text-white uppercase tracking-wider flex items-center gap-2 text-xs">
-                        <CreditCard className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-                        6. Room Tariff, Complimentary Option & Advance Deposit
-                      </span>
+                          {/* MANDATORY FOREIGN NATIONAL SECTION (FORM C) */}
+                          {editingGrc.nationality === "Foreign" && (
+                            <div className="rounded-xl border border-blue-200 dark:border-blue-500/30 bg-blue-50/80 dark:bg-blue-950/20 p-4 space-y-3.5 animate-in fade-in">
+                              <div className="flex items-center justify-between border-b border-blue-200 dark:border-blue-900/50 pb-2">
+                                <div className="flex items-center gap-2">
+                                  <Globe className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                                  <span className="font-bold text-zinc-900 dark:text-white uppercase tracking-wider text-xs">
+                                    Foreign National Form C Details (Mandatory)
+                                  </span>
+                                </div>
+                                <span className="text-[10px] font-mono text-blue-800 dark:text-blue-300 bg-blue-100 dark:bg-blue-500/20 border border-blue-300 dark:border-blue-500/30 px-2 py-0.5 rounded font-bold">
+                                  Govt Form C Compliance
+                                </span>
+                              </div>
 
-                      {/* Complimentary Room Option */}
-                      <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-emerald-800 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 px-2.5 py-1 rounded-lg border border-emerald-200 dark:border-emerald-800">
-                        <input
-                          type="checkbox"
-                          checked={editingGrc.isComplimentary || editingGrc.agreedRoomTariff === 0}
-                          onChange={(e) => {
-                            const checked = e.target.checked;
-                            const newRate = checked ? 0 : (editingGrc.agreedRoomTariff || 3200);
-                            const pRoom = editingGrc.preAssignedRoom;
-                            setEditingGrc((prev: any) => ({
-                              ...prev,
-                              isComplimentary: checked,
-                              agreedRoomTariff: newRate,
-                              roomRates: {
-                                ...(prev.roomRates || {}),
-                                ...(pRoom ? { [pRoom]: newRate } : {}),
-                              },
-                            }));
-                          }}
-                          className="w-4 h-4 rounded text-emerald-600 cursor-pointer"
-                        />
-                        <span>🎁 {editingGrc.additionalRoomIds?.length > 0 ? `Room ${editingGrc.preAssignedRoom || "Primary"} Complimentary (₹0 Free)` : "Complimentary Room (₹0 Free Stay)"}</span>
-                      </label>
-                    </div>
+                              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+                                <div className="space-y-1">
+                                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">
+                                    Country of Citizenship *
+                                  </label>
+                                  <input
+                                    type="text"
+                                    required
+                                    placeholder="e.g. United Kingdom / USA / Japan"
+                                    value={editingGrc.foreignDetails?.countryOfCitizenship || ""}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      setEditingGrc({
+                                        ...editingGrc,
+                                        country: val,
+                                        foreignDetails: { ...(editingGrc.foreignDetails || {}), countryOfCitizenship: val },
+                                      });
+                                    }}
+                                    className="w-full h-10 px-3 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                                  />
+                                </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
-                      <div className="space-y-1">
-                        <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">
-                          {editingGrc.additionalRoomIds?.length > 0
-                            ? `Room ${editingGrc.preAssignedRoom || "Primary"} Rate (₹)`
-                            : "Agreed Room Rate (₹)"}
-                        </label>
-                        <div className="relative flex items-center">
-                          <span className="absolute left-3 text-zinc-400 font-bold font-mono text-xs">₹</span>
-                          <input
-                            type="number"
-                            placeholder={editingGrc.isComplimentary ? "0 (Complimentary)" : "Enter custom rate"}
-                            disabled={editingGrc.isComplimentary}
-                            value={editingGrc.isComplimentary ? 0 : (editingGrc.agreedRoomTariff !== undefined ? editingGrc.agreedRoomTariff : "")}
-                            onChange={(e) => {
-                              const val = Number(e.target.value);
-                              const pRoom = editingGrc.preAssignedRoom;
-                              const pRoomObj = roomsList.find((r) => r.number === pRoom || r.id === pRoom);
-                              setEditingGrc((prev: any) => ({
-                                ...prev,
-                                agreedRoomTariff: val,
-                                roomRates: {
-                                  ...(prev.roomRates || {}),
-                                  ...(pRoom ? { [pRoom]: val } : {}),
-                                  ...(pRoomObj?.id ? { [pRoomObj.id]: val } : {}),
-                                },
-                              }));
-                            }}
-                            className="w-full h-10 pl-7 pr-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-blue-700 dark:text-blue-400 font-mono font-bold text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all disabled:opacity-60 disabled:bg-zinc-100 dark:disabled:bg-zinc-800"
-                          />
+                                <div className="space-y-1">
+                                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">
+                                    Passport Number *
+                                  </label>
+                                  <input
+                                    type="text"
+                                    required
+                                    placeholder="e.g. Z1234567"
+                                    value={editingGrc.foreignDetails?.passportNo || ""}
+                                    onChange={(e) =>
+                                      setEditingGrc({
+                                        ...editingGrc,
+                                        foreignDetails: { ...(editingGrc.foreignDetails || {}), passportNo: e.target.value },
+                                      })
+                                    }
+                                    className="w-full h-10 px-3 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono font-bold text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                                  />
+                                </div>
+
+                                <div className="space-y-1">
+                                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">
+                                    Passport Issue Place & Date *
+                                  </label>
+                                  <input
+                                    type="text"
+                                    required
+                                    placeholder="e.g. London / 2022-05-10"
+                                    value={editingGrc.foreignDetails?.datePlaceOfIssue || ""}
+                                    onChange={(e) =>
+                                      setEditingGrc({
+                                        ...editingGrc,
+                                        foreignDetails: { ...(editingGrc.foreignDetails || {}), datePlaceOfIssue: e.target.value },
+                                      })
+                                    }
+                                    className="w-full h-10 px-3 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                                  />
+                                </div>
+
+                                <div className="space-y-1">
+                                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">
+                                    Visa / Permit Number *
+                                  </label>
+                                  <input
+                                    type="text"
+                                    required
+                                    placeholder="e.g. V9876543 / eVisa"
+                                    value={editingGrc.foreignDetails?.restrictedPermitNo || ""}
+                                    onChange={(e) =>
+                                      setEditingGrc({
+                                        ...editingGrc,
+                                        foreignDetails: { ...(editingGrc.foreignDetails || {}), restrictedPermitNo: e.target.value },
+                                      })
+                                    }
+                                    className="w-full h-10 px-3 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                                  />
+                                </div>
+
+                                <div className="space-y-1">
+                                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">
+                                    Date of Arrival in India *
+                                  </label>
+                                  <input
+                                    type="date"
+                                    required
+                                    value={editingGrc.foreignDetails?.dateOfArrivalInIndia || ""}
+                                    onChange={(e) =>
+                                      setEditingGrc({
+                                        ...editingGrc,
+                                        foreignDetails: { ...(editingGrc.foreignDetails || {}), dateOfArrivalInIndia: e.target.value },
+                                      })
+                                    }
+                                    className="w-full h-10 px-3 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer"
+                                  />
+                                </div>
+
+                                <div className="space-y-1">
+                                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">
+                                    Port / City of Entry in India
+                                  </label>
+                                  <input
+                                    type="text"
+                                    placeholder="e.g. Delhi / Kolkata / Mumbai"
+                                    value={editingGrc.foreignDetails?.portOfEntry || ""}
+                                    onChange={(e) =>
+                                      setEditingGrc({
+                                        ...editingGrc,
+                                        foreignDetails: { ...(editingGrc.foreignDetails || {}), portOfEntry: e.target.value },
+                                      })
+                                    }
+                                    className="w-full h-10 px-3 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                                  />
+                                </div>
+
+                                <div className="space-y-1 sm:col-span-3">
+                                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">
+                                    Next Destination in India / Abroad
+                                  </label>
+                                  <input
+                                    type="text"
+                                    placeholder="e.g. Kaziranga / Bangkok"
+                                    value={editingGrc.foreignDetails?.nextDestination || ""}
+                                    onChange={(e) =>
+                                      setEditingGrc({
+                                        ...editingGrc,
+                                        foreignDetails: { ...(editingGrc.foreignDetails || {}), nextDestination: e.target.value },
+                                      })
+                                    }
+                                    className="w-full h-10 px-3 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          )}
                         </div>
-                      </div>
 
-                      {/* GST Tax Treatment Toggle */}
-                      <div className="space-y-1">
-                        <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">
-                          GST Tax Treatment
-                        </label>
-                        <div className="flex items-center bg-zinc-200/80 dark:bg-zinc-800 p-1 rounded-xl border border-zinc-300 dark:border-zinc-700 h-10">
-                          <button
-                            type="button"
-                            onClick={() => setEditingGrc({ ...editingGrc, isRateInclusive: true })}
-                            className={`flex-1 h-full rounded-lg text-xs font-bold transition flex items-center justify-center gap-1 cursor-pointer ${
-                              editingGrc.isRateInclusive !== false
-                                ? "bg-white dark:bg-zinc-900 text-blue-700 dark:text-blue-400 shadow-xs border border-zinc-200 dark:border-zinc-700"
-                                : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900"
-                            }`}
-                            title="Rate includes GST"
-                          >
-                            <span>Incl. GST</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setEditingGrc({ ...editingGrc, isRateInclusive: false })}
-                            className={`flex-1 h-full rounded-lg text-xs font-bold transition flex items-center justify-center gap-1 cursor-pointer ${
-                              editingGrc.isRateInclusive === false
-                                ? "bg-white dark:bg-zinc-900 text-amber-700 dark:text-amber-400 shadow-xs border border-zinc-200 dark:border-zinc-700"
-                                : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900"
-                            }`}
-                            title="GST is added on top of base rate"
-                          >
-                            <span>+Tax Extra</span>
-                          </button>
-                        </div>
-                      </div>
-
-                      <div className="space-y-1">
-                        <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">
-                          Advance Deposit (₹)
-                        </label>
-                        <div className="relative flex items-center">
-                          <span className="absolute left-3 text-emerald-500 font-bold font-mono text-xs">₹</span>
-                          <input
-                            type="number"
-                            placeholder="0"
-                            value={editingGrc.depositAmount !== undefined ? editingGrc.depositAmount : 0}
-                            onChange={(e) => {
-                              const val = Number(e.target.value) || 0;
-                              setEditingGrc({
-                                ...editingGrc,
-                                depositAmount: val,
-                                advancePaymentMethod: val > 0 ? (editingGrc.advancePaymentMethod || "UPI") : "",
-                              });
-                            }}
-                            className="w-full h-10 pl-7 pr-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-emerald-700 dark:text-emerald-400 font-mono font-bold text-sm focus:border-emerald-500 focus:outline-none"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="space-y-1">
-                        <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">
-                          Payment Mode
-                        </label>
-                        <select
-                          value={editingGrc.advancePaymentMethod || "UPI"}
-                          onChange={(e) => setEditingGrc({ ...editingGrc, advancePaymentMethod: e.target.value })}
-                          className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-bold text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
-                        >
-                          <option value="UPI">UPI / QR Code</option>
-                          <option value="CASH">Cash Drawer</option>
-                          <option value="CARD">Credit / Debit Card</option>
-                          <option value="DIRECT_BILL">🏢 Bill to Company (Company Ledger / BTC)</option>
-                          <option value="BANK_TRANSFER">Bank Transfer / NEFT</option>
-                          <option value="ONLINE">Online Portal / Pre-paid OTA</option>
-                        </select>
-                      </div>
-
-                      <div className="space-y-1">
-                        <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">
-                          Transaction / UTR / PO Ref
-                        </label>
-                        <input
-                          type="text"
-                          placeholder="e.g. UTR/98127391 or PO-2026"
-                          value={editingGrc.transactionRef || ""}
-                          onChange={(e) => setEditingGrc({ ...editingGrc, transactionRef: e.target.value.toUpperCase() })}
-                          className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Multi-Room Tariff Breakdown Card */}
-                    {(() => {
-                      const additionalRooms = editingGrc.additionalRoomIds || [];
-                      if (additionalRooms.length === 0) return null;
-                      const primaryRate = editingGrc.isComplimentary ? 0 : Number(editingGrc.agreedRoomTariff || 0);
-                      const totalDailyTariff = additionalRooms.reduce((sum: number, rid: string) => {
-                        const rObj = roomsList.find((r) => r.id === rid || r.number === rid);
-                        const rRate = Number(editingGrc.roomRates?.[rid] ?? (rObj?.roomType?.basePrice || 3200));
-                        return sum + (isNaN(rRate) ? 0 : rRate);
-                      }, primaryRate);
-
-                      return (
-                        <div className="p-3.5 rounded-xl bg-blue-50/70 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800/50 space-y-2.5">
-                          <div className="flex items-center justify-between flex-wrap gap-2">
-                            <span className="font-bold text-xs text-blue-900 dark:text-blue-200 uppercase tracking-wide flex items-center gap-1.5">
-                              <Building2 className="h-3.5 w-3.5 text-blue-600" />
-                              Multi-Room Group Tariff Breakdown ({additionalRooms.length + 1} Rooms)
-                            </span>
-                            <span className="px-2.5 py-1 rounded-lg bg-blue-600 text-white font-mono font-black text-xs shadow-xs">
-                              Combined: ₹{totalDailyTariff}/Night
+                        {/* CARD 3: RESIDENTIAL ADDRESS */}
+                        <div className="rounded-2xl border border-zinc-200/90 dark:border-zinc-800 bg-white dark:bg-[#121215] p-5 lg:p-6 shadow-xs space-y-4">
+                          <div className="border-b border-zinc-200 dark:border-zinc-800 pb-3 flex items-center gap-2.5">
+                            <div className="p-1.5 rounded-lg bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800/60">
+                              <MapPin className="h-4 w-4" />
+                            </div>
+                            <span className="font-bold text-zinc-900 dark:text-white uppercase tracking-wider text-xs">
+                              3. Permanent Residential Address
                             </span>
                           </div>
 
-                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                            <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-white dark:bg-zinc-900 border border-blue-100 dark:border-blue-900/60 shadow-2xs">
-                              <div className="flex items-center gap-1.5">
-                                <span className="font-mono font-bold text-xs text-zinc-900 dark:text-white">
-                                  Room {editingGrc.preAssignedRoom || "Primary"}
-                                </span>
-                                <span className="text-[10px] text-zinc-400 font-medium">(Main)</span>
+                          <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
+                            <div className="space-y-1 sm:col-span-2">
+                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">Street / House Address</label>
+                              <input
+                                type="text"
+                                placeholder="Flat / Building / Road / Locality"
+                                value={editingGrc.streetAddress || ""}
+                                onChange={(e) => setEditingGrc({ ...editingGrc, streetAddress: e.target.value.toUpperCase() })}
+                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                              />
+                            </div>
+
+                            <div className="space-y-1">
+                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">Police Station</label>
+                              <input
+                                type="text"
+                                placeholder="Local P.S."
+                                value={editingGrc.policeStation || ""}
+                                onChange={(e) => setEditingGrc({ ...editingGrc, policeStation: e.target.value.toUpperCase() })}
+                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                              />
+                            </div>
+
+                            <div className="space-y-1">
+                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">City</label>
+                              <input
+                                type="text"
+                                placeholder="e.g. Guwahati / Kolkata"
+                                value={editingGrc.city || ""}
+                                onChange={(e) => setEditingGrc({ ...editingGrc, city: e.target.value.toUpperCase() })}
+                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                              />
+                            </div>
+
+                            <div className="space-y-1">
+                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">State</label>
+                              <input
+                                type="text"
+                                placeholder="e.g. Assam"
+                                value={editingGrc.state || ""}
+                                onChange={(e) => setEditingGrc({ ...editingGrc, state: e.target.value.toUpperCase() })}
+                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                              />
+                            </div>
+
+                            <div className="space-y-1">
+                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">PIN / Zip Code</label>
+                              <input
+                                type="text"
+                                placeholder="e.g. 781008"
+                                value={editingGrc.pinZipCode || ""}
+                                onChange={(e) => setEditingGrc({ ...editingGrc, pinZipCode: e.target.value })}
+                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                              />
+                            </div>
+
+                            <div className="space-y-1 sm:col-span-2">
+                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">Country</label>
+                              <input
+                                type="text"
+                                placeholder="e.g. India"
+                                value={editingGrc.country || "India"}
+                                onChange={(e) => setEditingGrc({ ...editingGrc, country: e.target.value })}
+                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* ========================================================================= */}
+                      {/* RIGHT COLUMN: BILLING, ID VERIFICATION, COMPANIONS & STATUS (5 Columns)   */}
+                      {/* ========================================================================= */}
+                      <div className="lg:col-span-5 xl:col-span-5 space-y-6">
+                        
+                        {/* CARD 4: BILLING, TARIFF & ADVANCE DEPOSIT */}
+                        <div className="rounded-2xl border border-zinc-200/90 dark:border-zinc-800 bg-white dark:bg-[#121215] p-5 lg:p-6 shadow-xs space-y-4">
+                          <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 pb-3">
+                            <div className="flex items-center gap-2.5">
+                              <div className="p-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60">
+                                <CreditCard className="h-4 w-4" />
                               </div>
-                              <span className="font-mono font-black text-xs text-blue-600 dark:text-blue-400">
-                                ₹{primaryRate}
+                              <span className="font-bold text-zinc-900 dark:text-white uppercase tracking-wider text-xs">
+                                4. Room Tariff & Advance Deposit
                               </span>
                             </div>
 
-                            {additionalRooms.map((rid: string) => {
-                              const rObj = roomsList.find((r) => r.id === rid || r.number === rid);
-                              const rRate = Number(editingGrc.roomRates?.[rid] ?? (rObj?.roomType?.basePrice || 3200));
-                              return (
-                                <div key={rid} className="flex items-center justify-between px-3 py-2 rounded-lg bg-white dark:bg-zinc-900 border border-blue-100 dark:border-blue-900/60 shadow-2xs">
-                                  <div className="flex items-center gap-1.5 truncate">
-                                    <span className="font-mono font-bold text-xs text-zinc-900 dark:text-white">
-                                      Room {rObj?.number || rid}
-                                    </span>
-                                    <span className="text-[10px] text-zinc-400 truncate">
-                                      ({rObj?.roomType?.name || "Extra"})
-                                    </span>
-                                  </div>
+                            {/* Complimentary Switch */}
+                            <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-emerald-800 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 px-2.5 py-1 rounded-lg border border-emerald-200 dark:border-emerald-800">
+                              <input
+                                type="checkbox"
+                                checked={editingGrc.isComplimentary || editingGrc.agreedRoomTariff === 0}
+                                onChange={(e) => {
+                                  const checked = e.target.checked;
+                                  const newRate = checked ? 0 : (editingGrc.agreedRoomTariff || 3200);
+                                  const pRoom = editingGrc.preAssignedRoom;
+                                  setEditingGrc((prev: any) => ({
+                                    ...prev,
+                                    isComplimentary: checked,
+                                    agreedRoomTariff: newRate,
+                                    roomRates: {
+                                      ...(prev.roomRates || {}),
+                                      ...(pRoom ? { [pRoom]: newRate } : {}),
+                                    },
+                                  }));
+                                }}
+                                className="w-4 h-4 rounded text-emerald-600 cursor-pointer"
+                              />
+                              <span>Complimentary Room</span>
+                            </label>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
+                            <div className="space-y-1">
+                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">
+                                {editingGrc.additionalRoomIds?.length > 0
+                                  ? `Room ${editingGrc.preAssignedRoom || "Primary"} Rate`
+                                  : "Agreed Room Rate"}
+                              </label>
+                              <div className="relative flex items-center">
+                                <span className="absolute left-3 text-zinc-400 font-bold font-mono text-xs">₹</span>
+                                <input
+                                  type="number"
+                                  placeholder={editingGrc.isComplimentary ? "0 (Free)" : "Rate"}
+                                  disabled={editingGrc.isComplimentary}
+                                  value={editingGrc.isComplimentary ? 0 : (editingGrc.agreedRoomTariff !== undefined ? editingGrc.agreedRoomTariff : "")}
+                                  onChange={(e) => {
+                                    const val = Number(e.target.value);
+                                    const pRoom = editingGrc.preAssignedRoom;
+                                    const pRoomObj = roomsList.find((r) => r.number === pRoom || r.id === pRoom);
+                                    setEditingGrc((prev: any) => ({
+                                      ...prev,
+                                      agreedRoomTariff: val,
+                                      roomRates: {
+                                        ...(prev.roomRates || {}),
+                                        ...(pRoom ? { [pRoom]: val } : {}),
+                                        ...(pRoomObj?.id ? { [pRoomObj.id]: val } : {}),
+                                      },
+                                    }));
+                                  }}
+                                  className="w-full h-10 pl-7 pr-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-blue-700 dark:text-blue-400 font-mono font-bold text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all disabled:opacity-60"
+                                />
+                              </div>
+                            </div>
+
+                            {/* GST Inclusive Toggle */}
+                            <div className="space-y-1">
+                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">
+                                GST Treatment
+                              </label>
+                              <div className="flex items-center bg-zinc-100 dark:bg-zinc-800 p-0.5 rounded-lg border border-zinc-200 dark:border-zinc-700 h-10">
+                                <button
+                                  type="button"
+                                  onClick={() => setEditingGrc({ ...editingGrc, isRateInclusive: true })}
+                                  className={`flex-1 h-full rounded-md text-xs font-bold transition flex items-center justify-center gap-1 cursor-pointer ${
+                                    editingGrc.isRateInclusive !== false
+                                      ? "bg-white dark:bg-zinc-900 text-blue-700 dark:text-blue-400 shadow-xs border border-zinc-200 dark:border-zinc-700"
+                                      : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900"
+                                  }`}
+                                >
+                                  <span>Incl. GST</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setEditingGrc({ ...editingGrc, isRateInclusive: false })}
+                                  className={`flex-1 h-full rounded-md text-xs font-bold transition flex items-center justify-center gap-1 cursor-pointer ${
+                                    editingGrc.isRateInclusive === false
+                                      ? "bg-white dark:bg-zinc-900 text-amber-700 dark:text-amber-400 shadow-xs border border-zinc-200 dark:border-zinc-700"
+                                      : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900"
+                                  }`}
+                                >
+                                  <span>+Tax Extra</span>
+                                </button>
+                              </div>
+                            </div>
+
+                            <div className="space-y-1">
+                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">
+                                Advance Deposit
+                              </label>
+                              <div className="relative flex items-center">
+                                <span className="absolute left-3 text-emerald-500 font-bold font-mono text-xs">₹</span>
+                                <input
+                                  type="number"
+                                  placeholder="0"
+                                  value={editingGrc.depositAmount !== undefined ? editingGrc.depositAmount : 0}
+                                  onChange={(e) => {
+                                    const val = Number(e.target.value) || 0;
+                                    setEditingGrc({
+                                      ...editingGrc,
+                                      depositAmount: val,
+                                      advancePaymentMethod: val > 0 ? (editingGrc.advancePaymentMethod || "UPI") : "",
+                                    });
+                                  }}
+                                  className="w-full h-10 pl-7 pr-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-emerald-700 dark:text-emerald-400 font-mono font-bold text-sm focus:border-emerald-500 focus:outline-none"
+                                />
+                              </div>
+                            </div>
+
+                            <div className="space-y-1">
+                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">
+                                Payment Mode
+                              </label>
+                              <select
+                                value={editingGrc.advancePaymentMethod || "UPI"}
+                                onChange={(e) => setEditingGrc({ ...editingGrc, advancePaymentMethod: e.target.value })}
+                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-bold text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                              >
+                                <option value="UPI">UPI / QR Code</option>
+                                <option value="CASH">Cash Drawer</option>
+                                <option value="CARD">Credit / Debit Card</option>
+                                <option value="DIRECT_BILL">Bill to Company (BTC)</option>
+                                <option value="BANK_TRANSFER">Bank Transfer / NEFT</option>
+                                <option value="ONLINE">Online Portal / OTA</option>
+                              </select>
+                            </div>
+
+                            <div className="space-y-1 sm:col-span-2">
+                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">
+                                Transaction / UTR / PO Reference
+                              </label>
+                              <input
+                                type="text"
+                                placeholder="e.g. UTR/98127391 or PO-2026"
+                                value={editingGrc.transactionRef || ""}
+                                onChange={(e) => setEditingGrc({ ...editingGrc, transactionRef: e.target.value.toUpperCase() })}
+                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                              />
+                            </div>
+                          </div>
+
+                          {/* Multi-Room Tariff Breakdown Card */}
+                          {(editingGrc.additionalRoomIds || []).length > 0 && (
+                            <div className="p-3.5 rounded-xl bg-blue-50/70 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800/50 space-y-2.5">
+                              <div className="flex items-center justify-between flex-wrap gap-2">
+                                <span className="font-bold text-xs text-blue-900 dark:text-blue-200 uppercase tracking-wide flex items-center gap-1.5">
+                                  <Building2 className="h-3.5 w-3.5 text-blue-600" />
+                                  Group Tariff Breakdown ({totalRoomsCount} Rooms)
+                                </span>
+                                <span className="px-2.5 py-1 rounded-lg bg-blue-600 text-white font-mono font-black text-xs shadow-xs">
+                                  Combined: ₹{totalDailyTariffCombined}/Night
+                                </span>
+                              </div>
+
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-white dark:bg-zinc-900 border border-blue-100 dark:border-blue-900/60">
+                                  <span className="font-mono font-bold text-xs text-zinc-900 dark:text-white">
+                                    Room {editingGrc.preAssignedRoom || "Primary"} (Main)
+                                  </span>
                                   <span className="font-mono font-black text-xs text-blue-600 dark:text-blue-400">
-                                    ₹{isNaN(rRate) ? 0 : rRate}
+                                    ₹{primaryRate}
                                   </span>
                                 </div>
-                              );
-                            })}
+
+                                {(editingGrc.additionalRoomIds || []).map((rid: string) => {
+                                  const rObj = roomsList.find((r) => r.id === rid || r.number === rid);
+                                  const rRate = Number(editingGrc.roomRates?.[rid] ?? (rObj?.roomType?.basePrice || 3200));
+                                  return (
+                                    <div key={rid} className="flex items-center justify-between px-3 py-2 rounded-lg bg-white dark:bg-zinc-900 border border-blue-100 dark:border-blue-900/60">
+                                      <span className="font-mono font-bold text-xs text-zinc-900 dark:text-white truncate">
+                                        Room {rObj?.number || rid}
+                                      </span>
+                                      <span className="font-mono font-black text-xs text-blue-600 dark:text-blue-400">
+                                        ₹{isNaN(rRate) ? 0 : rRate}
+                                      </span>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+
+                          {editingGrc.advancePaymentMethod === "DIRECT_BILL" && (
+                            <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-700/60 text-xs text-amber-900 dark:text-amber-200 flex items-center gap-2">
+                              <Building2 className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                              <span>
+                                Billing will be posted to Company Ledger:{" "}
+                                <strong>{editingGrc.companyName || "Corporate Account (Select Company below)"}</strong>
+                                {editingGrc.guestGstin ? ` • GSTIN: ${editingGrc.guestGstin}` : ""}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* CARD 5: TRAVEL DETAILS & ID VERIFICATION */}
+                        <div className="rounded-2xl border border-zinc-200/90 dark:border-zinc-800 bg-white dark:bg-[#121215] p-5 lg:p-6 shadow-xs space-y-4">
+                          <div className="border-b border-zinc-200 dark:border-zinc-800 pb-3 flex items-center gap-2.5">
+                            <div className="p-1.5 rounded-lg bg-cyan-50 dark:bg-cyan-950/60 text-cyan-600 dark:text-cyan-400 border border-cyan-200 dark:border-cyan-800/60">
+                              <Compass className="h-4 w-4" />
+                            </div>
+                            <span className="font-bold text-zinc-900 dark:text-white uppercase tracking-wider text-xs">
+                              5. Travel Details, ID Proof & Corporate Master
+                            </span>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
+                            <div className="space-y-1">
+                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">Arrived From</label>
+                              <input
+                                type="text"
+                                placeholder="e.g. Kolkata, Delhi"
+                                value={editingGrc.arrivedFrom || ""}
+                                onChange={(e) => setEditingGrc({ ...editingGrc, arrivedFrom: e.target.value.toUpperCase() })}
+                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                              />
+                            </div>
+
+                            <div className="space-y-1">
+                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">Going To</label>
+                              <input
+                                type="text"
+                                placeholder="e.g. Shillong, Home"
+                                value={editingGrc.goingTo || ""}
+                                onChange={(e) => setEditingGrc({ ...editingGrc, goingTo: e.target.value.toUpperCase() })}
+                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                              />
+                            </div>
+
+                            <div className="space-y-1">
+                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">Purpose of Visit</label>
+                              <select
+                                value={editingGrc.purposeOfVisit || "Tourism / Holiday"}
+                                onChange={(e) => setEditingGrc({ ...editingGrc, purposeOfVisit: e.target.value })}
+                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer font-medium"
+                              >
+                                {PURPOSE_OF_VISIT_OPTIONS.map((opt) => (
+                                  <option key={opt.id} value={opt.label}>
+                                    {opt.label}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+
+                            <div className="space-y-1">
+                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">Vehicle Number</label>
+                              <input
+                                type="text"
+                                placeholder="e.g. AS 01 EX 1234"
+                                value={editingGrc.vehicleNumber || ""}
+                                onChange={(e) => setEditingGrc({ ...editingGrc, vehicleNumber: e.target.value.toUpperCase() })}
+                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                              />
+                            </div>
+
+                            <div className="space-y-1">
+                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">ID Document Type</label>
+                              <select
+                                value={editingGrc.idDocumentType || "AADHAAR"}
+                                onChange={(e) => setEditingGrc({ ...editingGrc, idDocumentType: e.target.value })}
+                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer"
+                              >
+                                {ID_PROOF_TYPES.map((id) => (
+                                  <option key={id.id} value={id.id}>
+                                    {id.label}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+
+                            <div className="space-y-1">
+                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">ID Number / Last 4</label>
+                              <input
+                                type="text"
+                                placeholder="e.g. 4521 or full ID"
+                                value={editingGrc.idDocumentNumber || ""}
+                                onChange={(e) => setEditingGrc({ ...editingGrc, idDocumentNumber: e.target.value.toUpperCase() })}
+                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                              />
+                            </div>
+
+                            <div className="space-y-1 sm:col-span-2">
+                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap flex items-center justify-between">
+                                <span>Company / Travel Agent Master</span>
+                                <span className="text-[10px] text-blue-600 dark:text-blue-400 font-mono font-bold">24+ Directory</span>
+                              </label>
+                              <CompanySelector
+                                value={editingGrc.companyName || ""}
+                                activeProperty={activeProperty}
+                                placeholder="Search corporate company (e.g. ABB, Asian Paints, MMT...)"
+                                onSelect={(comp) => {
+                                  if (!comp) {
+                                    setEditingGrc((prev: any) => ({
+                                      ...prev,
+                                      companyName: "",
+                                      guestGstin: "",
+                                    }));
+                                    return;
+                                  }
+                                  setEditingGrc((prev: any) => ({
+                                    ...prev,
+                                    companyName: comp.accountName,
+                                    guestGstin: comp.gstin || "",
+                                    email: prev.email || comp.email || "",
+                                    alternatePhone: prev.alternatePhone || comp.phone || comp.mobile || "",
+                                    referralChannel: comp.accountType === "TRAVEL_AGENT" ? (comp.shortName || comp.accountName) : prev.referralChannel,
+                                  }));
+                                }}
+                              />
+                            </div>
+
+                            <div className="space-y-1 sm:col-span-2">
+                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">Company GSTIN</label>
+                              <input
+                                type="text"
+                                placeholder="e.g. 18AAAAA0000A1Z5"
+                                value={editingGrc.guestGstin || ""}
+                                onChange={(e) => setEditingGrc({ ...editingGrc, guestGstin: e.target.value.toUpperCase() })}
+                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-semibold"
+                              />
+                            </div>
                           </div>
                         </div>
-                      );
-                    })()}
 
-                    {editingGrc.advancePaymentMethod === "DIRECT_BILL" && (
-                      <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-700/60 text-xs text-amber-900 dark:text-amber-200 flex items-center gap-2">
-                        <Building2 className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
-                        <span>
-                          Billing will be posted to Company Ledger:{" "}
-                          <strong>{editingGrc.companyName || "Corporate Account (Please enter Company Name in Section 4)"}</strong>
-                          {editingGrc.guestGstin ? ` • GSTIN: ${editingGrc.guestGstin}` : ""}
-                        </span>
+                        {/* CARD 6: ACCOMPANYING CO-GUESTS */}
+                        <div className="rounded-2xl border border-zinc-200/90 dark:border-zinc-800 bg-white dark:bg-[#121215] p-5 lg:p-6 shadow-xs space-y-4">
+                          <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 pb-3">
+                            <div className="flex items-center gap-2.5">
+                              <div className="p-1.5 rounded-lg bg-cyan-50 dark:bg-cyan-950/60 text-cyan-600 dark:text-cyan-400 border border-cyan-200 dark:border-cyan-800/60">
+                                <Users className="h-4 w-4" />
+                              </div>
+                              <span className="font-bold text-zinc-900 dark:text-white uppercase tracking-wider text-xs">
+                                6. Accompanying Co-Guests ({(editingGrc.coGuests || []).length})
+                              </span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const list = Array.isArray(editingGrc.coGuests) ? [...editingGrc.coGuests] : [];
+                                list.push({ name: "", soDoWo: "", age: "", gender: "Male", relation: "Spouse" });
+                                setEditingGrc({ ...editingGrc, coGuests: list });
+                              }}
+                              className="px-3 py-1.5 rounded-lg bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-900 dark:text-white font-bold text-xs flex items-center gap-1.5 transition cursor-pointer"
+                            >
+                              <Plus className="h-3.5 w-3.5" />
+                              <span>Add Companion</span>
+                            </button>
+                          </div>
+
+                          {(editingGrc.coGuests || []).length > 0 ? (
+                            <div className="space-y-2.5">
+                              {editingGrc.coGuests.map((cg: any, idx: number) => (
+                                <div key={idx} className="grid grid-cols-1 sm:grid-cols-12 gap-2 bg-zinc-50/70 dark:bg-zinc-900/60 p-3 rounded-xl border border-zinc-200 dark:border-zinc-800 items-center">
+                                  <div className="sm:col-span-5">
+                                    <input
+                                      type="text"
+                                      required
+                                      placeholder="Companion Name *"
+                                      value={cg.name || ""}
+                                      onChange={(e) => {
+                                        const updated = [...editingGrc.coGuests];
+                                        updated[idx] = { ...updated[idx], name: e.target.value.toUpperCase() };
+                                        setEditingGrc({ ...editingGrc, coGuests: updated });
+                                      }}
+                                      className="w-full h-9 px-2.5 rounded-lg bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                                    />
+                                  </div>
+                                  <div className="sm:col-span-2">
+                                    <input
+                                      type="number"
+                                      placeholder="Age"
+                                      value={cg.age || ""}
+                                      onChange={(e) => {
+                                        const updated = [...editingGrc.coGuests];
+                                        updated[idx] = { ...updated[idx], age: e.target.value };
+                                        setEditingGrc({ ...editingGrc, coGuests: updated });
+                                      }}
+                                      className="w-full h-9 px-2 rounded-lg bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                                    />
+                                  </div>
+                                  <div className="sm:col-span-2">
+                                    <select
+                                      value={cg.gender || "Male"}
+                                      onChange={(e) => {
+                                        const updated = [...editingGrc.coGuests];
+                                        updated[idx] = { ...updated[idx], gender: e.target.value };
+                                        setEditingGrc({ ...editingGrc, coGuests: updated });
+                                      }}
+                                      className="w-full h-9 px-2 rounded-lg bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                                    >
+                                      <option value="Male">Male</option>
+                                      <option value="Female">Female</option>
+                                    </select>
+                                  </div>
+                                  <div className="sm:col-span-2">
+                                    <select
+                                      value={cg.relation || "Spouse"}
+                                      onChange={(e) => {
+                                        const updated = [...editingGrc.coGuests];
+                                        updated[idx] = { ...updated[idx], relation: e.target.value };
+                                        setEditingGrc({ ...editingGrc, coGuests: updated });
+                                      }}
+                                      className="w-full h-9 px-2 rounded-lg bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                                    >
+                                      <option value="Spouse">Spouse</option>
+                                      <option value="Child">Child</option>
+                                      <option value="Parent">Parent</option>
+                                      <option value="Friend">Friend</option>
+                                      <option value="Colleague">Colleague</option>
+                                      <option value="Relative">Relative</option>
+                                    </select>
+                                  </div>
+                                  <div className="sm:col-span-1 flex justify-end">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const updated = editingGrc.coGuests.filter((_: any, i: number) => i !== idx);
+                                        setEditingGrc({ ...editingGrc, coGuests: updated });
+                                      }}
+                                      className="p-1.5 rounded-lg text-rose-500 hover:text-rose-700 dark:hover:text-rose-300 hover:bg-rose-50 dark:hover:bg-rose-950/50 transition cursor-pointer"
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-zinc-500 italic text-[11px]">
+                              No co-guests added. Click "Add Companion" if the guest has family or colleagues sharing the room.
+                            </p>
+                          )}
+                        </div>
+
+                        {/* CARD 7: OPERATIONAL STATUS & AUDIT */}
+                        <div className="rounded-2xl border border-zinc-200/90 dark:border-zinc-800 bg-white dark:bg-[#121215] p-5 lg:p-6 shadow-xs space-y-4">
+                          <div className="border-b border-zinc-200 dark:border-zinc-800 pb-3 flex items-center gap-2.5">
+                            <div className="p-1.5 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800/60">
+                              <Shield className="h-4 w-4" />
+                            </div>
+                            <span className="font-bold text-zinc-900 dark:text-white uppercase tracking-wider text-xs">
+                              7. Operational Status & Verification
+                            </span>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
+                            <div className="space-y-1">
+                              <label className="block text-[11px] font-bold text-zinc-700 dark:text-zinc-300 uppercase">
+                                Registration Operational Status
+                              </label>
+                              <select
+                                value={editingGrc.status || "CHECKED_IN"}
+                                onChange={(e) => setEditingGrc({ ...editingGrc, status: e.target.value })}
+                                className="w-full h-10 px-3.5 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                              >
+                                <option value="CHECKED_IN">CHECKED_IN (In-House / Active Stay)</option>
+                                <option value="PENDING_REVIEW">PENDING_REVIEW (Digital Kiosk Submission)</option>
+                                <option value="REJECTED">REJECTED (Cancelled / Voided)</option>
+                              </select>
+                            </div>
+
+                            {editingGrc.signatureDataUrl && (
+                              <div className="p-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 space-y-1">
+                                <span className="text-[10px] font-bold uppercase text-zinc-400 block">Digital Signature On File</span>
+                                <img
+                                  src={editingGrc.signatureDataUrl}
+                                  alt="Guest Signature"
+                                  className="h-12 border border-zinc-200 dark:border-zinc-700 bg-white rounded p-1"
+                                />
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
                       </div>
-                    )}
+                    </div>
                   </div>
 
-                  {/* 7. OPERATIONAL STATUS & SIGNATURE */}
-                  <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-[#09090b] p-4 space-y-3.5 shadow-xs">
-                    <div className="border-b border-zinc-200 dark:border-zinc-800 pb-2">
-                      <span className="font-bold text-zinc-900 dark:text-white uppercase tracking-wider flex items-center gap-2 text-xs">
-                        <Shield className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                        7. Registration Operational Status & Signature
+                  {/* 3. STICKY BOTTOM ACTION BAR WITH LIVE METRICS (FULL WIDTH) */}
+                  <div className="shrink-0 px-4 sm:px-6 lg:px-8 py-3.5 border-t border-zinc-200 dark:border-zinc-800 bg-white/95 dark:bg-[#121215]/95 backdrop-blur-md flex items-center justify-between gap-4 z-10 shadow-lg">
+                    <div className="hidden md:flex items-center gap-3 text-xs font-mono">
+                      <span className="px-2.5 py-1 rounded-lg bg-zinc-100 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 font-semibold">
+                        Rooms: <strong>{totalRoomsCount}</strong>
                       </span>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
-                      <div className="space-y-1">
-                        <label className="block text-[11px] font-bold text-zinc-700 dark:text-zinc-300 uppercase">
-                          Registration Operational Status
-                        </label>
-                        <select
-                          value={editingGrc.status || "CHECKED_IN"}
-                          onChange={(e) => setEditingGrc({ ...editingGrc, status: e.target.value })}
-                          className="w-full h-10 px-3.5 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
-                        >
-                          <option value="CHECKED_IN">CHECKED_IN (In-House / Active Stay)</option>
-                          <option value="PENDING_REVIEW">PENDING_REVIEW (Digital Kiosk Submission)</option>
-                          <option value="REJECTED">REJECTED (Cancelled / Voided)</option>
-                        </select>
-                      </div>
-
-                      {editingGrc.signatureDataUrl && (
-                        <div className="p-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 space-y-1">
-                          <span className="text-[10px] font-bold uppercase text-zinc-400 block">Digital Signature On File</span>
-                          <img
-                            src={editingGrc.signatureDataUrl}
-                            alt="Guest Signature"
-                            className="h-12 border border-zinc-200 dark:border-zinc-700 bg-white rounded p-1"
-                          />
-                        </div>
+                      <span className="px-2.5 py-1 rounded-lg bg-zinc-100 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 font-semibold">
+                        Headcount: <strong>{totalAdultsCount} Adults{totalChildrenCount > 0 ? `, ${totalChildrenCount} Child` : ""}</strong>
+                      </span>
+                      <span className="px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-950/50 border border-blue-200 dark:border-blue-800/60 text-blue-700 dark:text-blue-300 font-semibold">
+                        Tariff: <strong>₹{totalDailyTariffCombined}/night</strong>
+                      </span>
+                      {Number(editingGrc.depositAmount) > 0 && (
+                        <span className="px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800/60 text-emerald-700 dark:text-emerald-300 font-semibold">
+                          Advance Paid: <strong>₹{Number(editingGrc.depositAmount)} ({editingGrc.advancePaymentMethod || "UPI"})</strong>
+                        </span>
                       )}
                     </div>
-                  </div>
-                </div>
-
-                  {/* Sticky Bottom Action Bar */}
-                  <div className="shrink-0 px-4 sm:px-8 py-3.5 border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50/95 dark:bg-[#121215]/95 backdrop-blur-md flex items-center justify-between gap-4 z-10 shadow-lg">
-                    <span className="text-[11px] text-zinc-500 font-mono hidden sm:inline truncate">
-                      Rule 46 Compliant GRC • Instant Sync Across Database
-                    </span>
 
                     <div className="flex items-center gap-3 ml-auto shrink-0">
                       <button
                         type="button"
                         onClick={() => setEditingGrc(null)}
-                        className="px-4 py-2.5 rounded-xl bg-zinc-200/80 hover:bg-zinc-300 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 text-xs font-bold transition cursor-pointer"
+                        className="px-4 py-2.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 text-xs font-bold transition cursor-pointer"
                       >
                         Cancel / Discard
                       </button>
                       <button
                         type="submit"
                         disabled={grcSaving}
-                        className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 font-bold text-white text-xs sm:text-sm transition shadow-md shadow-blue-600/20 flex items-center gap-2 disabled:opacity-50 whitespace-nowrap cursor-pointer"
+                        className="px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 font-bold text-white text-xs sm:text-sm transition shadow-md shadow-blue-600/20 flex items-center gap-2 disabled:opacity-50 whitespace-nowrap cursor-pointer"
                       >
                         {grcSaving ? (
                           <>
@@ -3465,8 +3424,8 @@ export default function AdminPortalPage() {
 
                 </form>
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           {/* Archived GRC Backup Snapshot Modal */}
           {selectedArchiveSnapshot && (
