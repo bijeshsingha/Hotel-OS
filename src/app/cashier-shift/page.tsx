@@ -53,6 +53,7 @@ export default function CashierShiftPage() {
   // Modals
   const [showAddIncomeModal, setShowAddIncomeModal] = useState(false);
   const [showAddExpenseModal, setShowAddExpenseModal] = useState(false);
+  const [showAddOwnerPayoutModal, setShowAddOwnerPayoutModal] = useState(false);
   const [showPrintHandoverModal, setShowPrintHandoverModal] = useState(false);
   const [selectedTx, setSelectedTx] = useState<any | null>(null);
   const [copiedTxId, setCopiedTxId] = useState(false);
@@ -100,6 +101,19 @@ export default function CashierShiftPage() {
   const [expenseSubmitting, setExpenseSubmitting] = useState(false);
   const [expenseError, setExpenseError] = useState<string | null>(null);
   const [expenseSuccess, setExpenseSuccess] = useState<string | null>(null);
+
+  // Owner Payout Form State
+  const [ownerPayoutForm, setOwnerPayoutForm] = useState({
+    ownerName: "",
+    amount: "",
+    paymentMethod: "CASH",
+    description: "Owner Cash Drawing / Profit Distribution",
+    reference: "",
+    notes: "",
+  });
+  const [ownerPayoutSubmitting, setOwnerPayoutSubmitting] = useState(false);
+  const [ownerPayoutError, setOwnerPayoutError] = useState<string | null>(null);
+  const [ownerPayoutSuccess, setOwnerPayoutSuccess] = useState<string | null>(null);
 
   const [datePreset, setDatePreset] = useState<string>("TODAY");
   const [customStartDate, setCustomStartDate] = useState("");
@@ -249,6 +263,23 @@ export default function CashierShiftPage() {
     return totalPhysicalCashCounted - expected;
   }, [totalPhysicalCashCounted, data]);
 
+  // Owner Payouts Summary
+  const ownerPayoutsSummary = useMemo(() => {
+    const list: any[] = data?.transactions || [];
+    const payouts = list.filter(
+      (tx) => tx.category === "OWNER_PAYOUT" || tx.type === "OWNER_PAYOUT"
+    );
+    const total = payouts.reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+    const cashTotal = payouts
+      .filter((tx) => tx.method === "CASH")
+      .reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+    return {
+      total,
+      cashTotal,
+      count: payouts.length,
+    };
+  }, [data]);
+
   // Handle Direct Income Submission
   const handleIncomeSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -394,6 +425,69 @@ export default function CashierShiftPage() {
     }
   };
 
+  // Handle Owner Payout Submission
+  const handleOwnerPayoutSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setOwnerPayoutError(null);
+    setOwnerPayoutSuccess(null);
+
+    if (!ownerPayoutForm.ownerName.trim()) {
+      setOwnerPayoutError("Please enter the Owner / Partner name.");
+      return;
+    }
+    if (!ownerPayoutForm.amount || isNaN(Number(ownerPayoutForm.amount)) || Number(ownerPayoutForm.amount) <= 0) {
+      setOwnerPayoutError("Please enter a valid positive payout amount.");
+      return;
+    }
+
+    setOwnerPayoutSubmitting(true);
+    try {
+      const res = await fetch("/api/v1/expenses", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          propertyId: activeProperty?.id,
+          category: "OWNER_PAYOUT",
+          payeeName: ownerPayoutForm.ownerName,
+          description: ownerPayoutForm.description || "Owner Payout / Cash Drawing",
+          amount: Number(ownerPayoutForm.amount),
+          taxAmount: 0,
+          paymentMethod: ownerPayoutForm.paymentMethod,
+          reference: ownerPayoutForm.reference || "Owner Drawing",
+          notes: ownerPayoutForm.notes,
+          businessDate: selectedDate || activeProperty?.businessDate,
+          createdByName: "Front Desk Cashier / Owner Portal",
+        }),
+      });
+
+      const json = await res.json();
+      if (!res.ok || json.error) {
+        throw new Error(json.error || "Failed to record owner payout");
+      }
+
+      setOwnerPayoutSuccess(`Owner Payout Voucher #${json.expense?.voucherNo || "Generated"} recorded successfully!`);
+      setOwnerPayoutForm({
+        ownerName: "",
+        amount: "",
+        paymentMethod: "CASH",
+        description: "Owner Cash Drawing / Profit Distribution",
+        reference: "",
+        notes: "",
+      });
+
+      triggerRefresh();
+      setTimeout(() => {
+        setShowAddOwnerPayoutModal(false);
+        setOwnerPayoutSuccess(null);
+        loadLedgerData();
+      }, 1000);
+    } catch (err: any) {
+      setOwnerPayoutError(err.message);
+    } finally {
+      setOwnerPayoutSubmitting(false);
+    }
+  };
+
   // Export CSV
   const exportLedgerCSV = () => {
     if (!filteredTransactions.length) return;
@@ -476,6 +570,13 @@ export default function CashierShiftPage() {
           >
             <Plus className="h-4 w-4" />
             Record Expense
+          </button>
+          <button
+            onClick={() => setShowAddOwnerPayoutModal(true)}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-purple-600 hover:bg-purple-500 text-white shadow-xs transition cursor-pointer"
+          >
+            <Building className="h-4 w-4" />
+            Owner Payout
           </button>
           <button
             onClick={() => setShowPrintHandoverModal(true)}
@@ -678,9 +779,12 @@ export default function CashierShiftPage() {
 
         {/* Total Outflows */}
         <div
-          onClick={() => setFlowFilter(flowFilter === "OUTFLOW" ? "ALL" : "OUTFLOW")}
+          onClick={() => {
+            setCategoryFilter("ALL");
+            setFlowFilter(flowFilter === "OUTFLOW" ? "ALL" : "OUTFLOW");
+          }}
           className={`p-4 rounded-xl border transition cursor-pointer bg-white dark:bg-[#111114] ${
-            flowFilter === "OUTFLOW"
+            flowFilter === "OUTFLOW" && categoryFilter === "ALL"
               ? "border-rose-500 ring-2 ring-rose-500/20"
               : "border-zinc-200/80 dark:border-zinc-800/80 hover:border-zinc-300"
           }`}
@@ -694,8 +798,13 @@ export default function CashierShiftPage() {
           <div className="text-2xl font-black font-mono text-zinc-900 dark:text-white mt-2">
             {formatINR(data?.totalExpenses || 0)}
           </div>
-          <div className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1">
-            {data?.expensesCount || 0} Total Vouchers Paid Out
+          <div className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1 flex items-center justify-between">
+            <span>{data?.expensesCount || 0} Total Vouchers Paid</span>
+            {ownerPayoutsSummary.total > 0 && (
+              <span className="text-purple-600 dark:text-purple-400 font-semibold font-mono">
+                👑 Owner: {formatINR(ownerPayoutsSummary.total)}
+              </span>
+            )}
           </div>
         </div>
 
@@ -776,10 +885,11 @@ export default function CashierShiftPage() {
             <button
               onClick={() => {
                 setFlowFilter("ALL");
+                setCategoryFilter("ALL");
                 setOnlyCashDrawer(false);
               }}
-              className={`px-2.5 py-1 rounded-md transition ${
-                flowFilter === "ALL" && !onlyCashDrawer
+              className={`px-2.5 py-1 rounded-md transition cursor-pointer ${
+                flowFilter === "ALL" && categoryFilter === "ALL" && !onlyCashDrawer
                   ? "bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white font-semibold shadow-2xs"
                   : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900"
               }`}
@@ -789,9 +899,10 @@ export default function CashierShiftPage() {
             <button
               onClick={() => {
                 setFlowFilter("INFLOW");
+                setCategoryFilter("ALL");
                 setOnlyCashDrawer(false);
               }}
-              className={`px-2.5 py-1 rounded-md transition ${
+              className={`px-2.5 py-1 rounded-md transition cursor-pointer ${
                 flowFilter === "INFLOW"
                   ? "bg-emerald-600 text-white font-semibold shadow-2xs"
                   : "text-emerald-700 dark:text-emerald-400 hover:text-emerald-800"
@@ -802,15 +913,31 @@ export default function CashierShiftPage() {
             <button
               onClick={() => {
                 setFlowFilter("OUTFLOW");
+                setCategoryFilter("ALL");
                 setOnlyCashDrawer(false);
               }}
-              className={`px-2.5 py-1 rounded-md transition ${
-                flowFilter === "OUTFLOW"
+              className={`px-2.5 py-1 rounded-md transition cursor-pointer ${
+                flowFilter === "OUTFLOW" && categoryFilter !== "OWNER_PAYOUT"
                   ? "bg-rose-600 text-white font-semibold shadow-2xs"
                   : "text-rose-700 dark:text-rose-400 hover:text-rose-800"
               }`}
             >
-              Outflows (-)
+              Expenses (-)
+            </button>
+            <button
+              onClick={() => {
+                setFlowFilter("OUTFLOW");
+                setCategoryFilter(categoryFilter === "OWNER_PAYOUT" ? "ALL" : "OWNER_PAYOUT");
+                setOnlyCashDrawer(false);
+              }}
+              className={`px-2.5 py-1 rounded-md transition cursor-pointer flex items-center gap-1 ${
+                categoryFilter === "OWNER_PAYOUT"
+                  ? "bg-purple-600 text-white font-semibold shadow-2xs"
+                  : "text-purple-700 dark:text-purple-400 hover:text-purple-800"
+              }`}
+            >
+              <span>👑</span>
+              <span>Owner Payouts</span>
             </button>
           </div>
 
@@ -878,25 +1005,32 @@ export default function CashierShiftPage() {
 
                     {/* Type & Flow Badge */}
                     <td className="px-4 py-3 whitespace-nowrap">
-                      <span
-                        className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${
-                          isInflow
-                            ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/60"
-                            : "bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800/60"
-                        }`}
-                      >
-                        {isInflow ? (
-                          <>
-                            <ArrowDownLeft className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
-                            <span>+ RECEIPT</span>
-                          </>
-                        ) : (
-                          <>
-                            <ArrowUpRight className="h-3 w-3 text-rose-600 dark:text-rose-400" />
-                            <span>- EXPENSE</span>
-                          </>
-                        )}
-                      </span>
+                      {tx.category === "OWNER_PAYOUT" ? (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800/60">
+                          <Building className="h-3 w-3 text-purple-600 dark:text-purple-400" />
+                          <span>👑 OWNER PAYOUT</span>
+                        </span>
+                      ) : (
+                        <span
+                          className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${
+                            isInflow
+                              ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/60"
+                              : "bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800/60"
+                          }`}
+                        >
+                          {isInflow ? (
+                            <>
+                              <ArrowDownLeft className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
+                              <span>+ RECEIPT</span>
+                            </>
+                          ) : (
+                            <>
+                              <ArrowUpRight className="h-3 w-3 text-rose-600 dark:text-rose-400" />
+                              <span>- EXPENSE</span>
+                            </>
+                          )}
+                        </span>
+                      )}
                     </td>
 
                     {/* Party / Payee / Guest */}
@@ -922,8 +1056,8 @@ export default function CashierShiftPage() {
                         {tx.particulars || tx.description || "General entry"}
                       </div>
                       <div className="text-[10px] text-zinc-400 flex items-center gap-2 mt-0.5">
-                        <span className="uppercase tracking-wider font-semibold text-[9.5px]">
-                          {tx.sourceLabel || tx.category?.replace(/_/g, " ") || "TRANSACTION"}
+                        <span className={`uppercase tracking-wider font-semibold text-[9.5px] ${tx.category === "OWNER_PAYOUT" ? "text-purple-600 dark:text-purple-400 font-bold" : ""}`}>
+                          {tx.category === "OWNER_PAYOUT" ? "👑 OWNER DRAWING / PAYOUT" : (tx.sourceLabel || tx.category?.replace(/_/g, " ") || "TRANSACTION")}
                         </span>
                         {tx.kotNo && (
                           <span className="font-mono font-bold text-amber-600 dark:text-amber-400">
@@ -942,7 +1076,7 @@ export default function CashierShiftPage() {
 
                     {/* Amount */}
                     <td className="px-4 py-3 text-right font-mono font-black text-xs whitespace-nowrap">
-                      <span className={isInflow ? "text-emerald-700 dark:text-emerald-400" : "text-rose-700 dark:text-rose-400"}>
+                      <span className={isInflow ? "text-emerald-700 dark:text-emerald-400" : tx.category === "OWNER_PAYOUT" ? "text-purple-700 dark:text-purple-400" : "text-rose-700 dark:text-rose-400"}>
                         {isInflow ? "+" : "-"}{formatINR(tx.amount)}
                       </span>
                     </td>
@@ -990,10 +1124,18 @@ export default function CashierShiftPage() {
                   className={`p-2 rounded-xl border ${
                     selectedTx.flow === "INFLOW"
                       ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800"
+                      : selectedTx.category === "OWNER_PAYOUT"
+                      ? "bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/40 dark:text-purple-300 dark:border-purple-800"
                       : "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800"
                   }`}
                 >
-                  {selectedTx.flow === "INFLOW" ? <ArrowDownLeft className="h-4 w-4" /> : <ArrowUpRight className="h-4 w-4" />}
+                  {selectedTx.flow === "INFLOW" ? (
+                    <ArrowDownLeft className="h-4 w-4" />
+                  ) : selectedTx.category === "OWNER_PAYOUT" ? (
+                    <Building className="h-4 w-4" />
+                  ) : (
+                    <ArrowUpRight className="h-4 w-4" />
+                  )}
                 </div>
                 <div>
                   <h3 className="text-sm sm:text-base font-bold text-zinc-900 dark:text-white">
@@ -1007,7 +1149,7 @@ export default function CashierShiftPage() {
 
               <button
                 onClick={() => setSelectedTx(null)}
-                className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition"
+                className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition cursor-pointer"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -1021,6 +1163,8 @@ export default function CashierShiftPage() {
                     className={`text-xl font-mono font-black mt-0.5 ${
                       selectedTx.flow === "INFLOW"
                         ? "text-emerald-700 dark:text-emerald-400"
+                        : selectedTx.category === "OWNER_PAYOUT"
+                        ? "text-purple-700 dark:text-purple-400"
                         : "text-rose-700 dark:text-rose-400"
                     }`}
                   >
@@ -1387,6 +1531,7 @@ export default function CashierShiftPage() {
                     className="w-full h-9 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 text-xs font-semibold text-zinc-900 dark:text-zinc-100"
                   >
                     <option value="DRIVER_COMMISSION">Driver Commission</option>
+                    <option value="OWNER_PAYOUT">👑 Owner Payout / Drawing</option>
                     <option value="FB_PURCHASE">Kitchen / F&B Provisions</option>
                     <option value="MAINTENANCE">Repairs & Maintenance</option>
                     <option value="HOUSEKEEPING">Housekeeping Supplies</option>
@@ -1492,6 +1637,191 @@ export default function CashierShiftPage() {
         </div>
       )}
 
+      {/* Record Owner Payout Modal */}
+      {showAddOwnerPayoutModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-150">
+          <div className="bg-white dark:bg-[#141418] border border-zinc-200 dark:border-zinc-800 rounded-2xl w-full max-w-xl max-h-[92vh] flex flex-col shadow-2xl overflow-hidden">
+            <div className="p-4 sm:p-5 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between bg-purple-50/50 dark:bg-purple-950/20">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-purple-100 dark:bg-purple-950/60 border border-purple-200 dark:border-purple-800 text-purple-700 dark:text-purple-300">
+                  <Building className="h-5 w-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm sm:text-base font-bold text-zinc-900 dark:text-white">
+                      Owner Payout / Cash Drawing
+                    </h3>
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-100 dark:bg-purple-900/60 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 uppercase tracking-wider">
+                      Ownership
+                    </span>
+                  </div>
+                  <p className="text-xs text-zinc-500 mt-0.5">
+                    Disburse drawings, interim profit settlements or withdrawals to hotel ownership
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowAddOwnerPayoutModal(false)}
+                className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 transition cursor-pointer"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleOwnerPayoutSubmit} className="p-5 overflow-y-auto space-y-4 text-xs">
+              {ownerPayoutError && (
+                <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-300 dark:border-rose-800 text-rose-800 dark:text-rose-300 flex items-center gap-2 font-medium">
+                  <AlertCircle className="h-4 w-4 shrink-0" />
+                  {ownerPayoutError}
+                </div>
+              )}
+
+              {ownerPayoutSuccess && (
+                <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 flex items-center gap-2 font-medium">
+                  <CheckCircle2 className="h-4 w-4 shrink-0" />
+                  {ownerPayoutSuccess}
+                </div>
+              )}
+
+              {/* Cash Drawer Position Realtime Monitor */}
+              {ownerPayoutForm.paymentMethod === "CASH" && (
+                <div className="p-3 rounded-xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 space-y-2">
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="text-zinc-500">Current Cash in Drawer Till:</span>
+                    <span className="font-mono font-bold text-zinc-900 dark:text-white">
+                      {formatINR(data?.cashDrawer?.netCashHandover || 0)}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="text-zinc-500">Remaining After This Payout:</span>
+                    <span
+                      className={`font-mono font-bold ${
+                        (data?.cashDrawer?.netCashHandover || 0) - (Number(ownerPayoutForm.amount) || 0) >= 0
+                          ? "text-emerald-600 dark:text-emerald-400"
+                          : "text-rose-600 dark:text-rose-400"
+                      }`}
+                    >
+                      {formatINR((data?.cashDrawer?.netCashHandover || 0) - (Number(ownerPayoutForm.amount) || 0))}
+                    </span>
+                  </div>
+                  {Number(ownerPayoutForm.amount) > (data?.cashDrawer?.netCashHandover || 0) && (
+                    <div className="text-[10.5px] text-rose-600 dark:text-rose-400 font-medium flex items-center gap-1.5 pt-1 border-t border-rose-200/50 dark:border-rose-900/50">
+                      <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                      <span>Warning: Withdrawal amount exceeds current drawer cash position!</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-1">
+                    Owner / Partner / Entity Name *
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Bijesh Singha (Owner) / Managing Partner"
+                    value={ownerPayoutForm.ownerName}
+                    onChange={(e) => setOwnerPayoutForm({ ...ownerPayoutForm, ownerName: e.target.value })}
+                    required
+                    className="w-full h-9 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 text-xs text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-1">
+                    Disbursement Method *
+                  </label>
+                  <select
+                    value={ownerPayoutForm.paymentMethod}
+                    onChange={(e) => setOwnerPayoutForm({ ...ownerPayoutForm, paymentMethod: e.target.value })}
+                    className="w-full h-9 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 text-xs font-semibold text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
+                  >
+                    <option value="CASH">Cash (From Drawer Till)</option>
+                    <option value="UPI">UPI / QR Transfer</option>
+                    <option value="BANK_TRANSFER">Bank Transfer / NEFT / IMPS</option>
+                    <option value="CHEQUE">Cheque</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-1">
+                    Payout Amount (INR) *
+                  </label>
+                  <input
+                    type="number"
+                    step="any"
+                    placeholder="e.g. 15000"
+                    value={ownerPayoutForm.amount}
+                    onChange={(e) => setOwnerPayoutForm({ ...ownerPayoutForm, amount: e.target.value })}
+                    required
+                    className="w-full h-9 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 text-xs font-bold font-mono text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-1">
+                    Receipt / Voucher / Slip Ref (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Slip #OP-01 / UTR / Acknowledgment"
+                    value={ownerPayoutForm.reference}
+                    onChange={(e) => setOwnerPayoutForm({ ...ownerPayoutForm, reference: e.target.value })}
+                    className="w-full h-9 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 text-xs text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-1">
+                  Narration / Purpose of Drawing
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Weekly owner cash drawing / Partner profit distribution"
+                  value={ownerPayoutForm.description}
+                  onChange={(e) => setOwnerPayoutForm({ ...ownerPayoutForm, description: e.target.value })}
+                  className="w-full h-9 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 text-xs text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-1">
+                  Additional Notes (Private / Internal)
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder="e.g. Collected personally by owner / Received via GPay to personal account"
+                  value={ownerPayoutForm.notes}
+                  onChange={(e) => setOwnerPayoutForm({ ...ownerPayoutForm, notes: e.target.value })}
+                  className="w-full rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 p-3 text-xs text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 resize-none"
+                />
+              </div>
+
+              <div className="p-4 -mx-5 -mb-5 mt-4 border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/30 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowAddOwnerPayoutModal(false)}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={ownerPayoutSubmitting}
+                  className="px-5 py-2 rounded-xl text-xs font-semibold bg-purple-600 hover:bg-purple-500 text-white transition disabled:opacity-50 cursor-pointer shadow-xs"
+                >
+                  {ownerPayoutSubmitting ? "Recording Payout..." : "Record Owner Payout"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* Formal Shift Handover Printable Sheet Modal */}
       {showPrintHandoverModal && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in">
@@ -1524,20 +1854,24 @@ export default function CashierShiftPage() {
               </div>
 
               {/* Summary Totals Grid */}
-              <div className="grid grid-cols-4 gap-2 text-center p-3 bg-zinc-50 rounded-xl border">
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-center p-3 bg-zinc-50 rounded-xl border">
                 <div>
                   <div className="text-[10px] uppercase text-zinc-500 font-semibold">Total Collections</div>
                   <div className="font-mono font-bold text-emerald-700 text-sm">{formatINR(data?.totalCollections || 0)}</div>
                 </div>
                 <div>
-                  <div className="text-[10px] uppercase text-zinc-500 font-semibold">Total Expenses</div>
-                  <div className="font-mono font-bold text-rose-700 text-sm">{formatINR(data?.totalExpenses || 0)}</div>
+                  <div className="text-[10px] uppercase text-zinc-500 font-semibold">Operating Expenses</div>
+                  <div className="font-mono font-bold text-rose-700 text-sm">{formatINR((data?.totalExpenses || 0) - ownerPayoutsSummary.total)}</div>
+                </div>
+                <div>
+                  <div className="text-[10px] uppercase text-purple-700 font-semibold">👑 Owner Drawings</div>
+                  <div className="font-mono font-bold text-purple-700 text-sm">{formatINR(ownerPayoutsSummary.total)}</div>
                 </div>
                 <div>
                   <div className="text-[10px] uppercase text-zinc-500 font-semibold">Net Shift Flow</div>
                   <div className="font-mono font-bold text-zinc-900 text-sm">{formatINR(data?.netCashFlow || 0)}</div>
                 </div>
-                <div className="bg-emerald-100/60 rounded-lg p-1">
+                <div className="bg-emerald-100/60 rounded-lg p-1 col-span-2 sm:col-span-1">
                   <div className="text-[10px] uppercase text-emerald-800 font-bold">System Cash Handover</div>
                   <div className="font-mono font-black text-emerald-900 text-sm">{formatINR(data?.cashDrawer?.netCashHandover || 0)}</div>
                 </div>

@@ -2344,6 +2344,7 @@ export default function ReportsPage() {
                   className="text-xs h-9 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 pl-3 pr-7 font-medium text-zinc-900 dark:text-zinc-100 cursor-pointer appearance-none focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500"
                 >
                   <option value="ALL">All Categories</option>
+                  <option value="OWNER_PAYOUT">👑 Owner Payout / Drawing</option>
                   <option value="DRIVER_COMMISSION">Driver Commission</option>
                   <option value="VENDOR_PAYMENT">Vendor / Supplier</option>
                   <option value="STAFF_ADVANCE">Staff Advance / Salary</option>
@@ -2448,8 +2449,14 @@ export default function ReportsPage() {
                           {e.date} {e.time}
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap font-sans">
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-800 dark:text-zinc-200 font-medium text-[11px]">
-                            {e.category.replace(/_/g, " ")}
+                          <span
+                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-medium text-[11px] ${
+                              e.category === "OWNER_PAYOUT"
+                                ? "bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800 text-purple-700 dark:text-purple-300 font-semibold"
+                                : "bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-800 dark:text-zinc-200"
+                            }`}
+                          >
+                            {e.category === "OWNER_PAYOUT" ? "👑 Owner Payout" : e.category.replace(/_/g, " ")}
                           </span>
                         </td>
                         <td className="px-4 py-3 font-sans font-medium text-zinc-900 dark:text-white whitespace-nowrap">
@@ -3029,6 +3036,7 @@ export default function ReportsPage() {
                     className="w-full rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-3 py-2 focus:border-rose-500 focus:outline-none"
                   >
                     <option value="DRIVER_COMMISSION">Driver Commission</option>
+                    <option value="OWNER_PAYOUT">👑 Owner Payout / Drawing</option>
                     <option value="VENDOR_PAYMENT">Vendor Payment</option>
                     <option value="FB_PURCHASE">F&B Raw Materials / Dairy</option>
                     <option value="MAINTENANCE">Maintenance & Repairs</option>

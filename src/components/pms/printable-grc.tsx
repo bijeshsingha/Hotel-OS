@@ -10,6 +10,7 @@ import {
   Check,
 } from "lucide-react";
 import { formatGuestDisplayName } from "@/lib/domain/name-utils";
+import { getPropertyLogoUrl, getPropertyInitials } from "@/lib/domain/property-branding";
 
 export interface GrcData {
   id?: string;
@@ -83,8 +84,11 @@ interface DigitalGrcModalProps {
     legalName?: string;
     address?: string | null;
     phone?: string | null;
+    email?: string | null;
+    website?: string | null;
     code?: string;
     gstin?: string | null;
+    logoUrl?: string | null;
   };
 }
 
@@ -98,12 +102,14 @@ export function PrintableGrcModal({
 
   if (!isOpen) return null;
 
-  // 1. Dynamic Hotel Particulars
+  // 1. Dynamic Hotel Particulars & Branding
   const hotelName = property.displayName || "Hotel Property";
   const hotelLegal = property.legalName || hotelName;
-  const hotelGstin = property.gstin || "—";
-  const hotelAddress = property.address || "—";
-  const hotelPhone = property.phone || "—";
+  const hotelGstin = property.gstin || "N/A";
+  const hotelAddress = property.address || "N/A";
+  const hotelPhone = property.phone || "N/A";
+  const logoUrl = getPropertyLogoUrl(property);
+  const initials = getPropertyInitials(property);
 
   // 2. Registration & Identification Numbers
   const registrationNumber = data.grcNo || data.registrationNo || "—";
@@ -324,6 +330,39 @@ export function PrintableGrcModal({
               color: #444;
               margin-top: 2px;
             }
+            .header-logo {
+              height: 44px;
+              width: auto;
+              max-width: 130px;
+              object-fit: contain;
+            }
+            .brand-monogram {
+              width: 42px;
+              height: 42px;
+              border: 1.8px solid #000;
+              border-radius: 4px;
+              display: inline-flex;
+              flex-direction: column;
+              align-items: center;
+              justify-content: center;
+              background: #f8fafc;
+              color: #000;
+            }
+            .brand-monogram-initials {
+              font-family: Georgia, serif;
+              font-weight: 900;
+              font-size: 14px;
+              line-height: 1;
+              letter-spacing: 0.5px;
+            }
+            .brand-monogram-sub {
+              font-family: Arial, sans-serif;
+              font-size: 6px;
+              font-weight: 900;
+              letter-spacing: 1.5px;
+              text-transform: uppercase;
+              margin-top: 2px;
+            }
             .grc-badge {
               border: 1.5px solid #000;
               background: #ffffff;
@@ -485,10 +524,19 @@ export function PrintableGrcModal({
             <!-- HEADER -->
             <table class="header-table">
               <tr>
-                <td style="width: 65%;">
-                  <div class="hotel-name">${hotelName}</div>
-                  <div class="hotel-sub">${hotelLegal} • GSTIN: ${hotelGstin}</div>
-                  <div class="hotel-addr">${hotelAddress} • Ph: ${hotelPhone}</div>
+                <td style="width: 65%; vertical-align: middle;">
+                  <table style="border-collapse: collapse; border: none; margin: 0;">
+                    <tr>
+                      <td style="border: none; padding: 0; vertical-align: middle; width: 48px;">
+                        ${logoUrl ? `<img src="${logoUrl}" alt="${hotelName}" class="header-logo" onerror="this.style.display='none'" />` : `<div class="brand-monogram"><span class="brand-monogram-initials">${initials}</span><span class="brand-monogram-sub">HOTEL</span></div>`}
+                      </td>
+                      <td style="border: none; padding: 0 0 0 10px; vertical-align: middle;">
+                        <div class="hotel-name">${hotelName}</div>
+                        <div class="hotel-sub">${hotelLegal}${hotelGstin && hotelGstin !== "N/A" && hotelGstin !== "—" ? ` &bull; GSTIN: ${hotelGstin}` : ""}</div>
+                        <div class="hotel-addr">${[hotelAddress && hotelAddress !== "N/A" && hotelAddress !== "—" ? hotelAddress : "", hotelPhone && hotelPhone !== "N/A" && hotelPhone !== "—" ? `Ph: ${hotelPhone}` : ""].filter(Boolean).join(" &bull; ")}</div>
+                      </td>
+                    </tr>
+                  </table>
                 </td>
                 <td style="width: 35%; text-align: right;">
                   <div class="grc-badge">
@@ -788,23 +836,34 @@ export function PrintableGrcModal({
             {/* 1. HOTEL LETTERHEAD & GRC HEADER */}
             <div className="border-2 border-black p-3 rounded-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-zinc-50">
               <div className="flex items-center gap-3">
-                <img
-                  src="/images/ambarish-logo.png"
-                  alt="Hotel Logo"
-                  className="h-10 sm:h-12 w-auto object-contain shrink-0"
-                  onError={(e) => {
-                    e.currentTarget.style.display = "none";
-                  }}
-                />
+                {logoUrl ? (
+                  <img
+                    src={logoUrl}
+                    alt={`${hotelName} Logo`}
+                    className="h-10 sm:h-12 w-auto object-contain shrink-0"
+                    onError={(e) => {
+                      e.currentTarget.style.display = "none";
+                    }}
+                  />
+                ) : (
+                  <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-lg border-2 border-black flex flex-col items-center justify-center bg-white text-black shrink-0 select-none shadow-xs">
+                    <span className="font-serif font-black text-sm tracking-wider leading-none">
+                      {initials}
+                    </span>
+                    <span className="text-[7px] font-sans font-bold tracking-widest uppercase opacity-75 mt-0.5">
+                      HOTEL
+                    </span>
+                  </div>
+                )}
                 <div className="space-y-0.5">
                   <h1 className="text-base sm:text-lg font-black tracking-tight text-black uppercase leading-tight font-serif">
                     {hotelName}
                   </h1>
                   <div className="text-[11px] font-bold text-zinc-800">
-                    {hotelLegal} • <span className="font-mono">GSTIN: {hotelGstin}</span>
+                    {hotelLegal} {hotelGstin && hotelGstin !== "—" && hotelGstin !== "N/A" ? <span>• <span className="font-mono">GSTIN: {hotelGstin}</span></span> : null}
                   </div>
                   <div className="text-[10px] text-zinc-700 max-w-lg leading-snug">
-                    {hotelAddress} • Ph: {hotelPhone}
+                    {[hotelAddress && hotelAddress !== "—" && hotelAddress !== "N/A" ? hotelAddress : null, hotelPhone && hotelPhone !== "—" && hotelPhone !== "N/A" ? `Ph: ${hotelPhone}` : null].filter(Boolean).join(" • ")}
                   </div>
                 </div>
               </div>

@@ -90,10 +90,15 @@ export function NewReservationModal({
     notes: "",
   });
 
-  // Keep roomTypeId updated once categories load
+  // Keep roomTypeId and ratePerNight updated once categories load
   React.useEffect(() => {
     if (!form.roomTypeId && roomCategories.length > 0) {
-      setForm((prev) => ({ ...prev, roomTypeId: roomCategories[0].id }));
+      const defaultCat = roomCategories[0];
+      setForm((prev) => ({
+        ...prev,
+        roomTypeId: defaultCat.id,
+        ratePerNight: defaultCat.basePrice || 3200,
+      }));
     }
   }, [roomCategories, form.roomTypeId]);
 
@@ -598,7 +603,15 @@ export function NewReservationModal({
                 <select
                   required
                   value={form.roomTypeId}
-                  onChange={(e) => setForm({ ...form, roomTypeId: e.target.value, assignedRoomId: "" })}
+                  onChange={(e) => {
+                    const selectedCat = roomCategories.find((rc) => rc.id === e.target.value);
+                    setForm({
+                      ...form,
+                      roomTypeId: e.target.value,
+                      assignedRoomId: "",
+                      ratePerNight: selectedCat?.basePrice || 3200,
+                    });
+                  }}
                   className="w-full h-9 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-white font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition shadow-xs cursor-pointer"
                 >
                   {roomCategories.map((rc) => (

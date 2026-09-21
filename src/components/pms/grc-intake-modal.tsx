@@ -185,6 +185,10 @@ export function GrcIntakeModal({
         const firstRoom = roomsList[0] || {};
         const totalDeposit = initialReservation.deposits?.reduce((s: number, d: any) => s + (d.originalAmount || d.payment?.amount || 0), 0) || (initialReservation.deposits?.[0]?.payment?.amount || 0);
         const assigned = firstRoom.assignedRoomId || initialRoomId;
+        const resolvedRoomId = assigned || (rooms.find((r) => r.roomState?.occupancyStatus === "VACANT" && (!firstRoom.roomTypeId || r.roomTypeId === firstRoom.roomTypeId))?.id || "");
+        const targetRoomObj = rooms.find((r) => r.id === resolvedRoomId);
+        const defaultRate = targetRoomObj?.roomType?.basePrice ? String(targetRoomObj.roomType.basePrice) : (firstRoom.ratePerNight ? String(firstRoom.ratePerNight) : "3200");
+        const defaultExtraRate = targetRoomObj?.roomType?.extraAdult ? String(targetRoomObj.roomType.extraAdult) : "500";
 
         setFormData((prev) => ({
           ...prev,
@@ -201,15 +205,24 @@ export function GrcIntakeModal({
           children: String(totalChildren),
           referralChannel: initialReservation.source || "DIRECT",
           depositAmount: String(totalDeposit),
-          roomId: assigned || prev.roomId || (rooms.find((r) => r.roomState?.occupancyStatus === "VACANT" && (!firstRoom.roomTypeId || r.roomTypeId === firstRoom.roomTypeId))?.id || ""),
+          roomId: resolvedRoomId,
+          agreedTariff: defaultRate,
+          extraBedRate: defaultExtraRate,
           additionalRoomIds: [],
           roomRates: {},
           groupBilling: true,
         }));
       } else {
+        const resolvedRoomId = initialRoomId || (rooms.find((r) => r.roomState?.occupancyStatus === "VACANT")?.id || "");
+        const targetRoomObj = rooms.find((r) => r.id === resolvedRoomId);
+        const defaultRate = targetRoomObj?.roomType?.basePrice ? String(targetRoomObj.roomType.basePrice) : "3200";
+        const defaultExtraRate = targetRoomObj?.roomType?.extraAdult ? String(targetRoomObj.roomType.extraAdult) : "500";
+
         setFormData((prev) => ({
           ...prev,
-          roomId: initialRoomId || prev.roomId,
+          roomId: resolvedRoomId,
+          agreedTariff: prev.agreedTariff && prev.agreedTariff !== "" ? prev.agreedTariff : defaultRate,
+          extraBedRate: defaultExtraRate,
           additionalRoomIds: [],
           roomRates: {},
           groupBilling: true,
@@ -410,7 +423,7 @@ export function GrcIntakeModal({
           depositMethod: formData.paymentMethod || "CASH",
           depositRef: formData.transactionRef?.trim() || undefined,
           extraBeds: (Number(formData.extraPaxCount) || 0) + formData.additionalRoomIds.reduce((acc, id) => acc + (Number(formData.roomExtraPax?.[id]) || 0), 0),
-          extraBedRate: Number(formData.extraBedRate) || 500,
+          extraBedRate: Number(formData.extraBedRate) || primaryRoom?.roomType?.extraAdult || 500,
           coGuests: formData.coGuests.filter((cg) => cg.name.trim() !== ""),
           foreignDetails: formData.nationality !== "Indian" ? formData.foreignDetails : undefined,
           kitchenDining: formData.kitchenDining || "NO",
@@ -546,7 +559,16 @@ export function GrcIntakeModal({
                   <select
                     required
                     value={formData.roomId}
-                    onChange={(e) => setFormData({ ...formData, roomId: e.target.value })}
+                    onChange={(e) => {
+                      const nextRoomId = e.target.value;
+                      const r = rooms.find((rm) => rm.id === nextRoomId);
+                      setFormData((prev) => ({
+                        ...prev,
+                        roomId: nextRoomId,
+                        agreedTariff: r?.roomType?.basePrice ? String(r.roomType.basePrice) : prev.agreedTariff,
+                        extraBedRate: r?.roomType?.extraAdult ? String(r.roomType.extraAdult) : (prev.extraBedRate || "500"),
+                      }));
+                    }}
                     className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs font-mono font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                   >
                     <option value="">-- Choose Room --</option>
@@ -697,7 +719,7 @@ export function GrcIntakeModal({
                 {/* Primary Room Extra Pax Stepper */}
                 <div className="space-y-1">
                   <label className="block font-bold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">
-                    Extra Pax (₹500/Pax)
+                    Extra Pax (₹{formData.extraBedRate || primaryRoom?.roomType?.extraAdult || 500}/Pax)
                   </label>
                   <div className="h-10 flex items-center justify-between px-2.5 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 shadow-xs">
                     {/* Compact Segmented Control */}
@@ -734,7 +756,7 @@ export function GrcIntakeModal({
                     {/* Price Badge */}
                     {(Number(formData.extraPaxCount) || 0) > 0 ? (
                       <span className="text-[11px] font-mono font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/60 px-2 py-0.5 rounded-md border border-amber-200 dark:border-amber-800/60">
-                        +₹{(Number(formData.extraPaxCount) || 0) * 500}/nt
+                        +₹{(Number(formData.extraPaxCount) || 0) * Number(formData.extraBedRate || primaryRoom?.roomType?.extraAdult || 500)}/nt
                       </span>
                     ) : (
                       <span className="text-[10px] font-mono text-zinc-400 dark:text-zinc-500 pr-1">₹0</span>
@@ -840,55 +862,60 @@ export function GrcIntakeModal({
                           </div>
 
                           {/* Per-Room Extra Pax Stepper */}
-                          <div className="flex items-center justify-between p-2.5 rounded-xl bg-white dark:bg-zinc-900/90 border border-zinc-200 dark:border-zinc-800 text-xs shadow-xs">
-                            <span className="font-bold text-zinc-800 dark:text-zinc-300">
-                              Extra Pax for Room {r?.number} (₹500/Pax)
-                            </span>
-                            <div className="flex items-center gap-2.5">
-                              <div className="flex items-center bg-zinc-100 dark:bg-zinc-800 p-0.5 rounded-lg border border-zinc-200 dark:border-zinc-700">
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const cur = formData.roomExtraPax?.[id] || 0;
-                                    const next = Math.max(0, cur - 1);
-                                    setFormData((prev) => ({
-                                      ...prev,
-                                      roomExtraPax: { ...(prev.roomExtraPax || {}), [id]: next },
-                                    }));
-                                  }}
-                                  className="h-6 w-6 rounded-md bg-white dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-700 active:scale-90 text-zinc-700 dark:text-zinc-200 flex items-center justify-center transition shadow-xs cursor-pointer"
-                                  title="Decrease Extra Pax"
-                                >
-                                  <Minus className="h-3 w-3 stroke-[2.5]" />
-                                </button>
-                                <span className="font-mono font-bold text-xs text-zinc-900 dark:text-white px-2 min-w-[20px] text-center select-none">
-                                  {roomPaxCount}
+                          {(() => {
+                            const roomExtraRate = r?.roomType?.extraAdult !== undefined ? Number(r.roomType.extraAdult) : (Number(formData.extraBedRate) || 500);
+                            return (
+                              <div className="flex items-center justify-between p-2.5 rounded-xl bg-white dark:bg-zinc-900/90 border border-zinc-200 dark:border-zinc-800 text-xs shadow-xs">
+                                <span className="font-bold text-zinc-800 dark:text-zinc-300">
+                                  Extra Pax for Room {r?.number} (₹{roomExtraRate}/Pax)
                                 </span>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const cur = formData.roomExtraPax?.[id] || 0;
-                                    const next = cur + 1;
-                                    setFormData((prev) => ({
-                                      ...prev,
-                                      roomExtraPax: { ...(prev.roomExtraPax || {}), [id]: next },
-                                    }));
-                                  }}
-                                  className="h-6 w-6 rounded-md bg-white dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-700 active:scale-90 text-zinc-700 dark:text-zinc-200 flex items-center justify-center transition shadow-xs cursor-pointer"
-                                  title="Increase Extra Pax"
-                                >
-                                  <Plus className="h-3 w-3 stroke-[2.5]" />
-                                </button>
+                                <div className="flex items-center gap-2.5">
+                                  <div className="flex items-center bg-zinc-100 dark:bg-zinc-800 p-0.5 rounded-lg border border-zinc-200 dark:border-zinc-700">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const cur = formData.roomExtraPax?.[id] || 0;
+                                        const next = Math.max(0, cur - 1);
+                                        setFormData((prev) => ({
+                                          ...prev,
+                                          roomExtraPax: { ...(prev.roomExtraPax || {}), [id]: next },
+                                        }));
+                                      }}
+                                      className="h-6 w-6 rounded-md bg-white dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-700 active:scale-90 text-zinc-700 dark:text-zinc-200 flex items-center justify-center transition shadow-xs cursor-pointer"
+                                      title="Decrease Extra Pax"
+                                    >
+                                      <Minus className="h-3 w-3 stroke-[2.5]" />
+                                    </button>
+                                    <span className="font-mono font-bold text-xs text-zinc-900 dark:text-white px-2 min-w-[20px] text-center select-none">
+                                      {roomPaxCount}
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const cur = formData.roomExtraPax?.[id] || 0;
+                                        const next = cur + 1;
+                                        setFormData((prev) => ({
+                                          ...prev,
+                                          roomExtraPax: { ...(prev.roomExtraPax || {}), [id]: next },
+                                        }));
+                                      }}
+                                      className="h-6 w-6 rounded-md bg-white dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-700 active:scale-90 text-zinc-700 dark:text-zinc-200 flex items-center justify-center transition shadow-xs cursor-pointer"
+                                      title="Increase Extra Pax"
+                                    >
+                                      <Plus className="h-3 w-3 stroke-[2.5]" />
+                                    </button>
+                                  </div>
+                                  {roomPaxCount > 0 ? (
+                                    <span className="text-[11px] font-mono font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/60 px-2 py-0.5 rounded-md border border-amber-200 dark:border-amber-800/60">
+                                      +₹{roomPaxCount * roomExtraRate}/nt
+                                    </span>
+                                  ) : (
+                                    <span className="text-[10px] font-mono text-zinc-400 dark:text-zinc-500 pr-1">₹0</span>
+                                  )}
+                                </div>
                               </div>
-                              {roomPaxCount > 0 ? (
-                                <span className="text-[11px] font-mono font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/60 px-2 py-0.5 rounded-md border border-amber-200 dark:border-amber-800/60">
-                                  +₹{roomPaxCount * 500}/nt
-                                </span>
-                              ) : (
-                                <span className="text-[10px] font-mono text-zinc-400 dark:text-zinc-500 pr-1">₹0</span>
-                              )}
-                            </div>
-                          </div>
+                            );
+                          })()}
                         </div>
                       );
                     })}
@@ -1076,7 +1103,7 @@ export function GrcIntakeModal({
                               {isBeyondMaxPhysicalLimit
                                 ? `${totalAdultsCount} Adults entered, exceeding maximum physical capacity of ${absoluteMaxRoomCapacity} for ${totalRoomsCount} room(s). You MUST add another room.`
                                 : isOverCapacity
-                                ? `${totalAdultsCount} Adults entered, but standard capacity is ${totalCapacity} Pax. Increment Extra Pax (+₹500/Adult) or add another room.`
+                                ? `${totalAdultsCount} Adults entered, but standard capacity is ${totalCapacity} Pax. Increment Extra Pax (+₹${formData.extraBedRate || primaryRoom?.roomType?.extraAdult || 500}/Adult) or add another room.`
                                 : hasGuestsEntered
                                 ? `${totalAdultsCount} Adult${totalAdultsCount > 1 ? "s" : ""}${totalChildrenCount > 0 ? ` + ${totalChildrenCount} Child${totalChildrenCount > 1 ? "ren" : ""} (Complimentary)` : ""} across ${totalRoomsCount} Room(s). Children stay free.`
                                 : `Base capacity: ${baseStandardCapacity} Adults (${totalRoomsCount} Room${totalRoomsCount > 1 ? "s" : ""}). Children stay free.`}

@@ -136,7 +136,23 @@ export async function syncGrcEditsEverywhere(updatedGrc: any) {
         include: {
           property: true,
           primaryGuest: true,
-          roomAssignments: { include: { room: { include: { roomType: true } } } },
+          roomAssignments: {
+            include: {
+              room: {
+                include: {
+                  roomType: {
+                    include: {
+                      rateVersions: {
+                        where: { active: true },
+                        orderBy: { createdAt: "desc" },
+                        take: 1,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
           folio: {
             include: {
               windows: { include: { entries: true } },
@@ -148,6 +164,20 @@ export async function syncGrcEditsEverywhere(updatedGrc: any) {
     : [];
 
   for (const stay of linkedStays) {
+    // Parse internal notes and common stay properties once
+    let notesObj: any = {};
+    try {
+      if (updatedGrc.internalNotes) {
+        notesObj = typeof updatedGrc.internalNotes === "string" ? JSON.parse(updatedGrc.internalNotes) : updatedGrc.internalNotes;
+      }
+    } catch {}
+
+    const primaryRoomNumber = preAssignedRoom
+      ? preAssignedRoom.replace(/^Room\s+/i, "").split(/[,;\s]+/)[0]
+      : null;
+
+    const isRateInclusive = notesObj.isRateInclusive !== false && updatedGrc.isRateInclusive !== false;
+
     // A. Update stay's expected departure if modified
     if (expectedDepartureDate) {
       await prisma.stay.update({
@@ -174,20 +204,7 @@ export async function syncGrcEditsEverywhere(updatedGrc: any) {
     // C. Synchronize Agreed Room Tariff across RoomAssignment and Folio Charges
     if (agreedRoomTariff !== undefined && agreedRoomTariff !== null && agreedRoomTariff !== "") {
       const numTariff = Number(agreedRoomTariff);
-
-      let notesObj: any = {};
-      try {
-        if (updatedGrc.internalNotes) {
-          notesObj = typeof updatedGrc.internalNotes === "string" ? JSON.parse(updatedGrc.internalNotes) : updatedGrc.internalNotes;
-        }
-      } catch {}
       const customRoomRates: Record<string, any> = notesObj.roomRates || {};
-
-      const primaryRoomNumber = preAssignedRoom
-        ? preAssignedRoom.replace(/^Room\s+/i, "").split(/[,;\s]+/)[0]
-        : null;
-
-      const isRateInclusive = notesObj.isRateInclusive !== false && updatedGrc.isRateInclusive !== false;
 
       // Update each room assignment with its specific rate if defined
       if (stay.roomAssignments && stay.roomAssignments.length > 0) {
@@ -316,6 +333,130 @@ export async function syncGrcEditsEverywhere(updatedGrc: any) {
               },
             });
           }
+        }
+      }
+    }
+
+    // D2. Synchronize Extra Pax Folio Charges across Stays & Folios
+    const primaryExtraPax = Number(
+      notesObj.extraPaxCount !== undefined
+        ? notesObj.extraPaxCount
+        : (primaryRoomNumber && notesObj.roomExtraPax?.[primaryRoomNumber] !== undefined
+            ? notesObj.roomExtraPax[primaryRoomNumber]
+            : (updatedGrc.extraPaxCount !== undefined ? updatedGrc.extraPaxCount : 0))
+    );
+
+    const customRoomExtraPax: Record<string, any> = notesObj.roomExtraPax || {};
+
+    let totalExtraPax = Math.max(0, primaryExtraPax);
+    if (stay.roomAssignments && stay.roomAssignments.length > 1) {
+      totalExtraPax = stay.roomAssignments.reduce((sum: number, a: any) => {
+        const isPrimaryAssignment = primaryRoomNumber
+          ? (a.room?.number === primaryRoomNumber || a.room?.id === primaryRoomNumber)
+          : a === stay.roomAssignments[0];
+
+        let roomPax = 0;
+        if (isPrimaryAssignment) {
+          roomPax = primaryExtraPax;
+        } else if (customRoomExtraPax[a.room?.id] !== undefined) {
+          roomPax = Number(customRoomExtraPax[a.room?.id]);
+        } else if (customRoomExtraPax[a.room?.number] !== undefined) {
+          roomPax = Number(customRoomExtraPax[a.room?.number]);
+        }
+        return sum + (isNaN(roomPax) ? 0 : Math.max(0, roomPax));
+      }, 0);
+    }
+
+    // Determine extra bed rate dynamically from room category or notes
+    let resolvedExtraRate = Number(notesObj.extraBedRate || updatedGrc.extraBedRate);
+    if (isNaN(resolvedExtraRate) || resolvedExtraRate <= 0) {
+      const primaryAssignment = stay.roomAssignments?.find(
+        (a: any) => a.room?.number === primaryRoomNumber || a.room?.id === primaryRoomNumber
+      ) || stay.roomAssignments?.[0];
+      const rateVersion = (primaryAssignment?.room?.roomType as any)?.rateVersions?.[0];
+      if (rateVersion?.pricingJson) {
+        try {
+          const pricing = JSON.parse(rateVersion.pricingJson);
+          if (pricing.extraAdult) resolvedExtraRate = Number(pricing.extraAdult);
+        } catch {}
+      }
+    }
+    if (isNaN(resolvedExtraRate) || resolvedExtraRate <= 0) {
+      resolvedExtraRate = 500;
+    }
+
+    if (stay.folio?.windows) {
+      const guestWindow = stay.folio.windows[0];
+      const allPaxEntries = stay.folio.windows.flatMap((w: any) =>
+        (w.entries || []).filter(
+          (e: any) => (e.chargeCode === "EXTRA_PAX" || e.chargeCode === "EXTRA_BED") && e.status === "POSTED"
+        )
+      );
+
+      if (totalExtraPax > 0) {
+        const totalGross = totalExtraPax * resolvedExtraRate * 1;
+        const extraBedGst = calculateGST({
+          grossOrBaseAmount: totalGross,
+          isInclusive: isRateInclusive,
+          sacHsn: "996311",
+          supplierStateCode: stay.property?.stateCode || "18",
+          customTaxRate: 5,
+        });
+
+        const paxDescription = `Extra Pax (${totalExtraPax} Pax x ₹${resolvedExtraRate}/night - Night 1)`;
+
+        if (allPaxEntries.length > 0) {
+          // Update primary extra pax folio entry
+          await prisma.folioEntry.update({
+            where: { id: allPaxEntries[0].id },
+            data: {
+              chargeCode: "EXTRA_PAX",
+              description: paxDescription,
+              qty: totalExtraPax,
+              unitAmount: resolvedExtraRate,
+              taxableAmount: extraBedGst.taxableAmount,
+              taxComponentsJson: JSON.stringify(extraBedGst.components),
+              totalAmount: extraBedGst.totalAmount,
+            },
+          });
+
+          // Delete any extra duplicate entries
+          for (let i = 1; i < allPaxEntries.length; i++) {
+            await prisma.folioEntry.delete({
+              where: { id: allPaxEntries[i].id },
+            });
+          }
+        } else if (guestWindow) {
+          const serviceDateStr = stay.arrivalAt
+            ? new Date(stay.arrivalAt).toISOString().split("T")[0]
+            : new Date().toISOString().split("T")[0];
+
+          await prisma.folioEntry.create({
+            data: {
+              organizationId: stay.organizationId,
+              propertyId: stay.propertyId,
+              folioId: stay.folio.id,
+              folioWindowId: guestWindow.id,
+              serviceDate: serviceDateStr,
+              type: "CHARGE",
+              chargeCode: "EXTRA_PAX",
+              description: paxDescription,
+              qty: totalExtraPax,
+              unitAmount: resolvedExtraRate,
+              taxableAmount: extraBedGst.taxableAmount,
+              taxComponentsJson: JSON.stringify(extraBedGst.components),
+              totalAmount: extraBedGst.totalAmount,
+              sourceType: "PMS_NIGHTLY_CHARGE",
+              status: "POSTED",
+            },
+          });
+        }
+      } else {
+        // totalExtraPax is 0: Cleanly remove any existing EXTRA_PAX charges
+        for (const entry of allPaxEntries) {
+          await prisma.folioEntry.delete({
+            where: { id: entry.id },
+          });
         }
       }
     }

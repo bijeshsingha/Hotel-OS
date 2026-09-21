@@ -43,6 +43,8 @@ import {
   Calendar,
   Car,
   Check,
+  Maximize2,
+  Minimize2,
 } from "lucide-react";
 import {
 
@@ -58,6 +60,7 @@ import { CompanySelector, CompanyItem } from "@/components/pms/company-selector"
 import initialCompaniesJson from "@/data/initial-companies.json";
 import { UserManagementTab } from "@/components/admin/user-management-tab";
 import { BackupRestoreTab } from "@/components/admin/backup-restore-tab";
+import { apiCache } from "@/lib/cache/api-cache";
 
 const ADMIN_SECTIONS = [
   { id: "HOTEL" as const, label: "Hotel & Property", shortLabel: "Hotel", icon: Building2 },
@@ -238,6 +241,19 @@ export default function AdminPortalPage() {
   const [grcViewMode, setGrcViewMode] = useState<"ACTIVE" | "ARCHIVED">("ACTIVE");
   const [grcStatusFilter, setGrcStatusFilter] = useState<"ALL" | "IN_HOUSE" | "CHECKED_OUT">("ALL");
   const [selectedArchiveSnapshot, setSelectedArchiveSnapshot] = useState<any | null>(null);
+  const [isGrcFullScreen, setIsGrcFullScreen] = useState(true);
+
+  // Keyboard shortcut to close GRC editor on Escape
+  useEffect(() => {
+    if (!editingGrc) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setEditingGrc(null);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [editingGrc]);
 
   const fetchGrcList = async () => {
     if (!activeProperty?.id) {
@@ -252,7 +268,23 @@ export default function AdminPortalPage() {
       );
       if (res.ok) {
         const data = await res.json();
-        setGrcList(Array.isArray(data) ? data : []);
+        const list = Array.isArray(data) ? data : [];
+        setGrcList(list);
+
+        // If editId was specified in query params, auto-open it
+        if (typeof window !== "undefined") {
+          const params = new URLSearchParams(window.location.search);
+          const editId = params.get("editId");
+          if (editId) {
+            const target = list.find((g: any) => g.id === editId || g.registrationNo === editId);
+            if (target) {
+              handleOpenGrcEdit(target);
+              const newUrl = new URL(window.location.href);
+              newUrl.searchParams.delete("editId");
+              window.history.replaceState({}, "", newUrl.toString());
+            }
+          }
+        }
       }
     } catch (e) {
       console.error("GRC fetch error:", e);
@@ -350,6 +382,10 @@ export default function AdminPortalPage() {
       }
     } catch {}
 
+    if (extraPaxCount === 0 && data.extraPaxCount !== undefined) {
+      extraPaxCount = Number(data.extraPaxCount);
+    }
+
     // Extract all room identifiers from data.preAssignedRoom, data.assignedRooms, and notes
     const allParsedRooms: string[] = [];
 
@@ -377,6 +413,20 @@ export default function AdminPortalPage() {
 
     let parsedPrimaryRoom = allParsedRooms[0] || data.assignedRoomNumber || data.preAssignedRoom || "310";
     const extraRooms = allParsedRooms.slice(1);
+
+    if (extraPaxCount === 0 && roomExtraPax[parsedPrimaryRoom] !== undefined) {
+      extraPaxCount = Number(roomExtraPax[parsedPrimaryRoom]);
+    }
+
+    const foundPrimary = roomsList.find((r) => r.number === parsedPrimaryRoom || r.id === parsedPrimaryRoom);
+    if (extraPaxCount === 0 && foundPrimary?.id && roomExtraPax[foundPrimary.id] !== undefined) {
+      extraPaxCount = Number(roomExtraPax[foundPrimary.id]);
+    }
+
+    roomExtraPax[parsedPrimaryRoom] = extraPaxCount;
+    if (foundPrimary?.id) {
+      roomExtraPax[foundPrimary.id] = extraPaxCount;
+    }
 
     const validAdditionalIds: string[] = [];
     extraRooms.forEach((rn) => {
@@ -480,7 +530,8 @@ export default function AdminPortalPage() {
         advancePaymentMethod: editingGrc.advancePaymentMethod,
         coGuestsJson: editingGrc.coGuests,
         foreignPassportDetailsJson: editingGrc.foreignDetails,
-        signatureDataUrl: editingGrc.signatureDataUrl,
+        extraPaxCount: Number(editingGrc.extraPaxCount) || 0,
+        roomExtraPax: editingGrc.roomExtraPax || {},
         companyName: editingGrc.companyName,
         guestGstin: editingGrc.guestGstin,
         internalNotes: {
@@ -514,6 +565,10 @@ export default function AdminPortalPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to update GRC");
+      apiCache.invalidate("rooms");
+      apiCache.invalidate("pms");
+      apiCache.invalidate("grc");
+      apiCache.invalidate("stays");
       showToast(`GRC ${editingGrc.registrationNo} updated & synchronized everywhere!`);
       setEditingGrc(null);
       fetchGrcList();
@@ -583,6 +638,9 @@ export default function AdminPortalPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to update rate");
+      apiCache.invalidate("rooms");
+      apiCache.invalidate("pms");
+      apiCache.invalidate("rates");
       showToast(`Tariff updated for ${rt.name}: ₹${rt.basePrice}/night`);
       fetchRates();
     } catch (err: any) {
@@ -645,6 +703,8 @@ export default function AdminPortalPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to update room");
+      apiCache.invalidate("rooms");
+      apiCache.invalidate("pms");
       showToast(`Room ${editingRoom.number} updated successfully!`);
       setEditingRoom(null);
       fetchRooms();
@@ -668,6 +728,8 @@ export default function AdminPortalPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to create room");
+      apiCache.invalidate("rooms");
+      apiCache.invalidate("pms");
       showToast(`Room ${newRoomForm.number} created successfully!`);
       setShowAddRoomModal(false);
       setNewRoomForm({ number: "", floor: 1, wing: "DELUXE", roomTypeId: roomTypes[0]?.id || "", name: "" });
@@ -1707,20 +1769,32 @@ export default function AdminPortalPage() {
               </div>
             </div>
 
-          {/* COMPREHENSIVE CHECK-IN GRC EDIT WINDOW (MATCHING CHECK-IN MODAL) */}
+          {/* COMPREHENSIVE CHECK-IN GRC EDIT WINDOW (FULL SCREEN VIEW) */}
           {editingGrc && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-2 sm:p-4 overflow-y-auto animate-in fade-in">
-              <div className="w-full max-w-4xl max-h-[92vh] rounded-2xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-[#121215] text-zinc-900 dark:text-zinc-100 p-5 sm:p-7 shadow-2xl flex flex-col overflow-hidden">
+            <div
+              className={`fixed inset-0 z-50 flex animate-in fade-in ${
+                isGrcFullScreen
+                  ? "flex-col bg-white dark:bg-[#0c0c0e] text-zinc-900 dark:text-zinc-100 overflow-hidden"
+                  : "items-center justify-center bg-black/80 backdrop-blur-md p-2 sm:p-4 overflow-y-auto"
+              }`}
+            >
+              <div
+                className={`w-full flex flex-col bg-white dark:bg-[#0c0c0e] text-zinc-900 dark:text-zinc-100 overflow-hidden shadow-2xl transition-all ${
+                  isGrcFullScreen
+                    ? "h-full rounded-none"
+                    : "max-w-5xl max-h-[94vh] rounded-2xl border border-zinc-200 dark:border-zinc-700"
+                }`}
+              >
                 
                 {/* Modal Top Header */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-zinc-200 dark:border-zinc-800 shrink-0">
+                <div className="flex items-center justify-between gap-3 px-4 sm:px-8 py-3.5 border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121215] shrink-0 shadow-xs">
                   <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-xl bg-blue-50 dark:bg-blue-600/20 border border-blue-200 dark:border-blue-500/30 flex items-center justify-center text-blue-600 dark:text-blue-400">
+                    <div className="h-10 w-10 rounded-xl bg-blue-50 dark:bg-blue-600/20 border border-blue-200 dark:border-blue-500/30 flex items-center justify-center text-blue-600 dark:text-blue-400 shrink-0">
                       <UserPlus className="h-5 w-5" />
                     </div>
                     <div>
                       <div className="flex items-center gap-2 flex-wrap">
-                        <h2 className="text-lg font-black text-zinc-900 dark:text-white tracking-tight">
+                        <h2 className="text-base sm:text-lg font-black text-zinc-900 dark:text-white tracking-tight">
                           Guest Registration Card (GRC) Editor
                         </h2>
                         <span className="px-2 py-0.5 rounded-lg bg-blue-100 dark:bg-blue-950 text-blue-800 dark:text-blue-300 font-mono font-black text-xs">
@@ -1733,6 +1807,9 @@ export default function AdminPortalPage() {
                         }`}>
                           {editingGrc.status}
                         </span>
+                        <span className="hidden md:inline-flex items-center gap-1 text-[10.5px] font-mono font-semibold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/50 px-2 py-0.5 rounded-md border border-blue-200 dark:border-blue-800/60">
+                          {isGrcFullScreen ? "Full Screen Active" : "Windowed View"}
+                        </span>
                       </div>
                       <p className="text-xs text-zinc-500 dark:text-zinc-400 font-mono">
                         {hotelForm.displayName || activeProperty?.displayName || "Hotel"} • {hotelForm.code || activeProperty?.code || ""}
@@ -1740,17 +1817,29 @@ export default function AdminPortalPage() {
                     </div>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() => setEditingGrc(null)}
-                    className="p-2 rounded-xl text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition cursor-pointer"
-                  >
-                    <X className="h-5 w-5" />
-                  </button>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setIsGrcFullScreen((prev) => !prev)}
+                      className="p-2 rounded-xl text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition cursor-pointer"
+                      title={isGrcFullScreen ? "Restore Windowed Size" : "Expand to Full Screen"}
+                    >
+                      {isGrcFullScreen ? <Minimize2 className="h-4.5 w-4.5" /> : <Maximize2 className="h-4.5 w-4.5" />}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditingGrc(null)}
+                      className="p-2 rounded-xl text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition cursor-pointer"
+                      title="Close GRC Editor (Esc)"
+                    >
+                      <X className="h-5 w-5" />
+                    </button>
+                  </div>
                 </div>
 
                 {/* PHYSICAL GRC DATA ENTRY & EDIT FORM */}
-                <form onSubmit={saveGrcEdit} className="overflow-y-auto space-y-6 pt-4 pr-1 text-xs flex-1">
+                <form onSubmit={saveGrcEdit} className="flex-1 flex flex-col overflow-hidden">
+                  <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 space-y-6 text-xs max-w-6xl mx-auto w-full">
                   
                   {/* 1. ROOM & STAY PERIOD SECTION */}
                   <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-[#09090b] p-4 space-y-3.5 shadow-xs">
@@ -1900,13 +1989,14 @@ export default function AdminPortalPage() {
                           const primaryRoomObj = roomsList.find(
                             (r) => r.number === editingGrc.preAssignedRoom || r.id === editingGrc.preAssignedRoom
                           );
-                          const primaryRoomNumber = primaryRoomObj?.number || editingGrc.preAssignedRoom || "—";
+                          const primaryRoomNumber = primaryRoomObj?.number || editingGrc.preAssignedRoom || "Primary";
                           const primaryRoomType = primaryRoomObj?.roomType?.name || primaryRoomObj?.name || "Standard Room";
                           const primaryPaxCount = Number(editingGrc.extraPaxCount) || 0;
+                          const primaryExtraPaxRate = primaryRoomObj?.roomType?.extraAdult || 500;
                           const primaryRate = editingGrc.isComplimentary ? 0 : (editingGrc.agreedRoomTariff !== undefined ? editingGrc.agreedRoomTariff : 3200);
 
                           return (
-                            <div className="p-3 rounded-xl bg-blue-50/70 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800/50 space-y-2 shadow-xs">
+                            <div className="p-3 rounded-xl bg-blue-50/70 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800/50 space-y-2.5 shadow-xs">
                               <div className="flex items-center justify-between gap-2 flex-wrap">
                                 <div className="flex items-center gap-2">
                                   <span className="px-2.5 py-1 rounded-lg bg-blue-600 text-white font-bold font-mono text-xs shadow-xs">
@@ -1947,32 +2037,70 @@ export default function AdminPortalPage() {
                                 </div>
                               </div>
 
-                              {/* Primary Room Extra Pax Stepper */}
-                              <div className="flex items-center justify-between p-2.5 rounded-xl bg-white dark:bg-zinc-900/90 border border-zinc-200 dark:border-zinc-800 text-xs shadow-xs">
-                                <span className="font-bold text-zinc-800 dark:text-zinc-300">
-                                  Extra Pax for Room {primaryRoomNumber} (₹500/Pax)
-                                </span>
+                              {/* Primary Room Extra Pax Stepper & Direct Input */}
+                              <div className="flex items-center justify-between p-2.5 rounded-xl bg-white dark:bg-zinc-900/90 border border-zinc-200 dark:border-zinc-800 text-xs shadow-xs gap-2 flex-wrap">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-bold text-zinc-800 dark:text-zinc-200">
+                                    Extra Pax for Room {primaryRoomNumber}
+                                  </span>
+                                  <span className="text-[11px] font-mono font-semibold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/60 px-2 py-0.5 rounded-md border border-blue-200 dark:border-blue-800/60">
+                                    ₹{primaryExtraPaxRate}/Pax
+                                  </span>
+                                </div>
                                 <div className="flex items-center gap-2.5">
                                   <div className="flex items-center bg-zinc-100 dark:bg-zinc-800 p-0.5 rounded-lg border border-zinc-200 dark:border-zinc-700">
                                     <button
                                       type="button"
                                       onClick={() => {
                                         const next = Math.max(0, primaryPaxCount - 1);
-                                        setEditingGrc({ ...editingGrc, extraPaxCount: next });
+                                        setEditingGrc((prev: any) => ({
+                                          ...prev,
+                                          extraPaxCount: next,
+                                          roomExtraPax: {
+                                            ...(prev.roomExtraPax || {}),
+                                            [primaryRoomNumber]: next,
+                                            ...(primaryRoomObj?.id ? { [primaryRoomObj.id]: next } : {}),
+                                          },
+                                        }));
                                       }}
                                       className="h-6 w-6 rounded-md bg-white dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-700 active:scale-90 text-zinc-700 dark:text-zinc-200 flex items-center justify-center transition shadow-xs cursor-pointer"
                                       title="Decrease Extra Pax"
                                     >
                                       <Minus className="h-3 w-3 stroke-[2.5]" />
                                     </button>
-                                    <span className="font-mono font-bold text-xs text-zinc-900 dark:text-white px-2 min-w-[20px] text-center select-none">
-                                      {primaryPaxCount}
-                                    </span>
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      max="10"
+                                      value={primaryPaxCount}
+                                      onChange={(e) => {
+                                        const next = Math.max(0, Math.min(10, Number(e.target.value) || 0));
+                                        setEditingGrc((prev: any) => ({
+                                          ...prev,
+                                          extraPaxCount: next,
+                                          roomExtraPax: {
+                                            ...(prev.roomExtraPax || {}),
+                                            [primaryRoomNumber]: next,
+                                            ...(primaryRoomObj?.id ? { [primaryRoomObj.id]: next } : {}),
+                                          },
+                                        }));
+                                      }}
+                                      className="w-10 h-6 text-center font-mono font-bold text-xs text-zinc-900 dark:text-white bg-transparent focus:outline-none focus:bg-white dark:focus:bg-zinc-900 rounded"
+                                      title="Type Extra Pax count"
+                                    />
                                     <button
                                       type="button"
                                       onClick={() => {
                                         const next = primaryPaxCount + 1;
-                                        setEditingGrc({ ...editingGrc, extraPaxCount: next });
+                                        setEditingGrc((prev: any) => ({
+                                          ...prev,
+                                          extraPaxCount: next,
+                                          roomExtraPax: {
+                                            ...(prev.roomExtraPax || {}),
+                                            [primaryRoomNumber]: next,
+                                            ...(primaryRoomObj?.id ? { [primaryRoomObj.id]: next } : {}),
+                                          },
+                                        }));
                                       }}
                                       className="h-6 w-6 rounded-md bg-white dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-700 active:scale-90 text-zinc-700 dark:text-zinc-200 flex items-center justify-center transition shadow-xs cursor-pointer"
                                       title="Increase Extra Pax"
@@ -1982,7 +2110,7 @@ export default function AdminPortalPage() {
                                   </div>
                                   {primaryPaxCount > 0 ? (
                                     <span className="text-[11px] font-mono font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/60 px-2 py-0.5 rounded-md border border-amber-200 dark:border-amber-800/60">
-                                      +₹{primaryPaxCount * 500}/nt
+                                      +₹{formatINR(primaryPaxCount * primaryExtraPaxRate)}/nt
                                     </span>
                                   ) : (
                                     <span className="text-[10px] font-mono text-zinc-400 dark:text-zinc-500 pr-1">₹0</span>
@@ -1997,11 +2125,12 @@ export default function AdminPortalPage() {
                         {(editingGrc.additionalRoomIds || []).map((id: string) => {
                           const r = roomsList.find((room) => room.id === id || room.number === id);
                           const roomPaxCount = editingGrc.roomExtraPax?.[id] ?? editingGrc.roomExtraPax?.[r?.number || ""] ?? 0;
+                          const roomExtraPaxRate = r?.roomType?.extraAdult || 500;
                           const currentRoomRate = editingGrc.roomRates?.[id] ?? editingGrc.roomRates?.[r?.number || ""] ?? (r?.roomType?.basePrice || 3200);
                           return (
                             <div
                               key={id}
-                              className="p-3 rounded-xl bg-blue-50/70 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800/50 space-y-2 shadow-xs"
+                              className="p-3 rounded-xl bg-blue-50/70 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800/50 space-y-2.5 shadow-xs"
                             >
                               <div className="flex items-center justify-between gap-2 flex-wrap">
                                 <div className="flex items-center gap-2">
@@ -2063,11 +2192,16 @@ export default function AdminPortalPage() {
                                 </div>
                               </div>
 
-                              {/* Per-Room Extra Pax Stepper */}
-                              <div className="flex items-center justify-between p-2.5 rounded-xl bg-white dark:bg-zinc-900/90 border border-zinc-200 dark:border-zinc-800 text-xs shadow-xs">
-                                <span className="font-bold text-zinc-800 dark:text-zinc-300">
-                                  Extra Pax for Room {r?.number || id} (₹500/Pax)
-                                </span>
+                              {/* Per-Room Extra Pax Stepper & Direct Input */}
+                              <div className="flex items-center justify-between p-2.5 rounded-xl bg-white dark:bg-zinc-900/90 border border-zinc-200 dark:border-zinc-800 text-xs shadow-xs gap-2 flex-wrap">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-bold text-zinc-800 dark:text-zinc-200">
+                                    Extra Pax for Room {r?.number || id}
+                                  </span>
+                                  <span className="text-[11px] font-mono font-semibold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/60 px-2 py-0.5 rounded-md border border-blue-200 dark:border-blue-800/60">
+                                    ₹{roomExtraPaxRate}/Pax
+                                  </span>
+                                </div>
                                 <div className="flex items-center gap-2.5">
                                   <div className="flex items-center bg-zinc-100 dark:bg-zinc-800 p-0.5 rounded-lg border border-zinc-200 dark:border-zinc-700">
                                     <button
@@ -2089,9 +2223,25 @@ export default function AdminPortalPage() {
                                     >
                                       <Minus className="h-3 w-3 stroke-[2.5]" />
                                     </button>
-                                    <span className="font-mono font-bold text-xs text-zinc-900 dark:text-white px-2 min-w-[20px] text-center select-none">
-                                      {roomPaxCount}
-                                    </span>
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      max="10"
+                                      value={roomPaxCount}
+                                      onChange={(e) => {
+                                        const next = Math.max(0, Math.min(10, Number(e.target.value) || 0));
+                                        setEditingGrc((prev: any) => ({
+                                          ...prev,
+                                          roomExtraPax: {
+                                            ...prev.roomExtraPax,
+                                            [id]: next,
+                                            ...(r?.number ? { [r.number]: next } : {}),
+                                          },
+                                        }));
+                                      }}
+                                      className="w-10 h-6 text-center font-mono font-bold text-xs text-zinc-900 dark:text-white bg-transparent focus:outline-none focus:bg-white dark:focus:bg-zinc-900 rounded"
+                                      title="Type Extra Pax count"
+                                    />
                                     <button
                                       type="button"
                                       onClick={() => {
@@ -2114,7 +2264,7 @@ export default function AdminPortalPage() {
                                   </div>
                                   {roomPaxCount > 0 ? (
                                     <span className="text-[11px] font-mono font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/60 px-2 py-0.5 rounded-md border border-amber-200 dark:border-amber-800/60">
-                                      +₹{roomPaxCount * 500}/nt
+                                      +₹{formatINR(roomPaxCount * roomExtraPaxRate)}/nt
                                     </span>
                                   ) : (
                                     <span className="text-[10px] font-mono text-zinc-400 dark:text-zinc-500 pr-1">₹0</span>
@@ -2254,22 +2404,70 @@ export default function AdminPortalPage() {
 
                     {/* Row 3: Live Accommodation Math Calculator */}
                     {(() => {
-                      const totalRoomsCount = 1 + (editingGrc.additionalRoomIds?.length || 0);
+                      // 1. Resolve room inventory objects for primary and additional rooms
+                      const primaryRoomObj = roomsList.find(
+                        (r) =>
+                          r.number === editingGrc.preAssignedRoom ||
+                          r.id === editingGrc.preAssignedRoom ||
+                          String(r.number) === String(editingGrc.preAssignedRoom).replace(/^Room\s*/i, "")
+                      );
+                      const additionalRoomObjs = (editingGrc.additionalRoomIds || []).map((rid: string) =>
+                        roomsList.find(
+                          (r) =>
+                            r.id === rid ||
+                            r.number === rid ||
+                            String(r.number) === String(rid).replace(/^Room\s*/i, "")
+                        )
+                      );
+                      const allSelectedRooms = [primaryRoomObj, ...additionalRoomObjs].filter(Boolean);
+                      const totalRoomsCount = Math.max(1, 1 + (editingGrc.additionalRoomIds?.length || 0));
+
+                      // 2. Base standard bed capacity summed from actual roomType categories
+                      // E.g. Deluxe Room (2) + Family Executive (4) = 6 Pax base standard capacity
+                      const baseStandardCapacity = allSelectedRooms.length > 0
+                        ? allSelectedRooms.reduce(
+                            (acc, r) => acc + (r?.roomType?.capacity || r?.roomType?.baseOccupancy || 2),
+                            0
+                          )
+                        : totalRoomsCount * 2;
+
+                      // 3. Extra Pax Count across all rooms
                       const additionalExtraPax = (editingGrc.additionalRoomIds || []).reduce(
                         (sum: number, rid: string) => sum + (Number(editingGrc.roomExtraPax?.[rid]) || 0),
                         0
                       );
                       const currentExtraPax = (Number(editingGrc.extraPaxCount) || 0) + additionalExtraPax;
-                      const totalCapacity = totalRoomsCount * 2 + currentExtraPax;
-                      const absoluteMaxRoomCapacity = totalRoomsCount * 4;
+                      const totalCapacity = baseStandardCapacity + currentExtraPax;
 
-                      const totalAdultsCount = Number(editingGrc.adults) || (Number(editingGrc.paxM || 0) + Number(editingGrc.paxF || 0)) || 0;
+                      // 4. Absolute maximum physical capacity (base capacity + maximum allowable extra beds per room)
+                      const absoluteMaxRoomCapacity = allSelectedRooms.length > 0
+                        ? allSelectedRooms.reduce(
+                            (acc, r) =>
+                              acc +
+                              (r?.roomType?.capacity || r?.roomType?.baseOccupancy || 2) +
+                              (r?.roomType?.extraCapacity ?? 1),
+                            0
+                          )
+                        : totalRoomsCount * 4;
+
+                      // 5. Total guest headcount (Adults & Children)
+                      const totalAdultsCount =
+                        Number(editingGrc.adults) ||
+                        (Number(editingGrc.paxM || 0) + Number(editingGrc.paxF || 0)) ||
+                        0;
                       const totalChildrenCount = Number(editingGrc.children || 0);
                       const totalGuests = totalAdultsCount + totalChildrenCount;
 
                       const hasGuestsEntered = totalGuests > 0;
-                      const isOverCapacity = hasGuestsEntered && totalGuests > totalCapacity;
-                      const isBeyondMax = hasGuestsEntered && totalGuests > absoluteMaxRoomCapacity;
+                      // Overcapacity warning triggers ONLY if adults exceed total allocated capacity (base + extra pax),
+                      // or total headcount exceeds absolute physical bed limit
+                      const isOverCapacity =
+                        hasGuestsEntered && (totalAdultsCount > totalCapacity || totalGuests > absoluteMaxRoomCapacity);
+                      const isBeyondMax =
+                        hasGuestsEntered &&
+                        (totalAdultsCount > absoluteMaxRoomCapacity || totalGuests > absoluteMaxRoomCapacity + totalRoomsCount);
+
+                      const extraPaxTariffRef = primaryRoomObj?.roomType?.extraAdult || 500;
 
                       return (
                         <div className="pt-2 border-t border-zinc-200 dark:border-zinc-800/80 space-y-3">
@@ -2301,19 +2499,19 @@ export default function AdminPortalPage() {
                                   </span>
                                   <p className="text-[11px] opacity-90 mt-0.5">
                                     {isBeyondMax
-                                      ? `${totalGuests} Guests entered, but standard capacity across ${totalRoomsCount} rooms is max ${absoluteMaxRoomCapacity} Pax.`
+                                      ? `${totalGuests} Guests entered, but physical capacity limit across ${totalRoomsCount} rooms is max ${absoluteMaxRoomCapacity} Pax.`
                                       : isOverCapacity
-                                      ? `${totalGuests} Guests entered, but capacity across ${totalRoomsCount} rooms is ${totalCapacity} Pax. Increment Extra Pax (+₹500/Pax).`
+                                      ? `${totalGuests} Guests entered, but standard capacity across ${totalRoomsCount} room(s) is ${totalCapacity} Pax. Increment Extra Pax (+₹${extraPaxTariffRef}/Pax).`
                                       : hasGuestsEntered
-                                      ? `${totalGuests} Guests fit across ${totalRoomsCount} Room(s) (Total Capacity: ${totalCapacity} Pax).`
-                                      : `Capacity: ${totalCapacity} Pax across ${totalRoomsCount} room(s). Increment Extra Pax if adding extra guests.`}
+                                      ? `${totalGuests} Guests fit comfortably across ${totalRoomsCount} Room(s) (Standard Capacity: ${baseStandardCapacity} Pax${currentExtraPax > 0 ? ` + ${currentExtraPax} Extra Pax` : ""}).`
+                                      : `Standard Capacity: ${baseStandardCapacity} Pax across ${totalRoomsCount} room(s). Increment Extra Pax if adding extra guests.`}
                                   </p>
                                 </div>
                               </div>
 
                               <div className="flex items-center gap-2 font-mono text-xs font-bold shrink-0 self-end sm:self-auto">
                                 <span className="px-2.5 py-1 rounded-lg border bg-zinc-200 dark:bg-black/40 border-zinc-300 dark:border-white/10 text-zinc-900 dark:text-white">
-                                  Pax: {totalGuests || "—"} / {totalCapacity} (Max {absoluteMaxRoomCapacity})
+                                  Pax: {totalGuests || "N/A"} / {totalCapacity} (Max {absoluteMaxRoomCapacity})
                                 </span>
                               </div>
                             </div>
@@ -3229,9 +3427,10 @@ export default function AdminPortalPage() {
                       )}
                     </div>
                   </div>
+                </div>
 
-                  {/* Bottom Actions */}
-                  <div className="pt-3.5 pb-1 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-between gap-4">
+                  {/* Sticky Bottom Action Bar */}
+                  <div className="shrink-0 px-4 sm:px-8 py-3.5 border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50/95 dark:bg-[#121215]/95 backdrop-blur-md flex items-center justify-between gap-4 z-10 shadow-lg">
                     <span className="text-[11px] text-zinc-500 font-mono hidden sm:inline truncate">
                       Rule 46 Compliant GRC • Instant Sync Across Database
                     </span>
@@ -3240,7 +3439,7 @@ export default function AdminPortalPage() {
                       <button
                         type="button"
                         onClick={() => setEditingGrc(null)}
-                        className="px-4 py-2.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 text-xs font-bold transition cursor-pointer"
+                        className="px-4 py-2.5 rounded-xl bg-zinc-200/80 hover:bg-zinc-300 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 text-xs font-bold transition cursor-pointer"
                       >
                         Cancel / Discard
                       </button>
@@ -3265,7 +3464,6 @@ export default function AdminPortalPage() {
                   </div>
 
                 </form>
-
               </div>
             </div>
           )}

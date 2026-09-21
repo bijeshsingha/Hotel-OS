@@ -14,7 +14,15 @@ export async function GET(request: Request) {
     const rooms = await prisma.room.findMany({
       where: { propertyId, active: true },
       include: {
-        roomType: true,
+        roomType: {
+          include: {
+            rateVersions: {
+              where: { active: true },
+              orderBy: { createdAt: "desc" },
+              take: 1,
+            },
+          },
+        },
         roomState: true,
         blocks: {
           where: { status: "ACTIVE" },
@@ -79,8 +87,32 @@ export async function GET(request: Request) {
           return a;
         });
 
+      let basePrice = 3200;
+      let extraAdult = 500;
+      let extraChild = 0;
+
+      if (room.roomType?.rateVersions && room.roomType.rateVersions.length > 0) {
+        try {
+          const pricing = JSON.parse(room.roomType.rateVersions[0].pricingJson);
+          if (pricing.basePrice !== undefined) basePrice = Number(pricing.basePrice);
+          if (pricing.extraAdult !== undefined) extraAdult = Number(pricing.extraAdult);
+          if (pricing.extraChild !== undefined) extraChild = Number(pricing.extraChild);
+        } catch {}
+      }
+
+      const enhancedRoomType = room.roomType
+        ? {
+            ...room.roomType,
+            basePrice,
+            extraAdult,
+            extraChild,
+            baseRate: basePrice,
+          }
+        : null;
+
       return {
         ...room,
+        roomType: enhancedRoomType,
         assignments: activeAssignments,
         roomState: room.roomState
           ? { ...room.roomState, occupancyStatus: trueOcc }

@@ -17,6 +17,7 @@ import {
   UserPlus,
 } from "lucide-react";
 import { formatINR } from "@/lib/gst/calculator";
+import { getPropertyLogoUrl, getPropertyInitials } from "@/lib/domain/property-branding";
 
 interface ReservationVoucherModalProps {
   isOpen: boolean;
@@ -36,6 +37,10 @@ export function ReservationVoucherModal({
   const printRef = useRef<HTMLDivElement>(null);
 
   if (!isOpen || !reservation) return null;
+
+  const logoUrl = getPropertyLogoUrl(activeProperty);
+  const initials = getPropertyInitials(activeProperty);
+  const hotelName = activeProperty?.displayName || activeProperty?.legalName || "Hotel Reservation Voucher";
 
   const activeRes = reservation?.reservation ? { ...reservation.reservation, ...reservation } : reservation;
 
@@ -150,17 +155,28 @@ export function ReservationVoucherModal({
           {/* Hotel Header Letterhead */}
           <div className="flex items-start justify-between border-b-2 border-zinc-900 pb-4 gap-4">
             <div className="flex items-center gap-3.5">
-              <img
-                src="/images/ambarish-logo.png"
-                alt="Hotel Ambarish Grand Residency Logo"
-                className="h-11 sm:h-13 w-auto object-contain shrink-0"
-                onError={(e) => {
-                  e.currentTarget.style.display = "none";
-                }}
-              />
+              {logoUrl ? (
+                <img
+                  src={logoUrl}
+                  alt={`${hotelName} Logo`}
+                  className="h-11 sm:h-13 w-auto object-contain shrink-0"
+                  onError={(e) => {
+                    e.currentTarget.style.display = "none";
+                  }}
+                />
+              ) : (
+                <div className="h-11 w-11 sm:h-13 sm:w-13 rounded-lg border-2 border-zinc-900 flex flex-col items-center justify-center bg-zinc-50 text-zinc-900 shrink-0 select-none shadow-xs">
+                  <span className="font-serif font-black text-sm tracking-wider leading-none">
+                    {initials}
+                  </span>
+                  <span className="text-[7px] font-sans font-bold tracking-widest uppercase opacity-75 mt-0.5">
+                    HOTEL
+                  </span>
+                </div>
+              )}
               <div>
                 <h1 className="text-xl sm:text-2xl font-black tracking-tight text-zinc-950 uppercase">
-                  {activeProperty?.displayName || "Hotel Reservation Voucher"}
+                  {hotelName}
                 </h1>
                 {activeProperty?.address && (
                   <p className="text-[11px] text-zinc-600 font-medium">
@@ -168,7 +184,7 @@ export function ReservationVoucherModal({
                   </p>
                 )}
                 <p className="text-[11px] text-zinc-600 font-mono">
-                  Phone: {activeProperty?.phone || "—"} • GSTIN: <strong>{activeProperty?.gstin || "—"}</strong>
+                  Phone: {activeProperty?.phone || "N/A"} • GSTIN: <strong>{activeProperty?.gstin || "N/A"}</strong>
                 </p>
               </div>
             </div>

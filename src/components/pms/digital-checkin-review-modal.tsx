@@ -147,6 +147,8 @@ export function DigitalCheckInReviewModal({
   ) || totalRoomsCount * 2;
   
   // Total extra pax enabled across all assigned rooms
+  const primarySelectedRoom = rooms.find((r) => r.id === selectedRoomId);
+  const primaryExtraPaxRate = primarySelectedRoom?.roomType?.extraAdult !== undefined ? Number(primarySelectedRoom.roomType.extraAdult) : 500;
   const totalExtraPaxCount = (Number(extraPaxCount) || 0) + additionalRoomIds.reduce((sum, id) => sum + (Number(roomExtraPax?.[id]) || 0), 0);
   const totalCap = baseCap + totalExtraPaxCount;
   const absoluteMax = baseCap + totalRoomsCount * 2;
@@ -170,6 +172,9 @@ export function DigitalCheckInReviewModal({
     const allRoomIds = [selectedRoomId, ...additionalRoomIds];
     const finalRoomRates = { ...roomRates, [selectedRoomId]: agreedTariff };
 
+    const primaryRoom = rooms.find((r) => r.id === selectedRoomId);
+    const dynamicExtraRate = primaryRoom?.roomType?.extraAdult !== undefined ? Number(primaryRoom.roomType.extraAdult) : 500;
+
     try {
       const res = await fetch(`/api/v1/registrations/${registration.id}/fulfill`, {
         method: "POST",
@@ -180,7 +185,7 @@ export function DigitalCheckInReviewModal({
           groupBilling,
           agreedTariff: Number(agreedTariff) || undefined,
           extraBeds: totalExtraPaxCount,
-          extraBedRate: 500,
+          extraBedRate: dynamicExtraRate,
           departureDate,
           depositAmount: Number(depositAmount) || 0,
           depositMethod,
@@ -548,43 +553,49 @@ export function DigitalCheckInReviewModal({
                       </div>
 
                       {/* Primary Room Extra Pax Stepper (+/-) */}
-                      <div className="space-y-1">
-                        <label className="text-zinc-600 dark:text-zinc-400 text-[11px] font-bold block">
-                          Extra Pax (₹500/Pax)
-                        </label>
-                        <div className="h-10 flex items-center justify-between px-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 shadow-xs">
-                          <div className="flex items-center bg-zinc-200/80 dark:bg-zinc-800 p-0.5 rounded-lg border border-zinc-300/80 dark:border-zinc-700">
-                            <button
-                              type="button"
-                              disabled={isAlreadyCheckedIn || loading}
-                              onClick={() => setExtraPaxCount((prev) => Math.max(0, prev - 1))}
-                              className="h-6 w-6 rounded-md bg-white dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-700 active:scale-90 text-zinc-700 dark:text-zinc-200 flex items-center justify-center transition shadow-xs cursor-pointer disabled:opacity-50"
-                              title="Decrease Extra Pax"
-                            >
-                              <Minus className="h-3 w-3 stroke-[2.5]" />
-                            </button>
-                            <span className="font-mono font-bold text-xs text-zinc-900 dark:text-white px-2 min-w-[20px] text-center select-none">
-                              {extraPaxCount}
-                            </span>
-                            <button
-                              type="button"
-                              disabled={isAlreadyCheckedIn || loading}
-                              onClick={() => setExtraPaxCount((prev) => prev + 1)}
-                              className="h-6 w-6 rounded-md bg-white dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-700 active:scale-90 text-zinc-700 dark:text-zinc-200 flex items-center justify-center transition shadow-xs cursor-pointer disabled:opacity-50"
-                              title="Increase Extra Pax"
-                            >
-                              <Plus className="h-3 w-3 stroke-[2.5]" />
-                            </button>
+                      {(() => {
+                        const primaryRoom = rooms.find((r) => r.id === selectedRoomId);
+                        const dynamicExtraRate = primaryRoom?.roomType?.extraAdult !== undefined ? Number(primaryRoom.roomType.extraAdult) : 500;
+                        return (
+                          <div className="space-y-1">
+                            <label className="text-zinc-600 dark:text-zinc-400 text-[11px] font-bold block">
+                              Extra Pax (₹{dynamicExtraRate}/Pax)
+                            </label>
+                            <div className="h-10 flex items-center justify-between px-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 shadow-xs">
+                              <div className="flex items-center bg-zinc-200/80 dark:bg-zinc-800 p-0.5 rounded-lg border border-zinc-300/80 dark:border-zinc-700">
+                                <button
+                                  type="button"
+                                  disabled={isAlreadyCheckedIn || loading}
+                                  onClick={() => setExtraPaxCount((prev) => Math.max(0, prev - 1))}
+                                  className="h-6 w-6 rounded-md bg-white dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-700 active:scale-90 text-zinc-700 dark:text-zinc-200 flex items-center justify-center transition shadow-xs cursor-pointer disabled:opacity-50"
+                                  title="Decrease Extra Pax"
+                                >
+                                  <Minus className="h-3 w-3 stroke-[2.5]" />
+                                </button>
+                                <span className="font-mono font-bold text-xs text-zinc-900 dark:text-white px-2 min-w-[20px] text-center select-none">
+                                  {extraPaxCount}
+                                </span>
+                                <button
+                                  type="button"
+                                  disabled={isAlreadyCheckedIn || loading}
+                                  onClick={() => setExtraPaxCount((prev) => prev + 1)}
+                                  className="h-6 w-6 rounded-md bg-white dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-700 active:scale-90 text-zinc-700 dark:text-zinc-200 flex items-center justify-center transition shadow-xs cursor-pointer disabled:opacity-50"
+                                  title="Increase Extra Pax"
+                                >
+                                  <Plus className="h-3 w-3 stroke-[2.5]" />
+                                </button>
+                              </div>
+                              {extraPaxCount > 0 ? (
+                                <span className="text-[11px] font-mono font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/60 px-2 py-0.5 rounded-md border border-amber-200 dark:border-amber-800/60">
+                                  +₹{extraPaxCount * dynamicExtraRate}/nt
+                                </span>
+                              ) : (
+                                <span className="text-[10px] font-mono text-zinc-400 dark:text-zinc-500 pr-1">₹0</span>
+                              )}
+                            </div>
                           </div>
-                          {extraPaxCount > 0 ? (
-                            <span className="text-[11px] font-mono font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/60 px-2 py-0.5 rounded-md border border-amber-200 dark:border-amber-800/60">
-                              +₹{extraPaxCount * 500}/nt
-                            </span>
-                          ) : (
-                            <span className="text-[10px] font-mono text-zinc-400 dark:text-zinc-500 pr-1">₹0</span>
-                          )}
-                        </div>
-                      </div>
+                        );
+                      })()}
                     </div>
                   </div>
 
@@ -673,53 +684,58 @@ export function DigitalCheckInReviewModal({
 
 
                               {/* Bottom row: Extra Pax Stepper */}
-                              <div className="flex items-center justify-between p-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-900/90 border border-zinc-200 dark:border-zinc-800 text-xs shadow-xs">
-                                <span className="font-bold text-zinc-800 dark:text-zinc-300">
-                                  Extra Pax for Room {r?.number} (₹500/Pax)
-                                </span>
-                                <div className="flex items-center gap-2.5">
-                                  <div className="flex items-center bg-zinc-200/80 dark:bg-zinc-800 p-0.5 rounded-lg border border-zinc-300/80 dark:border-zinc-700">
-                                    <button
-                                      type="button"
-                                      disabled={isAlreadyCheckedIn || loading}
-                                      onClick={() =>
-                                        setRoomExtraPax((prev) => ({
-                                          ...prev,
-                                          [id]: Math.max(0, (prev[id] || 0) - 1),
-                                        }))
-                                      }
-                                      className="h-6 w-6 rounded-md bg-white dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-700 active:scale-90 text-zinc-700 dark:text-zinc-200 flex items-center justify-center transition shadow-xs cursor-pointer disabled:opacity-50"
-                                      title="Decrease Extra Pax"
-                                    >
-                                      <Minus className="h-3 w-3 stroke-[2.5]" />
-                                    </button>
-                                    <span className="font-mono font-bold text-xs text-zinc-900 dark:text-white px-2 min-w-[20px] text-center select-none">
-                                      {roomPax}
+                              {(() => {
+                                const roomExtraRate = r?.roomType?.extraAdult !== undefined ? Number(r.roomType.extraAdult) : 500;
+                                return (
+                                  <div className="flex items-center justify-between p-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-900/90 border border-zinc-200 dark:border-zinc-800 text-xs shadow-xs">
+                                    <span className="font-bold text-zinc-800 dark:text-zinc-300">
+                                      Extra Pax for Room {r?.number} (₹{roomExtraRate}/Pax)
                                     </span>
-                                    <button
-                                      type="button"
-                                      disabled={isAlreadyCheckedIn || loading}
-                                      onClick={() =>
-                                        setRoomExtraPax((prev) => ({
-                                          ...prev,
-                                          [id]: (prev[id] || 0) + 1,
-                                        }))
-                                      }
-                                      className="h-6 w-6 rounded-md bg-white dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-700 active:scale-90 text-zinc-700 dark:text-zinc-200 flex items-center justify-center transition shadow-xs cursor-pointer disabled:opacity-50"
-                                      title="Increase Extra Pax"
-                                    >
-                                      <Plus className="h-3 w-3 stroke-[2.5]" />
-                                    </button>
+                                    <div className="flex items-center gap-2.5">
+                                      <div className="flex items-center bg-zinc-200/80 dark:bg-zinc-800 p-0.5 rounded-lg border border-zinc-300/80 dark:border-zinc-700">
+                                        <button
+                                          type="button"
+                                          disabled={isAlreadyCheckedIn || loading}
+                                          onClick={() =>
+                                            setRoomExtraPax((prev) => ({
+                                              ...prev,
+                                              [id]: Math.max(0, (prev[id] || 0) - 1),
+                                            }))
+                                          }
+                                          className="h-6 w-6 rounded-md bg-white dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-700 active:scale-90 text-zinc-700 dark:text-zinc-200 flex items-center justify-center transition shadow-xs cursor-pointer disabled:opacity-50"
+                                          title="Decrease Extra Pax"
+                                        >
+                                          <Minus className="h-3 w-3 stroke-[2.5]" />
+                                        </button>
+                                        <span className="font-mono font-bold text-xs text-zinc-900 dark:text-white px-2 min-w-[20px] text-center select-none">
+                                          {roomPax}
+                                        </span>
+                                        <button
+                                          type="button"
+                                          disabled={isAlreadyCheckedIn || loading}
+                                          onClick={() =>
+                                            setRoomExtraPax((prev) => ({
+                                              ...prev,
+                                              [id]: (prev[id] || 0) + 1,
+                                            }))
+                                          }
+                                          className="h-6 w-6 rounded-md bg-white dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-700 active:scale-90 text-zinc-700 dark:text-zinc-200 flex items-center justify-center transition shadow-xs cursor-pointer disabled:opacity-50"
+                                          title="Increase Extra Pax"
+                                        >
+                                          <Plus className="h-3 w-3 stroke-[2.5]" />
+                                        </button>
+                                      </div>
+                                      {roomPax > 0 ? (
+                                        <span className="text-[11px] font-mono font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/60 px-2 py-0.5 rounded-md border border-amber-200 dark:border-amber-800/60">
+                                          +₹{roomPax * roomExtraRate}/nt
+                                        </span>
+                                      ) : (
+                                        <span className="text-[10px] font-mono text-zinc-400 dark:text-zinc-500 pr-1">₹0</span>
+                                      )}
+                                    </div>
                                   </div>
-                                  {roomPax > 0 ? (
-                                    <span className="text-[11px] font-mono font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/60 px-2 py-0.5 rounded-md border border-amber-200 dark:border-amber-800/60">
-                                      +₹{roomPax * 500}/nt
-                                    </span>
-                                  ) : (
-                                    <span className="text-[10px] font-mono text-zinc-400 dark:text-zinc-500 pr-1">₹0</span>
-                                  )}
-                                </div>
-                              </div>
+                                );
+                              })()}
                             </div>
                           );
                         })}
@@ -812,7 +828,7 @@ export function DigitalCheckInReviewModal({
                             {isBeyondMax
                               ? `${totalPax} Guests registered, but ${totalRoomsCount} room(s) can only fit max ${absoluteMax} Pax. Please add another room.`
                               : isOver
-                              ? `${totalPax} Guests registered, but standard capacity is ${totalCap} Pax. Increment Extra Pax (+₹500/Pax) or add an extra room.`
+                              ? `${totalPax} Guests registered, but standard capacity is ${totalCap} Pax. Increment Extra Pax (+₹${primaryExtraPaxRate}/Pax) or add an extra room.`
                               : `${totalPax} Guest(s) fit across ${totalRoomsCount} room(s) (Base: ${baseCap} + ${totalExtraPaxCount} Extra Pax = Capacity: ${totalCap} Pax).`}
                           </p>
                         </div>

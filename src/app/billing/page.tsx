@@ -2582,14 +2582,15 @@ function BillingContent() {
           onClose={() => setShowInvoiceModal(false)}
           isLiveTaxBillView={isLiveTaxBillView}
           property={{
-            displayName: activeProperty?.displayName || "HOTEL AMBARISH GRAND RESIDENCY",
-            legalName: activeProperty?.legalName || "AMBARISH RESIDENCY",
-            address: activeProperty?.address || "MD Shah Road, Paltan Bazar, Guwahati, Assam, 781008, India",
-            phone: activeProperty?.phone || "9864341211, 0361 2547102",
-            email: (activeProperty as any)?.email || "reservation.ambarish@gmail.com",
-            website: (activeProperty as any)?.website || "www.hotelambarish.com",
-            gstin: activeProperty?.gstin || "18AACCB2447F1ZX",
-            stateCode: activeProperty?.stateCode || "18",
+            displayName: activeProperty?.displayName || activeProperty?.legalName || "HOTEL OS",
+            legalName: activeProperty?.legalName || activeProperty?.displayName || "HOTEL OS",
+            address: activeProperty?.address || "",
+            phone: activeProperty?.phone || "",
+            email: activeProperty?.email || "",
+            website: activeProperty?.website || "",
+            gstin: activeProperty?.gstin || "",
+            stateCode: activeProperty?.stateCode || "",
+            logoUrl: activeProperty?.logoUrl || undefined,
           }}
           stay={activeStay}
           roomNumber={activeRoomNumber}

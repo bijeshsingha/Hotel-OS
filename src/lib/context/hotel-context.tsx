@@ -12,6 +12,9 @@ export interface PropertyInfo {
   stateCode?: string;
   address?: string | null;
   phone?: string | null;
+  email?: string | null;
+  website?: string | null;
+  logoUrl?: string | null;
   businessDate: string;
   currency: string;
 }

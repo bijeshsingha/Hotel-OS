@@ -8,6 +8,7 @@ export const PAYMENT_METHODS = [
 ] as const;
 
 export const EXPENSE_CATEGORIES = [
+  { id: "OWNER_PAYOUT", label: "Owner Payout / Drawing", defaultDescription: "Cash withdrawal / profit payout to hotel owner" },
   { id: "DRIVER_COMMISSION", label: "Driver Commission", defaultDescription: "Cab / Taxi driver referral commission" },
   { id: "PETTY_CASH", label: "Petty Cash Purchase", defaultDescription: "Daily front office / pantry petty cash" },
   { id: "VENDOR_SUPPLY", label: "Vendor / Supplier Payment", defaultDescription: "Fresh vegetables, dairy, linens, toiletries" },

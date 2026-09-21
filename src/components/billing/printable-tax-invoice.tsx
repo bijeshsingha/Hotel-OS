@@ -3,6 +3,7 @@
 import React, { useRef } from "react";
 import { Printer, X } from "lucide-react";
 import { formatGuestDisplayName } from "@/lib/domain/name-utils";
+import { getPropertyLogoUrl, getPropertyInitials } from "@/lib/domain/property-branding";
 
 export interface InvoiceLineItem {
   id?: string;
@@ -45,6 +46,7 @@ export interface PrintableTaxInvoiceProps {
     website?: string;
     gstin?: string;
     stateCode?: string;
+    logoUrl?: string;
   };
   stay: any;
   roomNumber: string;
@@ -129,6 +131,11 @@ export function PrintableTaxInvoiceModal({
   const printSheetRef = useRef<HTMLDivElement>(null);
 
   if (!isOpen) return null;
+
+  // Property Branding & Identity
+  const logoUrl = getPropertyLogoUrl(property);
+  const initials = getPropertyInitials(property);
+  const hotelDisplayName = property.displayName || property.legalName || "TAX INVOICE";
 
   // Primary Guest Details
   const primaryGuest = stay?.primaryGuest || {};
@@ -403,7 +410,36 @@ export function PrintableTaxInvoiceModal({
             .logo-img {
               height: 48px;
               max-height: 48px;
-              object-contain: contain;
+              width: auto;
+              object-fit: contain;
+              margin-top: 2px;
+            }
+            .brand-monogram {
+              width: 44px;
+              height: 44px;
+              border: 1.5px solid #000;
+              border-radius: 4px;
+              display: inline-flex;
+              flex-direction: column;
+              align-items: center;
+              justify-content: center;
+              background: #f8fafc;
+              color: #000;
+              margin-top: 2px;
+            }
+            .brand-monogram-initials {
+              font-family: Georgia, serif;
+              font-weight: 900;
+              font-size: 14px;
+              line-height: 1;
+              letter-spacing: 0.5px;
+            }
+            .brand-monogram-sub {
+              font-family: Arial, sans-serif;
+              font-size: 6px;
+              font-weight: 900;
+              letter-spacing: 1.5px;
+              text-transform: uppercase;
               margin-top: 2px;
             }
             .meta-table {
@@ -483,12 +519,15 @@ export function PrintableTaxInvoiceModal({
             <!-- HEADER -->
             <div class="header-flex">
               <div style="max-width: 58%;">
-                <div class="hotel-title">${property.displayName || "HOTEL AMBARISH GRAND RESIDENCY"}</div>
+                <div class="hotel-title">${hotelDisplayName}</div>
                 <div class="hotel-info">
-                  <strong>GSTIN:</strong> ${property.gstin || "18AACCB2447F1ZX"} &bull; <strong>State:</strong> Assam (18)<br/>
-                  ${property.address || "MD Shah Road, Paltan Bazar, Guwahati, Assam, 781008, India"}<br/>
-                  <strong>Phone:</strong> ${property.phone || "9864341211, 0361 2547102"} &bull; <strong>Email:</strong> ${property.email || "reservation.ambarish@gmail.com"}<br/>
-                  <strong>URL:</strong> ${property.website || "www.hotelambarish.com"}
+                  ${property.gstin ? `<strong>GSTIN:</strong> ${property.gstin}` : ""} ${property.stateCode ? `&bull; <strong>State:</strong> ${property.stateCode}` : ""}${property.gstin || property.stateCode ? "<br/>" : ""}
+                  ${property.address ? `${property.address}<br/>` : ""}
+                  ${[
+                    property.phone ? `<strong>Phone:</strong> ${property.phone}` : "",
+                    property.email ? `<strong>Email:</strong> ${property.email}` : "",
+                  ].filter(Boolean).join(" &bull; ")}${property.phone || property.email ? "<br/>" : ""}
+                  ${property.website ? `<strong>URL:</strong> ${property.website}` : ""}
                 </div>
               </div>
               <div style="text-align: right; display: flex; flex-direction: column; align-items: flex-end;">
@@ -496,7 +535,7 @@ export function PrintableTaxInvoiceModal({
                   <div class="inv-title">Tax Invoice</div>
                   <div style="font-size: 8px; font-weight: bold; color: #555; text-transform: uppercase; margin-top: 1px;">Original For Recipient</div>
                 </div>
-                <img src="/images/ambarish-logo.png" alt="Ambarish Logo" class="logo-img" />
+                ${logoUrl ? `<img src="${logoUrl}" alt="${hotelDisplayName} Logo" class="logo-img" onerror="this.style.display='none'" />` : `<div class="brand-monogram"><span class="brand-monogram-initials">${initials}</span><span class="brand-monogram-sub">HOTEL</span></div>`}
               </div>
             </div>
 
@@ -662,8 +701,13 @@ export function PrintableTaxInvoiceModal({
 
             <!-- GOLDEN FOOTER BANNER -->
             <div class="footer-banner">
-              <strong style="text-transform: uppercase; font-size: 9.5px; color: #78350f;">HOTEL AMBARISH GRAND RESIDENCY</strong><br/>
-              MD Shah Road, Paltan Bazar, Guwahati - 781008 (Assam) &bull; Phone: +91 98643 41211, 0361 2547102 &bull; Email: reservation.ambarish@gmail.com &bull; Website: www.hotelambarish.com
+              <strong style="text-transform: uppercase; font-size: 9.5px; color: #78350f;">${hotelDisplayName}</strong><br/>
+              ${[
+                property.address,
+                property.phone ? `Phone: ${property.phone}` : "",
+                property.email ? `Email: ${property.email}` : "",
+                property.website ? `Website: ${property.website}` : "",
+              ].filter(Boolean).join(" &bull; ")}
             </div>
 
           </div>
@@ -727,23 +771,27 @@ export function PrintableTaxInvoiceModal({
             {/* Left: Hotel Legal & Contact Details */}
             <div className="space-y-0.5 max-w-[55%]">
               <h1 className="text-base sm:text-lg font-black tracking-tight text-zinc-950 uppercase leading-none">
-                {property.displayName || property.legalName || "HOTEL AMBARISH GRAND RESIDENCY"}
+                {hotelDisplayName}
               </h1>
               <div className="text-[10px] font-bold font-mono text-zinc-700 uppercase">
-                GSTIN: <span className="text-zinc-950 font-black">{property.gstin || "18AACCB2447F1ZX"}</span>
-                {property.stateCode && ` • State Code: ${property.stateCode} (Assam)`}
+                {property.gstin ? (
+                  <span>GSTIN: <span className="text-zinc-950 font-black">{property.gstin}</span></span>
+                ) : null}
+                {property.stateCode && ` • State Code: ${property.stateCode}`}
               </div>
-              <div className="text-[10px] text-zinc-700 leading-tight">
-                {property.address || "MD Shah Road, Paltan Bazar, Guwahati, Assam, 781008, India"}
-              </div>
+              {property.address && (
+                <div className="text-[10px] text-zinc-700 leading-tight">
+                  {property.address}
+                </div>
+              )}
               <div className="text-[9.5px] text-zinc-600 font-mono flex items-center gap-2 flex-wrap">
-                <span>Phone: <strong>{property.phone || "9864341211, 0361 2547102"}</strong></span>
-                <span>• Email: <strong>{property.email || "reservation.ambarish@gmail.com"}</strong></span>
-                <span>• URL: <strong>{property.website || "www.hotelambarish.com"}</strong></span>
+                {property.phone && <span>Phone: <strong>{property.phone}</strong></span>}
+                {property.email && <span>• Email: <strong>{property.email}</strong></span>}
+                {property.website && <span>• URL: <strong>{property.website}</strong></span>}
               </div>
             </div>
 
-            {/* Center / Right: Tax Invoice Title & 3-Star Ambarish Logo */}
+            {/* Center / Right: Tax Invoice Title & Dynamic Property Logo */}
             <div className="flex flex-col items-end shrink-0 text-right space-y-1">
               <div className="text-center sm:text-right">
                 <span className="text-base sm:text-lg font-black uppercase tracking-wider text-zinc-950 border-b border-zinc-950 pb-0.5 block">
@@ -754,16 +802,27 @@ export function PrintableTaxInvoiceModal({
                 </span>
               </div>
 
-              {/* Logo Embed */}
+              {/* Logo Embed or Luxury Monogram */}
               <div className="pt-0.5">
-                <img
-                  src="/images/ambarish-logo.png"
-                  alt="Hotel Ambarish Grand Residency Logo"
-                  className="h-10 sm:h-12 w-auto object-contain"
-                  onError={(e) => {
-                    e.currentTarget.style.display = "none";
-                  }}
-                />
+                {logoUrl ? (
+                  <img
+                    src={logoUrl}
+                    alt={`${hotelDisplayName} Logo`}
+                    className="h-10 sm:h-12 w-auto object-contain"
+                    onError={(e) => {
+                      e.currentTarget.style.display = "none";
+                    }}
+                  />
+                ) : (
+                  <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-lg border-2 border-black flex flex-col items-center justify-center bg-white text-black shrink-0 select-none shadow-xs">
+                    <span className="font-serif font-black text-sm tracking-wider leading-none">
+                      {initials}
+                    </span>
+                    <span className="text-[7px] font-sans font-bold tracking-widest uppercase opacity-75 mt-0.5">
+                      HOTEL
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -1123,13 +1182,20 @@ export function PrintableTaxInvoiceModal({
 
           </div>
 
-          {/* 7. GOLDEN FOOTER BANNER (Exact Style of Hotel Palace Reference) */}
+          {/* 7. GOLDEN FOOTER BANNER */}
           <div className="mt-2 p-2 rounded-lg bg-amber-100/80 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-700/60 text-center font-bold text-amber-950 dark:text-amber-200 text-[10px] space-y-0.5 page-break-avoid">
             <div className="uppercase tracking-wide font-black text-[11px] text-amber-900 dark:text-amber-100">
-              HOTEL AMBARISH GRAND RESIDENCY
+              {hotelDisplayName}
             </div>
             <div className="text-[9px] font-mono font-medium">
-              MD Shah Road, Paltan Bazar, Guwahati - 781008 (Assam) • Phone: +91 98643 41211, 0361 2547102 • Email: reservation.ambarish@gmail.com • Website: www.hotelambarish.com
+              {[
+                property.address,
+                property.phone ? `Phone: ${property.phone}` : null,
+                property.email ? `Email: ${property.email}` : null,
+                property.website ? `Website: ${property.website}` : null,
+              ]
+                .filter(Boolean)
+                .join(" • ")}
             </div>
           </div>
 

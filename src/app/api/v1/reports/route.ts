@@ -240,6 +240,7 @@ export async function GET(request: Request) {
 
       // Category & Method Breakdown for Expenses
       const expensesByCategory: Record<string, number> = {
+        OWNER_PAYOUT: 0,
         DRIVER_COMMISSION: 0,
         VENDOR_PAYMENT: 0,
         STAFF_ADVANCE: 0,
@@ -319,7 +320,8 @@ export async function GET(request: Request) {
             recordId: e.voucherNo,
             flow: "OUTFLOW",
             party: e.payeeName,
-            particulars: `${e.category.replace("_", " ")}: ${e.description}`,
+            sourceLabel: e.category === "OWNER_PAYOUT" ? "Owner Payout / Drawing" : e.category.replace(/_/g, " "),
+            particulars: `${e.category === "OWNER_PAYOUT" ? "Owner Payout / Drawing" : e.category.replace(/_/g, " ")}: ${e.description}`,
             netAmount: -e.totalAmount,
           })),
         ].sort((a, b) => new Date(b.fullTimestamp).getTime() - new Date(a.fullTimestamp).getTime()),

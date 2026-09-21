@@ -1197,6 +1197,12 @@ export async function checkInGuest({
         advancePaymentMethod: depositMethod,
         kitchenDining: kitchenDining || "NO",
         diningFixedRate: diningFixedRate || 0,
+        extraPaxCount: extraBeds || 0,
+        extraBedRate: extraBedRate || 500,
+        roomExtraPax: rooms.reduce((acc, r, idx) => {
+          if (idx === 0) acc[r.number] = extraBeds || 0;
+          return acc;
+        }, {} as Record<string, number>),
       }),
     },
   });

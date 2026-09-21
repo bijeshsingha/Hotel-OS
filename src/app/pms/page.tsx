@@ -47,6 +47,7 @@ import {
   Tag,
   Globe,
   LogOut,
+  Edit3,
 } from "lucide-react";
 
 import { useSearchParams, useRouter } from "next/navigation";
@@ -751,9 +752,7 @@ function PMSFrontDeskContent() {
 
     const inHouseGuest = activeStay?.primaryGuest;
     const isOccupied = Boolean(activeStay);
-    const baseTariff = room.roomType?.ratePlans?.[0]?.versions?.[0]?.pricingJson 
-      ? JSON.parse(room.roomType.ratePlans[0].versions[0].pricingJson).basePrice 
-      : (room.roomType?.baseRate || 2000);
+    const baseTariff = room.roomType?.basePrice || room.roomType?.baseRate || 3200;
 
     return (
       <div
@@ -2384,6 +2383,9 @@ function PMSFrontDeskContent() {
             phone: activeProperty?.phone || "",
             code: activeProperty?.code || "",
             gstin: activeProperty?.gstin || "",
+            logoUrl: activeProperty?.logoUrl || undefined,
+            email: activeProperty?.email || undefined,
+            website: activeProperty?.website || undefined,
           }}
           data={{
             grcNo: selectedRegForPrint.registrationNo || selectedRegForPrint.grcNo,
@@ -2988,17 +2990,31 @@ function PMSFrontDeskContent() {
                       </button>
 
                       {matchingGrc && (
-                        <button
-                          onClick={() => {
-                            setSelectedRegForPrint(matchingGrc);
-                            setShowGrcModal(true);
-                          }}
-                          className="px-3 py-2 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 font-bold text-xs transition flex items-center gap-1.5 cursor-pointer"
-                          title="Print / View GRC Form"
-                        >
-                          <Printer className="h-3.5 w-3.5" />
-                          <span>GRC</span>
-                        </button>
+                        <>
+                          <button
+                            onClick={() => {
+                              setSelectedRegForPrint(matchingGrc);
+                              setShowGrcModal(true);
+                            }}
+                            className="px-3 py-2 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 font-bold text-xs transition flex items-center gap-1.5 cursor-pointer"
+                            title="Print / View GRC Form"
+                          >
+                            <Printer className="h-3.5 w-3.5" />
+                            <span>GRC</span>
+                          </button>
+
+                          <button
+                            onClick={() => {
+                              setSelectedRoomForInspect(null);
+                              router.push(`/admin?tab=GRC&editId=${matchingGrc.id}`);
+                            }}
+                            className="px-3 py-2 rounded-xl bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/40 dark:hover:bg-amber-900/60 border border-amber-200 dark:border-amber-800/60 text-amber-800 dark:text-amber-200 font-bold text-xs transition flex items-center gap-1.5 cursor-pointer"
+                            title="Edit GRC & Extra Pax"
+                          >
+                            <Edit3 className="h-3.5 w-3.5" />
+                            <span>Edit GRC</span>
+                          </button>
+                        </>
                       )}
 
                       <button
@@ -3158,6 +3174,8 @@ function PMSFrontDeskContent() {
                 }
                 setActionLoading(true);
                 try {
+                  const selectedRoomForAdd = rooms.find((rm) => rm.id === addRoomForm.roomId);
+                  const dynamicExtraBedRate = selectedRoomForAdd?.roomType?.extraAdult !== undefined ? Number(selectedRoomForAdd.roomType.extraAdult) : 500;
                   const res = await fetch("/api/v1/stays/add-room", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -3167,7 +3185,7 @@ function PMSFrontDeskContent() {
                       agreedTariff: addRoomForm.isComplimentary ? 0 : (addRoomForm.agreedTariff !== "" ? Number(addRoomForm.agreedTariff) : undefined),
                       isComplimentary: addRoomForm.isComplimentary,
                       extraBeds: Number(addRoomForm.extraBeds) || 0,
-                      extraBedRate: 500,
+                      extraBedRate: dynamicExtraBedRate,
                     }),
                   });
                   const data = await res.json();
@@ -3337,49 +3355,55 @@ function PMSFrontDeskContent() {
                     </div>
                   </div>
 
-                  <div className="space-y-1">
-                    <label className="block font-bold text-zinc-700 dark:text-zinc-300 uppercase text-[11px]">
-                      Extra Pax (₹500/Pax)
-                    </label>
-                    <div className="h-10 flex items-center justify-between px-2.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 shadow-xs">
-                      <div className="flex items-center bg-zinc-100 dark:bg-zinc-800 p-0.5 rounded-lg border border-zinc-200 dark:border-zinc-700">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const cur = addRoomForm.extraBeds || 0;
-                            const next = Math.max(0, cur - 1);
-                            setAddRoomForm({ ...addRoomForm, extraBeds: next });
-                          }}
-                          className="h-6 w-6 rounded-md bg-white dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-700 active:scale-90 text-zinc-700 dark:text-zinc-200 flex items-center justify-center transition shadow-xs cursor-pointer"
-                          title="Decrease Extra Pax"
-                        >
-                          <Minus className="h-3 w-3 stroke-[2.5]" />
-                        </button>
-                        <span className="font-mono font-bold text-xs text-zinc-900 dark:text-white px-2 min-w-[20px] text-center select-none">
-                          {addRoomForm.extraBeds || 0}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const cur = addRoomForm.extraBeds || 0;
-                            const next = cur + 1;
-                            setAddRoomForm({ ...addRoomForm, extraBeds: next });
-                          }}
-                          className="h-6 w-6 rounded-md bg-white dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-700 active:scale-90 text-zinc-700 dark:text-zinc-200 flex items-center justify-center transition shadow-xs cursor-pointer"
-                          title="Increase Extra Pax"
-                        >
-                          <Plus className="h-3 w-3 stroke-[2.5]" />
-                        </button>
+                  {(() => {
+                    const selectedRoomForAdd = rooms.find((rm) => rm.id === addRoomForm.roomId);
+                    const dynamicExtraBedRate = selectedRoomForAdd?.roomType?.extraAdult !== undefined ? Number(selectedRoomForAdd.roomType.extraAdult) : 500;
+                    return (
+                      <div className="space-y-1">
+                        <label className="block font-bold text-zinc-700 dark:text-zinc-300 uppercase text-[11px]">
+                          Extra Pax (₹{dynamicExtraBedRate}/Pax)
+                        </label>
+                        <div className="h-10 flex items-center justify-between px-2.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 shadow-xs">
+                          <div className="flex items-center bg-zinc-100 dark:bg-zinc-800 p-0.5 rounded-lg border border-zinc-200 dark:border-zinc-700">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const cur = addRoomForm.extraBeds || 0;
+                                const next = Math.max(0, cur - 1);
+                                setAddRoomForm({ ...addRoomForm, extraBeds: next });
+                              }}
+                              className="h-6 w-6 rounded-md bg-white dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-700 active:scale-90 text-zinc-700 dark:text-zinc-200 flex items-center justify-center transition shadow-xs cursor-pointer"
+                              title="Decrease Extra Pax"
+                            >
+                              <Minus className="h-3 w-3 stroke-[2.5]" />
+                            </button>
+                            <span className="font-mono font-bold text-xs text-zinc-900 dark:text-white px-2 min-w-[20px] text-center select-none">
+                              {addRoomForm.extraBeds || 0}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const cur = addRoomForm.extraBeds || 0;
+                                const next = cur + 1;
+                                setAddRoomForm({ ...addRoomForm, extraBeds: next });
+                              }}
+                              className="h-6 w-6 rounded-md bg-white dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-700 active:scale-90 text-zinc-700 dark:text-zinc-200 flex items-center justify-center transition shadow-xs cursor-pointer"
+                              title="Increase Extra Pax"
+                            >
+                              <Plus className="h-3 w-3 stroke-[2.5]" />
+                            </button>
+                          </div>
+                          {(addRoomForm.extraBeds || 0) > 0 ? (
+                            <span className="text-[11px] font-mono font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/60 px-2 py-0.5 rounded-md border border-amber-200 dark:border-amber-800/60">
+                              +₹{(addRoomForm.extraBeds || 0) * dynamicExtraBedRate}/nt
+                            </span>
+                          ) : (
+                            <span className="text-[10px] font-mono text-zinc-400 dark:text-zinc-500 pr-1">₹0</span>
+                          )}
+                        </div>
                       </div>
-                      {(addRoomForm.extraBeds || 0) > 0 ? (
-                        <span className="text-[11px] font-mono font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/60 px-2 py-0.5 rounded-md border border-amber-200 dark:border-amber-800/60">
-                          +₹{(addRoomForm.extraBeds || 0) * 500}/nt
-                        </span>
-                      ) : (
-                        <span className="text-[10px] font-mono text-zinc-400 dark:text-zinc-500 pr-1">₹0</span>
-                      )}
-                    </div>
-                  </div>
+                    );
+                  })()}
                 </div>
               </div>
 

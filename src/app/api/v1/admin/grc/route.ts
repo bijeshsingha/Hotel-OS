@@ -51,12 +51,15 @@ export async function GET(request: Request) {
       take: limit,
     });
 
-    // Enrich records with live Stay agreed tariffs and Folio deposit payment methods
+    // Enrich records with live Stay agreed tariffs, extra pax counts, and Folio deposit payment methods
     const enrichedRecords = await Promise.all(
       records.map(async (rec) => {
         let agreedRoomTariff = 3200;
         let depositAmount = rec.depositAmount || 0;
         let advancePaymentMethod = "";
+        let extraPaxCount = 0;
+        let roomExtraPax: Record<string, number> = {};
+        let extraBedRate = 500;
 
         // Check internal notes JSON first
         try {
@@ -65,10 +68,13 @@ export async function GET(request: Request) {
             if (parsed.agreedTariff !== undefined) agreedRoomTariff = Number(parsed.agreedTariff);
             if (parsed.advancePaymentMethod) advancePaymentMethod = parsed.advancePaymentMethod;
             if (parsed.depositAmount !== undefined) depositAmount = Number(parsed.depositAmount);
+            if (parsed.extraPaxCount !== undefined) extraPaxCount = Number(parsed.extraPaxCount);
+            if (parsed.roomExtraPax && typeof parsed.roomExtraPax === "object") roomExtraPax = parsed.roomExtraPax;
+            if (parsed.extraBedRate !== undefined) extraBedRate = Number(parsed.extraBedRate);
           }
         } catch {}
 
-        // Query linked Stay for real-time operational rate and payments
+        // Query linked Stay for real-time operational rate, extra pax charges, and payments
         let assignedRooms: { id: string; number: string; rate: number }[] = [];
         let roomRates: Record<string, number> = {};
 
@@ -87,7 +93,12 @@ export async function GET(request: Request) {
               where: { id: rec.stayId },
               include: {
                 roomAssignments: { include: { room: true } },
-                folio: { include: { payments: true } },
+                folio: {
+                  include: {
+                    payments: true,
+                    windows: { include: { entries: true } },
+                  },
+                },
               },
             });
           }
@@ -122,6 +133,20 @@ export async function GET(request: Request) {
               }
             }
 
+            // Inspect stay folio windows for active EXTRA_PAX charges
+            if (stay.folio?.windows) {
+              for (const win of stay.folio.windows) {
+                const paxEntry = (win.entries || []).find(
+                  (e: any) => (e.chargeCode === "EXTRA_PAX" || e.chargeCode === "EXTRA_BED") && e.status === "POSTED"
+                );
+                if (paxEntry && paxEntry.qty) {
+                  if (extraPaxCount === 0) extraPaxCount = Number(paxEntry.qty);
+                  if (paxEntry.unitAmount) extraBedRate = Number(paxEntry.unitAmount);
+                  break;
+                }
+              }
+            }
+
             if (stay.folio?.payments && stay.folio.payments.length > 0) {
               const firstPayment = stay.folio.payments[0];
               depositAmount = firstPayment.amount;
@@ -138,6 +163,9 @@ export async function GET(request: Request) {
           agreedRoomTariff,
           depositAmount,
           advancePaymentMethod,
+          extraPaxCount,
+          roomExtraPax,
+          extraBedRate,
           assignedRooms,
           roomRates,
         };
@@ -183,6 +211,9 @@ export async function PATCH(request: Request) {
       agreedRoomTariff,
       depositAmount,
       advancePaymentMethod,
+      extraPaxCount,
+      roomExtraPax,
+      extraBedRate,
       coGuestsJson,
       foreignPassportDetailsJson,
       signatureDataUrl,
@@ -208,6 +239,9 @@ export async function PATCH(request: Request) {
     if (agreedRoomTariff !== undefined) notesObj.agreedTariff = Number(agreedRoomTariff);
     if (depositAmount !== undefined) notesObj.depositAmount = Number(depositAmount);
     if (advancePaymentMethod !== undefined) notesObj.advancePaymentMethod = advancePaymentMethod;
+    if (extraPaxCount !== undefined) notesObj.extraPaxCount = Number(extraPaxCount);
+    if (roomExtraPax !== undefined) notesObj.roomExtraPax = roomExtraPax;
+    if (extraBedRate !== undefined) notesObj.extraBedRate = Number(extraBedRate);
 
     const updated = await prisma.guestRegistration.update({
       where: { id },
@@ -251,6 +285,9 @@ export async function PATCH(request: Request) {
       agreedRoomTariff: agreedRoomTariff !== undefined ? Number(agreedRoomTariff) : undefined,
       depositAmount: depositAmount !== undefined ? Number(depositAmount) : undefined,
       advancePaymentMethod: advancePaymentMethod !== undefined ? advancePaymentMethod : undefined,
+      extraPaxCount: notesObj.extraPaxCount !== undefined ? Number(notesObj.extraPaxCount) : undefined,
+      roomExtraPax: notesObj.roomExtraPax,
+      extraBedRate: notesObj.extraBedRate !== undefined ? Number(notesObj.extraBedRate) : undefined,
     });
 
     // Audit log
