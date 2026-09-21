@@ -264,11 +264,21 @@ export async function closeOperationalDay(
   });
 
   // Open new Operational Day
-  await prisma.operationalDay.create({
-    data: {
+  await prisma.operationalDay.upsert({
+    where: {
+      propertyId_businessDate: {
+        propertyId,
+        businessDate: nextBusinessDate,
+      },
+    },
+    create: {
       organizationId: property.organizationId,
       propertyId,
       businessDate: nextBusinessDate,
+      status: "OPEN",
+      openedById: actorId,
+    },
+    update: {
       status: "OPEN",
       openedById: actorId,
     },
@@ -319,42 +329,55 @@ export function getHotelTodayDate(): string {
   }).format(new Date());
 }
 
-/**
- * Ensures property businessDate is automatically rolled over and synced to today's date.
- * If the date is behind, it posts nightly room charges, snapshots the closed day, and advances to today.
- */
-export async function ensurePropertyDateSynchronized(propertyId: string) {
-  const property = await prisma.property.findUnique({
-    where: { id: propertyId },
-    select: { id: true, businessDate: true },
-  });
+// Concurrency lock to deduplicate concurrent rollover runs for the same property
+const syncLocks = new Map<string, Promise<string | null>>();
 
-  if (!property) return null;
-
-  const todayStr = getHotelTodayDate();
-  let currentBizDate = property.businessDate;
-
-  // If business date is behind today, auto close each day and advance
-  while (currentBizDate < todayStr) {
-    try {
-      await postNightlyRoomCharges(propertyId);
-    } catch (e) {
-      console.warn(`[Auto-Audit] Charge posting error for ${currentBizDate}:`, e);
-    }
-
-    try {
-      const res = await closeOperationalDay(propertyId, "SYSTEM_AUTO_MIDNIGHT");
-      currentBizDate = res.nextBusinessDate;
-    } catch (e) {
-      console.warn(`[Auto-Audit] Day close rollover error for ${currentBizDate}:`, e);
-      await prisma.property.update({
-        where: { id: propertyId },
-        data: { businessDate: todayStr },
-      });
-      break;
-    }
+export async function ensurePropertyDateSynchronized(propertyId: string): Promise<string | null> {
+  const existingLock = syncLocks.get(propertyId);
+  if (existingLock) {
+    return existingLock;
   }
 
-  return todayStr;
+  const syncPromise = (async () => {
+    try {
+      const property = await prisma.property.findUnique({
+        where: { id: propertyId },
+        select: { id: true, businessDate: true },
+      });
+
+      if (!property) return null;
+
+      const todayStr = getHotelTodayDate();
+      let currentBizDate = property.businessDate;
+
+      // If business date is behind today, auto close each day and advance
+      while (currentBizDate < todayStr) {
+        try {
+          await postNightlyRoomCharges(propertyId);
+        } catch (e) {
+          console.warn(`[Auto-Audit] Charge posting error for ${currentBizDate}:`, e);
+        }
+
+        try {
+          const res = await closeOperationalDay(propertyId, "SYSTEM_AUTO_MIDNIGHT");
+          currentBizDate = res.nextBusinessDate;
+        } catch (e) {
+          console.warn(`[Auto-Audit] Day close rollover error for ${currentBizDate}:`, e);
+          await prisma.property.update({
+            where: { id: propertyId },
+            data: { businessDate: todayStr },
+          });
+          break;
+        }
+      }
+
+      return todayStr;
+    } finally {
+      syncLocks.delete(propertyId);
+    }
+  })();
+
+  syncLocks.set(propertyId, syncPromise);
+  return syncPromise;
 }
 

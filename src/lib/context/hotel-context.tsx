@@ -68,32 +68,8 @@ const HotelContext = createContext<HotelContextType | undefined>(undefined);
 
 export function HotelProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<UserInfo | null>(INITIAL_USER);
-  const [activeProperty, setActiveProperty] = useState<PropertyInfo | null>(() => {
-    if (typeof window !== "undefined") {
-      try {
-        const saved = localStorage.getItem("hotel_os_active_property_data");
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          if (parsed && parsed.id) return parsed;
-        }
-      } catch (e) {
-        console.warn("Failed to parse saved property:", e);
-      }
-    }
-    return null;
-  });
-  const [availableProperties, setAvailableProperties] = useState<PropertyInfo[]>(() => {
-    if (typeof window !== "undefined") {
-      try {
-        const saved = localStorage.getItem("hotel_os_available_properties_data");
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-        }
-      } catch (e) {}
-    }
-    return [];
-  });
+  const [activeProperty, setActiveProperty] = useState<PropertyInfo | null>(null);
+  const [availableProperties, setAvailableProperties] = useState<PropertyInfo[]>([]);
   const [allUsers, setAllUsers] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isInitialized, setIsInitialized] = useState<boolean | null>(null);
@@ -194,6 +170,22 @@ export function HotelProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const savedPropData = localStorage.getItem("hotel_os_active_property_data");
+        if (savedPropData) {
+          const parsed = JSON.parse(savedPropData);
+          if (parsed && parsed.id) setActiveProperty(parsed);
+        }
+        const savedPropsData = localStorage.getItem("hotel_os_available_properties_data");
+        if (savedPropsData) {
+          const parsedList = JSON.parse(savedPropsData);
+          if (Array.isArray(parsedList) && parsedList.length > 0) setAvailableProperties(parsedList);
+        }
+      } catch (e) {
+        console.warn("Failed to parse cached property data:", e);
+      }
+    }
     const savedUser = typeof window !== "undefined" ? localStorage.getItem("hotel_os_user") : null;
     const savedProp = typeof window !== "undefined" ? localStorage.getItem("hotel_os_property") : null;
     fetchSession(savedUser || undefined, savedProp || undefined);

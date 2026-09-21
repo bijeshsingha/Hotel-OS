@@ -245,7 +245,7 @@ export function AppHeader() {
                 className="flex items-center gap-1 sm:gap-1.5 rounded-lg bg-zinc-100/80 hover:bg-zinc-200/80 dark:bg-zinc-900 dark:hover:bg-zinc-800 px-2 sm:px-2.5 py-1.5 text-xs font-semibold text-zinc-800 dark:text-zinc-200 border border-zinc-200 dark:border-zinc-800 transition shadow-xs cursor-pointer max-w-[110px] xs:max-w-[135px] sm:max-w-[170px] md:max-w-[210px]"
               >
                 <Building2 className="h-3.5 w-3.5 text-zinc-500 dark:text-zinc-400 shrink-0" />
-                <span className="font-bold text-zinc-900 dark:text-white truncate">{activeProperty?.displayName || "Select Property"}</span>
+                <span suppressHydrationWarning className="font-bold text-zinc-900 dark:text-white truncate">{activeProperty?.displayName || "Select Property"}</span>
                 <ChevronDown className="h-3 w-3 text-zinc-500 dark:text-zinc-400 shrink-0" />
               </button>
 
