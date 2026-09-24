@@ -39,7 +39,6 @@ import {
   Tag,
   FileText,
   Banknote,
-  Sparkles,
   Moon,
   Sun,
   ChevronLeft,
@@ -52,16 +51,19 @@ import {
   ExternalLink,
   Eye,
   FileSpreadsheet,
+  Mail,
 } from "lucide-react";
 import { apiCache } from "@/lib/cache/api-cache";
 import { PageHeader, StatCard, SegmentedControl } from "@/components/ui";
 import { PrintableTaxInvoiceModal } from "@/components/billing/printable-tax-invoice";
+import { EmailReportModal } from "@/components/reports/email-report-modal";
+import { ComprehensiveHotelReportView } from "@/components/reports/comprehensive-hotel-report-view";
 
 export default function ReportsPage() {
   const { activeProperty, refreshKey, refreshData } = useHotel();
   const [reportType, setReportType] = useState<
-    "INHOUSE_OUTSTANDING" | "ROOM_TRANSFERS" | "FINAL_BILLS" | "EXPENSES" | "REVENUE" | "FNB"
-  >("INHOUSE_OUTSTANDING");
+    "COMPREHENSIVE_AUDIT" | "INHOUSE_OUTSTANDING" | "ROOM_TRANSFERS" | "FINAL_BILLS" | "EXPENSES" | "REVENUE" | "FNB"
+  >("COMPREHENSIVE_AUDIT");
 
   // Date Filter State for 12 AM - 12 AM Cycle
   const [selectedDate, setSelectedDate] = useState<string>("");
@@ -122,6 +124,7 @@ export default function ReportsPage() {
   const [showFinalBillsPrintModal, setShowFinalBillsPrintModal] = useState(false);
   const [showKotPrintModal, setShowKotPrintModal] = useState(false);
   const [showRevenuePrintModal, setShowRevenuePrintModal] = useState(false);
+  const [showEmailModal, setShowEmailModal] = useState(false);
 
   // Countdown to next 12 AM Midnight
   const [timeUntilMidnight, setTimeUntilMidnight] = useState("");
@@ -309,6 +312,7 @@ export default function ReportsPage() {
           reference: expenseForm.reference,
           notes: expenseForm.notes,
           businessDate: targetBusinessDate,
+          paidAt: targetBusinessDate ? new Date(`${targetBusinessDate}T12:00:00.000Z`).toISOString() : undefined,
           createdByName: "Front Desk Cashier",
         }),
       });
@@ -1189,6 +1193,12 @@ export default function ReportsPage() {
         businessDate={activeProperty?.businessDate}
         actions={
           <div className="flex items-center gap-2 flex-wrap">
+            <button
+              onClick={() => setShowEmailModal(true)}
+              className="h-9 flex items-center gap-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white px-3.5 text-xs font-semibold transition shadow-xs cursor-pointer active:scale-98"
+            >
+              <Mail className="h-4 w-4" /> Email Report
+            </button>
             {reportType === "INHOUSE_OUTSTANDING" && (
               <>
                 <button
@@ -1337,6 +1347,7 @@ export default function ReportsPage() {
           value={reportType}
           onChange={(val) => setReportType(val as any)}
           options={[
+            { value: "COMPREHENSIVE_AUDIT", label: "Comprehensive Hotel Audit", icon: Building2 },
             { value: "INHOUSE_OUTSTANDING", label: "In-House Guest Outstanding", icon: Users },
             { value: "ROOM_TRANSFERS", label: "Room Transfers & Moves", icon: ArrowRightLeft },
             { value: "FINAL_BILLS", label: "Final Bills & Invoices", icon: Receipt },
@@ -1346,6 +1357,32 @@ export default function ReportsPage() {
           ]}
         />
       </div>
+
+      {/* ========================================================================= */}
+      {/* TAB: COMPREHENSIVE HOTEL MASTER REPORT                                    */}
+      {/* ========================================================================= */}
+      {reportType === "COMPREHENSIVE_AUDIT" && (
+        <div className="space-y-4 animate-in fade-in">
+          {loading && !data ? (
+            <div className="p-12 text-center rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 space-y-3">
+              <RefreshCw className="h-6 w-6 animate-spin text-blue-600 mx-auto" />
+              <div className="text-xs text-zinc-500 font-semibold">Generating Comprehensive Hotel Master Audit...</div>
+            </div>
+          ) : data ? (
+            <ComprehensiveHotelReportView
+              report={data}
+              selectedDate={selectedDate || activeProperty?.businessDate || ""}
+              onDateChange={(d) => setSelectedDate(d)}
+              onRefresh={() => loadReportData(true)}
+              loading={loading}
+            />
+          ) : (
+            <div className="p-8 text-center text-xs text-zinc-500 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800">
+              No report data available for this business date.
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ========================================================================= */}
       {/* TAB 0: IN-HOUSE GUEST OUTSTANDING & DUE STATUS DAILY REPORT               */}
@@ -4162,6 +4199,13 @@ export default function ReportsPage() {
           receptionistName="Gobin Tamang"
         />
       )}
+      {/* Email Report Modal */}
+      <EmailReportModal
+        isOpen={showEmailModal}
+        onClose={() => setShowEmailModal(false)}
+        defaultReportType="DAILY_MANAGER_MIDNIGHT"
+        targetDate={selectedDate || activeProperty?.businessDate}
+      />
     </div>
   );
 }

@@ -12,6 +12,7 @@ export async function POST(request: Request) {
       roomIds, // NEW
       groupBilling, // NEW
       roomRates, // NEW
+      roomPax, // NEW: Record<string, { adults?: number; children?: number }>
       arrivalAt,
       expectedDepartureAt,
       adults,
@@ -49,6 +50,7 @@ export async function POST(request: Request) {
       roomIds: finalRoomIds,
       groupBilling: groupBilling !== undefined ? groupBilling : true,
       roomRates, // NEW
+      roomPax, // NEW
       arrivalAt: arrivalAt ? new Date(arrivalAt) : undefined,
       expectedDepartureAt: new Date(expectedDepartureAt),
       adults: Number(adults) || 2,

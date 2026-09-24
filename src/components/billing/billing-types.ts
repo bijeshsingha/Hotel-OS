@@ -4,6 +4,7 @@ export interface DirectoryRoomItem {
   stay: any;
   roomNumber: string;
   roomId?: string;
+  room?: any;
   roomType?: any;
   rateHandling?: string;
   moveReason?: string;

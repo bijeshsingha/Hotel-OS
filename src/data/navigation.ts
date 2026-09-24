@@ -1,7 +1,7 @@
 import {
   LayoutDashboard,
   BedDouble,
-  Sparkles,
+  Brush,
   Receipt,
   Wallet,
   Briefcase,
@@ -43,7 +43,7 @@ export const NAV_ITEMS: NavItem[] = [
   {
     label: "Housekeeping",
     href: "/housekeeping",
-    icon: Sparkles,
+    icon: Brush,
     badge: "H",
     description: "Room cleaning Kanban, tasks & inspections",
   },

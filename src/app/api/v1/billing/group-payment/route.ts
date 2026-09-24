@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { getNextDocumentNumber } from "@/lib/sequence/generator";
+import { markOutstandingSettled } from "@/lib/domain/outstanding-ledger-service";
 
 export async function POST(request: Request) {
   try {
@@ -98,6 +99,27 @@ export async function POST(request: Request) {
             balance: { decrement: allocAmt },
           },
         });
+
+        // 3b. If folio was checked out with debt and is now cleared, close it
+        const updatedFolio = await tx.folio.findUnique({ where: { id: folio.id } });
+        if (
+          updatedFolio &&
+          (updatedFolio.status === "CLOSED_OUTSTANDING" ||
+            updatedFolio.status === "OUTSTANDING" ||
+            updatedFolio.status === "CLOSED") &&
+          updatedFolio.balance <= 0.05
+        ) {
+          await tx.folio.update({
+            where: { id: folio.id },
+            data: {
+              status: "CLOSED",
+              balance: Math.max(0, updatedFolio.balance),
+            },
+          });
+        }
+        try {
+          markOutstandingSettled(folio.id, allocAmt, method, reference);
+        } catch {}
 
         createdPayments.push(p);
       }

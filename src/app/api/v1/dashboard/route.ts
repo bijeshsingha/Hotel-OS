@@ -14,7 +14,6 @@ export async function GET(request: Request) {
     // Auto-sync property business date to today
     await ensurePropertyDateSynchronized(propertyId);
 
-
     const property = await prisma.property.findUniqueOrThrow({
       where: { id: propertyId },
       include: {
@@ -36,8 +35,10 @@ export async function GET(request: Request) {
     });
 
     const currentDate = property.businessDate;
+    const todayStart = new Date(`${currentDate}T00:00:00.000Z`);
+    const todayEnd = new Date(`${currentDate}T23:59:59.999Z`);
 
-    // 1. Current property live stats
+    // 1. Current property live room stats
     const totalRooms = property.rooms.length;
     const inHouseStays = await prisma.stay.count({
       where: { propertyId, status: "IN_HOUSE" },
@@ -55,19 +56,50 @@ export async function GET(request: Request) {
     const cleanRooms = property.rooms.filter((r) => r.roomState?.housekeepingStatus === "CLEAN").length;
     const inspectedRooms = property.rooms.filter((r) => r.roomState?.housekeepingStatus === "INSPECTED").length;
 
-    // Arrivals & Departures
+    // 2. Arrivals & Departures
     const arrivalsToday = await prisma.reservation.count({
       where: { propertyId, arrivalDate: currentDate, status: { in: ["CONFIRMED", "TENTATIVE"] } },
     });
 
-    const staysList = await prisma.stay.findMany({
-      where: { propertyId, status: "IN_HOUSE" },
+    const rawArrivals = await prisma.reservation.findMany({
+      where: { propertyId, arrivalDate: currentDate, status: { in: ["CONFIRMED", "TENTATIVE"] } },
+      include: {
+        primaryGuest: true,
+        rooms: true,
+      },
+      take: 6,
     });
-    const departuresToday = staysList.filter((s) => {
-      return s.expectedDepartureAt.toISOString().split("T")[0] === currentDate;
-    }).length;
 
-    // Financial calculations for today
+    const arrivalsList = rawArrivals.map((r) => ({
+      id: r.id,
+      confirmationNo: r.confirmationNo,
+      primaryGuestName: r.primaryGuest?.name || "Guest",
+      status: r.status,
+      roomCount: r.rooms.length || 1,
+    }));
+
+    const allInHouseStays = await prisma.stay.findMany({
+      where: { propertyId, status: "IN_HOUSE" },
+      include: {
+        primaryGuest: { select: { name: true, phone: true } },
+        roomAssignments: { where: { endsAt: null }, include: { room: true } },
+        folio: { select: { balance: true } },
+      },
+    });
+
+    const todayDepartures = allInHouseStays
+      .filter((s) => s.expectedDepartureAt.toISOString().split("T")[0] === currentDate)
+      .map((s) => ({
+        id: s.id,
+        guestName: s.primaryGuest?.name || "Guest",
+        roomNumbers: s.roomAssignments.map((ra) => ra.room.number).join(", ") || "Assigned",
+        balance: s.folio?.balance || 0,
+        departureTime: s.expectedDepartureAt.toISOString(),
+      }));
+
+    const departuresToday = todayDepartures.length;
+
+    // 3. Financial calculations for today
     const dayEntries = await prisma.folioEntry.findMany({
       where: { propertyId, serviceDate: currentDate, status: "POSTED" },
     });
@@ -80,30 +112,109 @@ export async function GET(request: Request) {
       .filter((e) => e.chargeCode === "RESTAURANT_FOOD" || e.chargeCode.includes("FB"))
       .reduce((sum, e) => sum + e.taxableAmount, 0);
 
+    const otherRevenue = dayEntries
+      .filter((e) => e.chargeCode !== "ROOM_TARIFF" && !e.chargeCode.includes("FB") && e.chargeCode !== "RESTAURANT_FOOD")
+      .reduce((sum, e) => sum + e.taxableAmount, 0);
+
     const totalTaxes = dayEntries.reduce((sum, e) => sum + (e.totalAmount - e.taxableAmount), 0);
-    const grossRevenue = roomRevenue + fbRevenue;
+    const grossRevenue = roomRevenue + fbRevenue + otherRevenue;
 
     const adr = inHouseStays > 0 ? Math.round(roomRevenue / inHouseStays) : 4850;
     const revpar = totalRooms > 0 ? Math.round(roomRevenue / totalRooms) : 3650;
 
-    // Total outstanding folio balance
-    const folios = await prisma.folio.findMany({
-      where: { propertyId, status: "OPEN" },
+    // 4. Payments, Collections & Hourly Velocity
+    const todayPayments = await prisma.payment.findMany({
+      where: {
+        propertyId,
+        status: "SUCCEEDED",
+        receivedAt: { gte: todayStart, lte: todayEnd },
+      },
+      select: { amount: true, method: true, receivedAt: true },
     });
-    const outstandingFolioBalance = folios.reduce((sum, f) => sum + f.balance, 0);
 
-    // Open KOTs count
+    const collectionsByMethod: Record<string, number> = {
+      UPI: 0,
+      CASH: 0,
+      CARD: 0,
+      OTA_VCC: 0,
+      BANK_TRANSFER: 0,
+      DIRECT_BILL: 0,
+    };
+    for (const p of todayPayments) {
+      collectionsByMethod[p.method] = (collectionsByMethod[p.method] || 0) + p.amount;
+    }
+    const totalTodayCollections = Object.values(collectionsByMethod).reduce((sum, v) => sum + v, 0);
+
+    // Hourly collections distribution
+    const hourlyMap: Record<number, number> = {};
+    for (let h = 0; h < 24; h++) hourlyMap[h] = 0;
+    for (const p of todayPayments) {
+      const hr = new Date(p.receivedAt).getHours();
+      hourlyMap[hr] = (hourlyMap[hr] || 0) + p.amount;
+    }
+    const hourlyCollections = Object.entries(hourlyMap).map(([hr, amt]) => ({
+      hour: `${String(hr).padStart(2, "0")}:00`,
+      amount: amt,
+    }));
+
+    // 5. Today's Expenses & Till Position
+    const todayExpenses = await prisma.expense.findMany({
+      where: {
+        propertyId,
+        status: "PAID",
+        OR: [
+          { businessDate: currentDate },
+          { paidAt: { gte: todayStart, lte: todayEnd } },
+        ],
+      },
+      select: { totalAmount: true, paymentMethod: true, category: true },
+    });
+    const totalTodayExpenses = todayExpenses.reduce((sum, e) => sum + e.totalAmount, 0);
+
+    const baseOpening = property.openingCashBalance || 0;
+    const todayCashIn = collectionsByMethod["CASH"] || 0;
+    const todayCashOut = todayExpenses
+      .filter((e) => e.paymentMethod === "CASH")
+      .reduce((sum, e) => sum + e.totalAmount, 0);
+    const netCashInHand = Math.round((baseOpening + todayCashIn - todayCashOut) * 100) / 100;
+
+    // 6. Outstanding Folio Balances & High-Dues
+    const openFolios = await prisma.folio.findMany({
+      where: { propertyId, status: "OPEN" },
+      include: {
+        stay: {
+          include: {
+            primaryGuest: { select: { name: true, phone: true } },
+            roomAssignments: { where: { endsAt: null }, include: { room: true } },
+          },
+        },
+      },
+      orderBy: { balance: "desc" },
+    });
+
+    const outstandingFolioBalance = openFolios.reduce((sum, f) => sum + f.balance, 0);
+    const urgentFolios = openFolios
+      .filter((f) => f.balance > 0 && f.stay)
+      .slice(0, 5)
+      .map((f) => ({
+        id: f.id,
+        stayId: f.stayId,
+        guestName: f.stay?.primaryGuest?.name || "Guest",
+        roomNumbers: f.stay?.roomAssignments.map((ra) => ra.room.number).join(", ") || "—",
+        balance: f.balance,
+      }));
+
+    // 7. Kitchen & Dining Status
     const openKots = await prisma.kOT.count({
       where: { propertyId, status: { in: ["QUEUED", "PREPARING", "READY"] } },
     });
 
-    // 2. Fetch 14-day history for charts
+    // 8. 14-day history for charts
     const metricSnapshots = await prisma.metricSnapshot.findMany({
       where: { propertyId },
       orderBy: { businessDate: "asc" },
     });
 
-    // Pivot snapshots into date rows
     const historyMap = new Map<string, any>();
     for (const m of metricSnapshots) {
       const row = historyMap.get(m.businessDate) || { date: m.businessDate };
@@ -112,7 +223,7 @@ export async function GET(request: Request) {
     }
     const trendHistory = Array.from(historyMap.values()).slice(-14);
 
-    // 3. Multi-property comparative overview
+    // 9. Multi-property comparative overview
     const propertiesComparison = property.organization.properties.map((p) => {
       const pTotal = p.rooms.length;
       const pInHouse = p.stays.length;
@@ -139,6 +250,7 @@ export async function GET(request: Request) {
         stateCode: property.stateCode,
         businessDate: currentDate,
         currency: property.currency,
+        openingCashBalance: property.openingCashBalance,
       },
       kpis: {
         totalRooms,
@@ -149,8 +261,11 @@ export async function GET(request: Request) {
         revpar,
         roomRevenue,
         fbRevenue,
+        otherRevenue,
         grossRevenue,
         totalTaxes,
+        totalTodayCollections,
+        totalTodayExpenses,
         outstandingFolioBalance,
         arrivalsToday,
         departuresToday,
@@ -160,6 +275,17 @@ export async function GET(request: Request) {
         cleanRooms,
         inspectedRooms,
       },
+      cashDrawerPosition: {
+        openingBalance: baseOpening,
+        cashIn: todayCashIn,
+        cashOut: todayCashOut,
+        netCashInHand,
+      },
+      collectionsByMethod,
+      hourlyCollections,
+      arrivalsList,
+      todayDepartures,
+      urgentFolios,
       trendHistory,
       propertiesComparison,
     });

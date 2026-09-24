@@ -44,6 +44,7 @@ model Property {
   auditCutoff     String   @default("03:00")
   businessDate    String   // YYYY-MM-DD
   ownersJson      String?  // JSON array of owner names, e.g. ["Ambarish Sharma"]
+  openingCashBalance Float @default(0)
   status          String   @default("ACTIVE")
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt

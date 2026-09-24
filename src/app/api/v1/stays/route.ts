@@ -105,13 +105,9 @@ export async function GET(request: Request) {
           }
         }
 
-        const grc = await prisma.guestRegistration.findFirst({
-          where: {
-            OR: [
-              { stayId: stay.id },
-              { guestId: stay.primaryGuestId, status: stay.status === "IN_HOUSE" ? "CHECKED_IN" : "CHECKED_OUT" },
-            ],
-          },
+        // 1. Direct stayId match
+        let grc: any = await prisma.guestRegistration.findFirst({
+          where: { stayId: stay.id },
           select: {
             id: true,
             registrationNo: true,
@@ -121,12 +117,94 @@ export async function GET(request: Request) {
             expectedDepartureDate: true,
             depositAmount: true,
             status: true,
+            internalNotes: true,
           },
           orderBy: { signedAt: "desc" },
         });
 
+        // 2. Check snapshot on folio window or invoice
+        if (!grc && stay.folio?.windows) {
+          let snapshotGrcNo: string | null = null;
+          for (const w of stay.folio.windows) {
+            try {
+              const snap = JSON.parse(w.guestOrCompanySnapshot || "{}");
+              if (snap.grcNo) { snapshotGrcNo = snap.grcNo; break; }
+            } catch {}
+            for (const inv of (w as any).invoices || []) {
+              try {
+                const rec = JSON.parse(inv.recipientSnapshot || "{}");
+                if (rec.grcNo) { snapshotGrcNo = rec.grcNo; break; }
+              } catch {}
+            }
+            if (snapshotGrcNo) break;
+          }
+
+          if (snapshotGrcNo) {
+            grc = await prisma.guestRegistration.findFirst({
+              where: { registrationNo: snapshotGrcNo },
+              select: {
+                id: true,
+                registrationNo: true,
+                signedAt: true,
+                preAssignedRoom: true,
+                arrivalDateTime: true,
+                expectedDepartureDate: true,
+                depositAmount: true,
+                status: true,
+                internalNotes: true,
+              },
+            });
+          }
+        }
+
+        // 3. Strict fallback: match by guest + room number within arrival window (+/- 3 days)
+        if (!grc && stay.primaryGuestId) {
+          const roomNumbers = stay.roomAssignments?.map((a: any) => a.room?.number).filter(Boolean) || [];
+          const arrivalDate = stay.arrivalAt || new Date();
+          const minDate = new Date(arrivalDate.getTime() - 3 * 86400000);
+          const maxDate = new Date(arrivalDate.getTime() + 3 * 86400000);
+
+          if (roomNumbers.length > 0) {
+            grc = await prisma.guestRegistration.findFirst({
+              where: {
+                guestId: stay.primaryGuestId,
+                createdAt: { gte: minDate, lte: maxDate },
+                OR: roomNumbers.map((rm: string) => ({ assignedRoomNumber: { contains: rm } })),
+              },
+              select: {
+                id: true,
+                registrationNo: true,
+                signedAt: true,
+                preAssignedRoom: true,
+                arrivalDateTime: true,
+                expectedDepartureDate: true,
+                depositAmount: true,
+                status: true,
+                internalNotes: true,
+              },
+              orderBy: { createdAt: "desc" },
+            });
+          }
+        }
+
+        // Room-specific pax enrichment
+        let roomAdults = stay.adults;
+        let roomChildren = stay.children;
+        if (grc?.internalNotes) {
+          try {
+            const parsedNotes = JSON.parse(grc.internalNotes);
+            const primaryRoomNo = stay.roomAssignments?.[0]?.room?.number;
+            if (primaryRoomNo && parsedNotes.roomPax?.[primaryRoomNo]) {
+              roomAdults = parsedNotes.roomPax[primaryRoomNo].adults ?? roomAdults;
+              roomChildren = parsedNotes.roomPax[primaryRoomNo].children ?? roomChildren;
+            }
+          } catch {}
+        }
+
         return {
           ...stay,
+          adults: roomAdults,
+          children: roomChildren,
           expectedDepartureAt: effectiveDepartureAt,
           isExtendedDeparture,
           extensionNights,

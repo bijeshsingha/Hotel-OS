@@ -30,7 +30,7 @@ import {
   Receipt,
   Wallet,
   Moon,
-  Sparkles,
+  Brush,
   SlidersHorizontal,
   AtSign,
   Layers,
@@ -91,7 +91,7 @@ const MODULE_PERMISSIONS = [
   { key: "billing", label: "Billing & Folio", shortName: "Billing", desc: "Charge posting, discounts, invoices, refunds", icon: Receipt },
   { key: "cashier", label: "Cashier & Shifts", shortName: "Cashier", desc: "Shift open/close, cash handover, expense vouchers", icon: Wallet },
   { key: "nightAudit", label: "Night Audit", shortName: "Audit", desc: "Day rollover, automated room tariffs", icon: Moon },
-  { key: "housekeeping", label: "Housekeeping & Tasks", shortName: "Housekeeping", desc: "Room cleaning Kanban, defect logs", icon: Sparkles },
+  { key: "housekeeping", label: "Housekeeping & Tasks", shortName: "Housekeeping", desc: "Room cleaning Kanban, defect logs", icon: Brush },
   { key: "masterAdmin", label: "Master Database Admin", shortName: "Admin", desc: "Rates, hotel taxes, staff & roles setup", icon: SlidersHorizontal },
 ] as const;
 

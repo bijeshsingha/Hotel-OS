@@ -16,7 +16,6 @@ import {
   Trash2,
   ArrowRight,
   ArrowLeft,
-  Sparkles,
   Layers,
   AlertCircle,
   Database,
@@ -595,7 +594,7 @@ export default function OnboardingPage() {
             <div className="space-y-1">
               <div className="flex items-center justify-between mb-1">
                 <span className="flex items-center gap-1.5 text-xs font-bold text-zinc-900 dark:text-white">
-                  <Sparkles className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
+                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
                   Quick Preset
                 </span>
                 {setupMode === "preset" && (
@@ -1621,7 +1620,7 @@ export default function OnboardingPage() {
                       </>
                     ) : (
                       <>
-                        <Sparkles className="h-4 w-4" />
+                        <Building2 className="h-4 w-4" />
                         <span>Launch & Provision Property</span>
                       </>
                     )}

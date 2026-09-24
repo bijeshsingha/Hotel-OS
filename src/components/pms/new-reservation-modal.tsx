@@ -12,7 +12,6 @@ import {
   CheckCircle2,
   FileText,
   DollarSign,
-  Sparkles,
   Users,
   Tag,
   AlertCircle,

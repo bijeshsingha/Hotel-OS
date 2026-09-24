@@ -25,27 +25,27 @@ export function StatCard({
 }: StatCardProps) {
   const variantClasses: Record<string, { card: string; iconBg: string; text: string }> = {
     default: {
-      card: "bg-white dark:bg-[#111114] border-zinc-200/80 dark:border-zinc-800/80",
+      card: "bg-white dark:bg-[#121215] border-zinc-200/80 dark:border-zinc-800",
       iconBg: "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400",
-      text: "text-zinc-900 dark:text-white",
+      text: "text-zinc-950 dark:text-zinc-50",
     },
     blue: {
-      card: "bg-white dark:bg-[#111114] border-blue-200 dark:border-blue-900/50",
+      card: "bg-white dark:bg-[#121215] border-blue-200 dark:border-blue-900/50",
       iconBg: "bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400",
       text: "text-blue-600 dark:text-blue-400",
     },
     green: {
-      card: "bg-white dark:bg-[#111114] border-emerald-200 dark:border-emerald-900/50",
+      card: "bg-white dark:bg-[#121215] border-emerald-200 dark:border-emerald-900/50",
       iconBg: "bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400",
       text: "text-emerald-600 dark:text-emerald-400",
     },
     amber: {
-      card: "bg-white dark:bg-[#111114] border-amber-200 dark:border-amber-900/50",
+      card: "bg-white dark:bg-[#121215] border-amber-200 dark:border-amber-900/50",
       iconBg: "bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400",
       text: "text-amber-600 dark:text-amber-400",
     },
     red: {
-      card: "bg-white dark:bg-[#111114] border-rose-200 dark:border-rose-900/50",
+      card: "bg-white dark:bg-[#121215] border-rose-200 dark:border-rose-900/50",
       iconBg: "bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400",
       text: "text-rose-600 dark:text-rose-400",
     },
@@ -56,34 +56,34 @@ export function StatCard({
   return (
     <div
       onClick={onClick}
-      className={`rounded-xl border p-4 shadow-xs space-y-1.5 transition-all ${v.card} ${
-        onClick ? "cursor-pointer hover:shadow-md hover:border-blue-400 dark:hover:border-blue-500/50" : ""
+      className={`rounded-2xl bg-white dark:bg-[#121215] border border-zinc-200/80 dark:border-zinc-800 p-5 sm:p-6 space-y-2 transition-all ${
+        onClick ? "cursor-pointer hover:border-zinc-400 dark:hover:border-zinc-600 hover:shadow-xs" : ""
       } ${className}`}
     >
       <div className="flex items-center justify-between gap-2">
-        <span className="text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider truncate">
+        <span className="text-xs sm:text-sm font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 truncate">
           {label}
         </span>
-        <div className="flex items-center gap-1.5 shrink-0">
+        <div className="flex items-center gap-2 shrink-0">
           {badge && (
-            <span className="rounded-md px-1.5 py-0.5 text-[10px] font-medium font-mono bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300">
+            <span className="rounded-full px-2 py-0.5 text-xs font-mono font-semibold bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400">
               {badge}
             </span>
           )}
           {Icon && (
-            <div className={`h-7 w-7 rounded-lg flex items-center justify-center ${v.iconBg}`}>
-              <Icon className="h-4 w-4" />
+            <div className={`p-2 rounded-xl ${v.iconBg}`}>
+              <Icon className="h-4.5 w-4.5" />
             </div>
           )}
         </div>
       </div>
 
-      <div className={`text-2xl font-bold font-mono tracking-tight tabular-nums ${v.text}`}>
+      <div className="text-3xl sm:text-4xl font-black font-mono tracking-tight tabular-nums text-zinc-950 dark:text-zinc-50">
         {value}
       </div>
 
       {subtext && (
-        <p className="text-xs text-zinc-500 dark:text-zinc-400 truncate">
+        <p className="text-xs sm:text-sm text-zinc-500 dark:text-zinc-400 truncate">
           {subtext}
         </p>
       )}

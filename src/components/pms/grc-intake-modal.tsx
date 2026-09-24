@@ -26,7 +26,6 @@ import {
   Copy,
   Check,
   BedDouble,
-  Sparkles,
   Clock,
 } from "lucide-react";
 import {
@@ -79,13 +78,14 @@ export function GrcIntakeModal({
     groupBilling: true,
     arrivalDate: todayStr,
     arrivalTime: currentTimeStr,
-    departureDate: new Date(Date.now() + 86400000 * 2).toISOString().split("T")[0],
+    departureDate: new Date(Date.now() + 86400000).toISOString().split("T")[0],
     mealPlan: "EP", // EP, CP, MAP, AP
     extraPaxCount: 0,
     roomExtraPax: {} as Record<string, number>,
+    roomPax: {} as Record<string, { adults: number; children: number }>,
     extraBedRate: "500",
-    adults: "",
-    children: "",
+    adults: "2",
+    children: "0",
     paxM: "",
     paxF: "",
     paxC: "",
@@ -168,7 +168,7 @@ export function GrcIntakeModal({
       const hours = String(now.getHours()).padStart(2, "0");
       const minutes = String(now.getMinutes()).padStart(2, "0");
       const currentDateTime = `${year}-${month}-${day} ${hours}:${minutes}`;
-      const defaultDepDate = new Date(Date.now() + 86400000 * 2).toISOString().split("T")[0];
+      const defaultDepDate = new Date(Date.now() + 86400000).toISOString().split("T")[0];
 
       if (initialReservation) {
         const guest = initialReservation.primaryGuest || {};
@@ -203,6 +203,9 @@ export function GrcIntakeModal({
           departureDate: initialReservation.departureDate || defaultDepDate,
           adults: String(totalAdults),
           children: String(totalChildren),
+          roomPax: resolvedRoomId ? {
+            [resolvedRoomId]: { adults: totalAdults, children: totalChildren }
+          } : {},
           referralChannel: initialReservation.source || "DIRECT",
           depositAmount: String(totalDeposit),
           roomId: resolvedRoomId,
@@ -217,14 +220,22 @@ export function GrcIntakeModal({
         const targetRoomObj = rooms.find((r) => r.id === resolvedRoomId);
         const defaultRate = targetRoomObj?.roomType?.basePrice ? String(targetRoomObj.roomType.basePrice) : "3200";
         const defaultExtraRate = targetRoomObj?.roomType?.extraAdult ? String(targetRoomObj.roomType.extraAdult) : "500";
+        const initialAdults = targetRoomObj?.roomType?.capacity ? Math.min(2, targetRoomObj.roomType.capacity) : 2;
 
         setFormData((prev) => ({
           ...prev,
           roomId: resolvedRoomId,
           agreedTariff: prev.agreedTariff && prev.agreedTariff !== "" ? prev.agreedTariff : defaultRate,
           extraBedRate: defaultExtraRate,
+          adults: prev.adults && Number(prev.adults) > 0 ? prev.adults : String(initialAdults),
+          children: prev.children || "0",
+          roomPax: resolvedRoomId ? {
+            [resolvedRoomId]: { adults: initialAdults, children: 0 }
+          } : {},
           additionalRoomIds: [],
           roomRates: {},
+          roomExtraPax: {},
+          extraPaxCount: 0,
           groupBilling: true,
           arrivalDateTime: currentDateTime,
           departureDate: prev.departureDate || defaultDepDate,
@@ -323,19 +334,78 @@ export function GrcIntakeModal({
     setFormData({ ...formData, coGuests: updated });
   };
 
+  const updateRoomPax = (roomId: string, field: "adults" | "children", val: number) => {
+    setFormData((prev) => {
+      const targetRoom = rooms.find((r) => r.id === roomId);
+      const roomBaseCap = targetRoom?.roomType?.capacity || 2;
+
+      const nextRoomPax = { ...(prev.roomPax || {}) };
+      const currentEntry = nextRoomPax[roomId] || {
+        adults: targetRoom?.roomType?.capacity ? Math.min(2, targetRoom.roomType.capacity) : 2,
+        children: 0,
+      };
+      nextRoomPax[roomId] = { ...currentEntry, [field]: val };
+
+      // Recompute total adults and children across all selected rooms
+      const allSelected = [prev.roomId, ...prev.additionalRoomIds].filter(Boolean);
+      let sumAdults = 0;
+      let sumChildren = 0;
+      for (const id of allSelected) {
+        sumAdults += nextRoomPax[id]?.adults !== undefined ? nextRoomPax[id].adults : 2;
+        sumChildren += nextRoomPax[id]?.children !== undefined ? nextRoomPax[id].children : 0;
+      }
+
+      // Auto-compute extra pax if adults exceed standard room capacity
+      let nextExtraPaxCount = prev.extraPaxCount;
+      const nextRoomExtraPax = { ...(prev.roomExtraPax || {}) };
+
+      if (roomId === prev.roomId) {
+        if (field === "adults") {
+          nextExtraPaxCount = Math.max(0, val - roomBaseCap);
+        }
+      } else {
+        if (field === "adults") {
+          nextRoomExtraPax[roomId] = Math.max(0, val - roomBaseCap);
+        }
+      }
+
+      return {
+        ...prev,
+        roomPax: nextRoomPax,
+        adults: String(sumAdults),
+        children: sumChildren > 0 ? String(sumChildren) : (prev.children || "0"),
+        extraPaxCount: nextExtraPaxCount,
+        roomExtraPax: nextRoomExtraPax,
+      };
+    });
+  };
+
   // Handle Submit Form
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.roomId) {
+
+    const allSelectedRooms = [formData.roomId, ...formData.additionalRoomIds].filter(Boolean);
+    if (allSelectedRooms.length === 0 || !formData.roomId) {
       alert("Please select a vacant room to assign.");
       return;
     }
-    if (!formData.adults || Number(formData.adults) < 1) {
+
+    const matrixAdults = allSelectedRooms.reduce((sum, rid) => {
+      const rAdults = formData.roomPax?.[rid]?.adults;
+      return sum + (rAdults !== undefined && !isNaN(rAdults) ? rAdults : 2);
+    }, 0);
+    const effectiveAdults = Math.max(1, matrixAdults || Number(formData.adults) || 2);
+
+    if (effectiveAdults < 1) {
       alert("Total Adults is mandatory (minimum 1 pax).");
       return;
     }
-    if (!formData.fullName.trim() || !formData.mobilePhone.trim()) {
-      alert("Guest Full Name and Mobile Phone are required.");
+    if (!formData.fullName || !formData.fullName.trim()) {
+      alert("Guest Full Name is required.");
+      return;
+    }
+    if (!formData.mobilePhone || !formData.mobilePhone.trim()) {
+      alert("Guest Mobile Phone Number is required.");
       return;
     }
 
@@ -409,7 +479,7 @@ export function GrcIntakeModal({
           },
           arrivalAt: `${formData.arrivalDate}T${formData.arrivalTime || "14:00"}:00`,
           expectedDepartureAt: formData.departureDate,
-          adults: Number(formData.adults) || 2,
+          adults: effectiveAdults,
           children: Number(formData.children) || 0,
           paxM: Number(formData.paxM) || 0,
           paxF: Number(formData.paxF) || 0,
@@ -424,6 +494,32 @@ export function GrcIntakeModal({
           depositRef: formData.transactionRef?.trim() || undefined,
           extraBeds: (Number(formData.extraPaxCount) || 0) + formData.additionalRoomIds.reduce((acc, id) => acc + (Number(formData.roomExtraPax?.[id]) || 0), 0),
           extraBedRate: Number(formData.extraBedRate) || primaryRoom?.roomType?.extraAdult || 500,
+          roomPax: (() => {
+            const allSelectedRooms = [formData.roomId, ...formData.additionalRoomIds].filter(Boolean);
+            const mapping: Record<string, { adults: number; children: number }> = {};
+            for (const rid of allSelectedRooms) {
+              const r = rooms.find((x) => x.id === rid);
+              const customPax = formData.roomPax?.[rid];
+              if (customPax) {
+                mapping[rid] = {
+                  adults: Number(customPax.adults) || 2,
+                  children: Number(customPax.children) || 0,
+                };
+                if (r?.number) {
+                  mapping[r.number] = mapping[rid];
+                }
+              } else {
+                mapping[rid] = {
+                  adults: Math.max(1, Math.min(Number(formData.adults) || 2, r?.roomType?.capacity || 2)),
+                  children: 0,
+                };
+                if (r?.number) {
+                  mapping[r.number] = mapping[rid];
+                }
+              }
+            }
+            return mapping;
+          })(),
           coGuests: formData.coGuests.filter((cg) => cg.name.trim() !== ""),
           foreignDetails: formData.nationality !== "Indian" ? formData.foreignDetails : undefined,
           kitchenDining: formData.kitchenDining || "NO",
@@ -435,6 +531,7 @@ export function GrcIntakeModal({
       if (!res.ok) throw new Error(result.error || "Failed to complete check-in");
 
       onSuccess(result);
+      onClose();
     } catch (err: any) {
       alert(`Check-in Error: ${err.message}`);
     } finally {
@@ -452,109 +549,121 @@ export function GrcIntakeModal({
 
   const selectedRoom = rooms.find((r) => r.id === formData.roomId);
   const primaryRoom = selectedRoom;
+  const allSelectedRoomsList = [formData.roomId, ...formData.additionalRoomIds].filter(Boolean);
+  const calculatedTotalAdults = allSelectedRoomsList.reduce((sum, rid) => {
+    return sum + (formData.roomPax?.[rid]?.adults ?? 2);
+  }, 0) || Math.max(1, Number(formData.adults) || 2);
+
+  if (!isOpen) return null;
 
   return (
-    <div className="w-full space-y-4 animate-in fade-in duration-150">
-      <div className="rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200/80 dark:border-zinc-800/80 shadow-xs overflow-hidden">
-        
-        {/* Top Header */}
-        <div className="p-4 sm:p-5 border-b border-zinc-200 dark:border-zinc-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-zinc-50/70 dark:bg-zinc-900/40">
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={onClose}
-              className="h-10 px-3.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-bold text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5 transition cursor-pointer shadow-xs"
-              title="Return to Front Desk"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              <span>Back to Room Rack</span>
-            </button>
+    <div className="fixed inset-0 z-50 bg-zinc-100 dark:bg-[#09090b] flex flex-col h-screen w-screen overflow-hidden animate-in fade-in duration-150">
+      
+      {/* Full-Width Sticky Top Header */}
+      <header className="w-full border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#111114] px-6 lg:px-10 py-3 flex items-center justify-between shrink-0 shadow-xs z-20">
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={onClose}
+            className="h-9 px-3.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 hover:bg-zinc-100 dark:bg-zinc-900 dark:hover:bg-zinc-800 text-xs font-bold text-zinc-700 dark:text-zinc-300 flex items-center gap-2 transition cursor-pointer shadow-xs"
+            title="Return to Front Desk"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            <span>Back to Room Rack</span>
+          </button>
 
-            <div className="h-10 w-10 rounded-xl bg-blue-50 dark:bg-blue-600/20 border border-blue-200 dark:border-blue-500/30 flex items-center justify-center text-blue-600 dark:text-blue-400">
-              <UserPlus className="h-5 w-5" />
-            </div>
-            <div>
-              <h2 className="text-lg sm:text-xl font-black text-zinc-900 dark:text-white tracking-tight flex items-center gap-2">
-                <span>Guest Check-In & GRC Intake</span>
-              </h2>
-              <p className="text-xs text-zinc-500 dark:text-zinc-400 font-mono">
-                {activeProperty?.displayName || "Hotel"} {activeProperty?.code ? `• ${activeProperty.code}` : ""}
-              </p>
-            </div>
+          <div className="h-9 w-9 rounded-xl bg-blue-50 dark:bg-blue-600/20 border border-blue-200 dark:border-blue-500/30 flex items-center justify-center text-blue-600 dark:text-blue-400 shrink-0">
+            <UserPlus className="h-4 w-4" />
           </div>
-
-          {/* Intake Method Switcher Tabs */}
-          <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-900 p-1 rounded-xl border border-zinc-200 dark:border-zinc-800">
-              <button
-                type="button"
-                onClick={() => setActiveMethod("PHYSICAL_ENTRY")}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
-                  activeMethod === "PHYSICAL_ENTRY"
-                    ? "bg-blue-600 text-white shadow-md font-black"
-                    : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
-                }`}
-              >
-                <FileText className="h-3.5 w-3.5" />
-                <span>Physical GRC Entry</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setActiveMethod("QR_DIGITAL")}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
-                  activeMethod === "QR_DIGITAL"
-                    ? "bg-blue-600 text-white shadow-md font-black"
-                    : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
-                }`}
-              >
-                <QrCode className="h-3.5 w-3.5" />
-                <span>Digital QR Kiosk</span>
-              </button>
-            </div>
-
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 rounded-xl text-xs font-bold text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition cursor-pointer"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={onClose}
-              className="p-2 rounded-xl text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition cursor-pointer"
-              title="Close (Esc)"
-            >
-              <X className="h-5 w-5" />
-            </button>
+          <div>
+            <h2 className="text-base sm:text-lg font-black text-zinc-900 dark:text-white tracking-tight flex items-center gap-2">
+              <span>Guest Check-In & GRC Intake</span>
+            </h2>
+            <p className="text-[11px] text-zinc-500 dark:text-zinc-400 font-mono">
+              {activeProperty?.displayName || "Hotel"} {activeProperty?.code ? `• ${activeProperty.code}` : ""}
+            </p>
           </div>
         </div>
 
-        {/* METHOD 1: PHYSICAL GRC DATA ENTRY FORM (KEYED IN BY RECEPTIONIST) */}
-        {activeMethod === "PHYSICAL_ENTRY" && (
-          <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-6 text-xs">
+        {/* Intake Method Switcher Tabs */}
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-900 p-1 rounded-xl border border-zinc-200 dark:border-zinc-800">
+            <button
+              type="button"
+              onClick={() => setActiveMethod("PHYSICAL_ENTRY")}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                activeMethod === "PHYSICAL_ENTRY"
+                  ? "bg-blue-600 text-white shadow-xs font-black"
+                  : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
+              }`}
+            >
+              <FileText className="h-3.5 w-3.5" />
+              <span>Physical GRC Entry</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveMethod("QR_DIGITAL")}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                activeMethod === "QR_DIGITAL"
+                  ? "bg-blue-600 text-white shadow-xs font-black"
+                  : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
+              }`}
+            >
+              <QrCode className="h-3.5 w-3.5" />
+              <span>Digital QR Kiosk</span>
+            </button>
+          </div>
+
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-2 rounded-xl text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition cursor-pointer"
+            title="Close (Esc)"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+      </header>
+
+      {/* METHOD 1: PHYSICAL GRC DATA ENTRY FORM */}
+      {activeMethod === "PHYSICAL_ENTRY" && (
+        <form onSubmit={handleSubmit} noValidate className="flex-1 flex flex-col overflow-hidden">
+          <div className="flex-1 overflow-y-auto w-full px-6 lg:px-12 py-6 space-y-6 text-xs max-w-[1700px] mx-auto">
             
-            {/* 1. ROOM & STAY PERIOD SECTION */}
-            <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-[#09090b] p-4 space-y-3.5 shadow-xs">
-              <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 pb-2">
-                <span className="font-bold text-zinc-900 dark:text-white uppercase tracking-wider flex items-center gap-2 text-xs">
-                  <Building2 className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                  1. Room Assignment & Stay Schedule
-                </span>
+            {/* 1. ROOM ASSIGNMENT & STAY SCHEDULE */}
+            <div className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-[#111114] p-5 sm:p-6 space-y-5 shadow-xs">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-100 dark:border-zinc-800/80 pb-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="h-7 w-7 rounded-lg bg-blue-50 dark:bg-blue-600/20 border border-blue-200 dark:border-blue-500/30 flex items-center justify-center text-blue-600 dark:text-blue-400">
+                    <Building2 className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <span className="font-extrabold text-zinc-900 dark:text-white uppercase tracking-wider text-xs">
+                      1. Room Assignment & Stay Schedule
+                    </span>
+                    <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
+                      Configure check-in parameters, stay duration, dining inclusions, and room guest allocations.
+                    </p>
+                  </div>
+                </div>
+
                 {selectedRoom && (
-                  <span className="text-[11px] font-mono text-emerald-700 dark:text-emerald-400 font-bold bg-emerald-50 dark:bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-200 dark:border-emerald-500/20">
-                    Floor {selectedRoom.floor} • {selectedRoom.roomType?.bedType || "King Bed"}
-                    {formData.additionalRoomIds.length > 0 && ` + ${formData.additionalRoomIds.length} Extra`}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] font-mono text-zinc-700 dark:text-zinc-300 font-semibold bg-zinc-100 dark:bg-zinc-800/80 px-2.5 py-1 rounded-lg border border-zinc-200 dark:border-zinc-700">
+                      Floor {selectedRoom.floor} • {selectedRoom.roomType?.bedType || "King Bed"}
+                      {formData.additionalRoomIds.length > 0 && ` • +${formData.additionalRoomIds.length} Extra Room${formData.additionalRoomIds.length > 1 ? "s" : ""}`}
+                    </span>
+                  </div>
                 )}
               </div>
 
-              {/* Row 1: Room Assignment & Schedule */}
-              <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-                <div className="space-y-1 sm:col-span-1">
-                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">
-                    Select Room *
+              {/* Parameter Grid 1: Stay Timings & Policies (4 Balanced Columns) */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                {/* 1. Select Primary Room */}
+                <div className="space-y-1.5">
+                  <label className="block font-bold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] tracking-wide">
+                    Select Primary Room *
                   </label>
                   <select
                     required
@@ -562,64 +671,67 @@ export function GrcIntakeModal({
                     onChange={(e) => {
                       const nextRoomId = e.target.value;
                       const r = rooms.find((rm) => rm.id === nextRoomId);
+                      const roomCap = r?.roomType?.capacity || 2;
+                      const currentRoomPax = formData.roomPax?.[nextRoomId]?.adults || Math.min(2, roomCap);
                       setFormData((prev) => ({
                         ...prev,
                         roomId: nextRoomId,
                         agreedTariff: r?.roomType?.basePrice ? String(r.roomType.basePrice) : prev.agreedTariff,
                         extraBedRate: r?.roomType?.extraAdult ? String(r.roomType.extraAdult) : (prev.extraBedRate || "500"),
+                        adults: prev.adults && Number(prev.adults) > 0 ? prev.adults : String(currentRoomPax),
+                        roomPax: {
+                          ...prev.roomPax,
+                          [nextRoomId]: prev.roomPax?.[nextRoomId] || { adults: currentRoomPax, children: 0 },
+                        },
                       }));
                     }}
-                    className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs font-mono font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                    className="w-full h-10 px-3 rounded-xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs font-mono font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer shadow-xs"
                   >
-                    <option value="">-- Choose Room --</option>
+                    <option value="">-- Choose Vacant Room --</option>
                     {rooms
                       .filter((r) => r.roomState?.occupancyStatus === "VACANT" || r.id === formData.roomId)
                       .map((r) => {
                         const bedType = r.roomType?.bedType || (r.wing === "TWIN" ? "Twin Beds" : "King Bed");
                         return (
                           <option key={r.id} value={r.id}>
-                            Room {r.number} — {r.roomType?.name} [{bedType}]
+                            Room {r.number} - {r.roomType?.name} [{bedType}]
                           </option>
                         );
                       })}
                   </select>
                 </div>
 
-                {/* Non-editable Check-In Date */}
-                <div className="space-y-1 sm:col-span-1">
-                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap flex items-center justify-between">
-                    <span>Check-In Date</span>
-                    <span className="text-[10px] text-zinc-400 font-mono font-medium">🔒 Locked</span>
-                  </label>
-                  <input
-                    type="date"
-                    disabled
-                    readOnly
-                    value={formData.arrivalDate}
-                    className="w-full h-10 px-3 rounded-xl bg-zinc-100 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400 font-mono text-xs cursor-not-allowed select-none font-bold"
-                    title="Check-in date is locked to the current business day"
-                  />
+                {/* 2. Check-In Date & Time (Paired container) */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="font-bold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] tracking-wide">
+                      Check-In Date & Time *
+                    </label>
+                    <span className="text-[10px] text-zinc-400 font-mono">🔒 Today</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <input
+                      type="date"
+                      disabled
+                      readOnly
+                      value={formData.arrivalDate}
+                      className="w-full h-10 px-2.5 rounded-xl bg-zinc-100 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400 font-mono text-xs cursor-not-allowed select-none font-bold"
+                      title="Check-in date is locked to the current business day"
+                    />
+                    <input
+                      type="time"
+                      required
+                      value={formData.arrivalTime}
+                      onChange={(e) => setFormData({ ...formData, arrivalTime: e.target.value })}
+                      className="w-full h-10 px-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer shadow-xs"
+                      title="Arrival Time"
+                    />
+                  </div>
                 </div>
 
-                {/* Editable Check-In Time */}
-                <div className="space-y-1 sm:col-span-1">
-                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap flex items-center justify-between">
-                    <span>Check-In Time *</span>
-                    <span className="text-[10px] text-blue-600 dark:text-blue-400 font-mono font-bold">Editable</span>
-                  </label>
-                  <input
-                    type="time"
-                    required
-                    value={formData.arrivalTime}
-                    onChange={(e) => setFormData({ ...formData, arrivalTime: e.target.value })}
-                    className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer shadow-xs"
-                    title="Change check-in arrival time"
-                  />
-                </div>
-
-                {/* Expected Departure Date */}
-                <div className="space-y-1 sm:col-span-1">
-                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">
+                {/* 3. Expected Departure Date */}
+                <div className="space-y-1.5">
+                  <label className="block font-bold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] tracking-wide">
                     Expected Departure *
                   </label>
                   <input
@@ -628,422 +740,184 @@ export function GrcIntakeModal({
                     min={formData.arrivalDate || new Date().toISOString().split("T")[0]}
                     value={formData.departureDate}
                     onChange={(e) => setFormData({ ...formData, departureDate: e.target.value })}
-                    className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer"
+                    className="w-full h-10 px-3 rounded-xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer shadow-xs"
                   />
                 </div>
 
-                {/* Checkout Billing Model */}
-                <div className="space-y-1 sm:col-span-1">
-                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">
-                    Checkout Billing *
+                {/* 4. Checkout Billing & Grace Period */}
+                <div className="space-y-1.5">
+                  <label className="block font-bold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] tracking-wide">
+                    Checkout Billing & Grace *
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <select
+                      value={formData.checkoutType}
+                      onChange={(e: any) => setFormData({ ...formData, checkoutType: e.target.value })}
+                      className="w-full h-10 px-2 rounded-xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer shadow-xs truncate"
+                      title="Checkout Billing Cycle"
+                    >
+                      <option value="FIXED_TIME">Std 11:00 AM</option>
+                      <option value="24_HOURS">24-Hour Cycle</option>
+                    </select>
+
+                    <select
+                      value={formData.gracePeriodMinutes}
+                      onChange={(e: any) => setFormData({ ...formData, gracePeriodMinutes: e.target.value })}
+                      className="w-full h-10 px-2 rounded-xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer shadow-xs truncate"
+                      title="Grace Period Window"
+                    >
+                      <option value="0">0h Grace</option>
+                      <option value="60">1h Grace</option>
+                      <option value="120">2h Grace</option>
+                      <option value="180">3h Grace</option>
+                      <option value="240">4h Grace</option>
+                      <option value="300">5h Grace</option>
+                      <option value="360">6h Grace</option>
+                      <option value="420">7h Grace</option>
+                      <option value="1440">Waive Night</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Parameter Grid 2: Total Adults (Calculated), Children, Meal Plan, Dining & Demographics (5 Balanced Columns) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 pt-1">
+                {/* 1. Total Adults (Read-Only Aggregate from Room Matrix) */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="font-bold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] tracking-wide">
+                      Total Adults
+                    </label>
+                    <span className="text-[10px] text-blue-600 dark:text-blue-400 font-bold bg-blue-50 dark:bg-blue-500/10 px-1.5 py-0.5 rounded border border-blue-200 dark:border-blue-500/20">
+                      Auto-Calculated
+                    </span>
+                  </div>
+                  <div 
+                    className="w-full h-10 px-3 rounded-xl bg-zinc-100/90 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-white font-mono text-xs font-bold flex items-center justify-between shadow-xs select-none cursor-default"
+                    title="Total Adults is auto-calculated from the assigned guests in each room below."
+                  >
+                    <span className="flex items-center gap-1.5">
+                      <span className="text-sm">👥</span>
+                      <span className="font-black text-sm">{calculatedTotalAdults}</span>
+                      <span className="text-[11px] font-medium text-zinc-600 dark:text-zinc-300">{calculatedTotalAdults === 1 ? "Adult" : "Adults"}</span>
+                    </span>
+                    <span className="text-[10px] font-sans font-semibold text-zinc-500 dark:text-zinc-400 bg-zinc-200/70 dark:bg-zinc-700/60 px-1.5 py-0.5 rounded">
+                      {allSelectedRoomsList.length} {allSelectedRoomsList.length === 1 ? "Room" : "Rooms"}
+                    </span>
+                  </div>
+                </div>
+
+                {/* 2. Children (Free) */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="font-bold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] tracking-wide">
+                      Children
+                    </label>
+                    <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold bg-emerald-50 dark:bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-200 dark:border-emerald-500/20">
+                      Free (₹0)
+                    </span>
+                  </div>
+                  <input
+                    type="number"
+                    placeholder="0"
+                    min="0"
+                    value={formData.children}
+                    onChange={(e) => setFormData({ ...formData, children: e.target.value })}
+                    className="w-full h-10 px-3 rounded-xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all shadow-xs"
+                  />
+                </div>
+
+                {/* 3. Meal Plan */}
+                <div className="space-y-1.5">
+                  <label className="block font-bold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] tracking-wide">
+                    Meal Plan
                   </label>
                   <select
-                    value={formData.checkoutType}
-                    onChange={(e: any) => setFormData({ ...formData, checkoutType: e.target.value })}
-                    className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer"
+                    value={formData.mealPlan}
+                    onChange={(e) => setFormData({ ...formData, mealPlan: e.target.value })}
+                    className="w-full h-10 px-3 rounded-xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer shadow-xs"
                   >
-                    <option value="FIXED_TIME">☀️ Standard 11:00 AM – 12:00 PM (Default)</option>
-                    <option value="24_HOURS">⏱️ 24-Hour Cycle from Check-In</option>
+                    <option value="EP">EP (Room Only)</option>
+                    <option value="CP">CP (Continental Plan - Breakfast)</option>
+                    <option value="MAP">MAP (Modified American - Half Board)</option>
+                    <option value="AP">AP (American Plan - Full Board)</option>
                   </select>
                 </div>
 
-                {/* Grace Period Window (0 to 7 hr range) */}
-                <div className="space-y-1 sm:col-span-1">
-                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">
-                    Grace Period *
-                  </label>
-                  <select
-                    value={formData.gracePeriodMinutes}
-                    onChange={(e: any) => setFormData({ ...formData, gracePeriodMinutes: e.target.value })}
-                    className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer"
-                  >
-                    <option value="0">0 Hours / None</option>
-                    <option value="60">1 Hour Grace</option>
-                    <option value="120">2 Hours Grace</option>
-                    <option value="180">3 Hours Grace</option>
-                    <option value="240">4 Hours Grace</option>
-                    <option value="300">5 Hours Grace</option>
-                    <option value="360">6 Hours Grace</option>
-                    <option value="420">7 Hours Grace</option>
-                    <option value="1440">Waive Next Night</option>
-                  </select>
-                </div>
-
-                {/* Kitchen Dining Yes/No & Fixed Rate */}
-                <div className="space-y-1 sm:col-span-1">
-                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">
+                {/* 4. Kitchen Dining */}
+                <div className="space-y-1.5">
+                  <label className="block font-bold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] tracking-wide">
                     Kitchen Dining
                   </label>
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-2">
                     <select
                       value={formData.kitchenDining || "NO"}
                       onChange={(e: any) => setFormData({ ...formData, kitchenDining: e.target.value })}
-                      className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer"
+                      className="w-full h-10 px-3 rounded-xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer shadow-xs"
                     >
-                      <option value="NO">No</option>
-                      <option value="YES">Yes</option>
+                      <option value="NO">No Dining</option>
+                      <option value="YES">Dining Included</option>
                     </select>
                     {formData.kitchenDining === "YES" && (
-                      <div className="relative w-28 shrink-0">
+                      <div className="relative w-32 shrink-0">
                         <span className="absolute left-2.5 top-2.5 text-xs text-zinc-400 font-bold font-mono">₹</span>
                         <input
                           type="number"
-                          placeholder="Rate"
+                          placeholder="Fixed Rate"
                           value={formData.diningFixedRate || ""}
                           onChange={(e) => setFormData({ ...formData, diningFixedRate: e.target.value })}
-                          className="w-full h-10 pl-6 pr-2 rounded-xl bg-white dark:bg-zinc-900 border border-amber-400 dark:border-amber-600 text-zinc-900 dark:text-white font-mono text-xs font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                          className="w-full h-10 pl-6 pr-2 rounded-xl bg-white dark:bg-zinc-900 border border-amber-400 dark:border-amber-600 text-zinc-900 dark:text-white font-mono text-xs font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all shadow-xs"
                         />
                       </div>
                     )}
                   </div>
                 </div>
 
-                {/* Early Bird Offer Banner */}
-                {(() => {
-                  const hour = parseInt(formData.arrivalTime?.split(":")[0] || "-1", 10);
-                  const isEarlyBird = hour >= 5 && hour < 11;
-                  if (!isEarlyBird) return null;
-                  return (
-                    <div className="sm:col-span-4 p-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-700/60 flex items-center gap-2 text-xs text-amber-900 dark:text-amber-200 animate-in fade-in">
-                      <span className="text-base">🌟</span>
-                      <div>
-                        <strong className="font-bold">Early Bird Offer:</strong>
-                        <span className="ml-1 text-[11.5px] text-amber-800 dark:text-amber-300">
-                          Early check-in (5:00 AM – 11:00 AM) included at no extra charge. Stay valid until Standard 12:00 PM Check-Out on departure date.
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })()}
-
-                {/* Primary Room Extra Pax Stepper */}
-                <div className="space-y-1">
-                  <label className="block font-bold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">
-                    Extra Pax (₹{formData.extraBedRate || primaryRoom?.roomType?.extraAdult || 500}/Pax)
+                {/* 5. Gender Demographics (Optional) */}
+                <div className="space-y-1.5">
+                  <label className="block font-bold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] tracking-wide">
+                    Gender Split (Optional)
                   </label>
-                  <div className="h-10 flex items-center justify-between px-2.5 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 shadow-xs">
-                    {/* Compact Segmented Control */}
-                    <div className="flex items-center bg-zinc-100 dark:bg-zinc-800 p-0.5 rounded-lg border border-zinc-200 dark:border-zinc-700">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const current = Number(formData.extraPaxCount) || 0;
-                          const next = Math.max(0, current - 1);
-                          setFormData((prev) => ({ ...prev, extraPaxCount: next }));
-                        }}
-                        className="h-6 w-6 rounded-md bg-white dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-700 active:scale-90 text-zinc-700 dark:text-zinc-200 flex items-center justify-center transition shadow-xs cursor-pointer"
-                        title="Decrease Extra Pax"
-                      >
-                        <Minus className="h-3 w-3 stroke-[2.5]" />
-                      </button>
-                      <span className="font-mono font-bold text-xs text-zinc-900 dark:text-white px-2 min-w-[24px] text-center select-none">
-                        {Number(formData.extraPaxCount) || 0}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const current = Number(formData.extraPaxCount) || 0;
-                          const next = current + 1;
-                          setFormData((prev) => ({ ...prev, extraPaxCount: next }));
-                        }}
-                        className="h-6 w-6 rounded-md bg-white dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-700 active:scale-90 text-zinc-700 dark:text-zinc-200 flex items-center justify-center transition shadow-xs cursor-pointer"
-                        title="Increase Extra Pax"
-                      >
-                        <Plus className="h-3 w-3 stroke-[2.5]" />
-                      </button>
-                    </div>
-
-                    {/* Price Badge */}
-                    {(Number(formData.extraPaxCount) || 0) > 0 ? (
-                      <span className="text-[11px] font-mono font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/60 px-2 py-0.5 rounded-md border border-amber-200 dark:border-amber-800/60">
-                        +₹{(Number(formData.extraPaxCount) || 0) * Number(formData.extraBedRate || primaryRoom?.roomType?.extraAdult || 500)}/nt
-                      </span>
-                    ) : (
-                      <span className="text-[10px] font-mono text-zinc-400 dark:text-zinc-500 pr-1">₹0</span>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Group Booking - Additional Rooms */}
-              <div className="space-y-2 border-t border-zinc-200 dark:border-zinc-800 pt-3">
-                <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px]">
-                  Add Additional Rooms (Group Booking)
-                </label>
-                
-                {/* Selected Rooms List */}
-                {formData.additionalRoomIds.length > 0 && (
-                  <div className="flex flex-col gap-2.5 mb-3">
-                    {formData.additionalRoomIds.map((id) => {
-                      const r = rooms.find((room) => room.id === id);
-                      const roomPaxCount = formData.roomExtraPax?.[id] || 0;
-                      const isRoomComp = formData.roomRates[id] === "0" || formData.roomRates[id] === "COMP";
-                      const currentRate = formData.roomRates[id] !== undefined ? formData.roomRates[id] : (r?.roomType?.basePrice ? String(r.roomType.basePrice) : "3200");
-
-                      return (
-                        <div
-                          key={id}
-                          className="p-3 rounded-xl bg-blue-50/70 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800/50 space-y-2 shadow-xs"
-                        >
-                          <div className="flex items-center justify-between gap-2 flex-wrap">
-                            <div className="flex items-center gap-2">
-                              <span className="px-2.5 py-1 rounded-lg bg-blue-100 dark:bg-blue-500/20 text-blue-800 dark:text-blue-300 font-bold font-mono text-xs border border-blue-200 dark:border-blue-500/30">
-                                Room {r?.number}
-                              </span>
-                              <span className="text-xs text-zinc-800 dark:text-zinc-300 font-medium truncate">
-                                {r?.roomType?.name}
-                              </span>
-                            </div>
-
-                            <div className="flex items-center gap-2">
-                              {/* Per-Room Comp Toggle */}
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setFormData((prev) => {
-                                    const nextRate = isRoomComp
-                                      ? (r?.roomType?.basePrice ? String(r.roomType.basePrice) : "3200")
-                                      : "0";
-                                    return {
-                                      ...prev,
-                                      roomRates: { ...prev.roomRates, [id]: nextRate },
-                                    };
-                                  });
-                                }}
-                                className={`px-2 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1 cursor-pointer border ${
-                                  isRoomComp
-                                    ? "bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800 shadow-xs"
-                                    : "bg-white dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 border-zinc-200 dark:border-zinc-700 hover:text-emerald-700 hover:bg-emerald-50"
-                                }`}
-                                title="Toggle complimentary stay for this specific room"
-                              >
-                                <span>🎁</span>
-                                <span>{isRoomComp ? "Comp (₹0)" : "Comp"}</span>
-                              </button>
-
-                              <div className="relative flex items-center">
-                                <span className="absolute left-2 text-xs text-zinc-400 font-bold font-mono">₹</span>
-                                <input
-                                  type="number"
-                                  placeholder="Rate"
-                                  disabled={isRoomComp}
-                                  value={isRoomComp ? "0" : currentRate}
-                                  onChange={(e) =>
-                                    setFormData((prev) => ({
-                                      ...prev,
-                                      roomRates: { ...prev.roomRates, [id]: e.target.value },
-                                    }))
-                                  }
-                                  className="w-24 h-8 pl-5 pr-2 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white font-mono text-xs font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all disabled:opacity-60 disabled:bg-zinc-100 dark:disabled:bg-zinc-800"
-                                />
-                              </div>
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  setFormData((prev) => {
-                                    const nextPax = { ...(prev.roomExtraPax || {}) };
-                                    const nextRates = { ...(prev.roomRates || {}) };
-                                    delete nextPax[id];
-                                    delete nextRates[id];
-                                    return {
-                                      ...prev,
-                                      additionalRoomIds: prev.additionalRoomIds.filter((rid) => rid !== id),
-                                      roomExtraPax: nextPax,
-                                      roomRates: nextRates,
-                                    };
-                                  })
-                                }
-                                className="p-1.5 text-zinc-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-colors cursor-pointer"
-                                title="Remove Room"
-                              >
-                                <X className="w-4 h-4" />
-                              </button>
-                            </div>
-                          </div>
-
-                          {/* Per-Room Extra Pax Stepper */}
-                          {(() => {
-                            const roomExtraRate = r?.roomType?.extraAdult !== undefined ? Number(r.roomType.extraAdult) : (Number(formData.extraBedRate) || 500);
-                            return (
-                              <div className="flex items-center justify-between p-2.5 rounded-xl bg-white dark:bg-zinc-900/90 border border-zinc-200 dark:border-zinc-800 text-xs shadow-xs">
-                                <span className="font-bold text-zinc-800 dark:text-zinc-300">
-                                  Extra Pax for Room {r?.number} (₹{roomExtraRate}/Pax)
-                                </span>
-                                <div className="flex items-center gap-2.5">
-                                  <div className="flex items-center bg-zinc-100 dark:bg-zinc-800 p-0.5 rounded-lg border border-zinc-200 dark:border-zinc-700">
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        const cur = formData.roomExtraPax?.[id] || 0;
-                                        const next = Math.max(0, cur - 1);
-                                        setFormData((prev) => ({
-                                          ...prev,
-                                          roomExtraPax: { ...(prev.roomExtraPax || {}), [id]: next },
-                                        }));
-                                      }}
-                                      className="h-6 w-6 rounded-md bg-white dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-700 active:scale-90 text-zinc-700 dark:text-zinc-200 flex items-center justify-center transition shadow-xs cursor-pointer"
-                                      title="Decrease Extra Pax"
-                                    >
-                                      <Minus className="h-3 w-3 stroke-[2.5]" />
-                                    </button>
-                                    <span className="font-mono font-bold text-xs text-zinc-900 dark:text-white px-2 min-w-[20px] text-center select-none">
-                                      {roomPaxCount}
-                                    </span>
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        const cur = formData.roomExtraPax?.[id] || 0;
-                                        const next = cur + 1;
-                                        setFormData((prev) => ({
-                                          ...prev,
-                                          roomExtraPax: { ...(prev.roomExtraPax || {}), [id]: next },
-                                        }));
-                                      }}
-                                      className="h-6 w-6 rounded-md bg-white dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-700 active:scale-90 text-zinc-700 dark:text-zinc-200 flex items-center justify-center transition shadow-xs cursor-pointer"
-                                      title="Increase Extra Pax"
-                                    >
-                                      <Plus className="h-3 w-3 stroke-[2.5]" />
-                                    </button>
-                                  </div>
-                                  {roomPaxCount > 0 ? (
-                                    <span className="text-[11px] font-mono font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/60 px-2 py-0.5 rounded-md border border-amber-200 dark:border-amber-800/60">
-                                      +₹{roomPaxCount * roomExtraRate}/nt
-                                    </span>
-                                  ) : (
-                                    <span className="text-[10px] font-mono text-zinc-400 dark:text-zinc-500 pr-1">₹0</span>
-                                  )}
-                                </div>
-                              </div>
-                            );
-                          })()}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-
-                {/* Dropdown to add more */}
-                <div className="flex gap-2">
-                  <select
-                    value=""
-                    onChange={(e) => {
-                      if (e.target.value) {
-                        const newId = e.target.value;
-                        const roomObj = rooms.find((r) => r.id === newId);
-                        const defaultRate = roomObj?.roomType?.basePrice
-                          ? String(roomObj.roomType.basePrice)
-                          : "3200";
-                        setFormData((prev) => ({
-                          ...prev,
-                          additionalRoomIds: [...prev.additionalRoomIds, newId],
-                          roomRates: { ...prev.roomRates, [newId]: defaultRate },
-                        }));
-                      }
-                    }}
-                    className="flex-1 h-9 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs font-mono focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
-                  >
-                    <option value="">-- Select Vacant Room to Add --</option>
-                    {rooms
-                      .filter(
-                        (r) =>
-                          r.roomState?.occupancyStatus === "VACANT" &&
-                          r.id !== formData.roomId &&
-                          !formData.additionalRoomIds.includes(r.id)
-                      )
-                      .map((r) => (
-                        <option key={r.id} value={r.id}>
-                          Room {r.number} — {r.roomType?.name}
-                        </option>
-                      ))}
-                  </select>
-                </div>
-                
-                {formData.additionalRoomIds.length > 0 && (
-                  <div className="flex items-center gap-2 mt-2 bg-blue-50 dark:bg-blue-950/20 p-2.5 rounded-lg border border-blue-200 dark:border-blue-900/50">
+                  <div className="grid grid-cols-2 gap-2">
                     <input
-                      type="checkbox"
-                      id="groupBilling"
-                      checked={formData.groupBilling}
-                      onChange={(e) => setFormData({ ...formData, groupBilling: e.target.checked })}
-                      className="w-4 h-4 rounded bg-white dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700 text-blue-600 focus:ring-blue-500/50 cursor-pointer"
+                      type="number"
+                      placeholder="Male"
+                      min="0"
+                      value={formData.paxM}
+                      onChange={(e) => setFormData({ ...formData, paxM: e.target.value })}
+                      className="w-full h-10 px-3 rounded-xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all shadow-xs"
                     />
-                    <label htmlFor="groupBilling" className="text-xs font-bold text-blue-800 dark:text-blue-300 cursor-pointer">
-                      Consolidate Bill (Create a single Master Folio for all {formData.additionalRoomIds.length + 1} rooms)
-                    </label>
+                    <input
+                      type="number"
+                      placeholder="Female"
+                      min="0"
+                      value={formData.paxF}
+                      onChange={(e) => setFormData({ ...formData, paxF: e.target.value })}
+                      className="w-full h-10 px-3 rounded-xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all shadow-xs"
+                    />
                   </div>
-                )}
-              </div>
-
-              {/* Row 2: Meal Plan & Pax Breakdown (5 Dedicated Columns) */}
-              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 pt-1">
-                <div className="space-y-1">
-                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">Meal Plan</label>
-                  <select
-                    value={formData.mealPlan}
-                    onChange={(e) => setFormData({ ...formData, mealPlan: e.target.value })}
-                    className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
-                  >
-                    <option value="EP">EP (Room Only)</option>
-                    <option value="CP">CP (Breakfast)</option>
-                    <option value="MAP">MAP (Half Board)</option>
-                    <option value="AP">AP (Full Board)</option>
-                  </select>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">Total Adults *</label>
-                  <input
-                    type="number"
-                    required
-                    min="1"
-                    placeholder="e.g. 2"
-                    value={formData.adults}
-                    onChange={(e) => setFormData({ ...formData, adults: e.target.value })}
-                    className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-bold"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">Male Pax</label>
-                  <input
-                    type="number"
-                    placeholder="e.g. 1"
-                    min="0"
-                    value={formData.paxM}
-                    onChange={(e) => setFormData({ ...formData, paxM: e.target.value })}
-                    className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">Female Pax</label>
-                  <input
-                    type="number"
-                    placeholder="e.g. 1"
-                    min="0"
-                    value={formData.paxF}
-                    onChange={(e) => setFormData({ ...formData, paxF: e.target.value })}
-                    className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap flex items-center justify-between">
-                    <span>Children</span>
-                    <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold">Free (₹0)</span>
-                  </label>
-                  <input
-                    type="number"
-                    placeholder="e.g. 0"
-                    min="0"
-                    value={formData.children}
-                    onChange={(e) => setFormData({ ...formData, children: e.target.value })}
-                    className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
-                  />
                 </div>
               </div>
 
-              {/* Row 3: Live Accommodation Math Calculator */}
+              {/* Early Bird Offer Banner */}
+              {(() => {
+                const hour = parseInt(formData.arrivalTime?.split(":")[0] || "-1", 10);
+                const isEarlyBird = hour >= 5 && hour < 11;
+                if (!isEarlyBird) return null;
+                return (
+                  <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-700/60 flex items-center gap-2.5 text-xs text-amber-900 dark:text-amber-200 shadow-xs">
+                    <span className="text-base">🌟</span>
+                    <div>
+                      <strong className="font-bold">Early Bird Check-In Included:</strong>
+                      <span className="ml-1 text-[11.5px] text-amber-800 dark:text-amber-300">
+                        Arrival between 5:00 AM and 11:00 AM is included at no extra charge. Stay valid until Standard Check-Out on departure date.
+                      </span>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Room & Occupancy Allocation Matrix */}
               {(() => {
                 const selectedRoomsList = rooms.filter(
                   (r) => r.id === formData.roomId || formData.additionalRoomIds.includes(r.id)
@@ -1058,70 +932,499 @@ export function GrcIntakeModal({
                 const totalCapacity = baseStandardCapacity + currentExtraPax;
                 const absoluteMaxRoomCapacity = baseStandardCapacity + totalRoomsCount * 2;
                 
-                const totalAdultsCount =
-                  Number(formData.adults) ||
-                  (Number(formData.paxM || 0) + Number(formData.paxF || 0)) ||
-                  0;
+                const allSelectedRooms = [formData.roomId, ...formData.additionalRoomIds].filter(Boolean);
+                const totalAdultsCount = allSelectedRooms.reduce((sum, rid) => {
+                  return sum + (formData.roomPax?.[rid]?.adults ?? (rid === formData.roomId ? (Number(formData.adults) || 2) : 2));
+                }, 0) || Number(formData.adults) || 2;
                 const totalChildrenCount = Number(formData.children || 0) + Number(formData.paxC || 0);
                 const totalGuests = totalAdultsCount + totalChildrenCount;
 
                 const hasGuestsEntered = totalGuests > 0;
-                // Children stay free: overcapacity applies if adult count exceeds bed capacity
                 const isOverCapacity = hasGuestsEntered && totalAdultsCount > totalCapacity;
                 const isBeyondMaxPhysicalLimit = hasGuestsEntered && (totalAdultsCount > absoluteMaxRoomCapacity || totalGuests > absoluteMaxRoomCapacity + totalRoomsCount * 2);
 
-                return (
-                  <div className="pt-2 border-t border-zinc-200 dark:border-zinc-800/80 space-y-3">
-                    {/* Live Room Accommodation Math Card */}
-                    <div
-                      className={`rounded-xl p-3.5 border transition-all ${
-                        isBeyondMaxPhysicalLimit
-                          ? "bg-rose-50 dark:bg-rose-950/50 border-rose-300 dark:border-rose-600 text-rose-800 dark:text-rose-200"
-                          : isOverCapacity
-                          ? "bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-600/60 text-amber-900 dark:text-amber-200"
-                          : hasGuestsEntered
-                          ? "bg-emerald-50 dark:bg-emerald-950/30 border-emerald-300 dark:border-emerald-500/40 text-emerald-900 dark:text-emerald-200"
-                          : "bg-zinc-100 dark:bg-zinc-900/60 border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300"
-                      }`}
-                    >
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                        <div className="flex items-center gap-2.5">
-                          <span className="text-base">
-                            {isBeyondMaxPhysicalLimit ? "⛔" : isOverCapacity ? "⚠️" : hasGuestsEntered ? "✅" : "👥"}
-                          </span>
-                          <div className="text-xs">
-                            <span className="font-bold">
-                              {isBeyondMaxPhysicalLimit
-                                ? "Room Capacity Exceeded (Additional Room Required)!"
-                                : isOverCapacity
-                                ? "Adult Overcapacity Warning!"
-                                : hasGuestsEntered
-                                ? "Capacity Verification Passed (Children Free)"
-                                : "Accommodation Capacity Math"}
-                            </span>
-                            <p className="text-[11px] opacity-90 mt-0.5">
-                              {isBeyondMaxPhysicalLimit
-                                ? `${totalAdultsCount} Adults entered, exceeding maximum physical capacity of ${absoluteMaxRoomCapacity} for ${totalRoomsCount} room(s). You MUST add another room.`
-                                : isOverCapacity
-                                ? `${totalAdultsCount} Adults entered, but standard capacity is ${totalCapacity} Pax. Increment Extra Pax (+₹${formData.extraBedRate || primaryRoom?.roomType?.extraAdult || 500}/Adult) or add another room.`
-                                : hasGuestsEntered
-                                ? `${totalAdultsCount} Adult${totalAdultsCount > 1 ? "s" : ""}${totalChildrenCount > 0 ? ` + ${totalChildrenCount} Child${totalChildrenCount > 1 ? "ren" : ""} (Complimentary)` : ""} across ${totalRoomsCount} Room(s). Children stay free.`
-                                : `Base capacity: ${baseStandardCapacity} Adults (${totalRoomsCount} Room${totalRoomsCount > 1 ? "s" : ""}). Children stay free.`}
-                            </p>
-                          </div>
-                        </div>
+                const primaryExtraRate = Number(formData.extraBedRate || primaryRoom?.roomType?.extraAdult || 500);
 
-                        {/* Capacity Stats Pill */}
-                        <div className="flex items-center gap-2 font-mono text-xs font-bold shrink-0 self-end sm:self-auto">
-                          <span className={`px-2.5 py-1 rounded-lg border ${
-                            isBeyondMaxPhysicalLimit
-                              ? "bg-rose-100 dark:bg-rose-900/60 border-rose-300 dark:border-rose-500 text-rose-900 dark:text-white"
-                              : "bg-zinc-200 dark:bg-black/40 border-zinc-300 dark:border-white/10 text-zinc-900 dark:text-white"
-                          }`}>
-                            Adults: {totalAdultsCount || "—"}/{totalCapacity} | Children: {totalChildrenCount || 0} (Free)
-                          </span>
-                        </div>
+                return (
+                  <div className="space-y-3 pt-2">
+                    {/* Header bar above matrix */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-black uppercase tracking-wider text-zinc-900 dark:text-white">
+                          Room & Occupancy Allocation Matrix
+                        </span>
+                        <span className="px-2 py-0.5 rounded-full text-[11px] font-bold font-mono bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700">
+                          {totalRoomsCount} {totalRoomsCount === 1 ? "Room" : "Rooms"}
+                        </span>
                       </div>
+
+                      {/* Capacity status pill */}
+                      <div className="flex items-center gap-2">
+                        <span className={`px-3 py-1 rounded-xl text-xs font-bold font-mono border flex items-center gap-1.5 shadow-xs ${
+                          isBeyondMaxPhysicalLimit
+                            ? "bg-rose-100 dark:bg-rose-950/60 border-rose-300 dark:border-rose-700 text-rose-800 dark:text-rose-200"
+                            : isOverCapacity
+                            ? "bg-amber-100 dark:bg-amber-950/60 border-amber-300 dark:border-amber-700 text-amber-800 dark:text-amber-200"
+                            : hasGuestsEntered
+                            ? "bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-700 text-emerald-800 dark:text-emerald-200"
+                            : "bg-zinc-100 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300"
+                        }`}>
+                          <span>{isBeyondMaxPhysicalLimit ? "⛔" : isOverCapacity ? "⚠️" : hasGuestsEntered ? "✓" : "👥"}</span>
+                          <span>
+                            {isBeyondMaxPhysicalLimit
+                              ? `Physical Limit Exceeded (${totalAdultsCount}/${absoluteMaxRoomCapacity} Pax)`
+                              : isOverCapacity
+                              ? `Overcapacity (${totalAdultsCount}/${totalCapacity} Pax - Add Extra Pax or Room)`
+                              : hasGuestsEntered
+                              ? `Capacity Verified: ${totalAdultsCount}/${totalCapacity} Adults • ${totalChildrenCount} Kids (Free)`
+                              : `Standard Capacity: ${baseStandardCapacity} Adults across ${totalRoomsCount} Room(s)`}
+                          </span>
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Table Matrix */}
+                    <div className="overflow-x-auto rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/30">
+                      <table className="w-full text-left text-xs border-collapse">
+                        <thead>
+                          <tr className="border-b border-zinc-200 dark:border-zinc-800 bg-zinc-100/70 dark:bg-zinc-900/80 text-[11px] font-bold uppercase tracking-wider text-zinc-600 dark:text-zinc-400">
+                            <th className="py-2.5 px-4">Room</th>
+                            <th className="py-2.5 px-4">Category & Bedding</th>
+                            <th className="py-2.5 px-4">Nightly Tariff</th>
+                            <th className="py-2.5 px-4 text-center">Assigned Guests</th>
+                            <th className="py-2.5 px-4 text-center">Extra Pax</th>
+                            <th className="py-2.5 px-4 text-right">Action</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-zinc-200 dark:border-zinc-800 dark:divide-zinc-800/80">
+                          {/* Row 1: Primary Room */}
+                          {primaryRoom ? (() => {
+                            const pAdults = formData.roomPax?.[primaryRoom.id]?.adults ?? (primaryRoom.roomType?.capacity ? Math.min(2, primaryRoom.roomType.capacity) : 2);
+                            const pKids = formData.roomPax?.[primaryRoom.id]?.children ?? 0;
+                            const pExtraPax = Number(formData.extraPaxCount) || 0;
+
+                            return (
+                              <tr className="bg-white dark:bg-[#111114] hover:bg-zinc-50/80 dark:hover:bg-zinc-900/40 transition-colors">
+                                <td className="py-3 px-4">
+                                  <div className="flex items-center gap-2">
+                                    <span className="px-2.5 py-1 rounded-lg bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-300 font-bold font-mono text-xs border border-blue-200 dark:border-blue-800">
+                                      Room {primaryRoom.number}
+                                    </span>
+                                    <span className="text-[10px] font-bold uppercase tracking-wider bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 px-1.5 py-0.5 rounded border border-zinc-200 dark:border-zinc-700">
+                                      Primary
+                                    </span>
+                                  </div>
+                                </td>
+
+                                <td className="py-3 px-4">
+                                  <div className="font-semibold text-zinc-900 dark:text-zinc-100">
+                                    {primaryRoom.roomType?.name || "Standard Room"}
+                                  </div>
+                                  <div className="text-[11px] text-zinc-500 font-mono">
+                                    Floor {primaryRoom.floor} • {primaryRoom.roomType?.bedType || "King Bed"}
+                                  </div>
+                                </td>
+
+                                <td className="py-3 px-4">
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="text-zinc-400 font-mono text-xs">₹</span>
+                                    <input
+                                      type="number"
+                                      disabled={formData.isComplimentary}
+                                      value={formData.isComplimentary ? "0" : formData.agreedTariff}
+                                      onChange={(e) => setFormData({ ...formData, agreedTariff: e.target.value })}
+                                      className="w-24 h-8 px-2 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 font-mono font-bold text-xs text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 disabled:opacity-50 shadow-xs"
+                                      placeholder="Tariff"
+                                    />
+                                    <button
+                                      type="button"
+                                      onClick={() => setFormData((prev) => ({ ...prev, isComplimentary: !prev.isComplimentary }))}
+                                      className={`px-2 py-1 rounded-lg text-[11px] font-bold transition flex items-center gap-1 cursor-pointer border ${
+                                        formData.isComplimentary
+                                          ? "bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800"
+                                          : "bg-zinc-50 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border-zinc-200 dark:border-zinc-700 hover:text-emerald-700"
+                                      }`}
+                                      title="Toggle complimentary stay"
+                                    >
+                                      <span>🎁</span>
+                                      <span>{formData.isComplimentary ? "Comp" : "Comp"}</span>
+                                    </button>
+                                  </div>
+                                </td>
+
+                                <td className="py-3 px-4">
+                                  <div className="flex items-center justify-center gap-3">
+                                    {/* Adults */}
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="text-[11px] text-zinc-500 font-medium">Adults:</span>
+                                      <div className="flex items-center bg-zinc-100 dark:bg-zinc-800 p-0.5 rounded-lg border border-zinc-200 dark:border-zinc-700">
+                                        <button
+                                          type="button"
+                                          onClick={() => updateRoomPax(primaryRoom.id, "adults", Math.max(1, pAdults - 1))}
+                                          className="h-6 w-6 rounded-md bg-white dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-700 active:scale-90 text-zinc-700 dark:text-zinc-200 flex items-center justify-center transition shadow-xs cursor-pointer"
+                                        >
+                                          <Minus className="h-3 w-3 stroke-[2.5]" />
+                                        </button>
+                                        <span className="font-mono font-bold text-xs text-zinc-900 dark:text-white px-2 min-w-[20px] text-center select-none">
+                                          {pAdults}
+                                        </span>
+                                        <button
+                                          type="button"
+                                          onClick={() => updateRoomPax(primaryRoom.id, "adults", pAdults + 1)}
+                                          className="h-6 w-6 rounded-md bg-white dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-700 active:scale-90 text-zinc-700 dark:text-zinc-200 flex items-center justify-center transition shadow-xs cursor-pointer"
+                                        >
+                                          <Plus className="h-3 w-3 stroke-[2.5]" />
+                                        </button>
+                                      </div>
+                                    </div>
+
+                                    {/* Kids */}
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="text-[11px] text-zinc-500 font-medium">Kids:</span>
+                                      <div className="flex items-center bg-zinc-100 dark:bg-zinc-800 p-0.5 rounded-lg border border-zinc-200 dark:border-zinc-700">
+                                        <button
+                                          type="button"
+                                          onClick={() => updateRoomPax(primaryRoom.id, "children", Math.max(0, pKids - 1))}
+                                          className="h-6 w-6 rounded-md bg-white dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-700 active:scale-90 text-zinc-700 dark:text-zinc-200 flex items-center justify-center transition shadow-xs cursor-pointer"
+                                        >
+                                          <Minus className="h-3 w-3 stroke-[2.5]" />
+                                        </button>
+                                        <span className="font-mono font-bold text-xs text-zinc-900 dark:text-white px-2 min-w-[20px] text-center select-none">
+                                          {pKids}
+                                        </span>
+                                        <button
+                                          type="button"
+                                          onClick={() => updateRoomPax(primaryRoom.id, "children", pKids + 1)}
+                                          className="h-6 w-6 rounded-md bg-white dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-700 active:scale-90 text-zinc-700 dark:text-zinc-200 flex items-center justify-center transition shadow-xs cursor-pointer"
+                                        >
+                                          <Plus className="h-3 w-3 stroke-[2.5]" />
+                                        </button>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </td>
+
+                                <td className="py-3 px-4">
+                                  <div className="flex items-center justify-center gap-2">
+                                    <div className="flex items-center bg-zinc-100 dark:bg-zinc-800 p-0.5 rounded-lg border border-zinc-200 dark:border-zinc-700">
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          const cur = Number(formData.extraPaxCount) || 0;
+                                          setFormData((prev) => ({ ...prev, extraPaxCount: Math.max(0, cur - 1) }));
+                                        }}
+                                        className="h-6 w-6 rounded-md bg-white dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-700 active:scale-90 text-zinc-700 dark:text-zinc-200 flex items-center justify-center transition shadow-xs cursor-pointer"
+                                      >
+                                        <Minus className="h-3 w-3 stroke-[2.5]" />
+                                      </button>
+                                      <span className="font-mono font-bold text-xs text-zinc-900 dark:text-white px-2 min-w-[20px] text-center select-none">
+                                        {pExtraPax}
+                                      </span>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          const cur = Number(formData.extraPaxCount) || 0;
+                                          setFormData((prev) => ({ ...prev, extraPaxCount: cur + 1 }));
+                                        }}
+                                        className="h-6 w-6 rounded-md bg-white dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-700 active:scale-90 text-zinc-700 dark:text-zinc-200 flex items-center justify-center transition shadow-xs cursor-pointer"
+                                      >
+                                        <Plus className="h-3 w-3 stroke-[2.5]" />
+                                      </button>
+                                    </div>
+                                    {pExtraPax > 0 && (
+                                      <span className="text-[10px] font-mono font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/60 px-1.5 py-0.5 rounded border border-amber-200 dark:border-amber-800">
+                                        +₹{pExtraPax * primaryExtraRate}
+                                      </span>
+                                    )}
+                                  </div>
+                                </td>
+
+                                <td className="py-3 px-4 text-right">
+                                  <span className="text-[11px] font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 rounded border border-blue-200 dark:border-blue-800">
+                                    Primary Stay
+                                  </span>
+                                </td>
+                              </tr>
+                            );
+                          })() : (
+                            <tr>
+                              <td colSpan={6} className="py-4 text-center text-zinc-400">
+                                Please select a primary room above.
+                              </td>
+                            </tr>
+                          )}
+
+                          {/* Subsequent Rows: Additional Group Rooms */}
+                          {formData.additionalRoomIds.map((id) => {
+                            const r = rooms.find((room) => room.id === id);
+                            const roomPaxCount = formData.roomExtraPax?.[id] || 0;
+                            const isRoomComp = formData.roomRates[id] === "0" || formData.roomRates[id] === "COMP";
+                            const currentRate = formData.roomRates[id] !== undefined ? formData.roomRates[id] : (r?.roomType?.basePrice ? String(r.roomType.basePrice) : "3200");
+                            const assignedAdults = formData.roomPax?.[id]?.adults ?? 2;
+                            const assignedKids = formData.roomPax?.[id]?.children ?? 0;
+                            const roomExtraRate = r?.roomType?.extraAdult !== undefined ? Number(r.roomType.extraAdult) : (Number(formData.extraBedRate) || 500);
+
+                            return (
+                              <tr key={id} className="bg-white dark:bg-[#111114] hover:bg-zinc-50/80 dark:hover:bg-zinc-900/40 transition-colors">
+                                <td className="py-3 px-4">
+                                  <div className="flex items-center gap-2">
+                                    <span className="px-2.5 py-1 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 font-bold font-mono text-xs border border-zinc-200 dark:border-zinc-700">
+                                      Room {r?.number}
+                                    </span>
+                                    <span className="text-[10px] font-bold uppercase tracking-wider bg-purple-50 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 px-1.5 py-0.5 rounded border border-purple-200 dark:border-purple-800">
+                                      Group
+                                    </span>
+                                  </div>
+                                </td>
+
+                                <td className="py-3 px-4">
+                                  <div className="font-semibold text-zinc-900 dark:text-zinc-100">
+                                    {r?.roomType?.name || "Standard Room"}
+                                  </div>
+                                  <div className="text-[11px] text-zinc-500 font-mono">
+                                    Floor {r?.floor} • {r?.roomType?.bedType || "Twin Bed"}
+                                  </div>
+                                </td>
+
+                                <td className="py-3 px-4">
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="text-zinc-400 font-mono text-xs">₹</span>
+                                    <input
+                                      type="number"
+                                      disabled={isRoomComp}
+                                      value={isRoomComp ? "0" : currentRate}
+                                      onChange={(e) =>
+                                        setFormData((prev) => ({
+                                          ...prev,
+                                          roomRates: { ...prev.roomRates, [id]: e.target.value },
+                                        }))
+                                      }
+                                      className="w-24 h-8 px-2 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 font-mono font-bold text-xs text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 disabled:opacity-50 shadow-xs"
+                                      placeholder="Tariff"
+                                    />
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setFormData((prev) => {
+                                          const nextRate = isRoomComp
+                                            ? (r?.roomType?.basePrice ? String(r.roomType.basePrice) : "3200")
+                                            : "0";
+                                          return {
+                                            ...prev,
+                                            roomRates: { ...prev.roomRates, [id]: nextRate },
+                                          };
+                                        });
+                                      }}
+                                      className={`px-2 py-1 rounded-lg text-[11px] font-bold transition flex items-center gap-1 cursor-pointer border ${
+                                        isRoomComp
+                                          ? "bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800"
+                                          : "bg-zinc-50 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border-zinc-200 dark:border-zinc-700 hover:text-emerald-700"
+                                      }`}
+                                      title="Toggle complimentary stay"
+                                    >
+                                      <span>🎁</span>
+                                      <span>{isRoomComp ? "Comp" : "Comp"}</span>
+                                    </button>
+                                  </div>
+                                </td>
+
+                                <td className="py-3 px-4">
+                                  <div className="flex items-center justify-center gap-3">
+                                    {/* Adults */}
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="text-[11px] text-zinc-500 font-medium">Adults:</span>
+                                      <div className="flex items-center bg-zinc-100 dark:bg-zinc-800 p-0.5 rounded-lg border border-zinc-200 dark:border-zinc-700">
+                                        <button
+                                          type="button"
+                                          onClick={() => updateRoomPax(id, "adults", Math.max(1, assignedAdults - 1))}
+                                          className="h-6 w-6 rounded-md bg-white dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-700 active:scale-90 text-zinc-700 dark:text-zinc-200 flex items-center justify-center transition shadow-xs cursor-pointer"
+                                        >
+                                          <Minus className="h-3 w-3 stroke-[2.5]" />
+                                        </button>
+                                        <span className="font-mono font-bold text-xs text-zinc-900 dark:text-white px-2 min-w-[20px] text-center select-none">
+                                          {assignedAdults}
+                                        </span>
+                                        <button
+                                          type="button"
+                                          onClick={() => updateRoomPax(id, "adults", assignedAdults + 1)}
+                                          className="h-6 w-6 rounded-md bg-white dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-700 active:scale-90 text-zinc-700 dark:text-zinc-200 flex items-center justify-center transition shadow-xs cursor-pointer"
+                                        >
+                                          <Plus className="h-3 w-3 stroke-[2.5]" />
+                                        </button>
+                                      </div>
+                                    </div>
+
+                                    {/* Kids */}
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="text-[11px] text-zinc-500 font-medium">Kids:</span>
+                                      <div className="flex items-center bg-zinc-100 dark:bg-zinc-800 p-0.5 rounded-lg border border-zinc-200 dark:border-zinc-700">
+                                        <button
+                                          type="button"
+                                          onClick={() => updateRoomPax(id, "children", Math.max(0, assignedKids - 1))}
+                                          className="h-6 w-6 rounded-md bg-white dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-700 active:scale-90 text-zinc-700 dark:text-zinc-200 flex items-center justify-center transition shadow-xs cursor-pointer"
+                                        >
+                                          <Minus className="h-3 w-3 stroke-[2.5]" />
+                                        </button>
+                                        <span className="font-mono font-bold text-xs text-zinc-900 dark:text-white px-2 min-w-[20px] text-center select-none">
+                                          {assignedKids}
+                                        </span>
+                                        <button
+                                          type="button"
+                                          onClick={() => updateRoomPax(id, "children", assignedKids + 1)}
+                                          className="h-6 w-6 rounded-md bg-white dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-700 active:scale-90 text-zinc-700 dark:text-zinc-200 flex items-center justify-center transition shadow-xs cursor-pointer"
+                                        >
+                                          <Plus className="h-3 w-3 stroke-[2.5]" />
+                                        </button>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </td>
+
+                                <td className="py-3 px-4">
+                                  <div className="flex items-center justify-center gap-2">
+                                    <div className="flex items-center bg-zinc-100 dark:bg-zinc-800 p-0.5 rounded-lg border border-zinc-200 dark:border-zinc-700">
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          const cur = formData.roomExtraPax?.[id] || 0;
+                                          setFormData((prev) => ({
+                                            ...prev,
+                                            roomExtraPax: { ...(prev.roomExtraPax || {}), [id]: Math.max(0, cur - 1) },
+                                          }));
+                                        }}
+                                        className="h-6 w-6 rounded-md bg-white dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-700 active:scale-90 text-zinc-700 dark:text-zinc-200 flex items-center justify-center transition shadow-xs cursor-pointer"
+                                      >
+                                        <Minus className="h-3 w-3 stroke-[2.5]" />
+                                      </button>
+                                      <span className="font-mono font-bold text-xs text-zinc-900 dark:text-white px-2 min-w-[20px] text-center select-none">
+                                        {roomPaxCount}
+                                      </span>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          const cur = formData.roomExtraPax?.[id] || 0;
+                                          setFormData((prev) => ({
+                                            ...prev,
+                                            roomExtraPax: { ...(prev.roomExtraPax || {}), [id]: cur + 1 },
+                                          }));
+                                        }}
+                                        className="h-6 w-6 rounded-md bg-white dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-700 active:scale-90 text-zinc-700 dark:text-zinc-200 flex items-center justify-center transition shadow-xs cursor-pointer"
+                                      >
+                                        <Plus className="h-3 w-3 stroke-[2.5]" />
+                                      </button>
+                                    </div>
+                                    {roomPaxCount > 0 && (
+                                      <span className="text-[10px] font-mono font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/60 px-1.5 py-0.5 rounded border border-amber-200 dark:border-amber-800">
+                                        +₹{roomPaxCount * roomExtraRate}
+                                      </span>
+                                    )}
+                                  </div>
+                                </td>
+
+                                <td className="py-3 px-4 text-right">
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setFormData((prev) => {
+                                        const nextPax = { ...(prev.roomExtraPax || {}) };
+                                        const nextRates = { ...(prev.roomRates || {}) };
+                                        const nextRoomPax = { ...(prev.roomPax || {}) };
+                                        delete nextPax[id];
+                                        delete nextRates[id];
+                                        delete nextRoomPax[id];
+                                        const remainingRoomIds = prev.additionalRoomIds.filter((rid) => rid !== id);
+                                        const allSelected = [prev.roomId, ...remainingRoomIds].filter(Boolean);
+                                        let sumAdults = 0;
+                                        for (const rid of allSelected) {
+                                          sumAdults += nextRoomPax[rid]?.adults ?? 2;
+                                        }
+                                        return {
+                                          ...prev,
+                                          additionalRoomIds: remainingRoomIds,
+                                          roomExtraPax: nextPax,
+                                          roomRates: nextRates,
+                                          roomPax: nextRoomPax,
+                                          adults: String(sumAdults),
+                                        };
+                                      })
+                                    }
+                                    className="p-1.5 text-zinc-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-colors cursor-pointer"
+                                    title="Remove Room"
+                                  >
+                                    <X className="w-4 h-4" />
+                                  </button>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Table Footer: Add Room Dropdown & Consolidate Folio Checkbox */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
+                      <div className="flex-1 max-w-md">
+                        <select
+                          value=""
+                          onChange={(e) => {
+                            if (e.target.value) {
+                              const newId = e.target.value;
+                              const roomObj = rooms.find((r) => r.id === newId);
+                              const defaultRate = roomObj?.roomType?.basePrice
+                                ? String(roomObj.roomType.basePrice)
+                                : "3200";
+                              const roomCap = roomObj?.roomType?.capacity || 2;
+                              setFormData((prev) => {
+                                const nextPax = {
+                                  ...(prev.roomPax || {}),
+                                  [newId]: { adults: roomCap, children: 0 },
+                                };
+                                const allSelected = [prev.roomId, ...prev.additionalRoomIds, newId].filter(Boolean);
+                                let sumAdults = 0;
+                                for (const rid of allSelected) {
+                                  sumAdults += nextPax[rid]?.adults ?? 2;
+                                }
+                                return {
+                                  ...prev,
+                                  additionalRoomIds: [...prev.additionalRoomIds, newId],
+                                  roomRates: { ...prev.roomRates, [newId]: defaultRate },
+                                  roomPax: nextPax,
+                                  adults: String(sumAdults),
+                                };
+                              });
+                            }
+                          }}
+                          className="w-full h-9 px-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-800 dark:text-zinc-200 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer shadow-xs"
+                        >
+                          <option value="">+ Add Vacant Room (Group Booking)...</option>
+                          {rooms
+                            .filter(
+                              (r) =>
+                                r.roomState?.occupancyStatus === "VACANT" &&
+                                r.id !== formData.roomId &&
+                                !formData.additionalRoomIds.includes(r.id)
+                            )
+                            .map((r) => (
+                              <option key={r.id} value={r.id}>
+                                Room {r.number} - {r.roomType?.name} (Floor {r.floor})
+                              </option>
+                            ))}
+                        </select>
+                      </div>
+
+                      {formData.additionalRoomIds.length > 0 && (
+                        <label className="flex items-center gap-2 cursor-pointer bg-blue-50/70 dark:bg-blue-950/30 px-3 py-1.5 rounded-xl border border-blue-200 dark:border-blue-900/60 shadow-xs">
+                          <input
+                            type="checkbox"
+                            checked={formData.groupBilling}
+                            onChange={(e) => setFormData({ ...formData, groupBilling: e.target.checked })}
+                            className="w-4 h-4 rounded bg-white dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700 text-blue-600 focus:ring-blue-500/50 cursor-pointer"
+                          />
+                          <span className="text-xs font-bold text-blue-900 dark:text-blue-300">
+                            Consolidate Master Folio (Single invoice for all {formData.additionalRoomIds.length + 1} rooms)
+                          </span>
+                        </label>
+                      )}
                     </div>
                   </div>
                 );
@@ -1129,8 +1432,8 @@ export function GrcIntakeModal({
             </div>
 
             {/* 2. PRIMARY GUEST DOSSIER */}
-            <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-[#09090b] p-4 space-y-3.5 shadow-xs">
-              <div className="border-b border-zinc-200 dark:border-zinc-800 pb-2 flex items-center justify-between">
+            <div className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-[#111114] p-5 sm:p-6 space-y-4 shadow-xs">
+              <div className="border-b border-zinc-100 dark:border-zinc-800 pb-2 flex items-center justify-between">
                 <span className="font-bold text-zinc-900 dark:text-white uppercase tracking-wider flex items-center gap-2 text-xs">
                   <Users className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
                   2. Primary Guest Profile (From Physical GRC Card)
@@ -1515,8 +1818,8 @@ export function GrcIntakeModal({
             )}
 
             {/* 3. RESIDENTIAL ADDRESS */}
-            <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-[#09090b] p-4 space-y-3.5 shadow-xs">
-              <div className="border-b border-zinc-200 dark:border-zinc-800 pb-2">
+            <div className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-[#111114] p-5 sm:p-6 space-y-4 shadow-xs">
+              <div className="border-b border-zinc-100 dark:border-zinc-800 pb-2">
                 <span className="font-bold text-zinc-900 dark:text-white uppercase tracking-wider flex items-center gap-2 text-xs">
                   <MapPin className="h-4 w-4 text-amber-600 dark:text-amber-400" />
                   3. Residential Address
@@ -1593,8 +1896,8 @@ export function GrcIntakeModal({
             </div>
 
             {/* 4. TRAVEL & ID VERIFICATION */}
-            <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-[#09090b] p-4 space-y-3.5 shadow-xs">
-              <div className="border-b border-zinc-200 dark:border-zinc-800 pb-2">
+            <div className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-[#111114] p-5 sm:p-6 space-y-4 shadow-xs">
+              <div className="border-b border-zinc-100 dark:border-zinc-800 pb-2">
                 <span className="font-bold text-zinc-900 dark:text-white uppercase tracking-wider flex items-center gap-2 text-xs">
                   <Compass className="h-4 w-4 text-cyan-600 dark:text-cyan-400" />
                   4. Travel Details, ID Proof & Vehicle
@@ -1721,8 +2024,8 @@ export function GrcIntakeModal({
             </div>
 
             {/* 5. ACCOMPANYING CO-GUESTS */}
-            <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-[#09090b] p-4 space-y-3.5 shadow-xs">
-              <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 pb-2">
+            <div className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-[#111114] p-5 sm:p-6 space-y-4 shadow-xs">
+              <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-2">
                 <span className="font-bold text-zinc-900 dark:text-white uppercase tracking-wider flex items-center gap-2 text-xs">
                   <Users className="h-4 w-4 text-cyan-600 dark:text-cyan-400" />
                   5. Accompanying Co-Guests ({formData.coGuests.length})
@@ -1804,8 +2107,8 @@ export function GrcIntakeModal({
             </div>
 
             {/* 6. ADVANCE PAYMENT & SETTLEMENT */}
-            <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-[#09090b] p-4 space-y-3.5 shadow-xs">
-              <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 pb-2 flex-wrap gap-2">
+            <div className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-[#111114] p-5 sm:p-6 space-y-4 shadow-xs">
+              <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-2 flex-wrap gap-2">
                 <span className="font-bold text-zinc-900 dark:text-white uppercase tracking-wider flex items-center gap-2 text-xs">
                   <CreditCard className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
                   {formData.additionalRoomIds.length > 0
@@ -1989,82 +2292,96 @@ export function GrcIntakeModal({
               )}
             </div>
 
-            {/* Bottom Actions */}
-            <div className="pt-3.5 pb-1 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-between gap-4">
-              <span className="text-[11px] text-zinc-500 font-mono hidden sm:inline truncate">
-                Rule 46 Compliant GRC • Instant Folio
-              </span>
+          </div> {/* End of scrollable form body */}
 
-              <div className="flex items-center gap-3 ml-auto shrink-0">
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="px-4 py-2.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 text-xs font-bold transition cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 font-bold text-white text-xs sm:text-sm transition shadow-md shadow-blue-600/20 flex items-center gap-2 disabled:opacity-50 whitespace-nowrap cursor-pointer"
-                >
-                  <CheckCircle2 className="h-4 w-4 shrink-0" />
-                  <span>{loading ? "Checking In..." : "Complete Check-In"}</span>
-                </button>
+          {/* Docked Sticky Bottom Actions Bar */}
+          <div className="border-t border-zinc-200 dark:border-zinc-800 bg-white/95 dark:bg-[#111114]/95 backdrop-blur-md px-6 lg:px-12 py-3 flex items-center justify-between shrink-0 shadow-lg z-20">
+            <div className="flex items-center gap-3">
+              <div className="h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse hidden sm:block" />
+              <div className="text-xs text-zinc-600 dark:text-zinc-400 font-medium">
+                <span className="font-bold text-zinc-900 dark:text-white font-mono">
+                  Room {primaryRoom?.number || "-"}
+                  {formData.additionalRoomIds.length > 0 && ` (+${formData.additionalRoomIds.length} group room${formData.additionalRoomIds.length > 1 ? "s" : ""})`}
+                </span>
+                <span className="mx-2 text-zinc-300 dark:text-zinc-700">•</span>
+                <span className="font-mono">
+                  {calculatedTotalAdults} Adults{Number(formData.children) > 0 ? `, ${formData.children} Children` : ""}
+                </span>
+                <span className="mx-2 text-zinc-300 dark:text-zinc-700">•</span>
+                <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                  Advance: ₹{formData.depositAmount || 0}
+                </span>
               </div>
             </div>
 
-          </form>
-        )}
-
-        {/* METHOD 2: DIGITAL QR KIOSK / GUEST SELF CHECK-IN */}
-        {activeMethod === "QR_DIGITAL" && (
-          <div className="overflow-y-auto space-y-6 pt-6 text-center max-w-lg mx-auto">
-            <div className="p-6 rounded-2xl bg-zinc-50 dark:bg-[#09090b] border border-zinc-200 dark:border-zinc-800 space-y-4 shadow-xs">
-              <div className="h-16 w-16 rounded-2xl bg-blue-50 dark:bg-blue-600/20 border border-blue-200 dark:border-blue-500/30 flex items-center justify-center text-blue-600 dark:text-blue-400 mx-auto shadow-inner">
-                <QrCode className="h-8 w-8" />
-              </div>
-
-              <div>
-                <h3 className="text-base font-bold text-zinc-900 dark:text-white">Contactless Guest Self Check-In</h3>
-                <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
-                  Guests can scan this QR code on their smartphone to fill out their GRC, upload ID photos, and sign digitally before reaching the counter.
-                </p>
-              </div>
-
-              <div className="p-4 bg-white rounded-2xl max-w-[200px] mx-auto shadow-md border border-zinc-200 dark:border-zinc-700">
-                {/* Visual QR Code Display */}
-                <div className="aspect-square bg-zinc-950 rounded-xl flex flex-col items-center justify-center p-3 text-white">
-                  <QrCode className="h-28 w-28 text-white" />
-                  <span className="text-[9px] font-mono text-zinc-400 mt-1 uppercase font-bold tracking-widest">
-                    SCAN TO CHECK-IN
-                  </span>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-center gap-2 pt-2">
-                <button
-                  onClick={handleCopyKioskLink}
-                  className="px-4 py-2 rounded-xl bg-zinc-200 hover:bg-zinc-300 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-xs font-bold text-zinc-800 dark:text-zinc-200 inline-flex items-center gap-1.5 transition"
-                >
-                  {copiedLink ? <Check className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" /> : <Copy className="h-3.5 w-3.5 text-zinc-500 dark:text-zinc-400" />}
-                  <span>{copiedLink ? "Link Copied" : "Copy Kiosk Link"}</span>
-                </button>
-
-                <a
-                  href={activeProperty?.code ? `/checkin?property=${encodeURIComponent(activeProperty.code)}` : activeProperty?.id ? `/checkin?propertyId=${activeProperty.id}` : "/checkin"}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-xs font-bold text-white inline-flex items-center gap-1.5 transition shadow"
-                >
-                  <span>Open Kiosk Portal ↗</span>
-                </a>
-              </div>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 text-xs font-bold transition cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={loading}
+                className="px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 font-bold text-white text-xs sm:text-sm transition shadow-md shadow-blue-600/20 flex items-center gap-2 disabled:opacity-50 whitespace-nowrap cursor-pointer"
+              >
+                <CheckCircle2 className="h-4 w-4 shrink-0" />
+                <span>{loading ? "Checking In..." : "Complete Check-In"}</span>
+              </button>
             </div>
           </div>
-        )}
+        </form>
+      )}
 
-      </div>
+      {/* METHOD 2: DIGITAL QR KIOSK / GUEST SELF CHECK-IN */}
+      {activeMethod === "QR_DIGITAL" && (
+        <div className="flex-1 overflow-y-auto flex items-center justify-center p-6">
+          <div className="p-8 rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200/80 dark:border-zinc-800/80 space-y-5 shadow-lg max-w-md w-full text-center">
+            <div className="h-16 w-16 rounded-2xl bg-blue-50 dark:bg-blue-600/20 border border-blue-200 dark:border-blue-500/30 flex items-center justify-center text-blue-600 dark:text-blue-400 mx-auto shadow-inner">
+              <QrCode className="h-8 w-8" />
+            </div>
+
+            <div>
+              <h3 className="text-base font-bold text-zinc-900 dark:text-white">Contactless Guest Self Check-In</h3>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+                Guests can scan this QR code on their smartphone to fill out their GRC, upload ID photos, and sign digitally before reaching the counter.
+              </p>
+            </div>
+
+            <div className="p-4 bg-white rounded-2xl max-w-[200px] mx-auto shadow-md border border-zinc-200 dark:border-zinc-700">
+              {/* Visual QR Code Display */}
+              <div className="aspect-square bg-zinc-950 rounded-xl flex flex-col items-center justify-center p-3 text-white">
+                <QrCode className="h-28 w-28 text-white" />
+                <span className="text-[9px] font-mono text-zinc-400 mt-1 uppercase font-bold tracking-widest">
+                  SCAN TO CHECK-IN
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-center gap-2 pt-2">
+              <button
+                type="button"
+                onClick={handleCopyKioskLink}
+                className="px-4 py-2 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-xs font-bold text-zinc-800 dark:text-zinc-200 inline-flex items-center gap-1.5 transition cursor-pointer"
+              >
+                {copiedLink ? <Check className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" /> : <Copy className="h-3.5 w-3.5 text-zinc-500 dark:text-zinc-400" />}
+                <span>{copiedLink ? "Link Copied" : "Copy Kiosk Link"}</span>
+              </button>
+
+              <a
+                href={activeProperty?.code ? `/checkin?property=${encodeURIComponent(activeProperty.code)}` : activeProperty?.id ? `/checkin?propertyId=${activeProperty.id}` : "/checkin"}
+                target="_blank"
+                rel="noreferrer"
+                className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-xs font-bold text-white inline-flex items-center gap-1.5 transition shadow"
+              >
+                <span>Open Kiosk Portal ↗</span>
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

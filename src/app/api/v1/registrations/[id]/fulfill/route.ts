@@ -234,28 +234,6 @@ export async function POST(
 
       // Assign each room and post its charges
       for (const rm of targetRooms) {
-        await prisma.roomAssignment.create({
-          data: {
-            stayId: stay.id,
-            roomId: rm.id,
-            startsAt: arrivalDate,
-            rateHandling: "RETAIN_RATE",
-          },
-        });
-
-        await prisma.roomState.upsert({
-          where: { roomId: rm.id },
-          create: {
-            organizationId: registration.organizationId,
-            propertyId: registration.propertyId,
-            roomId: rm.id,
-            occupancyStatus: "OCCUPIED",
-            housekeepingStatus: "CLEAN",
-            sellabilityStatus: "SELLABLE",
-          },
-          update: { occupancyStatus: "OCCUPIED", lastChangedAt: new Date() },
-        });
-
         // Determine Room Base Price and Complimentary status
         let roomBasePrice = 3200;
         let isThisRoomComp = false;
@@ -298,6 +276,31 @@ export async function POST(
             } catch {}
           }
         }
+
+        await prisma.roomAssignment.create({
+          data: {
+            stayId: stay.id,
+            roomId: rm.id,
+            startsAt: arrivalDate,
+            rateHandling: isThisRoomComp ? "COMPLIMENTARY" : "RETAIN_RATE",
+            moveReason: isThisRoomComp ? "AGREED_RATE:0" : `AGREED_RATE:${roomBasePrice}`,
+          },
+        });
+
+        await prisma.roomState.upsert({
+          where: { roomId: rm.id },
+          create: {
+            organizationId: registration.organizationId,
+            propertyId: registration.propertyId,
+            roomId: rm.id,
+            occupancyStatus: "OCCUPIED",
+            housekeepingStatus: "CLEAN",
+            sellabilityStatus: "SELLABLE",
+          },
+          update: { occupancyStatus: "OCCUPIED", lastChangedAt: new Date() },
+        });
+
+
 
         const initialNightPrice = roomBasePrice * 1;
         const roomGst = isThisRoomComp
@@ -385,12 +388,55 @@ export async function POST(
         });
         if (i === 0) primaryStayId = stay.id;
 
+        let roomBasePrice = 3200;
+        let isThisRoomComp = false;
+
+        if (roomRates[rm.id] !== undefined && roomRates[rm.id] !== "") {
+          const rawVal = roomRates[rm.id];
+          const numVal = Number(rawVal);
+          if (rawVal === "COMP" || rawVal === "0" || numVal === 0) {
+            isThisRoomComp = true;
+            roomBasePrice = 0;
+          } else {
+            isThisRoomComp = false;
+            roomBasePrice = isNaN(numVal) ? 3200 : numVal;
+          }
+        } else if (rm.id === targetRooms[0]?.id) {
+          if (agreedTariff !== undefined && agreedTariff !== null && agreedTariff !== "") {
+            roomBasePrice = Number(agreedTariff);
+            isThisRoomComp = roomBasePrice === 0;
+          } else if (rm.roomTypeId) {
+            const rateVersion = await prisma.ratePlanVersion.findFirst({
+              where: { roomTypeId: rm.roomTypeId, active: true },
+              orderBy: { createdAt: "desc" },
+            });
+            if (rateVersion?.pricingJson) {
+              try {
+                const pricing = JSON.parse(rateVersion.pricingJson);
+                if (pricing.basePrice) roomBasePrice = Number(pricing.basePrice);
+              } catch {}
+            }
+          }
+        } else if (rm.roomTypeId) {
+          const rateVersion = await prisma.ratePlanVersion.findFirst({
+            where: { roomTypeId: rm.roomTypeId, active: true },
+            orderBy: { createdAt: "desc" },
+          });
+          if (rateVersion?.pricingJson) {
+            try {
+              const pricing = JSON.parse(rateVersion.pricingJson);
+              if (pricing.basePrice) roomBasePrice = Number(pricing.basePrice);
+            } catch {}
+          }
+        }
+
         await prisma.roomAssignment.create({
           data: {
             stayId: stay.id,
             roomId: rm.id,
             startsAt: arrivalDate,
-            rateHandling: "RETAIN_RATE",
+            rateHandling: isThisRoomComp ? "COMPLIMENTARY" : "RETAIN_RATE",
+            moveReason: isThisRoomComp ? "AGREED_RATE:0" : `AGREED_RATE:${roomBasePrice}`,
           },
         });
 
@@ -436,48 +482,6 @@ export async function POST(
           data: { folioId: folio.id },
         });
 
-        let roomBasePrice = 3200;
-        let isThisRoomComp = false;
-
-        if (roomRates[rm.id] !== undefined && roomRates[rm.id] !== "") {
-          const rawVal = roomRates[rm.id];
-          const numVal = Number(rawVal);
-          if (rawVal === "COMP" || rawVal === "0" || numVal === 0) {
-            isThisRoomComp = true;
-            roomBasePrice = 0;
-          } else {
-            isThisRoomComp = false;
-            roomBasePrice = isNaN(numVal) ? 3200 : numVal;
-          }
-        } else if (rm.id === targetRooms[0]?.id) {
-          if (agreedTariff !== undefined && agreedTariff !== null && agreedTariff !== "") {
-            roomBasePrice = Number(agreedTariff);
-            isThisRoomComp = roomBasePrice === 0;
-          } else if (rm.roomTypeId) {
-            const rateVersion = await prisma.ratePlanVersion.findFirst({
-              where: { roomTypeId: rm.roomTypeId, active: true },
-              orderBy: { createdAt: "desc" },
-            });
-            if (rateVersion?.pricingJson) {
-              try {
-                const pricing = JSON.parse(rateVersion.pricingJson);
-                if (pricing.basePrice) roomBasePrice = Number(pricing.basePrice);
-              } catch {}
-            }
-          }
-        } else if (rm.roomTypeId) {
-          const rateVersion = await prisma.ratePlanVersion.findFirst({
-            where: { roomTypeId: rm.roomTypeId, active: true },
-            orderBy: { createdAt: "desc" },
-          });
-          if (rateVersion?.pricingJson) {
-            try {
-              const pricing = JSON.parse(rateVersion.pricingJson);
-              if (pricing.basePrice) roomBasePrice = Number(pricing.basePrice);
-            } catch {}
-          }
-        }
-
         const initialNightPrice = roomBasePrice * 1;
         const roomGst = isThisRoomComp
           ? { taxableAmount: 0, taxAmount: 0, totalAmount: 0, components: [] }
@@ -522,6 +526,8 @@ export async function POST(
 
     // 5. Handle Advance Deposit on Master Folio
     let currentBalance = totalStayCharges;
+    const isMultiRoomGroup = targetRooms.length > 1;
+
     if (Number(depositAmount) > 0 && masterFolioId && masterWindowId) {
       const depAmt = Number(depositAmount);
       const seq = await prisma.documentSequence.findFirst({
@@ -548,13 +554,18 @@ export async function POST(
           status: "SUCCEEDED",
           reference: depositRef && depositRef.trim().length > 0
             ? depositRef.trim()
-            : (depositMethod === "DIRECT_BILL" ? `BTC-${companyName || guest?.companyName || "CORP"}` : null),
+            : (depositMethod === "DIRECT_BILL"
+              ? `BTC-${companyName || guest?.companyName || "CORP"}`
+              : (isMultiRoomGroup ? `GROUP_ADVANCE_POOL:₹${depAmt}` : null)),
           payerSnapshot: JSON.stringify({
             name: registration.fullName,
             phone: registration.mobilePhone,
             companyName: companyName || guest?.companyName || "",
             gstin: gstin || guest?.gstin || "",
             billToCompany: depositMethod === "DIRECT_BILL",
+            isGroupAdvancePool: isMultiRoomGroup,
+            totalGroupRooms: targetRooms.length,
+            groupRoomNumbers: targetRooms.map((r) => r.number),
           }),
         },
       });
@@ -566,6 +577,22 @@ export async function POST(
           amount: depAmt,
         },
       });
+
+      // Record unallocated Group Advance Pool in Deposit table
+      if (isMultiRoomGroup) {
+        await prisma.deposit.create({
+          data: {
+            organizationId: registration.organizationId,
+            propertyId: registration.propertyId,
+            reservationId: registration.id,
+            folioId: masterFolioId,
+            paymentId: payment.id,
+            originalAmount: depAmt,
+            availableAmount: depAmt,
+            status: "AVAILABLE",
+          },
+        });
+      }
 
       currentBalance -= depAmt;
     }

@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { useHotel } from "@/lib/context/hotel-context";
 import {
-  Sparkles,
+  Brush,
   CheckCircle2,
   Clock,
   AlertTriangle,
@@ -165,7 +165,7 @@ export default function HousekeepingPage() {
       <PageHeader
         title="Housekeeping Board"
         description="Turnaround cleaning, supervisor inspections & room state transitions"
-        icon={Sparkles}
+        icon={Brush}
         badge="H01–H05"
         badgeVariant="neutral"
         businessDate={activeProperty?.businessDate}

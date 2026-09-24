@@ -3,18 +3,32 @@ import { prisma } from "@/lib/db/prisma";
 import { getMidnightDayBoundaries } from "@/lib/domain/daily-report-service";
 import { calculateGST } from "@/lib/gst/calculator";
 import { isEntryForRoom } from "@/lib/domain/folio-service";
+import { resolveSelectedProperty } from "@/lib/config/property-config";
+import { getComprehensiveHotelReport } from "@/lib/domain/comprehensive-report-service";
 
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const propertyId = searchParams.get("propertyId");
+    const requestedPropId = searchParams.get("propertyId");
     const reportType = searchParams.get("type") || "CASHIER_COLLECTIONS_EXPENSES";
     const date = searchParams.get("date") || undefined;
     const startDate = searchParams.get("startDate") || undefined;
     const endDate = searchParams.get("endDate") || undefined;
 
-    if (!propertyId) {
-      return NextResponse.json({ error: "propertyId is required" }, { status: 400 });
+    // Resolve property from request or fallback to .env configuration (SELECTED_HOTEL_ID / SELECTED_HOTEL_CODE)
+    const targetProperty = await resolveSelectedProperty(requestedPropId);
+    if (!targetProperty) {
+      return NextResponse.json({ error: "No hotel property found. Please check SELECTED_HOTEL_ID in .env" }, { status: 400 });
+    }
+    const propertyId = targetProperty.id;
+
+    // 0. COMPREHENSIVE HOTEL MASTER REPORT (Daily Money, Rooms, and Admin Modifications)
+    if (reportType === "COMPREHENSIVE_AUDIT" || reportType === "COMPREHENSIVE_HOTEL_AUDIT") {
+      const comprehensiveReport = await getComprehensiveHotelReport({
+        propertyId,
+        date,
+      });
+      return NextResponse.json(comprehensiveReport);
     }
 
     // Compute 12 AM to 12 AM Midnight Date Range Boundaries
@@ -76,7 +90,7 @@ export async function GET(request: Request) {
         }),
         prisma.property.findUnique({
           where: { id: propertyId },
-          select: { displayName: true, code: true, gstin: true, businessDate: true },
+          select: { displayName: true, code: true, gstin: true, businessDate: true, openingCashBalance: true },
         }),
       ]);
 
@@ -208,14 +222,21 @@ export async function GET(request: Request) {
       }));
 
       // Method & Source Breakdown for Collections
+      // Compute Outstanding Dues across all active/open folios
+      const openFoliosList = await prisma.folio.findMany({
+        where: { propertyId, status: "OPEN" },
+        select: { balance: true },
+      });
+      const totalOutstanding = openFoliosList.reduce((sum, f) => sum + Math.max(0, f.balance), 0);
+
       const collectionsByMethod: Record<string, number> = {
-        UPI: 0,
         CASH: 0,
+        UPI: 0,
+        BTC: 0,
         CARD: 0,
-        OTA_VCC: 0,
         BANK_TRANSFER: 0,
-        DIRECT_BILL: 0,
         CHEQUE: 0,
+        OUTSTANDING: Math.round(totalOutstanding * 100) / 100,
       };
 
       const collectionsBySource: Record<string, number> = {
@@ -230,10 +251,27 @@ export async function GET(request: Request) {
       };
 
       let totalCollections = 0;
+      let validCollectionsCount = 0;
+
       formattedCollections.forEach((c) => {
+        const rawMethod = (c.method || "CASH").toUpperCase().trim();
+        // Skip internal ledger transfers from monetary collections
+        if (rawMethod === "TRANSFER" || rawMethod === "ADVANCE_ALLOCATION") {
+          return;
+        }
+
+        let targetMethod = rawMethod;
+        if (targetMethod === "DIRECT_BILL") targetMethod = "BTC";
+        else if (targetMethod === "OTA_VCC") targetMethod = "CARD";
+        else if (targetMethod === "BANK_TRANSFER" || targetMethod === "BANK TRASFER") targetMethod = "BANK_TRANSFER";
+        else if (!["CASH", "UPI", "BTC", "CARD", "BANK_TRANSFER", "CHEQUE"].includes(targetMethod)) {
+          targetMethod = "UPI";
+        }
+
         totalCollections += c.amount;
-        const m = c.method || "CASH";
-        collectionsByMethod[m] = (collectionsByMethod[m] || 0) + c.amount;
+        validCollectionsCount++;
+        collectionsByMethod[targetMethod] = (collectionsByMethod[targetMethod] || 0) + c.amount;
+
         const src = c.sourceCategory || "FOLIO_SETTLEMENT";
         collectionsBySource[src] = (collectionsBySource[src] || 0) + c.amount;
       });
@@ -267,10 +305,40 @@ export async function GET(request: Request) {
         expensesByMethod[m] = (expensesByMethod[m] || 0) + e.totalAmount;
       });
 
+      // Calculate Opening Balance (Starting float + carry-forward from prior days)
+      const baseOpening = (property as any).openingCashBalance || 0;
+      let openingBalance = baseOpening;
+      if (dateFilter?.gte) {
+        const priorCutoff = dateFilter.gte;
+        const [priorCashPayments, priorCashExpenses] = await Promise.all([
+          prisma.payment.findMany({
+            where: {
+              propertyId,
+              method: "CASH",
+              status: "SUCCEEDED",
+              receivedAt: { lt: priorCutoff },
+            },
+            select: { amount: true },
+          }),
+          prisma.expense.findMany({
+            where: {
+              propertyId,
+              status: "PAID",
+              paymentMethod: "CASH",
+              paidAt: { lt: priorCutoff },
+            },
+            select: { totalAmount: true },
+          }),
+        ]);
+        const priorCashIn = priorCashPayments.reduce((sum, p) => sum + p.amount, 0);
+        const priorCashOut = priorCashExpenses.reduce((sum, e) => sum + e.totalAmount, 0);
+        openingBalance = Math.round((baseOpening + priorCashIn - priorCashOut) * 100) / 100;
+      }
+
       const cashCollections = collectionsByMethod["CASH"] || 0;
       const cashExpenses = expensesByMethod["CASH"] || 0;
       const netCashFlow = totalCollections - totalExpenses;
-      const netCashDrawer = cashCollections - cashExpenses;
+      const netCashDrawer = Math.round((openingBalance + cashCollections - cashExpenses) * 100) / 100;
 
       return NextResponse.json({
         reportType,
@@ -289,6 +357,7 @@ export async function GET(request: Request) {
           expensesByMethod,
           netCashFlow,
           cashDrawerPosition: {
+            openingBalance,
             cashIn: cashCollections,
             cashOut: cashExpenses,
             netCashInHand: netCashDrawer,

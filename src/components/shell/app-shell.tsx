@@ -38,11 +38,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-100/60 dark:bg-[#09090b] text-slate-900 dark:text-zinc-100 transition-colors duration-150">
+    <div className="min-h-screen flex flex-col bg-zinc-50 dark:bg-[#09090b] text-zinc-900 dark:text-zinc-100 transition-colors duration-150">
       <AppHeader />
       <div className="flex flex-1 min-w-0">
         <AppSidebar />
-        <main className="flex-1 min-w-0 p-3 sm:p-4 lg:p-6 overflow-x-hidden transition-all duration-200">{children}</main>
+        <main className="flex-1 min-w-0 p-3 sm:p-5 lg:p-6 overflow-x-hidden transition-all duration-200">{children}</main>
       </div>
     </div>
   );

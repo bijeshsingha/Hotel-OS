@@ -36,7 +36,6 @@ import {
   Database,
   ArrowRight,
   ArrowLeft,
-  Sparkles,
   UserPlus,
   Globe,
   Compass,
@@ -44,6 +43,7 @@ import {
   Calendar,
   Car,
   Check,
+  Coins,
 } from "lucide-react";
 import {
 
@@ -176,6 +176,8 @@ export default function AdminPortalPage() {
     grcPrefix: "GRC-2627-",
     grcPreview: "",
     owners: [] as string[],
+    openingCashBalance: "0",
+    openingBalanceReason: "",
   });
   const [newOwnerName, setNewOwnerName] = useState("");
   const [hotelLoading, setHotelLoading] = useState(false);
@@ -210,6 +212,8 @@ export default function AdminPortalPage() {
           grcPrefix: grcSeq.prefix || "GRC-2627-",
           grcPreview: grcSeq.formattedPreview || "",
           owners: Array.isArray(data.owners) ? data.owners : [],
+          openingCashBalance: data.openingCashBalance !== undefined && data.openingCashBalance !== null ? String(data.openingCashBalance) : "0",
+          openingBalanceReason: "",
         });
       }
     } catch (e) {
@@ -226,7 +230,10 @@ export default function AdminPortalPage() {
       const res = await fetch("/api/v1/admin/hotel", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(hotelForm),
+        body: JSON.stringify({
+          ...hotelForm,
+          actorName: "Master Administrator",
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to save hotel details");
@@ -396,10 +403,19 @@ export default function AdminPortalPage() {
       extraPaxCount = Number(data.extraPaxCount);
     }
 
-    // Extract all room identifiers from data.preAssignedRoom, data.assignedRooms, and notes
+    // Extract active room identifiers from data.assignedRooms (live stay assignments) or fallback to data.preAssignedRoom
     const allParsedRooms: string[] = [];
 
-    if (data.preAssignedRoom) {
+    if (Array.isArray(data.assignedRooms) && data.assignedRooms.length > 0) {
+      data.assignedRooms.forEach((ar: any) => {
+        const rNum = ar.number || ar.id;
+        if (rNum && !allParsedRooms.includes(rNum)) allParsedRooms.push(rNum);
+        if (ar.rate !== undefined) {
+          roomRates[rNum] = ar.rate;
+          if (ar.id) roomRates[ar.id] = ar.rate;
+        }
+      });
+    } else if (data.preAssignedRoom) {
       const cleanStr = String(data.preAssignedRoom).replace(/^Room\s+/i, "");
       const rawRooms = cleanStr
         .split(/[,;\s]+/)
@@ -410,15 +426,8 @@ export default function AdminPortalPage() {
       });
     }
 
-    if (Array.isArray(data.assignedRooms)) {
-      data.assignedRooms.forEach((ar: any) => {
-        const rNum = ar.number || ar.id;
-        if (rNum && !allParsedRooms.includes(rNum)) allParsedRooms.push(rNum);
-        if (ar.rate !== undefined) {
-          roomRates[rNum] = ar.rate;
-          if (ar.id) roomRates[ar.id] = ar.rate;
-        }
-      });
+    if (data.roomRates && typeof data.roomRates === "object") {
+      roomRates = { ...roomRates, ...data.roomRates };
     }
 
     let parsedPrimaryRoom = allParsedRooms[0] || data.assignedRoomNumber || data.preAssignedRoom || "310";
@@ -532,12 +541,19 @@ export default function AdminPortalPage() {
         idDocumentNumber: editingGrc.idDocumentNumber,
         arrivalDateTime: `${editingGrc.arrivalDate} ${editingGrc.arrivalTime || "14:00"}`,
         expectedDepartureDate: editingGrc.expectedDepartureDate,
-        preAssignedRoom: editingGrc.preAssignedRoom,
+        preAssignedRoom: [
+          editingGrc.preAssignedRoom,
+          ...(editingGrc.additionalRoomIds || []).map((rid: string) => {
+            const r = roomsList.find((rm: any) => rm.id === rid || rm.number === rid);
+            return r?.number || rid;
+          }),
+        ].filter(Boolean).join(", "),
         status: editingGrc.status,
         agreedRoomTariff: editingGrc.isComplimentary ? 0 : Number(editingGrc.agreedRoomTariff),
         isRateInclusive: editingGrc.isRateInclusive !== false,
         depositAmount: Number(editingGrc.depositAmount) || 0,
         advancePaymentMethod: editingGrc.advancePaymentMethod,
+        roomRates: editingGrc.roomRates || {},
         coGuestsJson: editingGrc.coGuests,
         foreignPassportDetailsJson: editingGrc.foreignDetails,
         extraPaxCount: Number(editingGrc.extraPaxCount) || 0,
@@ -793,6 +809,8 @@ export default function AdminPortalPage() {
   };
 
   const handleOpenAddExpense = () => {
+    const now = new Date();
+    const localIso = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
     setExpenseForm({
       id: "",
       voucherNo: "",
@@ -804,7 +822,7 @@ export default function AdminPortalPage() {
       paymentMethod: "CASH",
       reference: "",
       notes: "",
-      paidAt: new Date().toISOString().slice(0, 16),
+      paidAt: localIso,
       status: "PAID",
     });
     setEditingExpense(null);
@@ -812,6 +830,15 @@ export default function AdminPortalPage() {
   };
 
   const handleOpenEditExpense = (expense: any) => {
+    const expenseDate = expense.paidAt
+      ? new Date(expense.paidAt)
+      : expense.businessDate
+      ? new Date(expense.businessDate + "T12:00:00")
+      : new Date();
+    const localIso = !isNaN(expenseDate.getTime())
+      ? new Date(expenseDate.getTime() - expenseDate.getTimezoneOffset() * 60000).toISOString().slice(0, 16)
+      : new Date().toISOString().slice(0, 16);
+
     setExpenseForm({
       id: expense.id,
       voucherNo: expense.voucherNo || "",
@@ -823,7 +850,7 @@ export default function AdminPortalPage() {
       paymentMethod: expense.paymentMethod || "CASH",
       reference: expense.reference || "",
       notes: expense.notes || "",
-      paidAt: expense.paidAt ? new Date(expense.paidAt).toISOString().slice(0, 16) : new Date().toISOString().slice(0, 16),
+      paidAt: localIso,
       status: expense.status || "PAID",
     });
     setEditingExpense(expense);
@@ -845,6 +872,13 @@ export default function AdminPortalPage() {
       return;
     }
 
+    const expenseDate = expenseForm.paidAt ? new Date(expenseForm.paidAt) : new Date();
+    const validExpenseDate = !isNaN(expenseDate.getTime()) ? expenseDate : new Date();
+    const expenseDateIso = validExpenseDate.toISOString();
+    const expenseBusinessDate = expenseForm.paidAt && expenseForm.paidAt.includes("T")
+      ? expenseForm.paidAt.split("T")[0]
+      : expenseDateIso.split("T")[0];
+
     setExpenseSaving(true);
     try {
       if (editingExpense?.id) {
@@ -860,7 +894,8 @@ export default function AdminPortalPage() {
             paymentMethod: expenseForm.paymentMethod,
             reference: expenseForm.reference,
             notes: expenseForm.notes,
-            paidAt: expenseForm.paidAt ? new Date(expenseForm.paidAt).toISOString() : undefined,
+            paidAt: expenseDateIso,
+            businessDate: expenseBusinessDate,
             status: expenseForm.status,
           }),
         });
@@ -881,6 +916,8 @@ export default function AdminPortalPage() {
             paymentMethod: expenseForm.paymentMethod,
             reference: expenseForm.reference,
             notes: expenseForm.notes,
+            paidAt: expenseDateIso,
+            businessDate: expenseBusinessDate,
             createdByName: "Admin",
           }),
         });
@@ -1537,13 +1574,84 @@ export default function AdminPortalPage() {
                     </div>
                   </div>
 
-                  {/* GROUP 5: Hotel Owners & Stakeholders (for Owner Payouts) */}
+                  {/* GROUP 5: Opening Cash Balance & Till Float */}
+                  <div className="space-y-3 pt-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="h-2 w-2 rounded-full bg-emerald-600" />
+                        <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">
+                          5. Opening Cash Balance (Starting Drawer Float)
+                        </h3>
+                      </div>
+                      <span className="text-[11px] font-mono text-emerald-600 dark:text-emerald-400 font-semibold bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded-md border border-emerald-200 dark:border-emerald-800">
+                        Mid-Operation Transition
+                      </span>
+                    </div>
+
+                    <div className="p-4 rounded-xl bg-emerald-50/20 dark:bg-emerald-950/10 border border-emerald-200/60 dark:border-emerald-900/40 space-y-4">
+                      <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed">
+                        When adopting Hotel OS mid-operation or taking over an existing property, enter the initial physical cash in the front desk till. This amount establishes the base opening drawer float for Cashier Shifts, Daily Manager Audits, and cash reconciliation.
+                      </p>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {/* Opening Cash Float */}
+                        <div className="space-y-1.5">
+                          <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                            Opening Cash Float (₹) <span className="text-rose-500">*</span>
+                          </label>
+                          <div className="relative">
+                            <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-bold text-zinc-400">
+                              ₹
+                            </span>
+                            <input
+                              type="number"
+                              min="0"
+                              step="any"
+                              value={hotelForm.openingCashBalance}
+                              onChange={(e) => setHotelForm({ ...hotelForm, openingCashBalance: e.target.value })}
+                              className="w-full h-11 pl-8 pr-3.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-base sm:text-xs font-mono font-bold text-emerald-700 dark:text-emerald-400 focus:border-emerald-600 focus:outline-none transition"
+                              placeholder="0.00"
+                            />
+                          </div>
+                          <p className="text-[11px] text-zinc-500">
+                            Physical cash counted in the drawer at the start of digital operations.
+                          </p>
+                        </div>
+
+                        {/* Audit Trail Narration / Reason */}
+                        <div className="space-y-1.5">
+                          <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                            Audit Trail Narration / Handover Reason
+                          </label>
+                          <input
+                            type="text"
+                            value={hotelForm.openingBalanceReason}
+                            onChange={(e) => setHotelForm({ ...hotelForm, openingBalanceReason: e.target.value })}
+                            className="w-full h-11 px-3.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-base sm:text-xs font-medium text-zinc-900 dark:text-white focus:border-emerald-600 focus:outline-none transition"
+                            placeholder="e.g. Initial till physical count upon going live"
+                          />
+                          <p className="text-[11px] text-zinc-500">
+                            Permanent note attached to the audit trail log for accounting compliance.
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-800 dark:text-emerald-300">
+                        <Coins className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                        <span>
+                          Every change to this opening float is recorded in the immutable System Audit Trail with timestamp, prior balance, new balance, and reason.
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* GROUP 6: Hotel Owners & Stakeholders (for Owner Payouts) */}
                   <div className="space-y-3 pt-2">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <span className="h-2 w-2 rounded-full bg-purple-600" />
                         <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">
-                          5. Hotel Owners & Equity Partners
+                          6. Hotel Owners & Equity Partners
                         </h3>
                       </div>
                       <span className="text-[11px] font-mono text-purple-600 dark:text-purple-400 font-semibold bg-purple-50 dark:bg-purple-950/60 px-2 py-0.5 rounded-md border border-purple-200 dark:border-purple-800">
@@ -4373,7 +4481,7 @@ export default function AdminPortalPage() {
 
                           {/* Date */}
                           <td className="py-2.5 px-3 font-mono text-zinc-600 dark:text-zinc-400 text-[11px] whitespace-nowrap">
-                            {exp.paidAt ? new Date(exp.paidAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : exp.businessDate || "—"}
+                            {exp.paidAt ? new Date(exp.paidAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : exp.businessDate || "-"}
                           </td>
 
                           {/* Category */}

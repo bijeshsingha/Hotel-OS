@@ -1,13 +1,15 @@
-import React from "react";
-import { Users, X } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { Users, Building2, X } from "lucide-react";
 import { formatINR } from "@/lib/gst/calculator";
 import { GroupPaymentFormState } from "./billing-types";
+import initialCompaniesJson from "@/data/initial-companies.json";
 
 interface GroupPaymentModalProps {
   isOpen: boolean;
   onClose: () => void;
   selectedGroupStayIds: string[];
   stays: any[];
+  activeProperty?: any;
   groupPaymentForm: GroupPaymentFormState;
   setGroupPaymentForm: React.Dispatch<React.SetStateAction<GroupPaymentFormState>>;
   onSubmit: (e: React.FormEvent) => Promise<void>;
@@ -19,11 +21,44 @@ export function GroupPaymentModal({
   onClose,
   selectedGroupStayIds,
   stays,
+  activeProperty,
   groupPaymentForm,
   setGroupPaymentForm,
   onSubmit,
   loading,
 }: GroupPaymentModalProps) {
+  const [companies, setCompanies] = useState<any[]>(initialCompaniesJson || []);
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string>("");
+
+  useEffect(() => {
+    async function loadCompanies() {
+      try {
+        const propId = activeProperty?.id || "";
+        const res = await fetch(`/api/v1/companies?propertyId=${propId}&type=ALL`);
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data) && data.length > 0) {
+            setCompanies(data);
+          }
+        }
+      } catch (err) {
+        console.warn("Could not fetch companies from API, using default list:", err);
+      }
+    }
+    loadCompanies();
+  }, [activeProperty?.id]);
+
+  useEffect(() => {
+    if (groupPaymentForm.companyName && companies.length > 0) {
+      const match = companies.find(
+        (c: any) => c.accountName?.toLowerCase() === groupPaymentForm.companyName.toLowerCase()
+      );
+      if (match) {
+        setSelectedCompanyId(match.id || match.accountName);
+      }
+    }
+  }, [groupPaymentForm.companyName, companies]);
+
   if (!isOpen) return null;
 
   return (
@@ -61,7 +96,17 @@ export function GroupPaymentModal({
               <label className="text-zinc-700 dark:text-zinc-300 font-bold block mb-1.5">Payment Method *</label>
               <select
                 value={groupPaymentForm.method}
-                onChange={(e) => setGroupPaymentForm({ ...groupPaymentForm, method: e.target.value })}
+                onChange={(e) => {
+                  const newMethod = e.target.value;
+                  setGroupPaymentForm((prev) => ({
+                    ...prev,
+                    method: newMethod,
+                    reference:
+                      newMethod === "DIRECT_BILL" && !prev.reference
+                        ? `PO-${(prev.companyName || "CORP").slice(0, 10)}`
+                        : prev.reference,
+                  }));
+                }}
                 className="w-full h-11 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 px-3 text-zinc-900 dark:text-white focus:outline-none focus:border-blue-500 font-bold"
               >
                 <option value="UPI">📱 UPI / QR Code</option>
@@ -74,31 +119,78 @@ export function GroupPaymentModal({
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="text-zinc-700 dark:text-zinc-300 font-bold block mb-1.5">
-                Company Name {groupPaymentForm.method === "DIRECT_BILL" ? "*" : "(Optional)"}
-              </label>
-              <input
-                type="text"
-                required={groupPaymentForm.method === "DIRECT_BILL"}
-                placeholder="e.g. Singhania Tech Ltd"
-                value={groupPaymentForm.companyName}
-                onChange={(e) => setGroupPaymentForm({ ...groupPaymentForm, companyName: e.target.value })}
-                className="w-full h-11 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 px-3.5 text-zinc-900 dark:text-white focus:outline-none focus:border-blue-500"
-              />
+          {/* Corporate Direct Billing Fields */}
+          {groupPaymentForm.method === "DIRECT_BILL" && (
+            <div className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-700/60 space-y-3.5 animate-in fade-in">
+              <div className="flex items-center gap-2 text-xs font-black text-amber-900 dark:text-amber-300 uppercase tracking-wider font-mono">
+                <Building2 className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                <span>Bill to Company (BTC / Corporate Group Ledger)</span>
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-zinc-700 dark:text-zinc-300 block mb-1">
+                  Select Registered Company
+                </label>
+                <select
+                  value={selectedCompanyId}
+                  onChange={(e) => {
+                    const id = e.target.value;
+                    setSelectedCompanyId(id);
+                    if (!id) return;
+                    const comp = companies.find((c: any) => (c.id || c.accountName) === id);
+                    if (comp) {
+                      setGroupPaymentForm((prev) => ({
+                        ...prev,
+                        companyName: comp.accountName,
+                        gstin: comp.gstin || prev.gstin,
+                        reference:
+                          prev.reference && !prev.reference.startsWith("PO-")
+                            ? prev.reference
+                            : `PO-${(comp.shortName || comp.accountName).slice(0, 10).replace(/[^a-zA-Z0-9]/g, "")}`,
+                      }));
+                    }
+                  }}
+                  className="w-full h-11 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 px-3 text-zinc-900 dark:text-white font-medium focus:outline-none focus:border-blue-500 cursor-pointer"
+                >
+                  <option value="">-- Choose Corporate Account / Entity --</option>
+                  {companies.map((c: any) => (
+                    <option key={c.id || c.accountName} value={c.id || c.accountName}>
+                      {c.accountName} {c.gstin ? `(${c.gstin})` : ""} {c.type ? `• ${c.type}` : ""}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[11px] text-zinc-500 mt-1">
+                  Select to auto-populate company details, or enter manually below.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                <div>
+                  <label className="text-zinc-700 dark:text-zinc-300 font-bold block mb-1.5">
+                    Company Name *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Singhania Tech Ltd"
+                    value={groupPaymentForm.companyName}
+                    onChange={(e) => setGroupPaymentForm({ ...groupPaymentForm, companyName: e.target.value })}
+                    className="w-full h-11 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 px-3.5 text-zinc-900 dark:text-white focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-zinc-700 dark:text-zinc-300 font-bold block mb-1.5">Company GSTIN (Optional)</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 18AAAAA0000A1Z5"
+                    value={groupPaymentForm.gstin}
+                    onChange={(e) => setGroupPaymentForm({ ...groupPaymentForm, gstin: e.target.value })}
+                    className="w-full h-11 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 px-3.5 text-zinc-900 dark:text-white focus:outline-none focus:border-blue-500 font-mono"
+                  />
+                </div>
+              </div>
             </div>
-            <div>
-              <label className="text-zinc-700 dark:text-zinc-300 font-bold block mb-1.5">Company GSTIN (Optional)</label>
-              <input
-                type="text"
-                placeholder="e.g. 18AAAAA0000A1Z5"
-                value={groupPaymentForm.gstin}
-                onChange={(e) => setGroupPaymentForm({ ...groupPaymentForm, gstin: e.target.value })}
-                className="w-full h-11 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 px-3.5 text-zinc-900 dark:text-white focus:outline-none focus:border-blue-500 font-mono"
-              />
-            </div>
-          </div>
+          )}
 
           <div>
             <label className="text-zinc-700 dark:text-zinc-300 font-bold block mb-1.5">Transaction Ref / UTR / Cheque # *</label>

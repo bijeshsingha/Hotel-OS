@@ -30,7 +30,8 @@ import {
   CreditCard,
   ArrowDownLeft,
   ArrowUpRight,
-  Sparkles,
+  Coins,
+  Mail,
 } from "lucide-react";
 
 type AuditCategory =
@@ -249,6 +250,20 @@ export default function AuditLogPage() {
           icon: <Calendar className="h-3 w-3 text-indigo-600 dark:text-indigo-400" />,
           label: action.replace(/_/g, " "),
         };
+      case "OPENING_CASH_BALANCE_SET":
+        return {
+          bg: "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/60",
+          dot: "bg-emerald-500",
+          icon: <Coins className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />,
+          label: "Opening Cash Set",
+        };
+      case "REPORT_EMAILED":
+        return {
+          bg: "bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800/60",
+          dot: "bg-blue-500",
+          icon: <Mail className="h-3 w-3 text-blue-600 dark:text-blue-400" />,
+          label: "Report Emailed",
+        };
       default:
         return {
           bg: "bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700",
@@ -273,6 +288,12 @@ export default function AuditLogPage() {
       }
       if (log.action === "PAYMENT_EDIT") {
         return `Edited: ₹${before?.amount} (${before?.method}) → ₹${after?.amount} (${after?.method})`;
+      }
+      if (log.action === "OPENING_CASH_BALANCE_SET") {
+        return `Opening Cash Float set: ₹${before?.openingCashBalance ?? 0} → ₹${after?.openingCashBalance ?? 0} (${after?.reason || "Starting Drawer Float"})`;
+      }
+      if (log.action === "REPORT_EMAILED") {
+        return `Report (${after?.reportType || "OPERATIONAL"}) emailed to ${after?.recipientEmail || "Recipient"}${after?.messageId ? ` [ID: ${after.messageId}]` : ""}`;
       }
       if (log.action === "EXPENSE_VOUCHER_CREATE") {
         return `Voucher ${after?.voucherNo || ""}: ₹${after?.totalAmount || after?.amount} to ${after?.payeeName || "Payee"} (${after?.category || "EXPENSE"})`;

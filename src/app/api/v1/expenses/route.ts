@@ -59,9 +59,66 @@ export async function POST(request: Request) {
     const numTax = Number(taxAmount || 0);
     const totalAmount = numAmount + numTax;
 
-    const count = await prisma.expense.count({ where: { propertyId } });
-    const voucherNo = `EXP-${property.code}-2627-${String(count + 1).padStart(4, "0")}`;
-    const targetBusinessDate = businessDate || property.businessDate || new Date().toISOString().split("T")[0];
+    // Generate unique, collision-proof voucher number based on highest sequence
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth() + 1;
+    const fyStart = month >= 4 ? year : year - 1;
+    const fyEnd = fyStart + 1;
+    const fyShort = `${String(fyStart).slice(2)}${String(fyEnd).slice(2)}`;
+    const prefix = `EXP-${property.code}-${fyShort}-`;
+
+    const latest = await prisma.expense.findFirst({
+      where: {
+        propertyId: property.id,
+        voucherNo: { startsWith: prefix },
+      },
+      orderBy: { voucherNo: "desc" },
+    });
+
+    let nextSeq = 1;
+    if (latest?.voucherNo) {
+      const parts = latest.voucherNo.split("-");
+      const lastPart = parts[parts.length - 1];
+      const parsed = parseInt(lastPart, 10);
+      if (!isNaN(parsed)) {
+        nextSeq = parsed + 1;
+      }
+    }
+
+    let voucherNo = `${prefix}${String(nextSeq).padStart(4, "0")}`;
+    let exists = await prisma.expense.findFirst({
+      where: { propertyId: property.id, voucherNo },
+    });
+    while (exists) {
+      nextSeq++;
+      voucherNo = `${prefix}${String(nextSeq).padStart(4, "0")}`;
+      exists = await prisma.expense.findFirst({
+        where: { propertyId: property.id, voucherNo },
+      });
+    }
+
+    let targetPaidAt: Date;
+    let targetBusinessDate: string;
+
+    if (paidAt) {
+      const parsed = new Date(paidAt);
+      targetPaidAt = !isNaN(parsed.getTime()) ? parsed : new Date();
+    } else if (businessDate) {
+      targetPaidAt = new Date(`${businessDate}T12:00:00.000Z`);
+    } else {
+      targetPaidAt = new Date();
+    }
+
+    if (businessDate) {
+      targetBusinessDate = businessDate;
+    } else if (paidAt) {
+      targetBusinessDate = typeof paidAt === "string" && paidAt.includes("T")
+        ? paidAt.split("T")[0]
+        : targetPaidAt.toISOString().split("T")[0];
+    } else {
+      targetBusinessDate = property.businessDate || new Date().toISOString().split("T")[0];
+    }
 
     const expense = await prisma.expense.create({
       data: {
@@ -78,7 +135,7 @@ export async function POST(request: Request) {
         reference: reference || null,
         notes: notes || null,
         businessDate: targetBusinessDate,
-        paidAt: paidAt ? new Date(paidAt) : new Date(),
+        paidAt: targetPaidAt,
         createdByName,
         status: "PAID",
       },

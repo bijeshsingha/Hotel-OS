@@ -34,48 +34,48 @@ export function PageHeader({
   };
 
   return (
-    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3.5 p-4 sm:p-5 rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200/80 dark:border-zinc-800/80 shadow-xs">
+    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 pb-4 border-b border-zinc-200/80 dark:border-zinc-800">
       <div className="space-y-1">
-        <div className="flex items-center gap-2.5 flex-wrap">
+        <div className="flex items-center gap-3 flex-wrap">
           {Icon && (
-            <div className="h-7 w-7 rounded-xl bg-blue-50 dark:bg-blue-950/50 border border-blue-200/60 dark:border-blue-800/50 flex items-center justify-center text-blue-600 dark:text-blue-400 shrink-0">
-              <Icon className="h-4 w-4" />
+            <div className="h-9 w-9 rounded-xl bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-zinc-700 dark:text-zinc-300 shrink-0">
+              <Icon className="h-5 w-5" />
             </div>
           )}
-          <h1 className="text-lg sm:text-xl font-bold text-zinc-900 dark:text-white tracking-tight">
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-zinc-950 dark:text-zinc-50 tracking-tight">
             {title}
           </h1>
           {badge && (
             <span
-              className={`rounded-md px-2 py-0.5 text-[10.5px] font-bold border uppercase tracking-wide flex items-center gap-1 shrink-0 ${
+              className={`rounded-full px-2.5 py-0.5 text-xs font-semibold border flex items-center gap-1.5 shrink-0 ${
                 badgeStyles[badgeVariant] || badgeStyles.neutral
               }`}
             >
               {badgeVariant === "live" && (
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
               )}
               {badge}
             </span>
           )}
         </div>
         {description && (
-          <p className="text-xs text-zinc-500 dark:text-zinc-400 max-w-3xl">
+          <p className="text-sm sm:text-base text-zinc-500 dark:text-zinc-400 max-w-3xl">
             {description}
           </p>
         )}
       </div>
 
-      <div className="flex items-center gap-2 flex-wrap md:self-center">
+      <div className="flex items-center gap-3 flex-wrap md:self-center">
         {metadata}
         {businessDate && (
-          <div className="flex items-center gap-2 h-9 px-3 rounded-xl bg-zinc-50/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 text-xs shadow-2xs shrink-0 select-none">
-            <span className="flex items-center gap-1.5 text-[10.5px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-              <Calendar className="h-3.5 w-3.5 text-zinc-400 dark:text-zinc-500 shrink-0" />
-              <span>Business Date</span>
+          <div className="flex items-center gap-2.5 h-10 px-3.5 rounded-xl bg-zinc-100/80 dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 text-sm shrink-0 select-none">
+            <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+              <Calendar className="h-4 w-4 text-zinc-400 dark:text-zinc-500 shrink-0" />
+              <span>Date</span>
             </span>
             <span className="h-3.5 w-px bg-zinc-200 dark:bg-zinc-700" />
-            <span className="font-mono font-bold text-xs text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            <span className="font-mono font-bold text-sm text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5">
+              <span className="h-2 w-2 rounded-full bg-emerald-500" />
               {businessDate}
             </span>
           </div>

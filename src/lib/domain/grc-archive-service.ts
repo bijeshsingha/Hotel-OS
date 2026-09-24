@@ -207,8 +207,12 @@ export async function syncGrcEditsEverywhere(updatedGrc: any) {
       const customRoomRates: Record<string, any> = notesObj.roomRates || {};
 
       // Update each room assignment with its specific rate if defined
+      // Update each active room assignment with its specific rate if defined
       if (stay.roomAssignments && stay.roomAssignments.length > 0) {
         for (const assignment of stay.roomAssignments) {
+          // If the assignment has already ended (e.g. historical room move or check-out), do not overwrite it!
+          if (assignment.endsAt) continue;
+
           const isPrimaryAssignment = primaryRoomNumber
             ? (assignment.room.number === primaryRoomNumber || assignment.room.id === primaryRoomNumber)
             : assignment === stay.roomAssignments[0];
@@ -220,18 +224,28 @@ export async function syncGrcEditsEverywhere(updatedGrc: any) {
             specificRate = Number(customRoomRates[assignment.room.id]);
           } else if (customRoomRates[assignment.room.number] !== undefined) {
             specificRate = Number(customRoomRates[assignment.room.number]);
-          } else if (assignment.moveReason?.startsWith("AGREED_RATE:")) {
-            const parsedMoveRate = Number(assignment.moveReason.replace("AGREED_RATE:", "").split(":")[0]);
-            if (!isNaN(parsedMoveRate)) specificRate = parsedMoveRate;
+          } else if (assignment.moveReason?.includes("AGREED_RATE:")) {
+            const match = assignment.moveReason.match(/AGREED_RATE:(\d+)/);
+            if (match) {
+              const parsedMoveRate = Number(match[1]);
+              if (!isNaN(parsedMoveRate)) specificRate = parsedMoveRate;
+            }
           } else {
             specificRate = numTariff;
           }
           
           const isRoomComp = specificRate === 0;
+          let newMoveReason = isRoomComp ? "AGREED_RATE:0" : `AGREED_RATE:${specificRate}:${isRateInclusive ? "INC" : "EXC"}`;
+          // Preserve any historical lineage prefix like MOVED_FROM:39|
+          if (assignment.moveReason && assignment.moveReason.includes("MOVED_FROM:")) {
+            const prefix = assignment.moveReason.split("AGREED_RATE:")[0];
+            newMoveReason = `${prefix}${newMoveReason}`;
+          }
+
           await prisma.roomAssignment.update({
             where: { id: assignment.id },
             data: {
-              moveReason: isRoomComp ? "AGREED_RATE:0" : `AGREED_RATE:${specificRate}:${isRateInclusive ? "INC" : "EXC"}`,
+              moveReason: newMoveReason,
               rateHandling: isRoomComp ? "COMPLIMENTARY" : "RETAIN_RATE",
             },
           });
@@ -239,7 +253,7 @@ export async function syncGrcEditsEverywhere(updatedGrc: any) {
       } else {
         const isComp = numTariff === 0;
         await prisma.roomAssignment.updateMany({
-          where: { stayId: stay.id },
+          where: { stayId: stay.id, endsAt: null },
           data: {
             moveReason: isComp ? "AGREED_RATE:0" : `AGREED_RATE:${numTariff}:${isRateInclusive ? "INC" : "EXC"}`,
             rateHandling: isComp ? "COMPLIMENTARY" : "RETAIN_RATE",
@@ -247,13 +261,14 @@ export async function syncGrcEditsEverywhere(updatedGrc: any) {
         });
       }
 
-      // Calculate total daily room tariff for folio update
+      // Calculate total daily room tariff for folio update using ACTIVE room assignments only
+      const activeAssignments = (stay.roomAssignments || []).filter(a => !a.endsAt);
       let totalDailyTariff = numTariff;
-      if (stay.roomAssignments && stay.roomAssignments.length > 1) {
-        totalDailyTariff = stay.roomAssignments.reduce((sum, a) => {
+      if (activeAssignments.length > 0) {
+        totalDailyTariff = activeAssignments.reduce((sum, a) => {
           const isPrimaryAssignment = primaryRoomNumber
             ? (a.room.number === primaryRoomNumber || a.room.id === primaryRoomNumber)
-            : a === stay.roomAssignments[0];
+            : a === activeAssignments[0];
 
           let specificRate = numTariff;
           if (isPrimaryAssignment) {
@@ -262,9 +277,12 @@ export async function syncGrcEditsEverywhere(updatedGrc: any) {
             specificRate = Number(customRoomRates[a.room.id]);
           } else if (customRoomRates[a.room.number] !== undefined) {
             specificRate = Number(customRoomRates[a.room.number]);
-          } else if (a.moveReason?.startsWith("AGREED_RATE:")) {
-            const parsedMoveRate = Number(a.moveReason.replace("AGREED_RATE:", "").split(":")[0]);
-            if (!isNaN(parsedMoveRate)) specificRate = parsedMoveRate;
+          } else if (a.moveReason?.includes("AGREED_RATE:")) {
+            const match = a.moveReason.match(/AGREED_RATE:(\d+)/);
+            if (match) {
+              const parsedMoveRate = Number(match[1]);
+              if (!isNaN(parsedMoveRate)) specificRate = parsedMoveRate;
+            }
           } else {
             specificRate = numTariff;
           }
@@ -291,18 +309,25 @@ export async function syncGrcEditsEverywhere(updatedGrc: any) {
               entryRate = Number(customRoomRates[entryRoomNum]);
             } else if (entryRoomNum) {
               const matchedAssignment = stay.roomAssignments?.find(
+                (a: any) => !a.endsAt && (a.room?.number === entryRoomNum || a.room?.id === entryRoomNum)
+              ) || stay.roomAssignments?.find(
                 (a: any) => a.room?.number === entryRoomNum || a.room?.id === entryRoomNum
               );
               const isMatchedPrimary = primaryRoomNumber
                 ? (matchedAssignment?.room?.number === primaryRoomNumber || matchedAssignment?.room?.id === primaryRoomNumber)
-                : matchedAssignment === stay.roomAssignments?.[0];
+                : matchedAssignment === (stay.roomAssignments || []).find((a: any) => !a.endsAt);
 
               if (isMatchedPrimary) {
                 entryRate = numTariff;
               } else {
-                const specificRate = matchedAssignment?.moveReason?.startsWith("AGREED_RATE:")
-                  ? Number(matchedAssignment.moveReason.replace("AGREED_RATE:", "").split(":")[0])
-                  : ((matchedAssignment?.room?.roomType as any)?.basePrice || numTariff);
+                let specificRate = (matchedAssignment?.room?.roomType as any)?.basePrice || numTariff;
+                if (matchedAssignment?.moveReason?.includes("AGREED_RATE:")) {
+                  const m = matchedAssignment.moveReason.match(/AGREED_RATE:(\d+)/);
+                  if (m) {
+                    const parsed = Number(m[1]);
+                    if (!isNaN(parsed)) specificRate = parsed;
+                  }
+                }
                 entryRate = isNaN(specificRate) ? numTariff : specificRate;
               }
             } else if (stay.roomAssignments && stay.roomAssignments.length > 1) {
@@ -349,11 +374,12 @@ export async function syncGrcEditsEverywhere(updatedGrc: any) {
     const customRoomExtraPax: Record<string, any> = notesObj.roomExtraPax || {};
 
     let totalExtraPax = Math.max(0, primaryExtraPax);
-    if (stay.roomAssignments && stay.roomAssignments.length > 1) {
-      totalExtraPax = stay.roomAssignments.reduce((sum: number, a: any) => {
+    const activeAssignmentsForPax = (stay.roomAssignments || []).filter((a: any) => !a.endsAt);
+    if (activeAssignmentsForPax.length > 1) {
+      totalExtraPax = activeAssignmentsForPax.reduce((sum: number, a: any) => {
         const isPrimaryAssignment = primaryRoomNumber
           ? (a.room?.number === primaryRoomNumber || a.room?.id === primaryRoomNumber)
-          : a === stay.roomAssignments[0];
+          : a === activeAssignmentsForPax[0];
 
         let roomPax = 0;
         if (isPrimaryAssignment) {
@@ -403,7 +429,10 @@ export async function syncGrcEditsEverywhere(updatedGrc: any) {
           customTaxRate: 5,
         });
 
-        const paxDescription = `Extra Pax (${totalExtraPax} Pax x ₹${resolvedExtraRate}/night - Night 1)`;
+        const primaryRoomNumber = stay.roomAssignments?.find((ra: any) => !ra.endsAt)?.room?.number || stay.roomAssignments?.[0]?.room?.number || "";
+        const paxDescription = primaryRoomNumber
+          ? `Extra Pax - Room ${primaryRoomNumber} (${totalExtraPax} Pax x ₹${resolvedExtraRate}/night - Night 1)`
+          : `Extra Pax (${totalExtraPax} Pax x ₹${resolvedExtraRate}/night - Night 1)`;
 
         if (allPaxEntries.length > 0) {
           // Update primary extra pax folio entry
@@ -466,22 +495,31 @@ export async function syncGrcEditsEverywhere(updatedGrc: any) {
       const numDeposit = Number(depositAmount) || 0;
       const guestWindow = stay.folio.windows[0];
 
-      // Find any advance deposit payment
+      // Find any advance deposit payment (including group advance pool)
       const existingAdvancePayment = stay.folio.payments.find(
-        (p) => p.reference === "ADVANCE_DEPOSIT" || p.reference?.startsWith("ADVANCE") || stay.folio?.payments.length === 1
+        (p) => p.reference?.includes("GROUP_ADVANCE_POOL") || p.reference === "ADVANCE_DEPOSIT" || p.reference?.startsWith("ADVANCE") || stay.folio?.payments.length === 1
       );
 
       if (numDeposit > 0) {
         if (existingAdvancePayment) {
-          // Update existing advance payment amount and method
+          // Update existing advance payment amount and method, preserving group pool reference if present
+          const isGroupPool = existingAdvancePayment.reference?.includes("GROUP_ADVANCE_POOL");
+          const newRef = isGroupPool ? `GROUP_ADVANCE_POOL:₹${numDeposit}` : (existingAdvancePayment.reference || "ADVANCE_DEPOSIT");
           await prisma.payment.update({
             where: { id: existingAdvancePayment.id },
             data: {
               amount: numDeposit,
               method: advancePaymentMethod || existingAdvancePayment.method || "CASH",
+              reference: newRef,
               payerSnapshot: JSON.stringify({
                 name: fullName || stay.primaryGuest?.name || "Guest",
                 phone: mobilePhone || stay.primaryGuest?.phone || "",
+                ...(existingAdvancePayment.payerSnapshot ? (() => {
+                  try {
+                    const snap = JSON.parse(existingAdvancePayment.payerSnapshot);
+                    return { isGroupAdvancePool: snap.isGroupAdvancePool, totalGroupRooms: snap.totalGroupRooms, groupRoomNumbers: snap.groupRoomNumbers };
+                  } catch { return {}; }
+                })() : {})
               }),
             },
           });

@@ -213,15 +213,21 @@ export async function getDailyMidnightReport(
     return dep === reportDate && (s.status === "CHECKED_OUT" || s.status === "IN_HOUSE");
   }).length;
 
-  // 5. Aggregate Collections
+  // 5. Aggregate Collections & Calculate Outstanding
+  const openFoliosList = await prisma.folio.findMany({
+    where: { propertyId, status: "OPEN" },
+    select: { balance: true },
+  });
+  const totalOutstanding = openFoliosList.reduce((sum, f) => sum + Math.max(0, f.balance), 0);
+
   const collectionsByMethod: Record<string, number> = {
-    UPI: 0,
     CASH: 0,
+    UPI: 0,
+    BTC: 0,
     CARD: 0,
-    OTA_VCC: 0,
     BANK_TRANSFER: 0,
-    DIRECT_BILL: 0,
     CHEQUE: 0,
+    OUTSTANDING: Math.round(totalOutstanding * 100) / 100,
   };
 
   const collectionsBySource: Record<string, number> = {
@@ -233,9 +239,10 @@ export async function getDailyMidnightReport(
   };
 
   let totalCollections = 0;
+  let validCollectionsCount = 0;
   const formattedCollections = payments.map((p) => {
     let payerName = "Guest";
-    let roomNumber = "—";
+    let roomNumber = "-";
 
     if (p.payerSnapshot) {
       try {
@@ -292,10 +299,22 @@ export async function getDailyMidnightReport(
       sourceLabel = "Direct Collection";
     }
 
-    totalCollections += p.amount;
-    const m = p.method || "CASH";
-    collectionsByMethod[m] = (collectionsByMethod[m] || 0) + p.amount;
-    collectionsBySource[sourceCategory] = (collectionsBySource[sourceCategory] || 0) + p.amount;
+    const rawMethod = (p.method || "CASH").toUpperCase().trim();
+    const isInternal = rawMethod === "TRANSFER" || rawMethod === "ADVANCE_ALLOCATION";
+
+    if (!isInternal) {
+      totalCollections += p.amount;
+      validCollectionsCount++;
+      let targetMethod = rawMethod;
+      if (targetMethod === "DIRECT_BILL") targetMethod = "BTC";
+      else if (targetMethod === "OTA_VCC") targetMethod = "CARD";
+      else if (targetMethod === "BANK_TRANSFER" || targetMethod === "BANK TRASFER") targetMethod = "BANK_TRANSFER";
+      else if (!["CASH", "UPI", "BTC", "CARD", "BANK_TRANSFER", "CHEQUE"].includes(targetMethod)) {
+        targetMethod = "UPI";
+      }
+      collectionsByMethod[targetMethod] = (collectionsByMethod[targetMethod] || 0) + p.amount;
+      collectionsBySource[sourceCategory] = (collectionsBySource[sourceCategory] || 0) + p.amount;
+    }
 
     return {
       id: p.id,
@@ -310,7 +329,7 @@ export async function getDailyMidnightReport(
       method: p.method,
       sourceCategory,
       sourceLabel,
-      reference: p.reference && !p.reference.startsWith("GRC-DEPOSIT-") ? p.reference : "—",
+      reference: p.reference && !p.reference.startsWith("GRC-DEPOSIT-") ? p.reference : "-",
     };
   });
 
@@ -384,7 +403,8 @@ export async function getDailyMidnightReport(
 
   const priorCashIn = priorCashPayments.reduce((sum, p) => sum + p.amount, 0);
   const priorCashOut = priorCashExpenses.reduce((sum, e) => sum + e.totalAmount, 0);
-  const openingBalance = Math.max(0, Math.round((priorCashIn - priorCashOut) * 100) / 100);
+  const baseOpening = (property as any).openingCashBalance || 0;
+  const openingBalance = Math.max(0, Math.round((baseOpening + priorCashIn - priorCashOut) * 100) / 100);
 
   const cashIn = collectionsByMethod["CASH"] || 0;
   const cashOut = expensesByMethod["CASH"] || 0;

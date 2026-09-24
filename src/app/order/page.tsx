@@ -26,7 +26,6 @@ import {
   Timer,
   RefreshCw,
   History,
-  Sparkles,
   ArrowRight,
   AlertCircle,
 } from "lucide-react";

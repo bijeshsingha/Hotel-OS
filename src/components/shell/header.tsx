@@ -18,7 +18,6 @@ import {
   BedDouble,
   ArrowRight,
   X,
-  Sparkles,
   LogOut,
   Plus,
   Sun,

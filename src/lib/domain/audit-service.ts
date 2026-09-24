@@ -74,6 +74,8 @@ export const AUDIT_CATEGORY_MAP: Record<string, AuditCategory[]> = {
   ROOM_UPDATE: ["ADMIN"],
   RATE_MATRIX_UPDATE: ["ADMIN"],
   HOTEL_PROFILE_UPDATE: ["ADMIN"],
+  OPENING_CASH_BALANCE_SET: ["FINANCIAL", "CASH_FLOW", "ADMIN"],
+  REPORT_EMAILED: ["ADMIN", "FINANCIAL"],
 };
 
 export function getAuditCategoriesForAction(action: string): AuditCategory[] {

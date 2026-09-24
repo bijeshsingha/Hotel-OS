@@ -25,7 +25,9 @@ import {
   ChevronLeft,
   ChevronRight,
   ShieldCheck,
+  Mail,
 } from "lucide-react";
+import { EmailReportModal } from "@/components/reports/email-report-modal";
 
 export default function DailyManagerAuditPage() {
   const { activeProperty, refreshKey, refreshData } = useHotel();
@@ -35,6 +37,7 @@ export default function DailyManagerAuditPage() {
   const [data, setData] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   const [showPrintModal, setShowPrintModal] = useState(false);
+  const [showEmailModal, setShowEmailModal] = useState(false);
   const [isArchiving, setIsArchiving] = useState(false);
   const [timeUntilMidnight, setTimeUntilMidnight] = useState("");
 
@@ -202,28 +205,39 @@ export default function DailyManagerAuditPage() {
           </div>
 
           {/* Quick Date Selector */}
-          <div className="flex items-center gap-1 bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-lg p-0.5 shadow-xs">
+          <div className="inline-flex items-center h-10 p-1 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 rounded-xl shadow-2xs">
             <button
               onClick={() => handleDateShift(-1)}
-              className="p-1.5 rounded-md hover:bg-zinc-200 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-400 transition cursor-pointer"
+              className="h-8 w-8 rounded-lg flex items-center justify-center hover:bg-white dark:hover:bg-zinc-800 text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white transition cursor-pointer"
               title="Previous Day"
             >
-              <ChevronLeft className="h-3.5 w-3.5" />
+              <ChevronLeft className="h-4 w-4" />
             </button>
-            <input
-              type="date"
-              value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
-              className="bg-transparent text-xs font-mono font-medium px-2 py-1 text-zinc-900 dark:text-white focus:outline-none cursor-pointer"
-            />
+            <div className="flex items-center px-1">
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                className="h-8 bg-transparent border-0 border-none outline-none ring-0 text-xs sm:text-sm font-mono font-bold px-1.5 text-zinc-900 dark:text-white focus:outline-none focus:ring-0 cursor-pointer"
+              />
+            </div>
             <button
               onClick={() => handleDateShift(1)}
-              className="p-1.5 rounded-md hover:bg-zinc-200 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-400 transition cursor-pointer"
+              className="h-8 w-8 rounded-lg flex items-center justify-center hover:bg-white dark:hover:bg-zinc-800 text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white transition cursor-pointer"
               title="Next Day"
             >
-              <ChevronRight className="h-3.5 w-3.5" />
+              <ChevronRight className="h-4 w-4" />
             </button>
           </div>
+
+          {/* Email Report Button */}
+          <button
+            onClick={() => setShowEmailModal(true)}
+            className="h-10 px-4 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center gap-2 transition shadow-xs cursor-pointer active:scale-98"
+          >
+            <Mail className="h-4 w-4" />
+            <span>Email Report</span>
+          </button>
 
           {/* Print Official Report Button */}
           <button
@@ -712,6 +726,12 @@ export default function DailyManagerAuditPage() {
               </span>
               <div className="flex items-center gap-2">
                 <button
+                  onClick={() => setShowEmailModal(true)}
+                  className="flex items-center gap-1.5 rounded-xl bg-blue-600 px-3.5 py-1.5 text-xs font-bold text-white hover:bg-blue-700 transition shadow-xs cursor-pointer"
+                >
+                  <Mail className="h-3.5 w-3.5" /> Email Copy
+                </button>
+                <button
                   onClick={() => window.print()}
                   className="flex items-center gap-1.5 rounded-xl bg-zinc-950 px-3.5 py-1.5 text-xs font-bold text-white hover:bg-zinc-800 transition shadow-xs cursor-pointer"
                 >
@@ -818,6 +838,13 @@ export default function DailyManagerAuditPage() {
           </div>
         </div>
       )}
+      {/* Email Report Modal */}
+      <EmailReportModal
+        isOpen={showEmailModal}
+        onClose={() => setShowEmailModal(false)}
+        defaultReportType="DAILY_MANAGER_MIDNIGHT"
+        targetDate={selectedDate}
+      />
     </div>
   );
 }

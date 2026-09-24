@@ -52,7 +52,7 @@
 }
 
 html {
-  font-size: 14px;
+  font-size: 16px;
 }
 
 body {
@@ -140,16 +140,42 @@ nextjs-portal {
    VERCEL GEIST FORM CONTROLS & TYPOGRAPHY ELEVATION
    ================================================================ */
 
-input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
-select,
-textarea {
-  min-height: 36px;
-  font-size: 13.5px;
-  border-radius: 0.5rem;
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not(.bg-transparent):not(.border-0):not(.border-none),
+select:not(.bg-transparent):not(.border-0):not(.border-none),
+textarea:not(.bg-transparent):not(.border-0):not(.border-none) {
+  min-height: 40px;
+  font-size: 14px;
+  border-radius: 0.625rem;
   border: 1px solid var(--border);
   background-color: var(--card);
   color: var(--foreground);
   transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+}
+
+/* Clean reset for transparent / borderless controls inside unified toolbars */
+input.bg-transparent,
+select.bg-transparent {
+  background-color: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  min-height: unset !important;
+}
+
+/* Native date input picker indicator clean styling */
+input[type="date"]::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  opacity: 0.55;
+  padding: 0;
+  margin: 0;
+  transition: opacity 0.15s;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
+}
+
+.dark input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(0.85);
 }
 
 input:not([type="checkbox"]):not([type="radio"]):not([type="range"])::placeholder,

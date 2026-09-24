@@ -1,67 +1,51 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
-import { useHotel } from "@/lib/context/hotel-context";
+import React, { useState } from "react";
+import Link from "next/link";
 import { formatINR } from "@/lib/gst/calculator";
 import {
   TrendingUp,
   BedDouble,
   DollarSign,
-  UtensilsCrossed,
   Receipt,
-  AlertTriangle,
-  Sparkles,
   Building2,
-  Calendar,
-  ArrowUpRight,
-  CheckCircle2,
+  Mail,
+  Coins,
+  RefreshCw,
+  PlusCircle,
+  FileText,
+  Moon,
+  Wallet,
   Clock,
-  ChevronRight,
+  ArrowUpRight,
+  ShieldCheck,
 } from "lucide-react";
-import {
-  ResponsiveContainer,
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  Tooltip,
-  CartesianGrid,
-} from "recharts";
 import { PageHeader, StatCard } from "@/components/ui";
+import { useDashboardMetrics } from "@/lib/hooks/use-dashboard-metrics";
+import { OperationalStatusStrip } from "@/components/dashboard/operational-status-strip";
+import { PortfolioOverview } from "@/components/dashboard/portfolio-overview";
+import { RevenueAnalyticsChart } from "@/components/dashboard/revenue-analytics-chart";
+import { DrawerCashWidget } from "@/components/dashboard/drawer-cash-widget";
+import { FrontDeskPulseCard } from "@/components/dashboard/frontdesk-pulse-card";
+import { EmailReportModal } from "@/components/reports/email-report-modal";
 
 export default function DashboardPage() {
-  const { activeProperty, refreshKey, isInitialized, isLoading: contextLoading } = useHotel();
-  const [data, setData] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (isInitialized === false && typeof window !== "undefined") {
-      window.location.href = "/onboarding";
-      return;
-    }
-
-    if (!activeProperty) return;
-    setLoading(true);
-    fetch(`/api/v1/dashboard?propertyId=${activeProperty.id}`)
-      .then((res) => res.json())
-      .then((d) => setData(d))
-      .catch((err) => console.error("Dashboard error:", err))
-      .finally(() => setLoading(false));
-  }, [activeProperty, refreshKey, isInitialized]);
+  const { activeProperty, isInitialized, data, loading } = useDashboardMetrics();
+  const [showEmailModal, setShowEmailModal] = useState(false);
 
   if (isInitialized === false) {
     return (
       <div className="flex min-h-[400px] flex-col items-center justify-center p-6 text-center">
-        <Building2 className="h-12 w-12 text-blue-500 mb-3" />
-        <h2 className="text-lg font-bold text-zinc-900 dark:text-white">Welcome to ROVESTA OS</h2>
+        <Building2 className="h-10 w-10 text-blue-500 mb-3" />
+        <h2 className="text-base font-bold text-zinc-900 dark:text-white">Setup Required</h2>
         <p className="text-xs text-zinc-500 max-w-sm mt-1 mb-4">
-          No hotel property is configured yet. Redirecting to Hotel Onboarding Studio...
+          No hotel property is configured yet. Redirecting to onboarding...
         </p>
         <a
           href="/onboarding"
-          className="rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-bold text-white hover:bg-blue-500 transition shadow-lg"
+          className="rounded-lg bg-blue-600 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-500 transition"
         >
-          Launch Hotel Onboarding Studio
+          Launch Onboarding
         </a>
       </div>
     );
@@ -72,328 +56,212 @@ export default function DashboardPage() {
       <div className="flex h-72 items-center justify-center">
         <div className="flex items-center gap-2 text-xs font-mono text-zinc-500">
           <div className="h-3 w-3 animate-spin rounded-full border-2 border-zinc-400 border-t-transparent" />
-          <span>Loading operational metrics...</span>
+          <span>Loading executive metrics & operational pulse...</span>
         </div>
       </div>
     );
   }
 
-  const { kpis, trendHistory, propertiesComparison } = data;
+  const {
+    kpis,
+    trendHistory,
+    propertiesComparison,
+    cashDrawerPosition,
+    collectionsByMethod,
+    hourlyCollections,
+    arrivalsList,
+    todayDepartures,
+    urgentFolios,
+  } = data;
 
   return (
-    <div className="space-y-4 max-w-[1600px] mx-auto w-full">
-      {/* Top Property Info Bar */}
+    <div className="space-y-6 max-w-[1700px] mx-auto w-full pb-16">
+      
+      {/* 1. EXECUTIVE COMMAND HEADER */}
       <PageHeader
-        title={activeProperty?.displayName || "Hotel Management Dashboard"}
-        description={`GSTIN: ${data.property?.gstin || "N/A"} • Property Code: ${activeProperty?.code || "DEFAULT"} • Multi-Property Portfolio`}
-        badge="Live"
+        title={activeProperty?.displayName || "Hotel Executive Command Center"}
+        description={`GSTIN: ${data.property?.gstin || "N/A"} • Code: ${activeProperty?.code || "DEFAULT"}`}
+        badge="Live Operations"
         badgeVariant="live"
         businessDate={activeProperty?.businessDate}
+        actions={
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              onClick={() => setShowEmailModal(true)}
+              className="h-9 px-3.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center gap-2 transition shadow-xs cursor-pointer active:scale-98"
+            >
+              <Mail className="h-4 w-4" />
+              <span>Email Briefing</span>
+            </button>
+
+            <Link
+              href="/night-audit/manager-audit"
+              className="h-9 px-3.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-white font-bold text-xs flex items-center gap-1.5 transition shadow-xs"
+            >
+              <Moon className="h-3.5 w-3.5 text-amber-400" />
+              <span className="hidden sm:inline">Midnight Audit</span>
+            </Link>
+          </div>
+        }
         metadata={
-          <div className="rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 px-3 py-1.5 text-right shadow-xs shrink-0">
-            <span className="text-zinc-400 text-[10px] block font-semibold uppercase">Audit Cutoff</span>
-            <span className="font-bold font-mono text-xs text-amber-600 dark:text-amber-400">03:00 AM</span>
+          <div className="rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 px-3.5 py-2 text-right shrink-0">
+            <span className="text-zinc-400 text-[10px] block font-bold uppercase tracking-wider">Audit Cutoff</span>
+            <span className="font-bold font-mono text-sm text-amber-600 dark:text-amber-400">03:00 AM</span>
           </div>
         }
       />
 
-      {/* Front Desk & Operations Launchpad */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
-        <a
+      {/* 2. QUICK ACTION LAUNCHPAD */}
+      <div className="p-2 sm:p-2.5 rounded-2xl bg-zinc-100/80 dark:bg-zinc-900/60 border border-zinc-200/60 dark:border-zinc-800/60 flex items-center gap-2 overflow-x-auto">
+        <Link
           href="/pms"
-          className="group p-4 rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200/80 dark:border-zinc-800/80 hover:border-emerald-400 dark:hover:border-emerald-500/50 transition-all shadow-xs space-y-2.5"
+          className="h-9 px-3 rounded-xl bg-white dark:bg-zinc-800 hover:bg-blue-50 dark:hover:bg-blue-950/40 text-zinc-900 dark:text-zinc-100 text-xs font-bold flex items-center gap-1.5 border border-zinc-200 dark:border-zinc-700 shrink-0 transition"
         >
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <span className="h-9 w-9 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
-                <BedDouble className="h-4.5 w-4.5" />
-              </span>
-              <div>
-                <h3 className="text-sm font-bold text-zinc-900 dark:text-white group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition">
-                  PMS Room Rack
-                </h3>
-                <p className="text-xs text-zinc-500">
-                  {kpis.totalRooms} Rooms Total • {kpis.inspectedRooms} Clean & Ready
-                </p>
-              </div>
-            </div>
-            <ArrowUpRight className="h-4 w-4 text-zinc-400 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition" />
-          </div>
-          <div className="pt-2 border-t border-zinc-100 dark:border-zinc-800/80 flex items-center justify-between text-xs">
-            <span className="text-zinc-500">Front Desk & Intake</span>
-            <span className="font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-0.5">
-              Open Grid <ChevronRight className="h-3 w-3" />
-            </span>
-          </div>
-        </a>
+          <PlusCircle className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
+          <span>New Check-in / GRC</span>
+        </Link>
 
-        <a
-          href="/pms?tab=reservations"
-          className="group p-4 rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200/80 dark:border-zinc-800/80 hover:border-blue-400 dark:hover:border-blue-500/50 transition-all shadow-xs space-y-2.5"
+        <Link
+          href="/billing"
+          className="h-9 px-3 rounded-xl bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700/60 text-zinc-900 dark:text-zinc-100 text-xs font-semibold flex items-center gap-1.5 border border-zinc-200 dark:border-zinc-700 shrink-0 transition"
         >
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <span className="h-9 w-9 rounded-xl bg-blue-50 dark:bg-blue-950/50 border border-blue-200 dark:border-blue-800/60 text-blue-600 dark:text-blue-400 flex items-center justify-center">
-                <Calendar className="h-4.5 w-4.5" />
-              </span>
-              <div>
-                <h3 className="text-sm font-bold text-zinc-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition">
-                  Future Bookings
-                </h3>
-                <p className="text-xs text-zinc-500">Advance Room Reservations</p>
-              </div>
-            </div>
-            <ArrowUpRight className="h-4 w-4 text-zinc-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition" />
-          </div>
-          <div className="pt-2 border-t border-zinc-100 dark:border-zinc-800/80 flex items-center justify-between text-xs">
-            <span className="text-zinc-500">Create & Manage Bookings</span>
-            <span className="font-semibold text-blue-600 dark:text-blue-400 flex items-center gap-0.5">
-              Bookings Suite <ChevronRight className="h-3 w-3" />
-            </span>
-          </div>
-        </a>
+          <Receipt className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+          <span>Guest Folios & Billing</span>
+        </Link>
 
-        <a
-          href="/order"
-          className="group p-4 rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200/80 dark:border-zinc-800/80 hover:border-amber-400 dark:hover:border-amber-500/50 transition-all shadow-xs space-y-2.5 sm:col-span-2 lg:col-span-1"
+        <Link
+          href="/cashier-shift"
+          className="h-9 px-3 rounded-xl bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700/60 text-zinc-900 dark:text-zinc-100 text-xs font-semibold flex items-center gap-1.5 border border-zinc-200 dark:border-zinc-700 shrink-0 transition"
         >
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <span className="h-9 w-9 rounded-xl bg-amber-50 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-800/60 text-amber-600 dark:text-amber-400 flex items-center justify-center">
-                <UtensilsCrossed className="h-4.5 w-4.5" />
-              </span>
-              <div>
-                <h3 className="text-sm font-bold text-zinc-900 dark:text-white group-hover:text-amber-600 dark:group-hover:text-amber-400 transition">
-                  In-Room Dining POS
-                </h3>
-                <p className="text-xs text-zinc-500">93 Menu Items Active</p>
-              </div>
-            </div>
-            <ArrowUpRight className="h-4 w-4 text-zinc-400 group-hover:text-amber-600 dark:group-hover:text-amber-400 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition" />
-          </div>
-          <div className="pt-2 border-t border-zinc-100 dark:border-zinc-800/80 flex items-center justify-between text-xs">
-            <span className="text-zinc-500">Restaurant & Room Service</span>
-            <span className="font-semibold text-amber-600 dark:text-amber-400 flex items-center gap-0.5">
-              Open Menu <ChevronRight className="h-3 w-3" />
-            </span>
-          </div>
-        </a>
+          <Wallet className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+          <span>Cashier Till & Shift Handover</span>
+        </Link>
+
+        <Link
+          href="/reports"
+          className="h-9 px-3 rounded-xl bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700/60 text-zinc-900 dark:text-zinc-100 text-xs font-semibold flex items-center gap-1.5 border border-zinc-200 dark:border-zinc-700 shrink-0 transition"
+        >
+          <FileText className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
+          <span>Master Reports & Ledgers</span>
+        </Link>
+
+        <Link
+          href="/housekeeping"
+          className="h-9 px-3 rounded-xl bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700/60 text-zinc-900 dark:text-zinc-100 text-xs font-semibold flex items-center gap-1.5 border border-zinc-200 dark:border-zinc-700 shrink-0 transition"
+        >
+          <BedDouble className="h-3.5 w-3.5 text-teal-600 dark:text-teal-400" />
+          <span>Housekeeping Board</span>
+        </Link>
       </div>
 
-      {/* KPI Stats Grid (4 -> 2 -> 1 Responsive Reflow) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-        {/* Occupancy % */}
+      {/* 3. 5 CORE FINANCIAL & OPERATIONAL STAT CARDS */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        
+        {/* Occupancy */}
         <StatCard
-          label="Occupancy"
+          label="Occupancy Rate"
           value={`${kpis.occupancyPct}%`}
           subtext={`${kpis.inHouseStays} / ${kpis.totalRooms} rooms occupied`}
           icon={BedDouble}
           variant="blue"
-          badge="+4.2%"
         />
 
-        {/* RevPAR */}
+        {/* RevPAR & ADR */}
         <StatCard
-          label="RevPAR"
+          label="RevPAR / ADR"
           value={formatINR(kpis.revpar)}
-          subtext={`ADR: ${formatINR(kpis.adr)} / occupied`}
+          subtext={`ADR: ${formatINR(kpis.adr)} per sold room`}
           icon={TrendingUp}
           variant="green"
         />
 
-        {/* Total Day Revenue */}
+        {/* Gross Revenue Today */}
         <StatCard
-          label="Day Revenue"
+          label="Today's Revenue"
           value={formatINR(kpis.grossRevenue)}
           subtext={`Room: ${formatINR(kpis.roomRevenue)} • F&B: ${formatINR(kpis.fbRevenue)}`}
           icon={DollarSign}
           variant="amber"
         />
 
-        {/* Total Taxes & Outstanding */}
+        {/* Physical Cash Drawer Till */}
         <StatCard
-          label="GST Collected"
-          value={formatINR(kpis.totalTaxes)}
-          subtext={`Folio Balances: ${formatINR(kpis.outstandingFolioBalance)}`}
+          label="Cash Till In-Hand"
+          value={formatINR(cashDrawerPosition?.netCashInHand || 0)}
+          subtext={`Float: ${formatINR(cashDrawerPosition?.openingBalance || 0)}`}
+          icon={Coins}
+          variant="green"
+        />
+
+        {/* Folio Receivables */}
+        <StatCard
+          label="Unsettled Folios"
+          value={formatINR(kpis.outstandingFolioBalance)}
+          subtext={`GST Collected: ${formatINR(kpis.totalTaxes)}`}
           icon={Receipt}
-          variant="default"
+          variant="red"
         />
       </div>
 
-      {/* 14-Day Performance Trend Chart & Operational Status */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3.5">
-        <div className="lg:col-span-2 p-4 sm:p-5 rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200/80 dark:border-zinc-800/80 space-y-3 shadow-xs">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-sm font-bold text-zinc-900 dark:text-white">Revenue Trend (14 Days)</h2>
-              <p className="text-xs text-zinc-500">Daily room and F&B progression</p>
-            </div>
-            <div className="flex items-center gap-3 text-xs font-semibold">
-              <span className="flex items-center gap-1.5 text-blue-600 dark:text-blue-400">
-                <span className="h-2 w-2 rounded-full bg-blue-500" /> Room
-              </span>
-              <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
-                <span className="h-2 w-2 rounded-full bg-emerald-500" /> F&B
-              </span>
-            </div>
-          </div>
-
-          <div className="h-60 w-full pt-2">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={trendHistory} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="colorRoom" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.25} />
-                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.0} />
-                  </linearGradient>
-                  <linearGradient id="colorFb" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.25} />
-                    <stop offset="95%" stopColor="#10b981" stopOpacity={0.0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="2 2" stroke="#71717a" opacity={0.15} />
-                <XAxis
-                  dataKey="date"
-                  tickFormatter={(val) => val.slice(5)}
-                  stroke="#71717a"
-                  fontSize={11}
-                />
-                <YAxis stroke="#71717a" fontSize={11} tickFormatter={(v) => `₹${v / 1000}k`} />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: "#18181b",
-                    borderColor: "#3f3f46",
-                    borderRadius: "0.75rem",
-                    fontSize: "12px",
-                    color: "#f4f4f5",
-                  }}
-                  formatter={(value: any) => [`₹${Number(value).toLocaleString("en-IN")}`, ""]}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="ROOM_REVENUE"
-                  name="Room Rev"
-                  stroke="#3b82f6"
-                  strokeWidth={2}
-                  fillOpacity={1}
-                  fill="url(#colorRoom)"
-                />
-                <Area
-                  type="monotone"
-                  dataKey="FB_REVENUE"
-                  name="F&B Rev"
-                  stroke="#10b981"
-                  strokeWidth={2}
-                  fillOpacity={1}
-                  fill="url(#colorFb)"
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
+      {/* 4. MAIN ANALYTICS ROW (RECHARTS + CASH TILL + STATUS) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+        
+        {/* Left: Recharts Multi-View Analytics (8 Cols) */}
+        <div className="lg:col-span-8 min-w-0">
+          <RevenueAnalyticsChart
+            trendHistory={trendHistory}
+            collectionsByMethod={collectionsByMethod}
+            hourlyCollections={hourlyCollections}
+          />
         </div>
 
-        {/* Operational Status */}
-        <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200/80 dark:border-zinc-800/80 space-y-3 shadow-xs">
-          <div>
-            <h2 className="text-sm font-bold text-zinc-900 dark:text-white">Live Room Status</h2>
-            <p className="text-xs text-zinc-500">Housekeeping and outlet metrics</p>
-          </div>
-
-          <div className="space-y-2 text-xs">
-            <div className="flex items-center justify-between p-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-xs">
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-                <span className="text-zinc-800 dark:text-zinc-200 font-medium">Clean & Inspected</span>
-              </div>
-              <span className="font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">{kpis.inspectedRooms}</span>
-            </div>
-
-            <div className="flex items-center justify-between p-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-xs">
-              <div className="flex items-center gap-2">
-                <Sparkles className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-                <span className="text-zinc-800 dark:text-zinc-200 font-medium">Dirty / Cleaning</span>
-              </div>
-              <span className="font-bold text-amber-600 dark:text-amber-400 tabular-nums">{kpis.dirtyRooms}</span>
-            </div>
-
-            <div className="flex items-center justify-between p-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-xs">
-              <div className="flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4 text-rose-600 dark:text-rose-400" />
-                <span className="text-zinc-800 dark:text-zinc-200 font-medium">Out of Order</span>
-              </div>
-              <span className="font-bold text-rose-600 dark:text-rose-400 tabular-nums">{kpis.outOfOrderRooms}</span>
-            </div>
-
-            <div className="flex items-center justify-between p-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-xs">
-              <div className="flex items-center gap-2">
-                <UtensilsCrossed className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                <span className="text-zinc-800 dark:text-zinc-200 font-medium">Open Dining KOTs</span>
-              </div>
-              <span className="font-bold text-blue-600 dark:text-blue-400 tabular-nums">{kpis.openKots}</span>
-            </div>
-          </div>
+        {/* Right: Drawer Cash Widget & Room Sellability (4 Cols) */}
+        <div className="lg:col-span-4 space-y-5 min-w-0">
+          <DrawerCashWidget cashDrawerPosition={cashDrawerPosition} />
+          
+          <OperationalStatusStrip
+            inspectedRooms={kpis.inspectedRooms}
+            dirtyRooms={kpis.dirtyRooms}
+            outOfOrderRooms={kpis.outOfOrderRooms}
+            openKots={kpis.openKots}
+          />
         </div>
       </div>
 
-      {/* Multi-Property Overview */}
-      <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200/80 dark:border-zinc-800/80 space-y-3 shadow-xs">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-sm font-bold text-zinc-900 dark:text-white">Properties in Portfolio</h2>
-            <p className="text-xs text-zinc-500">Brahmaputra Hospitality Pvt Ltd</p>
-          </div>
-          <span className="rounded-lg px-2.5 py-0.5 text-[10px] font-semibold text-zinc-600 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 uppercase tracking-wide">
-            2 Properties
-          </span>
+      {/* 5. OPERATIONS ROW: FRONT DESK PULSE & PORTFOLIO */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+        
+        {/* Left: Front Desk Pulse (Arrivals, Departures, High Folio Dues) (8 Cols) */}
+        <div className="lg:col-span-8 min-w-0">
+          <FrontDeskPulseCard
+            arrivalsToday={kpis.arrivalsToday}
+            departuresToday={kpis.departuresToday}
+            inHouseStays={kpis.inHouseStays}
+            totalRooms={kpis.totalRooms}
+            openKots={kpis.openKots}
+            arrivalsList={arrivalsList}
+            todayDepartures={todayDepartures}
+            urgentFolios={urgentFolios}
+          />
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-          {propertiesComparison.map((prop: any) => (
-            <div
-              key={prop.id}
-              className={`rounded-2xl p-4 border transition flex flex-col justify-between shadow-xs ${
-                prop.id === activeProperty?.id
-                  ? "bg-blue-50/40 dark:bg-blue-950/20 border-blue-300 dark:border-blue-500/40"
-                  : "bg-zinc-50/50 dark:bg-zinc-900/30 border-zinc-200/80 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700"
-              }`}
-            >
-              <div className="flex items-start justify-between">
-                <div>
-                  <div className="font-bold text-xs sm:text-sm text-zinc-900 dark:text-white flex items-center gap-1.5">
-                    <Building2 className="h-4 w-4 text-zinc-400" />
-                    {prop.name}
-                  </div>
-                  <div className="text-xs text-zinc-500 mt-0.5">{prop.city} • Code: <span className="font-mono">{prop.code}</span></div>
-                </div>
-                {prop.id === activeProperty?.id ? (
-                  <span className="rounded-md bg-blue-100 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 px-2 py-0.5 text-[10px] font-bold text-blue-700 dark:text-blue-400">
-                    Selected
-                  </span>
-                ) : (
-                  <span className="rounded-md bg-zinc-200/80 dark:bg-zinc-800 px-2 py-0.5 text-[10px] font-semibold text-zinc-700 dark:text-zinc-400">
-                    Active
-                  </span>
-                )}
-              </div>
-
-              <div className="grid grid-cols-3 gap-2 mt-3.5 pt-3 border-t border-zinc-200/80 dark:border-zinc-800/80 text-center text-xs">
-                <div>
-                  <div className="text-[11px] text-zinc-500">Rooms</div>
-                  <div className="font-bold text-zinc-800 dark:text-zinc-200 tabular-nums">{prop.totalRooms}</div>
-                </div>
-                <div>
-                  <div className="text-[11px] text-zinc-500">In-House</div>
-                  <div className="font-bold text-blue-600 dark:text-blue-400 tabular-nums">{prop.inHouseStays}</div>
-                </div>
-                <div>
-                  <div className="text-[11px] text-zinc-500">Occupancy</div>
-                  <div className="font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">{prop.occupancyPct}%</div>
-                </div>
-              </div>
-            </div>
-          ))}
+        {/* Right: Multi-Property Portfolio Overview (4 Cols) */}
+        <div className="lg:col-span-4 min-w-0">
+          <PortfolioOverview
+            propertiesComparison={propertiesComparison}
+            activePropertyId={activeProperty?.id}
+          />
         </div>
       </div>
+
+      {/* EMAIL REPORT MODAL TRIGGER */}
+      <EmailReportModal
+        isOpen={showEmailModal}
+        onClose={() => setShowEmailModal(false)}
+        defaultReportType="EXECUTIVE_FLASH"
+        targetDate={activeProperty?.businessDate}
+      />
+
     </div>
   );
 }

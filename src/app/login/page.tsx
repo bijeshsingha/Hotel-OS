@@ -9,7 +9,6 @@ import {
   User,
   ShieldCheck,
   ArrowRight,
-  Sparkles,
   BedDouble,
   CheckCircle2,
   AlertCircle,

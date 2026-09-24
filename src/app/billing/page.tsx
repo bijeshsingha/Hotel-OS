@@ -20,7 +20,6 @@ import {
   Clock,
   Layers,
   Building2,
-  Sparkles,
   ArrowRight,
   ShieldCheck,
   Calendar,
@@ -59,29 +58,96 @@ import { ProcessRefundModal } from "@/components/billing/process-refund-modal";
 import { GroupPaymentModal } from "@/components/billing/group-payment-modal";
 import { GroupAdvanceModal } from "@/components/billing/group-advance-modal";
 import { CheckoutSettlementModal } from "@/components/billing/checkout-settlement-modal";
+import { TransferRoomModal } from "@/components/billing/transfer-room-modal";
 import { BillingSidebar } from "@/components/billing/billing-sidebar";
+import { FolioHero } from "@/components/billing/folio/folio-hero";
+import { FolioChargesTable } from "@/components/billing/folio/folio-charges-table";
+import { FolioPaymentsTable } from "@/components/billing/folio/folio-payments-table";
 import { apiCache } from "@/lib/cache/api-cache";
 import { calculate24HrBillableDays, calculateDynamicDepartureDate } from "@/lib/domain/pms-service";
 
 export type { DirectoryRoomItem, MainFolioTab };
 
-// Helper to match charges with specific rooms in separate billing mode
-function isEntryForRoom(entry: any, roomNumber: string, allOtherRoomNumbers: string[]): boolean {
-  if (!roomNumber || roomNumber === "Unassigned") return true;
-  const desc = entry.description || "";
+// Helper to discover all historical/predecessor room numbers for a given room in a stay
+function getPredecessorRoomNumbers(assignments: any[] = [], currentRoomNumber: string): string[] {
+  if (!currentRoomNumber || currentRoomNumber === "Unassigned") return [];
+  const predecessors = new Set<string>();
+  const queue = [currentRoomNumber];
 
-  // Check if description explicitly mentions another room in the group
-  const otherRooms = allOtherRoomNumbers.filter((r) => r !== roomNumber);
-  for (const other of otherRooms) {
-    const regex = new RegExp(`\\b(?:Room|Rm)\\s*#?\\s*${other}\\b`, "i");
-    if (regex.test(desc)) {
-      return false; // Belongs to the other room
+  while (queue.length > 0) {
+    const curr = queue.shift()!;
+    for (const a of assignments) {
+      const roomNum = a.room?.number;
+      // 1. If this assignment is curr, check its moveReason for MOVED_FROM:XYZ
+      if (roomNum === curr && a.moveReason) {
+        const match = a.moveReason.match(/MOVED_FROM:([^|:]+)/i);
+        if (match && match[1] && match[1].trim() !== currentRoomNumber && !predecessors.has(match[1].trim())) {
+          predecessors.add(match[1].trim());
+          queue.push(match[1].trim());
+        }
+      }
+      // 2. If another assignment has reason: "Moved to Room curr"
+      const reasonText = `${a.moveReason || ""} ${a.reason || ""}`;
+      if (a.endsAt && reasonText) {
+        const movedMatch = reasonText.match(/Moved to Room\s+([A-Za-z0-9_-]+)/i);
+        if (movedMatch && movedMatch[1]?.toLowerCase() === curr.toLowerCase()) {
+          if (roomNum && roomNum !== currentRoomNumber && !predecessors.has(roomNum)) {
+            predecessors.add(roomNum);
+            queue.push(roomNum);
+          }
+        }
+      }
     }
   }
 
-  // If description mentions this room, it definitely belongs here
-  const thisRoomRegex = new RegExp(`\\b(?:Room|Rm)\\s*#?\\s*${roomNumber}\\b`, "i");
-  if (thisRoomRegex.test(desc)) {
+  predecessors.delete(currentRoomNumber);
+  return Array.from(predecessors);
+}
+
+// Helper to match charges with specific rooms in separate billing mode
+function isEntryForRoom(
+  entry: any,
+  roomNumber: string,
+  allOtherRoomNumbers: string[],
+  predecessorRooms: string[] = [],
+  primaryRoomNumber?: string
+): boolean {
+  if (!roomNumber || roomNumber === "Unassigned") return true;
+  const desc = entry.description || "";
+
+  // 1. Explicit Room Mention Detection: If description mentions ANY room, evaluate strictly
+  const roomMatches = Array.from(desc.matchAll(/\b(?:Room|Rm)\s*#?\s*([A-Za-z0-9_-]+)\b/gi));
+  if (roomMatches.length > 0) {
+    const mentionedRooms = roomMatches.map((m: any) => m[1]?.trim().toLowerCase());
+    const isThis = mentionedRooms.includes(roomNumber.toLowerCase());
+    const isPred = predecessorRooms.some((p) => mentionedRooms.includes(p.toLowerCase()));
+    if (isThis || isPred) {
+      return true;
+    }
+    // Mentions other room(s) (even if ended or transferred) - strictly reject
+    return false;
+  }
+
+  // 2. Fallback check for other active rooms without explicit "Room" prefix
+  const otherRooms = allOtherRoomNumbers.filter((r) => r !== roomNumber && !predecessorRooms.includes(r));
+  for (const other of otherRooms) {
+    const regex = new RegExp(`\\b(?:Room|Rm)?\\s*#?\\s*${other}\\b`, "i");
+    if (regex.test(desc)) {
+      return false;
+    }
+  }
+
+  // 3. Prevent room tariffs or extra pax without room numbers from blindly falling back to primary room if different
+  if (
+    (entry.chargeCode === "ROOM_TARIFF" || entry.chargeCode === "EXTRA_PAX" || entry.chargeCode === "EXTRA_BED") &&
+    primaryRoomNumber &&
+    roomNumber !== primaryRoomNumber
+  ) {
+    return false;
+  }
+
+  // 4. Attribute general stay charges (dining, laundry, misc) to the primary room
+  if (primaryRoomNumber && roomNumber === primaryRoomNumber) {
     return true;
   }
 
@@ -89,7 +155,7 @@ function isEntryForRoom(entry: any, roomNumber: string, allOtherRoomNumbers: str
 }
 
 function formatShortDate(dateStr?: string | null): string {
-  if (!dateStr) return "—";
+  if (!dateStr) return "-";
   try {
     const d = new Date(dateStr);
     if (isNaN(d.getTime())) return dateStr.slice(0, 10);
@@ -100,15 +166,15 @@ function formatShortDate(dateStr?: string | null): string {
 }
 
 function formatDateTimeShort(dateStr?: string | Date | null): string {
-  if (!dateStr) return "—";
+  if (!dateStr) return "-";
   try {
     const d = dateStr instanceof Date ? dateStr : new Date(dateStr);
-    if (isNaN(d.getTime())) return typeof dateStr === "string" ? dateStr : "—";
+    if (isNaN(d.getTime())) return typeof dateStr === "string" ? dateStr : "-";
     const datePart = d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
     const timePart = d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
     return `${datePart}, ${timePart}`;
   } catch {
-    return typeof dateStr === "string" ? dateStr : "—";
+    return typeof dateStr === "string" ? dateStr : "-";
   }
 }
 
@@ -233,6 +299,10 @@ function BillingContent() {
   // Grace Period control state (in minutes) - Default: 0 mins (Strict 11 AM - 12 PM Checkout)
   const [gracePeriodMinutes, setGracePeriodMinutes] = useState<number>(0);
 
+  // In-Folio Room Transfer modal state & rooms cache
+  const [showTransferRoomModal, setShowTransferRoomModal] = useState(false);
+  const [propertyRooms, setPropertyRooms] = useState<any[]>([]);
+
   // Global Escape key listener to close billing modals
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -245,6 +315,7 @@ function BillingContent() {
         setShowInvoiceModal(false);
         setShowGroupPaymentModal(false);
         setShowOutstandingModal(false);
+        setShowTransferRoomModal(false);
       }
     };
     window.addEventListener("keydown", handleKeyDown);
@@ -277,6 +348,12 @@ function BillingContent() {
             const activeAssign = targetStay.roomAssignments?.find((a: any) => !a.endsAt) || targetStay.roomAssignments?.[0];
             const firstRoom = activeAssign?.room?.number || "";
             setSelectedRoomNumber(firstRoom);
+          } else {
+            const currentStay = cached.find((s: any) => s.id === selectedStayId);
+            if (currentStay && !selectedRoomNumber) {
+              const activeAssign = currentStay.roomAssignments?.find((a: any) => !a.endsAt) || currentStay.roomAssignments?.[0];
+              setSelectedRoomNumber(activeAssign?.room?.number || "");
+            }
           }
         } else {
           setSelectedStayId("");
@@ -310,6 +387,12 @@ function BillingContent() {
             const activeAssign = targetStay.roomAssignments?.find((a: any) => !a.endsAt) || targetStay.roomAssignments?.[0];
             const firstRoom = activeAssign?.room?.number || "";
             setSelectedRoomNumber(firstRoom);
+          } else {
+            const currentStay = data.find((s: any) => s.id === selectedStayId);
+            if (currentStay && !selectedRoomNumber) {
+              const activeAssign = currentStay.roomAssignments?.find((a: any) => !a.endsAt) || currentStay.roomAssignments?.[0];
+              setSelectedRoomNumber(activeAssign?.room?.number || "");
+            }
           }
         } else {
           // Zero stays for this property: strictly wipe folio data
@@ -361,6 +444,22 @@ function BillingContent() {
     }
   };
 
+  const loadPropertyRooms = async () => {
+    if (!activeProperty?.id) {
+      setPropertyRooms([]);
+      return;
+    }
+    try {
+      const res = await fetch(`/api/v1/rooms?propertyId=${activeProperty.id}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data)) setPropertyRooms(data);
+      }
+    } catch (err) {
+      console.error("Failed to load rooms for billing:", err);
+    }
+  };
+
   useEffect(() => {
     // When active property changes, immediately reset stay/folio state to prevent cross-hotel leakage
     setStays([]);
@@ -370,6 +469,7 @@ function BillingContent() {
     setSelectedInvoice(null);
     setSelectedRoomKeys([]);
     loadStays();
+    loadPropertyRooms();
   }, [activeProperty?.id, refreshKey]);
 
   // When selected stay changes, fetch its live folio and sync saved grace period
@@ -477,12 +577,16 @@ function BillingContent() {
       distinctRooms.forEach((assignment) => {
         const roomNo = assignment.room?.number || "Unassigned";
         const otherRooms = allRoomNumbers.filter((r) => r !== roomNo);
-        const rawEntriesList = s.folio?.windows?.flatMap((w: any) => w.entries || w.lineItems || []) || [];
+        const predecessors = getPredecessorRoomNumbers(assignments, roomNo);
+        const rawEntriesList = (s.folio?.windows?.flatMap((w: any) => w.entries || w.lineItems || []) || []).filter(
+          (e: any) => e.chargeCode !== "ROOM_TRANSFER_CREDIT"
+        );
         const paymentsList = s.folio?.payments || [];
 
-        // Determine charges for this room
+        // Determine charges for this room (including predecessor rooms)
+        const originalPrimaryRoom = assignments[0]?.room?.number || allRoomNumbers[0];
         const roomEntries = isMultiRoom
-          ? rawEntriesList.filter((e: any) => isEntryForRoom(e, roomNo, otherRooms))
+          ? rawEntriesList.filter((e: any) => isEntryForRoom(e, roomNo, otherRooms, predecessors, originalPrimaryRoom))
           : rawEntriesList;
         const roomCharges = roomEntries.reduce((sum: number, e: any) => sum + (e.totalAmount || 0), 0);
         const totalGroupCharges = rawEntriesList.reduce((sum: number, e: any) => sum + (e.totalAmount || 0), 0);
@@ -491,37 +595,48 @@ function BillingContent() {
         // Determine payments for this room (direct payments and explicit allocations only)
         let allocatedPayment = 0;
         paymentsList.forEach((p: any) => {
+          if (p.method === "ADVANCE_ALLOCATION") return;
           const text = `${p.reference || ""} ${p.payerSnapshot || ""} ${p.notes || ""}`;
-          const isThis = new RegExp(`\\b(?:Room|Rm)\\s*#?\\s*${roomNo}\\b`, "i").test(text);
-          const isOther = otherRooms.some((o) => new RegExp(`\\b(?:Room|Rm)\\s*#?\\s*${o}\\b`, "i").test(text));
+          const isThis =
+            new RegExp(`\\b(?:Room|Rm)\\s*#?\\s*${roomNo}\\b`, "i").test(text) ||
+            new RegExp(`"roomNumber"\\s*:\\s*"${roomNo}"`, "i").test(text) ||
+            new RegExp(`"room"\\s*:\\s*"${roomNo}"`, "i").test(text) ||
+            predecessors.some((pred) =>
+              new RegExp(`\\b(?:Room|Rm)\\s*#?\\s*${pred}\\b`, "i").test(text) ||
+              new RegExp(`"roomNumber"\\s*:\\s*"${pred}"`, "i").test(text)
+            );
+          const isOther = otherRooms
+            .filter((o) => !predecessors.includes(o))
+            .some((o) =>
+              new RegExp(`\\b(?:Room|Rm)\\s*#?\\s*${o}\\b`, "i").test(text) ||
+              new RegExp(`"roomNumber"\\s*:\\s*"${o}"`, "i").test(text)
+            );
 
           if (isThis && !isOther) {
             allocatedPayment += p.amount || 0;
           }
         });
 
-        // Group advance calculation under Master-Sub Folio Industry Standard:
+        // Group advance allocated to this specific room
         let groupAdvanceCovered = 0;
-        if (isMultiRoom && roomCharges > allocatedPayment) {
-          const roomDueBeforeAdvance = roomCharges - allocatedPayment;
-
-          // Unallocated payments made at the master level (not assigned to a specific room)
-          const unallocatedPayments = paymentsList.filter((p: any) => {
-            if (p.status !== "SUCCEEDED") return false;
+        paymentsList.forEach((p: any) => {
+          if (p.method === "ADVANCE_ALLOCATION") {
             const text = `${p.reference || ""} ${p.payerSnapshot || ""} ${p.notes || ""}`;
-            const isSpecific = allRoomNumbers.some((r) => new RegExp(`\\b(?:Room|Rm)\\s*#?\\s*${r}\\b`, "i").test(text));
-            return !isSpecific;
-          });
-          const totalUnallocated = unallocatedPayments.reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
-
-          // If the group master payments cover all group charges (fully prepaid reservation)
-          if (totalGroupPayments >= totalGroupCharges - 0.5) {
-            groupAdvanceCovered = roomDueBeforeAdvance;
-          } else if (totalUnallocated > 0) {
-            // Group advance covers up to remaining group advance pool
-            groupAdvanceCovered = Math.min(roomDueBeforeAdvance, totalUnallocated);
+            const isSingleRoomFolio = distinctRooms.length === 1;
+            const isMatch =
+              isSingleRoomFolio ||
+              new RegExp(`\\b(?:Room|Rm)\\s*#?\\s*${roomNo}\\b`, "i").test(text) ||
+              new RegExp(`"roomNumber"\\s*:\\s*"${roomNo}"`, "i").test(text) ||
+              new RegExp(`"room"\\s*:\\s*"${roomNo}"`, "i").test(text) ||
+              predecessors.some((pred) =>
+                new RegExp(`\\b(?:Room|Rm)\\s*#?\\s*${pred}\\b`, "i").test(text) ||
+                new RegExp(`"roomNumber"\\s*:\\s*"${pred}"`, "i").test(text)
+              );
+            if (isMatch) {
+              groupAdvanceCovered += p.amount || 0;
+            }
           }
-        }
+        });
 
         const effectiveRoomPaid = isMultiRoom ? (allocatedPayment + groupAdvanceCovered) : totalGroupPayments;
         const roomBalance = Math.max(0, Math.round((roomCharges - effectiveRoomPaid) * 100) / 100);
@@ -532,6 +647,7 @@ function BillingContent() {
           stay: s,
           roomNumber: roomNo,
           roomId: assignment.room?.id,
+          room: assignment.room,
           roomType: assignment.room?.roomType,
           rateHandling: assignment.rateHandling,
           moveReason: assignment.moveReason,
@@ -646,6 +762,58 @@ function BillingContent() {
     }
   }, [searchParams, directoryItems]);
 
+  // Synchronize URL parameters (stayId & room) from Front Desk PMS or external links
+  useEffect(() => {
+    if (stays.length === 0) return;
+    const urlStayId = searchParams.get("stayId");
+    const urlRoom = searchParams.get("room") || searchParams.get("roomNumber");
+    if (!urlStayId && !urlRoom) return;
+
+    const matchedStay = stays.find((s) => {
+      if (urlStayId && s.id === urlStayId) return true;
+      if (urlRoom && s.roomAssignments?.some((ra: any) => ra.room?.number === urlRoom)) return true;
+      return false;
+    });
+
+    if (matchedStay) {
+      setSelectedStayId(matchedStay.id);
+      const activeAssign =
+        matchedStay.roomAssignments?.find(
+          (ra: any) => !ra.endsAt && (urlRoom ? ra.room?.number === urlRoom : true)
+        ) || matchedStay.roomAssignments?.[0];
+      const rNum = activeAssign?.room?.number || urlRoom || "";
+      setSelectedRoomNumber(rNum);
+
+      // Auto-switch main tab according to stay status
+      if (matchedStay.status === "IN_HOUSE") {
+        if (activeMainTab !== "IN_HOUSE") setActiveMainTab("IN_HOUSE");
+      } else if (matchedStay.status === "CHECKED_OUT" || matchedStay.status === "COMPLETED") {
+        const rawEntries = (matchedStay.folio?.windows?.flatMap((w: any) => w.entries || w.lineItems || []) || []).filter(
+          (e: any) => e.chargeCode !== "ROOM_TRANSFER_CREDIT"
+        );
+        const totCharges = rawEntries
+          .filter((e: any) => e.type === "DEBIT" || !e.type)
+          .reduce((s: number, e: any) => s + (e.totalAmount || 0), 0);
+        const totCredits = rawEntries
+          .filter((e: any) => e.type === "CREDIT")
+          .reduce((s: number, e: any) => s + (e.totalAmount || 0), 0);
+        const bal = totCharges - totCredits;
+        if (bal > 0.5) {
+          if (activeMainTab !== "OUTSTANDING_DUES") setActiveMainTab("OUTSTANDING_DUES");
+        } else {
+          if (activeMainTab !== "SETTLED_ARCHIVE") setActiveMainTab("SETTLED_ARCHIVE");
+        }
+      }
+
+      setStaySearchQuery("");
+      setStayStatusFilter("ALL");
+
+      if (matchedStay.folio?.id) {
+        loadFolio(matchedStay.folio.id);
+      }
+    }
+  }, [searchParams, stays]);
+
   const handleSwitchMainTab = (tab: "IN_HOUSE" | "OUTSTANDING_DUES" | "SETTLED_ARCHIVE") => {
     setActiveMainTab(tab);
     setStayStatusFilter("ALL");
@@ -681,23 +849,56 @@ function BillingContent() {
 
   // Group Advance Pool Metrics (For Multi-Room Groups)
   const groupAdvanceMetrics = useMemo(() => {
-    if (!isMultiRoomGroup || !folioData) {
+    if (!isMultiRoomGroup) {
       return { totalReceived: 0, consumed: 0, available: 0, unallocatedPayments: [] as any[] };
     }
-    const paymentsList = folioData.payments || [];
-    const entriesList = folioData.windows?.flatMap((w: any) => w.entries || w.lineItems || []) || [];
 
-    // Advance/Deposit payments not tied to a single specific room
+    // Collect all related stays belonging to this specific group and guest
+    const relatedStays = stays.filter((s) => {
+      if (s.id === activeStay?.id) return true;
+      // Stays MUST belong to the same primary guest profile to prevent leaking other guests' advance funds
+      if (s.primaryGuestId !== activeStay?.primaryGuestId) return false;
+      // Shared reservation linkage or shared group room numbers
+      if (activeStay?.reservationId && s.reservationId === activeStay?.reservationId) return true;
+      const sRooms = s.roomAssignments?.map((ra: any) => ra.room?.number).filter(Boolean) || [];
+      return sRooms.some((r: string) => allGroupRooms.includes(r));
+    });
+
+    const paymentsList = Array.from(
+      new Map(
+        relatedStays
+          .flatMap((s) => s.folio?.payments || [])
+          .concat(folioData?.payments || [])
+          .map((p: any) => [p.id, p])
+      ).values()
+    );
+
+    const entriesList = Array.from(
+      new Map(
+        relatedStays
+          .flatMap((s) => s.folio?.windows?.flatMap((w: any) => w.entries || w.lineItems || []) || [])
+          .concat(folioData?.windows?.flatMap((w: any) => w.entries || w.lineItems || []) || [])
+          .map((e: any) => [e.id, e])
+      ).values()
+    );
+
+    // Advance/Deposit payments not tied to a single specific room (i.e. group advance pool)
     const unallocated = paymentsList.filter((p: any) => {
       if (p.status !== "SUCCEEDED") return false;
+      // Exclude internal allocation accounting vouchers
+      if (p.method === "ADVANCE_ALLOCATION") return false;
+      // Exclude individual room checkout settlement receipts
+      if (p.reference?.includes("Settlement for Room")) return false;
+
       const text = `${p.reference || ""} ${p.payerSnapshot || ""} ${p.notes || ""}`;
+      const isGroupPool = text.includes("isGroupAdvancePool") || text.includes("GROUP_ADVANCE_POOL");
       const isSpecific = allGroupRooms.some((r) => new RegExp(`\\b(?:Room|Rm)\\s*#?\\s*${r}\\b`, "i").test(text));
-      return !isSpecific;
+      return isGroupPool || !isSpecific;
     });
     const totalReceived = unallocated.reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
 
     // Consumed advance:
-    // Any GROUP_ADVANCE_CONSUMPTION charge entries posted on the master folio
+    // Any GROUP_ADVANCE_CONSUMPTION charge entries or ADVANCE_ALLOCATION payments
     const consumed = entriesList
       .filter((e: any) => e.chargeCode === "GROUP_ADVANCE_CONSUMPTION")
       .reduce((sum: number, e: any) => sum + (e.totalAmount || 0), 0);
@@ -710,7 +911,7 @@ function BillingContent() {
       available,
       unallocatedPayments: unallocated,
     };
-  }, [isMultiRoomGroup, folioData, allGroupRooms]);
+  }, [isMultiRoomGroup, folioData, allGroupRooms, stays, activeStay]);
 
   // Room Card Checkbox toggle (operates per distinct room item key)
   const toggleRoomSelection = (key: string) => {
@@ -753,16 +954,23 @@ function BillingContent() {
     let isRateInclusive = true;
 
     const assignment = activeStay.roomAssignments?.find((a: any) => a.room?.number === activeRoomNumber) || activeStay.roomAssignments?.[0];
-    if (assignment?.rateHandling === "COMPLIMENTARY" || assignment?.moveReason === "AGREED_RATE:0") {
+    const predecessors = getPredecessorRoomNumbers(activeStay.roomAssignments || [], activeRoomNumber);
+    if (assignment?.rateHandling === "COMPLIMENTARY" || assignment?.moveReason === "AGREED_RATE:0" || assignment?.moveReason?.includes("AGREED_RATE:0")) {
       rate = 0;
       isComp = true;
-    } else if (assignment?.moveReason?.startsWith("AGREED_RATE:")) {
-      const parts = assignment.moveReason.replace("AGREED_RATE:", "").split(":");
-      rate = Number(parts[0]) || 3200;
-      if (parts[1] === "EXC") isRateInclusive = false;
+    } else if (assignment?.moveReason?.includes("AGREED_RATE:")) {
+      const match = assignment.moveReason.match(/AGREED_RATE:(\d+)(?::([A-Z]+))?/);
+      if (match) {
+        rate = Number(match[1]) || 3200;
+        if (match[2] === "EXC") isRateInclusive = false;
+      }
     } else if (folioData?.windows?.[0]) {
       const items = folioData.windows[0].entries || folioData.windows[0].lineItems || [];
-      const roomCharge = items.find((i: any) => i.chargeCode?.includes("ROOM_TARIFF") && (i.description?.includes(activeRoomNumber) || true));
+      const roomCharge = items.find((i: any) => i.chargeCode?.includes("ROOM_TARIFF") && (
+        i.description?.includes(activeRoomNumber) ||
+        predecessors.some((pred: string) => i.description?.includes(pred)) ||
+        true
+      ));
       if (roomCharge && roomCharge.unitAmount !== undefined) {
         rate = roomCharge.unitAmount;
         if (rate === 0) isComp = true;
@@ -791,7 +999,8 @@ function BillingContent() {
     const chargedRoomEntries = allRoomEntries.filter((i: any) => {
       if (groupBillingMode === "YES" || !isMultiRoomGroup) return true;
       if (allRoomEntries.length <= 1) return true;
-      return i.description?.includes(activeRoomNumber);
+      const desc = i.description || "";
+      return desc.includes(activeRoomNumber) || predecessors.some((pred: string) => desc.includes(pred));
     });
     const chargedNights = chargedRoomEntries.length > 0
       ? chargedRoomEntries.reduce((sum: number, i: any) => sum + (i.qty || 1), 0)
@@ -840,7 +1049,9 @@ function BillingContent() {
   const rawEntries = useMemo(() => {
     if (!folioData?.windows) return [];
     const allItems = folioData.windows.flatMap((w: any) => w.entries || w.lineItems || []);
-    return allItems.sort((a: any, b: any) => new Date(a.createdAt || a.postedAt).getTime() - new Date(b.createdAt || b.postedAt).getTime());
+    return allItems
+      .filter((e: any) => e.chargeCode !== "ROOM_TRANSFER_CREDIT")
+      .sort((a: any, b: any) => new Date(a.createdAt || a.postedAt).getTime() - new Date(b.createdAt || b.postedAt).getTime());
   }, [folioData]);
 
   // Entries filtered by Group Billing Mode (Separate vs Combined Group)
@@ -850,9 +1061,12 @@ function BillingContent() {
     }
     // "NO" mode: Separate billing for activeRoomNumber only
     const otherRooms = allGroupRooms.filter((r) => r !== activeRoomNumber);
-    const filtered = rawEntries.filter((e: any) => isEntryForRoom(e, activeRoomNumber, otherRooms));
-    return filtered.length > 0 ? filtered : rawEntries;
-  }, [rawEntries, groupBillingMode, isMultiRoomGroup, activeRoomNumber, allGroupRooms]);
+    const predecessors = getPredecessorRoomNumbers(activeStay?.roomAssignments || [], activeRoomNumber);
+    const filtered = rawEntries.filter((e: any) =>
+      isEntryForRoom(e, activeRoomNumber, otherRooms, predecessors, allGroupRooms[0])
+    );
+    return filtered;
+  }, [rawEntries, groupBillingMode, isMultiRoomGroup, activeRoomNumber, allGroupRooms, activeStay]);
 
   // Filtered charges ledger items (search and category)
   const entries = useMemo(() => {
@@ -900,8 +1114,9 @@ function BillingContent() {
   }, [netDifference]);
 
   const surplusCredit = useMemo(() => {
-    return netDifference < 0 ? Math.abs(netDifference) : 0;
-  }, [netDifference]);
+    if (totalPayments <= 0 || totalPayments <= totalCharges) return 0;
+    return Math.round((totalPayments - totalCharges) * 100) / 100;
+  }, [totalCharges, totalPayments]);
 
   // Post Manual / Restaurant Charge (5% GST Inclusive)
   const handlePostCharge = async (e: React.FormEvent) => {
@@ -1037,6 +1252,35 @@ function BillingContent() {
     }
   };
 
+  // Allocate advance from Group Advance Pool to a specific room
+  const handleApplyGroupAdvance = async (stayId: string, roomNumber: string, amount: number) => {
+    if (!stayId || amount <= 0) return;
+    setActionLoading(true);
+    try {
+      const res = await fetch("/api/v1/billing/group-advance/allocate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          stayId,
+          roomNumber,
+          amount,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to allocate group advance");
+      }
+      alert(`Successfully deducted ${formatINR(amount)} from Group Advance Pool and applied to Room ${roomNumber}.`);
+      if (folioData?.id) await loadFolio(folioData.id);
+      await loadStays(true);
+      await refreshData();
+    } catch (err: any) {
+      alert(`Error applying group advance: ${err.message}`);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   // Record Single Payment
   const handleRecordPayment = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1047,6 +1291,12 @@ function BillingContent() {
       if (numAmt <= 0) {
         alert("Please enter a valid payment amount.");
         setActionLoading(false);
+        return;
+      }
+
+      if (paymentForm.method === "ADVANCE_ALLOCATION") {
+        await handleApplyGroupAdvance(activeStay?.id, activeRoomNumber, numAmt);
+        setShowPaymentModal(false);
         return;
       }
 
@@ -1432,12 +1682,12 @@ function BillingContent() {
 
     if (surplusCredit > 0.5) {
       const confirmRefund = window.confirm(
-        `This folio has an Advance Surplus of ${formatINR(surplusCredit)}.\n\nClick OK to record a ${formatINR(surplusCredit)} refund payout now.\nClick CANCEL to proceed with checkout retaining surplus as advance.`
+        `This folio has an Advance Surplus of ${formatINR(surplusCredit)}.\n\nClick OK to record a ${formatINR(surplusCredit)} refund payout now.\nClick Cancel to abort and cancel check out.`
       );
       if (confirmRefund) {
         handleOpenRefundModal(surplusCredit);
-        return;
       }
+      return; // Clicking Cancel cancels check out!
     }
 
     await handlePerformCheckout();
@@ -1445,298 +1695,86 @@ function BillingContent() {
 
   return (
     <>
-      <div className="billing-dashboard-view no-print print:hidden max-w-[1600px] mx-auto w-full text-zinc-900 dark:text-zinc-100 space-y-4 transition-colors duration-150">
+      <div className="billing-dashboard-view no-print print:hidden max-w-[1700px] mx-auto w-full text-zinc-900 dark:text-zinc-100 space-y-6 transition-colors duration-150">
         
-        {/* 1. MASTER TOP HEADER & ACTIONS (CLEAN 1440x900 BAR) */}
-      <div className="rounded-2xl bg-white dark:bg-[#121215] border border-zinc-200/80 dark:border-zinc-800/80 p-3.5 sm:p-4 shadow-xs space-y-3">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-xl bg-blue-600 dark:bg-white text-white dark:text-zinc-950 font-bold text-base flex items-center justify-center shadow-xs shrink-0">
-              <Receipt className="h-5 w-5" />
+        {/* 1. MASTER TOP HEADER (SLEEK & INTEGRATED) */}
+        <div className="pb-4 border-b border-zinc-200/80 dark:border-zinc-800 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <div className="flex items-center gap-3">
+              <h1 className="text-2xl sm:text-3xl font-extrabold text-zinc-950 dark:text-zinc-50 tracking-tight">
+                Billing & Folio
+              </h1>
+              <span className="rounded-full px-2.5 py-0.5 text-xs font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800/40 uppercase tracking-wide">
+                GST Rule 46
+              </span>
             </div>
-            <div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <h1 className="text-lg sm:text-xl font-bold text-zinc-900 dark:text-white tracking-tight">
-                  Folio, Billing & Tax Invoices
-                </h1>
-                <span className="rounded-md px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800/40 uppercase tracking-wide">
-                  GST Rule 46
-                </span>
-              </div>
-              <div className="flex items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400 mt-0.5 flex-wrap">
-                <span className="text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
-                  <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                  {activeProperty?.displayName || "Hotel Folio & Billing"}
-                </span>
-                <span>•</span>
-                <span className="font-mono">GSTIN: {activeProperty?.gstin || "—"}</span>
-                <span>•</span>
-                <span>Date: <strong className="font-mono text-zinc-700 dark:text-zinc-300">{activeProperty?.businessDate || (typeof window !== "undefined" ? new Date().toLocaleDateString("en-CA") : "")}</strong></span>
-              </div>
+            <div className="flex items-center gap-2 text-xs sm:text-sm text-zinc-500 dark:text-zinc-400 flex-wrap">
+              <span className="text-emerald-600 dark:text-emerald-400 font-semibold">
+                {activeProperty?.displayName || "Hotel Folio & Billing"}
+              </span>
+              <span>•</span>
+              <span className="font-mono">GSTIN: {activeProperty?.gstin || "N/A"}</span>
+              <span>•</span>
+              <span>Date: <strong className="font-mono text-zinc-800 dark:text-zinc-200">{activeProperty?.businessDate || (typeof window !== "undefined" ? new Date().toLocaleDateString("en-CA") : "")}</strong></span>
             </div>
           </div>
 
           {/* Top Main Tab Navigation: In-House vs Outstanding Dues vs Settled Archive */}
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-1.5 p-1 rounded-2xl bg-zinc-100/90 dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800/80 w-full lg:w-auto">
+          <div className="flex items-center gap-1.5 bg-zinc-100 dark:bg-zinc-800/80 p-1 rounded-xl text-xs sm:text-sm font-semibold self-start md:self-auto border border-zinc-200/60 dark:border-zinc-700/60">
             <button
               type="button"
               onClick={() => handleSwitchMainTab("IN_HOUSE")}
-              className={`flex items-center justify-between sm:justify-start gap-2 px-3.5 py-2 sm:py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              className={`flex items-center gap-2 h-9 px-3.5 rounded-lg transition cursor-pointer ${
                 activeMainTab === "IN_HOUSE"
-                  ? "bg-white dark:bg-zinc-800 text-blue-600 dark:text-blue-400 shadow-xs border border-zinc-200/60 dark:border-zinc-700"
-                  : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
+                  ? "bg-white dark:bg-zinc-900 text-zinc-950 dark:text-white font-bold shadow-xs"
+                  : "text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200"
               }`}
             >
-              <div className="flex items-center gap-1.5">
-                <BedDouble className="h-3.5 w-3.5" />
-                <span>🏨 In-House Active Folios</span>
-              </div>
-              <span className={`px-2 py-0.2 rounded-md text-[10.5px] font-mono font-bold ${
-                activeMainTab === "IN_HOUSE"
-                  ? "bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800"
-                  : "bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400"
-              }`}>
-                {inHouseCount}
-              </span>
+              <BedDouble className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+              <span>In-House</span>
+              <span className="font-mono text-xs opacity-80">({inHouseCount})</span>
             </button>
 
             <button
               type="button"
               onClick={() => handleSwitchMainTab("OUTSTANDING_DUES")}
-              className={`flex items-center justify-between sm:justify-start gap-2 px-3.5 py-2 sm:py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              className={`flex items-center gap-2 h-9 px-3.5 rounded-lg transition cursor-pointer ${
                 activeMainTab === "OUTSTANDING_DUES"
-                  ? "bg-white dark:bg-zinc-800 text-rose-600 dark:text-rose-400 shadow-xs border border-zinc-200/60 dark:border-zinc-700"
-                  : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
+                  ? "bg-rose-600 text-white font-bold shadow-xs"
+                  : "text-rose-700 dark:text-rose-400 hover:text-rose-900"
               }`}
             >
-              <div className="flex items-center gap-1.5">
-                <AlertCircle className="h-3.5 w-3.5" />
-                <span>⚠️ Outstanding Dues</span>
-              </div>
-              <span className={`px-2 py-0.2 rounded-md text-[10.5px] font-mono font-bold ${
-                activeMainTab === "OUTSTANDING_DUES"
-                  ? "bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800"
-                  : "bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400"
-              }`}>
-                {outstandingCount}
-              </span>
+              <AlertCircle className="h-4 w-4" />
+              <span>Debtors</span>
+              <span className="font-mono text-xs opacity-80">({outstandingCount})</span>
             </button>
 
             <button
               type="button"
               onClick={() => handleSwitchMainTab("SETTLED_ARCHIVE")}
-              className={`flex items-center justify-between sm:justify-start gap-2 px-3.5 py-2 sm:py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              className={`flex items-center gap-2 h-9 px-3.5 rounded-lg transition cursor-pointer ${
                 activeMainTab === "SETTLED_ARCHIVE"
-                  ? "bg-white dark:bg-zinc-800 text-blue-600 dark:text-blue-400 shadow-xs border border-zinc-200/60 dark:border-zinc-700"
-                  : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
+                  ? "bg-white dark:bg-zinc-900 text-zinc-950 dark:text-white font-bold shadow-xs"
+                  : "text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200"
               }`}
             >
-              <div className="flex items-center gap-1.5">
-                <Archive className="h-3.5 w-3.5" />
-                <span>📁 Settled Archive</span>
-              </div>
-              <span className={`px-2 py-0.2 rounded-md text-[10.5px] font-mono font-bold ${
-                activeMainTab === "SETTLED_ARCHIVE"
-                  ? "bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800"
-                  : "bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400"
-              }`}>
-                {settledArchiveCount}
-              </span>
+              <Archive className="h-4 w-4 text-zinc-400" />
+              <span>Settled</span>
+              <span className="font-mono text-xs opacity-80">({settledArchiveCount})</span>
             </button>
           </div>
         </div>
 
-        {/* Action Toolbar for In-House Stays */}
-        {activeMainTab === "IN_HOUSE" && (
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-2 border-t border-zinc-100 dark:border-zinc-800/80">
-            <div className="text-xs font-medium text-zinc-500 flex items-center gap-1.5">
-              <span className="h-2 w-2 rounded-full bg-emerald-500" />
-              <span>Showing {filteredDirectoryItems.length} currently occupied rooms</span>
-            </div>
-
-            <div className="flex items-center gap-2 flex-wrap">
-              {selectedRoomKeys.length > 0 && (
-                <button
-                  onClick={handleOpenGroupPaymentModal}
-                  className="h-9 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-bold text-xs flex items-center gap-2 transition-all duration-150 shadow-xs shadow-emerald-600/25 active:scale-[0.98] cursor-pointer animate-in fade-in"
-                >
-                  <Users className="h-3.5 w-3.5" />
-                  <span>Group Payment ({selectedRoomKeys.length} {selectedRoomKeys.length === 1 ? "Room" : "Rooms"})</span>
-                </button>
-              )}
-
-              {selectedRoomKeys.length > 0 && (
-                <button
-                  onClick={handleExecuteGroupCheckout}
-                  className="h-9 px-3.5 rounded-xl bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-zinc-800 dark:text-zinc-200 border border-zinc-200/90 dark:border-zinc-800 font-semibold text-xs flex items-center gap-1.5 transition-all duration-150 shadow-2xs active:scale-[0.98] cursor-pointer"
-                >
-                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-                  <span>Group Checkout ({selectedRoomKeys.length})</span>
-                </button>
-              )}
-
-              {folioData && (
-                <>
-                  <button
-                    onClick={handleOpenLiveTaxBill}
-                    className="h-9 px-3.5 rounded-xl bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800/90 border border-zinc-200/90 dark:border-zinc-800 text-zinc-700 dark:text-zinc-200 font-semibold text-xs flex items-center gap-1.5 transition-all duration-150 shadow-2xs hover:shadow-xs active:scale-[0.98] cursor-pointer group"
-                  >
-                    <Printer className="h-3.5 w-3.5 text-zinc-500 group-hover:text-blue-600 dark:text-zinc-400 dark:group-hover:text-blue-400 transition-colors" />
-                    <span>Live Tax Bill</span>
-                  </button>
-
-                  <button
-                    onClick={() => {
-                      setChargeForm({
-                        chargeCode: "RESTAURANT_FOOD",
-                        description: "Kitchen Order (KOT)",
-                        amount: "",
-                        sacHsn: "996331",
-                        isInclusive: true,
-                        kotNumber: "",
-                      });
-                      setShowManualChargeModal(true);
-                    }}
-                    className="h-9 px-3.5 rounded-xl bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800/90 border border-zinc-200/90 dark:border-zinc-800 text-zinc-700 dark:text-zinc-200 font-semibold text-xs flex items-center gap-1.5 transition-all duration-150 shadow-2xs hover:shadow-xs active:scale-[0.98] cursor-pointer group"
-                  >
-                    <UtensilsCrossed className="h-3.5 w-3.5 text-zinc-500 group-hover:text-orange-500 dark:text-zinc-400 dark:group-hover:text-orange-400 transition-colors" />
-                    <span>Add KOT Bill</span>
-                  </button>
-
-                  <button
-                    onClick={() => {
-                      setChargeForm({
-                        chargeCode: "MISC",
-                        description: "Guest Service Charge",
-                        amount: "",
-                        sacHsn: "9999",
-                        isInclusive: true,
-                        kotNumber: "",
-                      });
-                      setShowManualChargeModal(true);
-                    }}
-                    className="h-9 px-3.5 rounded-xl bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800/90 border border-zinc-200/90 dark:border-zinc-800 text-zinc-700 dark:text-zinc-200 font-semibold text-xs flex items-center gap-1.5 transition-all duration-150 shadow-2xs hover:shadow-xs active:scale-[0.98] cursor-pointer group"
-                  >
-                    <Plus className="h-3.5 w-3.5 text-zinc-500 group-hover:text-amber-500 dark:text-zinc-400 dark:group-hover:text-amber-400 transition-colors" />
-                    <span>Post Charge</span>
-                  </button>
-
-                  <button
-                    onClick={() => {
-                      setDiscountForm({
-                        description: "Discount / Rebate",
-                        amount: "500",
-                        sacHsn: "996311",
-                      });
-                      setShowDiscountModal(true);
-                    }}
-                    className="h-9 px-3.5 rounded-xl bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800/90 border border-zinc-200/90 dark:border-zinc-800 text-zinc-700 dark:text-zinc-200 font-semibold text-xs flex items-center gap-1.5 transition-all duration-150 shadow-2xs hover:shadow-xs active:scale-[0.98] cursor-pointer group"
-                  >
-                    <Plus className="h-3.5 w-3.5 text-zinc-500 group-hover:text-rose-500 dark:text-zinc-400 dark:group-hover:text-rose-400 transition-colors" />
-                    <span>Add Discount</span>
-                  </button>
-
-                  <button
-                    onClick={() => {
-                      const hasCompany = Boolean(activeStay?.primaryGuest?.companyName);
-                      setPaymentForm({
-                        amount: String(Math.max(0, currentBalance)),
-                        method: hasCompany ? "DIRECT_BILL" : "UPI",
-                        reference: hasCompany ? `PO-${(activeStay.primaryGuest.companyName || "").slice(0, 10)}` : "",
-                        payerName: formatGuestDisplayName(activeStay?.primaryGuest?.name) || "Guest",
-                        companyName: activeStay?.primaryGuest?.companyName || "",
-                        gstin: activeStay?.primaryGuest?.gstin || "",
-                        creditPeriod: "30_DAYS",
-                        billingRemarks: "",
-                      });
-                      setShowPaymentModal(true);
-                    }}
-                    className="h-9 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white font-bold text-xs flex items-center gap-2 transition-all duration-150 shadow-xs shadow-blue-600/25 hover:shadow-sm hover:shadow-blue-600/35 active:scale-[0.98] cursor-pointer"
-                  >
-                    <CreditCard className="h-3.5 w-3.5" />
-                    <span>Collect Payment</span>
-                  </button>
-                </>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Action Toolbar for Outstanding Dues */}
-        {activeMainTab === "OUTSTANDING_DUES" && (
-          <div className="flex items-center justify-between gap-2 pt-2 border-t border-rose-100 dark:border-rose-950/80 flex-wrap">
-            <div className="text-xs font-semibold text-rose-700 dark:text-rose-400 flex items-center gap-1.5">
-              <AlertCircle className="h-4 w-4 text-rose-600 dark:text-rose-400" />
-              <span>Checked-out rooms with pending receivables / debtor balances ({filteredDirectoryItems.length} records)</span>
-            </div>
-
-            {folioData && (
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={handleOpenPrintInvoice}
-                  className="h-8.5 px-3.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-800 dark:text-zinc-200 hover:bg-zinc-100 font-bold text-xs flex items-center gap-1.5 transition shadow-xs cursor-pointer"
-                >
-                  <Printer className="h-3.5 w-3.5" />
-                  <span>Print Invoice</span>
-                </button>
-                {currentBalance > 0.5 && (
-                  <button
-                    onClick={() => {
-                      setPaymentForm({
-                        amount: String(Math.max(0, currentBalance)),
-                        method: activeStay?.primaryGuest?.companyName ? "DIRECT_BILL" : "UPI",
-                        reference: `Outstanding Settlement for Room ${activeRoomNumber}`,
-                        payerName: formatGuestDisplayName(activeStay?.primaryGuest?.name) || "Guest",
-                        companyName: activeStay?.primaryGuest?.companyName || "",
-                        gstin: activeStay?.primaryGuest?.gstin || "",
-                        creditPeriod: "30_DAYS",
-                        billingRemarks: `Settling outstanding balance for Room ${activeRoomNumber}`,
-                      });
-                      setShowPaymentModal(true);
-                    }}
-                    className="h-8.5 px-4 rounded-xl bg-emerald-600 text-white hover:bg-emerald-500 font-bold text-xs flex items-center gap-1.5 transition shadow-xs cursor-pointer"
-                  >
-                    <CreditCard className="h-3.5 w-3.5" />
-                    <span>Collect Outstanding ({formatINR(currentBalance)})</span>
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Action Toolbar for Settled Archive */}
-        {activeMainTab === "SETTLED_ARCHIVE" && (
-          <div className="flex items-center justify-between gap-2 pt-2 border-t border-zinc-100 dark:border-zinc-800/80 flex-wrap">
-            <div className="text-xs font-medium text-zinc-500 flex items-center gap-1.5">
-              <Archive className="h-3.5 w-3.5 text-zinc-400" />
-              <span>Viewing historical settled folios & tax invoices ({filteredDirectoryItems.length} records)</span>
-            </div>
-
-            {folioData && (
-              <button
-                onClick={handleOpenPrintInvoice}
-                className="h-8.5 px-4 rounded-xl bg-zinc-900 text-white hover:bg-zinc-800 dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-200 font-bold text-xs flex items-center gap-1.5 transition shadow-xs cursor-pointer"
-              >
-                <Printer className="h-3.5 w-3.5" />
-                <span>Print Final Tax Invoice</span>
-              </button>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* 2. MAIN 2-COLUMN OPERATIONAL GRID */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 xl:gap-4 items-start w-full">
+      {/* 2. MAIN 2-COLUMN OPERATIONAL VIEW: Optimal proportions and fluid workspace */}
+      <div className="flex flex-col lg:flex-row gap-6 items-start w-full">
         
-        {/* LEFT COLUMN: ROOMS DIRECTORY & GROUP SELECTOR */}
+        {/* LEFT COLUMN: ROOMS DIRECTORY */}
         <BillingSidebar
           activeMainTab={activeMainTab}
           directoryItems={directoryItems}
           filteredDirectoryItems={filteredDirectoryItems}
           selectedStayId={selectedStayId}
           selectedRoomNumber={selectedRoomNumber}
-          selectedRoomKeys={selectedRoomKeys}
           staySearchQuery={staySearchQuery}
           setStaySearchQuery={setStaySearchQuery}
           stayStatusFilter={stayStatusFilter}
@@ -1746,15 +1784,6 @@ function BillingContent() {
             setSelectedRoomNumber(roomNumber);
             setGroupBillingMode("NO");
           }}
-          onToggleRoomSelection={toggleRoomSelection}
-          onSelectAllRooms={() => {
-            const inHouseKeys = filteredDirectoryItems.filter((d) => d.status === "IN_HOUSE").map((d) => d.key);
-            if (selectedRoomKeys.length === inHouseKeys.length) {
-              setSelectedRoomKeys([]);
-            } else {
-              setSelectedRoomKeys(inHouseKeys);
-            }
-          }}
           inHouseCount={inHouseCount}
           outstandingCount={outstandingCount}
           settledArchiveCount={settledArchiveCount}
@@ -1762,689 +1791,148 @@ function BillingContent() {
         />
 
         {/* RIGHT COLUMN: FOLIO HERO, KPI CARDS & LEDGER */}
-        <div className="lg:col-span-8 xl:col-span-8 2xl:col-span-9 min-w-0 space-y-3.5 xl:space-y-4">
+        <div className="flex-1 min-w-0 space-y-6 w-full">
           {folioData && activeStay ? (
             <>
-              {/* 1. ACTIVE STAY HERO OVERVIEW CARD */}
-              <div className="rounded-2xl bg-white dark:bg-[#121215] border border-zinc-200/80 dark:border-zinc-800/80 shadow-xs overflow-hidden">
-                {/* Hero Header Top Row */}
-                <div className="p-4 sm:p-5 space-y-3">
-                  {/* Primary Row: Identity & Primary CTA */}
-                  <div className="flex items-center justify-between gap-4 flex-wrap">
-                    <div className="flex items-center gap-2.5 flex-wrap">
-                      <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-zinc-900 dark:text-white">
-                        {groupBillingMode === "YES" && isMultiRoomGroup
-                          ? `Rooms ${allGroupRooms.join(" + ")}`
-                          : `Room ${activeRoomNumber}`}
-                      </h1>
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-200/70 dark:border-zinc-700/60">
-                        {groupBillingMode === "YES" && isMultiRoomGroup
-                          ? "Combined Group Folio"
-                          : activeDirectoryItem?.roomType?.name || activeStay?.roomAssignments?.[0]?.room?.roomType?.name || "Deluxe Room"}
-                      </span>
-                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold ${
-                        activeStay?.status === "IN_HOUSE"
-                          ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/50"
-                          : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700"
-                      }`}>
-                        {activeStay?.status === "IN_HOUSE" && (
-                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                        )}
-                        {activeStay?.status === "IN_HOUSE" ? "In-House" : activeStay?.status}
-                      </span>
-                    </div>
+              <FolioHero
+                activeStay={activeStay}
+                activeRoomNumber={activeRoomNumber}
+                activeDirectoryItem={activeDirectoryItem}
+                groupBillingMode={groupBillingMode}
+                setGroupBillingMode={setGroupBillingMode}
+                isMultiRoomGroup={isMultiRoomGroup}
+                allGroupRooms={allGroupRooms}
+                currentBalance={currentBalance}
+                surplusCredit={surplusCredit}
+                totalCharges={totalCharges}
+                totalTaxable={totalTaxable}
+                totalTaxes={totalTaxes}
+                totalPayments={totalPayments}
+                paymentsCount={payments.length}
+                stayCalculations={stayCalculations}
+                gracePeriodMinutes={gracePeriodMinutes}
+                onGracePeriodChange={handleGracePeriodChange}
+                groupAdvanceMetrics={groupAdvanceMetrics}
+                onManageAdvance={() => setShowAdvanceModal(true)}
+                onApplyGroupAdvance={(amount) => handleApplyGroupAdvance(activeStay?.id, activeRoomNumber, amount)}
+                onExecuteCheckout={handleExecuteCheckout}
+                onOpenPaymentModal={() => {
+                  const hasCompany = Boolean(activeStay?.primaryGuest?.companyName);
+                  setPaymentForm({
+                    amount: String(Math.max(0, currentBalance)),
+                    method: hasCompany ? "DIRECT_BILL" : "UPI",
+                    reference: hasCompany ? `PO-${(activeStay.primaryGuest.companyName || "").slice(0, 10)}` : "",
+                    payerName: formatGuestDisplayName(activeStay?.primaryGuest?.name) || "Guest",
+                    companyName: activeStay?.primaryGuest?.companyName || "",
+                    gstin: activeStay?.primaryGuest?.gstin || "",
+                    creditPeriod: "30_DAYS",
+                    billingRemarks: "",
+                  });
+                  setShowPaymentModal(true);
+                }}
+                onOpenPrintInvoice={handleOpenPrintInvoice}
+                onOpenLiveTaxBill={handleOpenLiveTaxBill}
+                onOpenChargeModal={() => {
+                  setChargeForm({
+                    chargeCode: "MISC",
+                    description: "Guest Service Charge",
+                    amount: "",
+                    sacHsn: "9999",
+                    isInclusive: true,
+                    kotNumber: "",
+                  });
+                  setShowManualChargeModal(true);
+                }}
+                onOpenKotModal={() => {
+                  setChargeForm({
+                    chargeCode: "RESTAURANT_FOOD",
+                    description: "Kitchen Order (KOT)",
+                    amount: "",
+                    sacHsn: "996331",
+                    isInclusive: true,
+                    kotNumber: "",
+                  });
+                  setShowManualChargeModal(true);
+                }}
+                onOpenDiscountModal={() => {
+                  setDiscountForm({
+                    description: "Discount / Rebate",
+                    amount: "500",
+                    sacHsn: "996311",
+                  });
+                  setShowDiscountModal(true);
+                }}
+                onOpenRefundModal={(amt) => handleOpenRefundModal(amt)}
+                onOpenTransferRoomModal={() => setShowTransferRoomModal(true)}
+                actionLoading={actionLoading}
+                folioStatus={folioData?.status}
+                formatDateTimeShort={formatDateTimeShort}
+                formatGuestDisplayName={formatGuestDisplayName}
+              />
 
-                    {/* Action Button */}
-                    <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-                      {activeStay?.status === "IN_HOUSE" ? (
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={handleExecuteCheckout}
-                            disabled={actionLoading}
-                            className="h-9 px-4 sm:h-10 sm:px-5 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-[0.98] text-white text-xs font-bold transition shadow-xs flex items-center gap-1.5 disabled:opacity-50 cursor-pointer whitespace-nowrap"
-                          >
-                            <CheckCircle2 className="h-4 w-4" />
-                            <span>
-                              {actionLoading
-                                ? "Checking Out..."
-                                : groupBillingMode === "YES" && isMultiRoomGroup
-                                ? "Check Out Group & Invoice"
-                                : `Check Out Room ${activeRoomNumber}`}
-                            </span>
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-2">
-                          {currentBalance > 0.5 && (
-                            <button
-                              onClick={() => {
-                                setPaymentForm({
-                                  amount: String(Math.max(0, currentBalance)),
-                                  method: activeStay?.primaryGuest?.companyName ? "DIRECT_BILL" : "UPI",
-                                  reference: `Outstanding Settlement for Room ${activeRoomNumber}`,
-                                  payerName: formatGuestDisplayName(activeStay?.primaryGuest?.name) || "Guest",
-                                  companyName: activeStay?.primaryGuest?.companyName || "",
-                                  gstin: activeStay?.primaryGuest?.gstin || "",
-                                  creditPeriod: "30_DAYS",
-                                  billingRemarks: `Settling outstanding debtor balance for Room ${activeRoomNumber}`,
-                                });
-                                setShowPaymentModal(true);
-                              }}
-                              className="h-9 px-3.5 sm:h-10 sm:px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-[0.98] text-white text-xs font-bold transition shadow-xs flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
-                            >
-                              <CreditCard className="h-4 w-4" />
-                              <span>Collect Due ({formatINR(currentBalance)})</span>
-                            </button>
-                          )}
-                          <button
-                            onClick={handleOpenPrintInvoice}
-                            className="h-9 px-4 sm:h-10 sm:px-5 rounded-xl bg-zinc-900 text-white hover:bg-zinc-800 dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-200 active:scale-[0.98] font-bold text-xs transition shadow-xs flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
-                          >
-                            <Printer className="h-4 w-4" />
-                            <span>Print Final Invoice</span>
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
+              <FolioChargesTable
+                entries={entries}
+                rawEntriesCount={rawEntries.length}
+                searchQuery={ledgerSearchQuery}
+                onSearchChange={setLedgerSearchQuery}
+                typeFilter={ledgerTypeFilter}
+                onTypeFilterChange={(val: any) => setLedgerTypeFilter(val)}
+                activeStayStatus={activeStay?.status}
+                folioStatus={folioData?.status}
+                actionLoading={actionLoading}
+                onDeleteCharge={(id, desc, amt) => handleDeleteCharge(id, desc, amt)}
+                activeTaxRates={ACTIVE_TAX_RATES}
+              />
 
-                  {/* Genuine Outstanding Ledger Alert Banner */}
-                  {currentBalance > 0.5 && (
-                    <div className="w-full p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs">
-                      <div className="flex items-center gap-2 text-rose-800 dark:text-rose-300">
-                        <AlertCircle className="h-4 w-4 text-rose-600 dark:text-rose-400 shrink-0" />
-                        <span>
-                          <strong>Debtors Ledger Record:</strong> Room {activeRoomNumber} has an unpaid balance of <strong>{formatINR(currentBalance)}</strong>.
-                        </span>
-                      </div>
-                      <span className="font-mono text-[11px] font-bold text-rose-700 dark:text-rose-400 bg-white dark:bg-zinc-900 px-2.5 py-1 rounded-lg border border-rose-200 dark:border-rose-800 shrink-0">
-                        Status: UNPAID_DEBTOR
-                      </span>
-                    </div>
-                  )}
+              <FolioPaymentsTable
+                payments={payments}
+                totalPayments={totalPayments}
+                onEditPayment={(p) => {
+                  let parsedSnap: any = {};
+                  try {
+                    if (p.payerSnapshot) parsedSnap = typeof p.payerSnapshot === "string" ? JSON.parse(p.payerSnapshot) : p.payerSnapshot;
+                  } catch {}
+                  setEditingPayment({
+                    id: p.id,
+                    receiptNo: p.receiptNo || "Payment",
+                    amount: String(Math.abs(p.amount || 0)),
+                    method: p.method || "CASH",
+                    reference: p.reference || "",
+                    payerName: parsedSnap.name || p.payerName || "",
+                    companyName: parsedSnap.companyName || "",
+                    gstin: parsedSnap.gstin || "",
+                  });
+                  setShowEditPaymentModal(true);
+                }}
+              />
 
-                  {/* Master Folio Settlement Banner (Industry Standard) */}
-                  {isMultiRoomGroup && currentBalance <= 0.5 && (
-                    <div className="w-full p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs">
-                      <div className="flex items-center gap-2 text-emerald-800 dark:text-emerald-300">
-                        <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                        <span>
-                          <strong>Master Folio Settlement:</strong> {groupBillingMode === "YES" ? "Combined Group charges" : `Room ${activeRoomNumber} tariff`} ({formatINR(totalCharges)}) is fully covered under the Group Advance Pool ({activeStay?.primaryGuest?.companyName || activeStay?.primaryGuest?.name}). Balance due from guest: <strong>₹0.00</strong>.
-                        </span>
-                      </div>
-                      <span className="font-mono text-[11px] font-bold text-emerald-700 dark:text-emerald-400 bg-white dark:bg-zinc-900 px-2.5 py-1 rounded-lg border border-emerald-200 dark:border-emerald-800 shrink-0">
-                        ✓ SETTLED & CLEARED
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Secondary Row: Guest Meta & Rate/Stay Summary */}
-                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-2.5 pt-0.5">
-                    <div className="flex items-center gap-2 text-xs text-zinc-600 dark:text-zinc-400 flex-wrap">
-                      <span className="font-medium text-zinc-900 dark:text-zinc-200">
-                        Guest: <strong className="font-bold">{formatGuestDisplayName(activeStay?.primaryGuest?.name)}</strong>
-                      </span>
-                      {activeStay?.primaryGuest?.phone && (
-                        <span className="font-mono text-zinc-400">({activeStay.primaryGuest.phone})</span>
-                      )}
-                      {activeStay?.primaryGuest?.email && (
-                        <span className="text-zinc-400 hidden sm:inline">• {activeStay.primaryGuest.email}</span>
-                      )}
-                      {activeStay?.primaryGuest?.companyName && (
-                        <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200/80 dark:border-amber-800/50 text-xs font-medium text-amber-900 dark:text-amber-200">
-                          <Building2 className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
-                          <span>Bill to: <strong>{activeStay.primaryGuest.companyName}</strong></span>
-                          {activeStay?.primaryGuest?.gstin && (
-                            <span className="font-mono text-amber-700 dark:text-amber-400 text-[11px]">• GSTIN: {activeStay.primaryGuest.gstin}</span>
-                          )}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Stay Cycle Metric Summary */}
-                    <div className="flex items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400 flex-wrap shrink-0">
-                      <span className="font-bold text-zinc-800 dark:text-zinc-200">
-                        {stayCalculations.nights} Night{stayCalculations.nights > 1 ? "s" : ""} Billed
-                      </span>
-                      <span className="text-[10px] px-1.5 py-0.2 rounded bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 font-mono font-bold">
-                        {stayCalculations.elapsedHours}h Stay
-                      </span>
-                      {stayCalculations.isEarlyBird && (
-                        <span className="text-[10px] px-1.5 py-0.2 rounded bg-amber-50 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 font-bold border border-amber-200 dark:border-amber-700">
-                          Early Bird
-                        </span>
-                      )}
-                      {stayCalculations.isWithinGrace && (
-                        <span className="text-[10px] px-1.5 py-0.2 rounded bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 font-bold border border-emerald-200 dark:border-emerald-700">
-                          In Grace
-                        </span>
-                      )}
-                      {stayCalculations.waivedNextNight && (
-                        <span className="text-[10px] px-1.5 py-0.2 rounded bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 font-bold border border-purple-200 dark:border-purple-800">
-                          Next Night Waived
-                        </span>
-                      )}
-                      <span className="font-mono text-[11px]">
-                        • {stayCalculations.isComplimentary ? "Complimentary" : `₹${stayCalculations.roomRatePerNight.toLocaleString("en-IN")}/nt (${stayCalculations.isRateInclusive ? "Incl. GST" : "+Tax"})`}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Sleek Horizontal Metadata Strip (Replaces the 4 chunky grey boxes) */}
-                <div className="border-t border-zinc-100 dark:border-zinc-800/80 bg-zinc-50/50 dark:bg-zinc-900/40">
-                  <div className="grid grid-cols-2 sm:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-zinc-200/60 dark:divide-zinc-800 text-xs">
-                    <div className="p-3 sm:px-4 sm:py-2.5">
-                      <span className="text-[10px] uppercase font-semibold text-zinc-400 dark:text-zinc-500 tracking-wider block">GRC Number</span>
-                      <span className="font-mono font-bold text-blue-600 dark:text-blue-400 text-xs mt-0.5 block truncate">
-                        {activeStay?.guestRegistration?.registrationNo || (activeStay?.reservationRoom?.reservation?.confirmationNo ? `GRC-${activeStay.reservationRoom.reservation.confirmationNo}` : (activeRoomNumber ? `GRC-2627-${activeRoomNumber}` : "—"))}
-                      </span>
-                    </div>
-
-                    <div className="p-3 sm:px-4 sm:py-2.5">
-                      <span className="text-[10px] uppercase font-semibold text-zinc-400 dark:text-zinc-500 tracking-wider block">Bill / Invoice No</span>
-                      <span className="font-mono font-bold text-zinc-800 dark:text-zinc-200 text-xs mt-0.5 block truncate">
-                        {folioData?.windows?.[0]?.invoices?.[0]?.invoiceNo || (activeStay?.status === "IN_HOUSE" ? `LIVE-BILL/${activeRoomNumber || "310"}` : `INV-2627-${activeRoomNumber || "310"}`)}
-                      </span>
-                    </div>
-
-                    <div className="p-3 sm:px-4 sm:py-2.5">
-                      <span className="text-[10px] uppercase font-semibold text-zinc-400 dark:text-zinc-500 tracking-wider block">Check-In</span>
-                      <span className="font-mono text-zinc-700 dark:text-zinc-300 text-xs mt-0.5 block truncate font-medium">
-                        {formatDateTimeShort(activeStay?.arrivalAt || activeStay?.guestRegistration?.arrivalDateTime)}
-                      </span>
-                    </div>
-
-                    <div className="p-3 sm:px-4 sm:py-2.5">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="text-[10px] uppercase font-semibold text-zinc-400 dark:text-zinc-500 tracking-wider block">
-                          {activeStay?.actualDepartureAt ? "Checked Out At" : "Expected Departure"}
-                        </span>
-                        {stayCalculations.isExtendedDeparture && !activeStay?.actualDepartureAt && (
-                          <span
-                            title={stayCalculations.originalExpectedDepartureAt ? `Originally scheduled: ${formatDateTimeShort(stayCalculations.originalExpectedDepartureAt)}` : "Auto-extended stay"}
-                            className="px-1.5 py-0.2 rounded text-[9.5px] font-bold bg-amber-100 text-amber-900 dark:bg-amber-950/80 dark:text-amber-300 border border-amber-300 dark:border-amber-800"
-                          >
-                            Auto-Extended{stayCalculations.extensionNights > 1 ? ` (+${stayCalculations.extensionNights - 1}N)` : ""}
-                          </span>
-                        )}
-                      </div>
-                      <span className="font-mono text-zinc-700 dark:text-zinc-300 text-xs mt-0.5 block truncate font-medium">
-                        {formatDateTimeShort(activeStay?.actualDepartureAt || stayCalculations.effectiveDepartureAt || activeStay?.expectedDepartureAt)}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Billing Controls: Grace Period & Group Billing */}
-                <div className="p-3.5 sm:px-5 border-t border-zinc-100 dark:border-zinc-800/80 flex items-center justify-between gap-3 flex-wrap">
-                  <div className="flex items-center gap-4 flex-wrap">
-                    {/* Grace Period */}
-                    <div className="flex items-center gap-2">
-                      <label className="text-xs font-semibold text-zinc-600 dark:text-zinc-300 flex items-center gap-1.5">
-                        <Clock className="h-3.5 w-3.5 text-amber-500 shrink-0" />
-                        Grace Period:
-                      </label>
-                      <select
-                        value={gracePeriodMinutes >= 1440 && !stayCalculations.canWaiveNextNight ? 0 : gracePeriodMinutes}
-                        onChange={(e) => handleGracePeriodChange(Number(e.target.value))}
-                        className="h-8 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 px-2.5 text-xs font-semibold text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-1 focus:ring-amber-500 cursor-pointer transition shadow-2xs"
-                      >
-                        <option value={0}>0 Hours / None</option>
-                        <option value={60}>1 Hour Grace</option>
-                        <option value={120}>2 Hours Grace</option>
-                        <option value={180}>3 Hours Grace</option>
-                        <option value={240}>4 Hours Grace</option>
-                        <option value={300}>5 Hours Grace</option>
-                        <option value={360}>6 Hours Grace</option>
-                        <option value={420}>7 Hours Grace</option>
-                        <option value={1440} disabled={!stayCalculations.canWaiveNextNight}>
-                          {stayCalculations.canWaiveNextNight
-                            ? `Waive Next Night (Waive Night ${stayCalculations.unWaivedNights})`
-                            : "Waive Next Night (Not applicable for 1-night stay)"}
-                        </option>
-                      </select>
-                    </div>
-
-                    {/* Group Billing Selector (Only visible for multi-room groups) */}
-                    {isMultiRoomGroup && (
-                      <div className="flex items-center gap-2">
-                        <label className="text-xs font-semibold text-zinc-600 dark:text-zinc-300 flex items-center gap-1.5">
-                          <Layers className="h-3.5 w-3.5 text-blue-500 shrink-0" />
-                          Group Billing:
-                        </label>
-                        <select
-                          value={groupBillingMode}
-                          onChange={(e) => setGroupBillingMode(e.target.value as "NO" | "YES")}
-                          className="h-8 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 px-2.5 text-xs font-semibold text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer transition shadow-2xs"
-                        >
-                          <option value="NO">No — Separate Billing (Room {activeRoomNumber} Only)</option>
-                          <option value="YES">Yes — Combined Group Billing ({allGroupRooms.length} Rooms)</option>
-                        </select>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Clean Status Badge for Multi-Room Group */}
-                  {isMultiRoomGroup && (
-                    <div className="flex items-center gap-2 text-xs font-medium shrink-0">
-                      {groupBillingMode === "NO" ? (
-                        <span className="text-blue-700 dark:text-blue-300 bg-blue-50/80 dark:bg-blue-950/40 border border-blue-200/70 dark:border-blue-800/60 px-2.5 py-0.5 rounded-full font-medium text-[11px]">
-                          Room {activeRoomNumber} of {allGroupRooms.length} (Group)
-                        </span>
-                      ) : (
-                        <span className="text-emerald-700 dark:text-emerald-300 bg-emerald-50/80 dark:bg-emerald-950/40 border border-emerald-200/70 dark:border-emerald-800/60 px-2.5 py-0.5 rounded-full font-semibold text-[11px]">
-                          ✓ Combined ({allGroupRooms.length} Rooms)
-                        </span>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Group Advance Deposit Pool Widget (Multi-Room Groups) */}
-              {isMultiRoomGroup && groupAdvanceMetrics.totalReceived > 0 && (
-                <div className="p-3.5 sm:p-4 rounded-2xl bg-gradient-to-r from-blue-50/80 via-indigo-50/60 to-emerald-50/80 dark:from-blue-950/40 dark:via-indigo-950/30 dark:to-emerald-950/40 border border-blue-200/80 dark:border-blue-900/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2.5 rounded-xl bg-blue-600 text-white shadow-xs">
-                      <Wallet className="h-5 w-5" />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-xs sm:text-sm font-bold text-zinc-900 dark:text-white uppercase tracking-wider">
-                          Group Advance Deposit Pool
-                        </span>
-                        <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800">
-                          {formatINR(groupAdvanceMetrics.available)} Available
-                        </span>
-                      </div>
-                      <p className="text-xs text-zinc-600 dark:text-zinc-400 mt-0.5">
-                        Total Received: <strong className="text-zinc-800 dark:text-zinc-200 font-mono">{formatINR(groupAdvanceMetrics.totalReceived)}</strong> • Applied to Rooms: <strong className="text-zinc-800 dark:text-zinc-200 font-mono">{formatINR(groupAdvanceMetrics.consumed)}</strong> • Held for room checkouts or final group settlement
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => setShowAdvanceModal(true)}
-                      className="h-8.5 px-3.5 rounded-xl bg-white dark:bg-zinc-900 hover:bg-zinc-100 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-800 dark:text-zinc-200 text-xs font-semibold transition shadow-2xs flex items-center gap-1.5 cursor-pointer"
-                    >
-                      <Coins className="h-4 w-4 text-blue-500" />
-                      <span>Manage Advance</span>
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* 2. THREE FINANCIAL KPI STAT TILES */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 xl:gap-3.5">
-                <div className="p-3.5 rounded-2xl bg-white dark:bg-[#121215] border border-zinc-200/80 dark:border-zinc-800/80 shadow-xs space-y-1 min-w-0">
-                  <div className="text-[10.5px] text-zinc-500 dark:text-zinc-400 uppercase font-bold tracking-wider truncate">
-                    Total Charges Posted
-                  </div>
-                  <div className="text-xl sm:text-2xl font-black text-zinc-900 dark:text-white tabular-nums truncate">
-                    {formatINR(totalCharges)}
-                  </div>
-                  <div className="text-[11px] text-zinc-400 font-mono truncate">
-                    Taxable: {formatINR(totalTaxable)} • Tax: {formatINR(totalTaxes)}
-                  </div>
-                </div>
-
-                <div className="p-3.5 rounded-2xl bg-white dark:bg-[#121215] border border-zinc-200/80 dark:border-zinc-800/80 shadow-xs space-y-1 min-w-0">
-                  <div className="text-[10.5px] text-zinc-500 dark:text-zinc-400 uppercase font-bold tracking-wider truncate">
-                    Payments Received
-                  </div>
-                  <div className="text-xl sm:text-2xl font-black text-emerald-600 dark:text-emerald-400 tabular-nums truncate">
-                    {formatINR(totalPayments)}
-                  </div>
-                  <div className="text-[11px] text-zinc-400 font-mono truncate">
-                    {payments.length} Transaction{payments.length === 1 ? "" : "s"}
-                  </div>
-                </div>
-
-                <div className={`p-3.5 rounded-2xl border shadow-xs space-y-1 transition min-w-0 ${
-                  surplusCredit > 0
-                    ? "bg-amber-50/40 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800/60"
-                    : currentBalance > 0
-                    ? "bg-white dark:bg-[#121215] border-zinc-200/80 dark:border-zinc-800/80"
-                    : "bg-emerald-50/40 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800/60"
-                }`}>
-                  <div className="flex items-center justify-between gap-1">
-                    <div className="text-[10.5px] uppercase font-bold tracking-wider text-zinc-500 dark:text-zinc-400 truncate">
-                      {surplusCredit > 0 ? "Advance Surplus" : "Outstanding Balance"}
-                    </div>
-                    {surplusCredit > 0 && (
-                      <button
-                        onClick={() => handleOpenRefundModal(surplusCredit)}
-                        className="px-2 py-0.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-zinc-950 font-bold text-[10px] transition shadow-2xs flex items-center gap-1 cursor-pointer shrink-0"
-                        title="Issue refund return to guest"
-                      >
-                        <span>↩️ Refund</span>
-                      </button>
-                    )}
-                  </div>
-                  <div
-                    className={`text-xl sm:text-2xl font-black tabular-nums truncate ${
-                      surplusCredit > 0
-                        ? "text-amber-700 dark:text-amber-400"
-                        : currentBalance > 0
-                        ? "text-rose-600 dark:text-rose-400"
-                        : "text-emerald-600 dark:text-emerald-400"
-                    }`}
-                  >
-                    {surplusCredit > 0 ? `+ ${formatINR(surplusCredit)}` : formatINR(currentBalance)}
-                  </div>
-                  <div className="text-[11px] font-medium text-zinc-400 truncate">
-                    {surplusCredit > 0
-                      ? "Refund Due at Checkout"
-                      : currentBalance > 0
-                      ? "Pending Settlement"
-                      : "✓ Settled & Cleared"}
-                  </div>
-                </div>
-              </div>
-
-              {/* 3. FOLIO CHARGES LEDGER TABLE */}
-              <div className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-[#121215] overflow-hidden shadow-xs">
-                <div className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-100 dark:border-zinc-800/80">
-                  <div className="flex items-center gap-2.5">
-                    <h2 className="text-xs sm:text-sm font-bold text-zinc-900 dark:text-white uppercase tracking-wider flex items-center gap-2">
-                      <FileText className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                      {groupBillingMode === "YES" && isMultiRoomGroup
-                        ? `Group Folio Ledger (${allGroupRooms.join(", ")})`
-                        : `Room ${activeRoomNumber} Itemized Charges`}
-                    </h2>
-                    <span className="text-[11px] font-mono text-zinc-500 font-medium px-2 py-0.5 rounded-full bg-zinc-100 dark:bg-zinc-800 border border-zinc-200/60 dark:border-zinc-700/60">
-                      {entries.length} Item{entries.length === 1 ? "" : "s"}
-                    </span>
-                  </div>
-
-                  {/* Filter Controls */}
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <div className="relative w-44 sm:w-56">
-                      <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-zinc-400" />
-                      <input
-                        type="text"
-                        placeholder="Filter charges..."
-                        value={ledgerSearchQuery}
-                        onChange={(e) => setLedgerSearchQuery(e.target.value)}
-                        className="w-full h-8.5 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 pl-8 pr-7 text-xs text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:border-blue-500 transition"
-                      />
-                      {ledgerSearchQuery && (
-                        <button
-                          onClick={() => setLedgerSearchQuery("")}
-                          className="absolute right-2.5 top-2 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 cursor-pointer"
-                        >
-                          <X className="h-3.5 w-3.5" />
-                        </button>
-                      )}
-                    </div>
-
-                    <select
-                      value={ledgerTypeFilter}
-                      onChange={(e: any) => setLedgerTypeFilter(e.target.value)}
-                      className="h-8.5 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-2.5 text-xs text-zinc-800 dark:text-zinc-200 focus:outline-none focus:border-blue-500 font-medium cursor-pointer"
-                    >
-                      <option value="ALL">All Categories</option>
-                      <option value="ROOM_TARIFF">Room Tariffs ({ACTIVE_TAX_RATES.ROOM_ACCOMMODATION_RATE}%)</option>
-                      <option value="RESTAURANT_FOOD">Restaurant F&B ({ACTIVE_TAX_RATES.RESTAURANT_FOOD_RATE}%)</option>
-                      <option value="MANUAL">Laundry & Services ({ACTIVE_TAX_RATES.SERVICES_LAUNDRY_RATE}%)</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs">
-                    <thead className="bg-zinc-50/70 dark:bg-zinc-900/50 text-zinc-500 dark:text-zinc-400 text-[10.5px] uppercase border-b border-zinc-100 dark:border-zinc-800 font-semibold tracking-wider">
-                      <tr>
-                        <th className="py-3 px-5">Date</th>
-                        <th className="py-3 px-5">Description & Category</th>
-                        <th className="py-3 px-5">SAC</th>
-                        <th className="py-3 px-5 text-right">Taxable</th>
-                        <th className="py-3 px-5 text-right">GST</th>
-                        <th className="py-3 px-5 text-right">Total Amount</th>
-                        <th className="py-3 px-5 text-right">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/60">
-                      {entries.map((e: any) => {
-                        const taxAmt = (e.totalAmount || 0) - (e.taxableAmount || 0);
-                        const isFood = e.chargeCode?.includes("FOOD") || e.chargeCode?.includes("RESTAURANT") || e.chargeCode?.includes("FB");
-                        const isRoom = e.chargeCode?.includes("ROOM_TARIFF") || e.chargeCode === "STAY_EXTENSION" || e.sourceType === "PMS_NIGHTLY_CHARGE" || e.chargeCode === "EXTRA_PAX";
-                        const isSystemRoomCharge = isRoom && e.sourceType !== "MANUAL_CHARGE";
-                        const isDiscount = (e.amount || 0) < 0 || (e.totalAmount || 0) < 0;
-
-                        return (
-                          <tr key={e.id} className="hover:bg-zinc-50/60 dark:hover:bg-zinc-900/30 transition-colors">
-                            <td className="py-3 px-5 text-zinc-500 dark:text-zinc-400 font-mono text-xs">
-                              {e.serviceDate || e.createdAt?.slice(0, 10)}
-                            </td>
-                            <td className="py-3 px-5 font-medium text-zinc-900 dark:text-zinc-100">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span>{e.description}</span>
-                                <span
-                                  className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
-                                    isDiscount
-                                      ? "bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border border-rose-200/70 dark:border-rose-800/60"
-                                      : isFood
-                                      ? "bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200/70 dark:border-amber-800/60"
-                                      : isRoom
-                                      ? "bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200/70 dark:border-blue-800/60"
-                                      : "bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border border-purple-200/70 dark:border-purple-800/60"
-                                  }`}
-                                >
-                                  {isDiscount ? "Discount" : isFood ? `F&B (${ACTIVE_TAX_RATES.RESTAURANT_FOOD_RATE}%)` : isRoom ? `Room (${ACTIVE_TAX_RATES.ROOM_ACCOMMODATION_RATE}%)` : `Service (${ACTIVE_TAX_RATES.SERVICES_LAUNDRY_RATE}%)`}
-                                </span>
-                              </div>
-                            </td>
-                            <td className="py-3 px-5 font-mono text-zinc-500 dark:text-zinc-400 text-xs">
-                              {e.sacHsn || (isFood ? "996331" : "996311")}
-                            </td>
-                            <td className="py-3 px-5 font-mono tabular-nums text-zinc-600 dark:text-zinc-300 text-right">
-                              {formatINR(e.taxableAmount || 0)}
-                            </td>
-                            <td className="py-3 px-5 font-mono text-zinc-400 dark:text-zinc-500 tabular-nums text-right">
-                              {formatINR(taxAmt)}
-                            </td>
-                            <td className="py-3 px-5 font-mono font-semibold text-zinc-950 dark:text-white text-right tabular-nums">
-                              {formatINR(e.totalAmount || 0)}
-                            </td>
-                            <td className="py-3 px-5 text-right">
-                              {!isSystemRoomCharge && activeStay?.status === "IN_HOUSE" && folioData?.status === "OPEN" ? (
-                                <button
-                                  type="button"
-                                  onClick={() => handleDeleteCharge(e.id, e.description, e.totalAmount || 0)}
-                                  disabled={actionLoading}
-                                  className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 border border-rose-200/80 dark:border-rose-800/60 transition cursor-pointer disabled:opacity-50"
-                                  title="Delete posted charge from folio"
-                                >
-                                  <Trash2 className="h-3.5 w-3.5" />
-                                  <span className="hidden sm:inline">Delete</span>
-                                </button>
-                              ) : (
-                                <span className="text-zinc-400 dark:text-zinc-600 select-none text-xs font-mono pr-2">—</span>
-                              )}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                      {entries.length === 0 && (
-                        <tr>
-                          <td colSpan={7} className="py-12 px-5 text-center text-zinc-400 dark:text-zinc-500 italic text-xs">
-                            {rawEntries.length === 0 ? "No charges posted yet" : "No charges match your search filter"}
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              {/* 4. PAYMENT RECEIPTS TABLE */}
-              <div className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-[#121215] overflow-hidden shadow-xs">
-                <div className="p-4 sm:p-5 flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800/80">
-                  <div>
-                    <h2 className="text-xs sm:text-sm font-bold text-zinc-900 dark:text-white uppercase tracking-wider flex items-center gap-1.5">
-                      <CreditCard className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-                      Payment & Settlement Receipts
-                    </h2>
-                    <p className="text-[11px] text-zinc-400 mt-0.5">
-                      {payments.length} Transaction{payments.length === 1 ? "" : "s"} Recorded for Folio
-                    </p>
-                  </div>
-                  <span className="text-xs font-mono font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-3 py-1 rounded-full border border-emerald-200/80 dark:border-emerald-800/60">
-                    Total Settled: {formatINR(totalPayments)}
-                  </span>
-                </div>
-
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs border-collapse">
-                    <thead className="bg-zinc-50/70 dark:bg-zinc-900/50 text-zinc-500 dark:text-zinc-400 text-[10.5px] uppercase border-b border-zinc-100 dark:border-zinc-800 font-semibold tracking-wider">
-                      <tr>
-                        <th className="py-3 px-5 whitespace-nowrap">Receipt #</th>
-                        <th className="py-3 px-5 whitespace-nowrap">Date & Time</th>
-                        <th className="py-3 px-5 whitespace-nowrap">Payment Method</th>
-                        <th className="py-3 px-5 whitespace-nowrap">Reference / Notes</th>
-                        <th className="py-3 px-5 text-right whitespace-nowrap">Amount</th>
-                        <th className="py-3 px-5 text-right whitespace-nowrap">Action</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/60">
-                      {payments.map((p: any) => {
-                        const isGroup = p.reference?.includes("GRP") || p.receiptNo?.includes("GRP");
-                        const isBTC = p.method === "DIRECT_BILL";
-                        const isRefund = Number(p.amount) < 0 || p.method?.includes("REFUND") || p.method?.includes("PAYOUT");
-
-                        return (
-                          <tr key={p.id} className="hover:bg-zinc-50/60 dark:hover:bg-zinc-900/30 transition-colors">
-                            <td className="py-3 px-5 font-mono text-blue-600 dark:text-blue-400 font-semibold whitespace-nowrap align-middle">
-                              <div className="inline-flex items-center gap-1.5">
-                                <span className={isRefund ? "text-amber-600 dark:text-amber-400 font-semibold" : ""}>
-                                  {p.receiptNo}
-                                </span>
-                                {isGroup && (
-                                  <span className="text-[10px] bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 px-1.5 py-0.2 rounded font-medium">
-                                    Group
-                                  </span>
-                                )}
-                                {isRefund && (
-                                  <span className="text-[10px] bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800 px-1.5 py-0.2 rounded font-medium uppercase">
-                                    Refund
-                                  </span>
-                                )}
-                              </div>
-                            </td>
-                            <td className="py-3 px-5 text-zinc-500 dark:text-zinc-400 text-xs whitespace-nowrap align-middle font-mono">
-                              {p.receivedAt ? new Date(p.receivedAt).toLocaleString("en-GB") : "—"}
-                            </td>
-                            <td className="py-3 px-5 font-medium text-zinc-800 dark:text-zinc-200 whitespace-nowrap align-middle">
-                              <span
-                                className={`rounded-full border px-2.5 py-0.5 text-xs font-medium inline-flex items-center gap-1.5 ${
-                                  isRefund
-                                    ? "bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800/60"
-                                    : isBTC
-                                    ? "bg-amber-50 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-800/60 shadow-2xs"
-                                    : p.method === "UPI"
-                                    ? "bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800/60"
-                                    : p.method === "CARD"
-                                    ? "bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800/60"
-                                    : p.method === "BANK_TRANSFER"
-                                    ? "bg-cyan-50 dark:bg-cyan-950/60 text-cyan-700 dark:text-cyan-300 border-cyan-200 dark:border-cyan-800/60"
-                                    : "bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/60"
-                                }`}
-                              >
-                                {isRefund ? (
-                                  <span>Refund Payout ({p.method.replace("_REFUND", "")})</span>
-                                ) : isBTC ? (
-                                  <>
-                                    <Building2 className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
-                                    <span>Bill to Company (BTC)</span>
-                                  </>
-                                ) : p.method === "UPI" ? (
-                                  <span>UPI / QR</span>
-                                ) : p.method === "CARD" ? (
-                                  <span>Card</span>
-                                ) : p.method === "BANK_TRANSFER" ? (
-                                  <span>Bank Transfer</span>
-                                ) : (
-                                  <span>{p.method || "Cash"}</span>
-                                )}
-                              </span>
-                            </td>
-                            <td className="py-3 px-5 font-mono text-zinc-600 dark:text-zinc-400 text-xs whitespace-nowrap align-middle">
-                              {p.reference && !p.reference.startsWith("GRC-DEPOSIT-") ? p.reference : "—"}
-                            </td>
-                            <td className={`py-3 px-5 font-mono font-bold text-right tabular-nums text-sm whitespace-nowrap align-middle ${
-                              isRefund ? "text-rose-600 dark:text-rose-400 font-black" : "text-emerald-600 dark:text-emerald-400"
-                            }`}>
-                              {isRefund ? `- ${formatINR(Math.abs(p.amount))}` : formatINR(p.amount || 0)}
-                            </td>
-                            <td className="py-3 px-5 text-right whitespace-nowrap align-middle">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  let parsedSnap: any = {};
-                                  try {
-                                    if (p.payerSnapshot) parsedSnap = typeof p.payerSnapshot === "string" ? JSON.parse(p.payerSnapshot) : p.payerSnapshot;
-                                  } catch {}
-                                  setEditingPayment({
-                                    id: p.id,
-                                    receiptNo: p.receiptNo || "Payment",
-                                    amount: String(Math.abs(p.amount || 0)),
-                                    method: p.method || "CASH",
-                                    reference: p.reference || "",
-                                    payerName: parsedSnap.name || p.payerName || "",
-                                    companyName: parsedSnap.companyName || "",
-                                    gstin: parsedSnap.gstin || "",
-                                  });
-                                  setShowEditPaymentModal(true);
-                                }}
-                                className="px-2.5 py-1 rounded-lg bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 font-semibold text-xs transition inline-flex items-center gap-1 cursor-pointer"
-                                title="Edit collected amount and payment details"
-                              >
-                                <Pencil className="h-3 w-3" />
-                                <span>Edit</span>
-                              </button>
-                            </td>
-                          </tr>
-                        );
-                      })}
-
-                      {payments.length === 0 && (
-                        <tr>
-                          <td colSpan={6} className="py-10 px-5 text-center text-zinc-400 italic text-xs">
-                            No payments recorded yet for this stay.
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
 
               {/* 5. GENERATED TAX INVOICES CARD */}
               {invoices.length > 0 && (
-                <div className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-[#121215] p-4 sm:p-5 space-y-3 shadow-xs">
-                  <h2 className="text-xs sm:text-sm font-bold text-zinc-900 dark:text-white uppercase tracking-wider">
-                    Generated Tax Invoices
-                  </h2>
-                  <div className="space-y-2">
+                <div className="rounded-xl border border-zinc-200/70 dark:border-zinc-800/70 bg-white dark:bg-[#121215] p-4 space-y-2.5">
+                  <div className="flex items-center gap-2">
+                    <Printer className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">
+                      Generated Tax Invoices
+                    </h3>
+                  </div>
+                  <div className="space-y-1.5">
                     {invoices.map((inv: any) => (
                       <div
                         key={inv.id}
-                        className="flex items-center justify-between p-3.5 rounded-xl bg-zinc-50/80 dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 text-xs sm:text-sm"
+                        className="flex items-center justify-between p-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200/70 dark:border-zinc-800 text-xs"
                       >
                         <div>
-                          <div className="font-mono font-bold text-blue-600 dark:text-blue-400 text-sm">
+                          <div className="font-mono font-bold text-blue-600 dark:text-blue-400">
                             {inv.invoiceNo}
                           </div>
-                          <div className="text-xs text-zinc-500 dark:text-zinc-400 font-mono mt-0.5">
+                          <div className="text-[11px] text-zinc-400 font-mono mt-0.5">
                             FY: {inv.financialYear} • Issued: {inv.issuedAt?.slice(0, 10)}
                           </div>
                         </div>
 
                         <div className="flex items-center gap-3">
-                          <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400 tabular-nums text-sm">
+                          <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">
                             {formatINR(inv.totalAmount || 0)}
                           </span>
                           <button
@@ -2453,10 +1941,10 @@ function BillingContent() {
                               setIsLiveTaxBillView(false);
                               setShowInvoiceModal(true);
                             }}
-                            className="h-8.5 px-3.5 rounded-xl bg-zinc-900 text-white hover:bg-zinc-800 dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-200 text-xs font-bold transition shadow-xs flex items-center gap-1.5 cursor-pointer"
+                            className="h-7.5 px-3 rounded-md bg-zinc-900 text-white hover:bg-zinc-800 dark:bg-white dark:text-zinc-950 text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition"
                           >
-                            <Printer className="h-3.5 w-3.5" />
-                            <span>Print Tax Invoice</span>
+                            <Printer className="h-3 w-3" />
+                            <span>Print</span>
                           </button>
                         </div>
                       </div>
@@ -2466,9 +1954,9 @@ function BillingContent() {
               )}
             </>
           ) : (
-            <div className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-[#121215] p-16 text-center text-zinc-500 dark:text-zinc-400 space-y-3 shadow-xs">
-              <Receipt className="h-10 w-10 text-zinc-400 dark:text-zinc-600 mx-auto" />
-              <p className="font-bold text-sm text-zinc-800 dark:text-zinc-200">
+            <div className="rounded-xl border border-zinc-200/70 dark:border-zinc-800/70 bg-white dark:bg-[#121215] p-12 text-center text-zinc-500 space-y-2">
+              <Receipt className="h-8 w-8 text-zinc-400 mx-auto" />
+              <p className="font-semibold text-sm text-zinc-800 dark:text-zinc-200">
                 {stays.length === 0 ? "No active folios found for this property" : "Select a room from the directory to manage billing"}
               </p>
               <p className="text-xs text-zinc-400 max-w-sm mx-auto">
@@ -2507,10 +1995,13 @@ function BillingContent() {
         isOpen={showPaymentModal}
         onClose={() => setShowPaymentModal(false)}
         activeStay={activeStay}
+        activeProperty={activeProperty}
         paymentForm={paymentForm}
         setPaymentForm={setPaymentForm}
         onSubmit={handleRecordPayment}
         loading={actionLoading}
+        groupAdvanceMetrics={groupAdvanceMetrics}
+        activeRoomNumber={activeRoomNumber}
       />
 
       <EditPaymentModal
@@ -2544,6 +2035,7 @@ function BillingContent() {
         onClose={() => setShowGroupPaymentModal(false)}
         selectedGroupStayIds={selectedGroupStayIds}
         stays={stays}
+        activeProperty={activeProperty}
         groupPaymentForm={groupPaymentForm}
         setGroupPaymentForm={setGroupPaymentForm}
         onSubmit={handleSubmitGroupPayment}
@@ -2588,6 +2080,40 @@ function BillingContent() {
         groupAdvanceMetrics={groupAdvanceMetrics}
         directoryItems={directoryItems}
         selectedStayId={selectedStayId}
+        onAllocateAdvance={handleApplyGroupAdvance}
+        onRefresh={async () => {
+          if (folioData?.id) await loadFolio(folioData.id);
+          await loadStays(true);
+          await refreshData();
+        }}
+      />
+
+      <TransferRoomModal
+        isOpen={showTransferRoomModal}
+        onClose={() => setShowTransferRoomModal(false)}
+        stay={activeStay}
+        currentRoom={
+          activeDirectoryItem?.room ||
+          activeStay?.roomAssignments?.find(
+            (ra: any) => !ra.endsAt && (ra.room?.number === activeRoomNumber || ra.roomId === activeDirectoryItem?.roomId)
+          )?.room ||
+          activeStay?.roomAssignments?.find((ra: any) => !ra.endsAt)?.room ||
+          activeStay?.roomAssignments?.[0]?.room
+        }
+        folioBalance={currentBalance}
+        rooms={propertyRooms}
+        onSuccess={async (targetRoomNumber?: string) => {
+          apiCache.invalidate("/api/v1/stays");
+          if (targetRoomNumber) {
+            setSelectedRoomNumber(targetRoomNumber);
+          }
+          await loadStays(true);
+          if (folioData?.id) {
+            await loadFolio(folioData.id);
+          }
+          await loadPropertyRooms();
+          refreshData();
+        }}
       />
 
       {/* ========================================================================= */}

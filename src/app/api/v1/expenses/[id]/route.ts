@@ -57,6 +57,24 @@ export async function PUT(
     const numTax = taxAmount !== undefined ? Number(taxAmount) : existingExpense.taxAmount;
     const totalAmount = numAmount + numTax;
 
+    let updatedPaidAt = existingExpense.paidAt;
+    let updatedBusinessDate = existingExpense.businessDate;
+
+    if (paidAt !== undefined && paidAt) {
+      const parsedDate = new Date(paidAt);
+      if (!isNaN(parsedDate.getTime())) {
+        updatedPaidAt = parsedDate;
+      }
+    }
+
+    if (businessDate !== undefined && businessDate) {
+      updatedBusinessDate = businessDate;
+    } else if (paidAt !== undefined && paidAt) {
+      updatedBusinessDate = typeof paidAt === "string" && paidAt.includes("T")
+        ? paidAt.split("T")[0]
+        : updatedPaidAt.toISOString().split("T")[0];
+    }
+
     const updated = await prisma.expense.update({
       where: { id },
       data: {
@@ -69,8 +87,8 @@ export async function PUT(
         paymentMethod: paymentMethod !== undefined ? paymentMethod : existingExpense.paymentMethod,
         reference: reference !== undefined ? reference : existingExpense.reference,
         notes: notes !== undefined ? notes : existingExpense.notes,
-        paidAt: paidAt ? new Date(paidAt) : existingExpense.paidAt,
-        businessDate: businessDate || existingExpense.businessDate,
+        paidAt: updatedPaidAt,
+        businessDate: updatedBusinessDate,
         status: status || existingExpense.status,
         voucherNo: voucherNo || existingExpense.voucherNo,
       },

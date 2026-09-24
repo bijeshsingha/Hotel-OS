@@ -1,5 +1,5 @@
 import React from "react";
-import { BedDouble, AlertCircle, Archive, Search, X, Building2 } from "lucide-react";
+import { BedDouble, AlertCircle, Archive, Search, X, Building2, Check, ArrowRight } from "lucide-react";
 import { formatINR } from "@/lib/gst/calculator";
 import { DirectoryRoomItem, MainFolioTab } from "./billing-types";
 
@@ -9,14 +9,14 @@ interface BillingSidebarProps {
   filteredDirectoryItems: DirectoryRoomItem[];
   selectedStayId: string;
   selectedRoomNumber: string;
-  selectedRoomKeys: string[];
+  selectedRoomKeys?: string[];
   staySearchQuery: string;
   setStaySearchQuery: (q: string) => void;
   stayStatusFilter: "ALL" | "SETTLED" | "WITH_BALANCE";
   setStayStatusFilter: React.Dispatch<React.SetStateAction<"ALL" | "SETTLED" | "WITH_BALANCE">>;
   onSelectRoom: (stayId: string, roomNumber: string) => void;
-  onToggleRoomSelection: (key: string) => void;
-  onSelectAllRooms: () => void;
+  onToggleRoomSelection?: (key: string) => void;
+  onSelectAllRooms?: () => void;
   inHouseCount: number;
   outstandingCount: number;
   settledArchiveCount: number;
@@ -29,98 +29,98 @@ export function BillingSidebar({
   filteredDirectoryItems,
   selectedStayId,
   selectedRoomNumber,
-  selectedRoomKeys,
   staySearchQuery,
   setStaySearchQuery,
   stayStatusFilter,
   setStayStatusFilter,
   onSelectRoom,
-  onToggleRoomSelection,
-  onSelectAllRooms,
   inHouseCount,
   outstandingCount,
   settledArchiveCount,
   formatShortDate,
 }: BillingSidebarProps) {
+  // Calculate tab total dues for quick directory context
+  const totalDueInView = filteredDirectoryItems.reduce((acc, item) => acc + (item.roomBalance || 0), 0);
+
   return (
-    <div className="lg:col-span-4 xl:col-span-4 2xl:col-span-3 rounded-2xl bg-white dark:bg-[#121215] border border-zinc-200/80 dark:border-zinc-800/80 p-3 sm:p-3.5 shadow-xs flex flex-col space-y-2.5 h-fit min-w-0">
-      {/* Directory Title & Multi-room Controls */}
-      <div className="flex items-center justify-between pb-2 border-b border-zinc-100 dark:border-zinc-800/80">
-        <div className="flex items-center gap-1.5 font-bold text-xs uppercase tracking-wider text-zinc-700 dark:text-zinc-300 font-mono">
+    <aside className="w-full lg:w-[350px] xl:w-[380px] shrink-0 sticky top-4 flex flex-col max-h-[calc(100vh-2rem)] rounded-2xl bg-white dark:bg-[#121215] border border-zinc-200/80 dark:border-zinc-800 p-4 space-y-3.5 shadow-xs transition-colors duration-150">
+      {/* Directory Title & Count Badge */}
+      <div className="flex items-center justify-between pb-3 border-b border-zinc-100 dark:border-zinc-800/80">
+        <div className="flex items-center gap-2 text-sm font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
           {activeMainTab === "IN_HOUSE" ? (
-            <BedDouble className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+            <div className="w-7 h-7 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800/60 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
+              <BedDouble className="h-4 w-4" />
+            </div>
           ) : activeMainTab === "OUTSTANDING_DUES" ? (
-            <AlertCircle className="h-4 w-4 text-rose-600 dark:text-rose-400" />
+            <div className="w-7 h-7 rounded-lg bg-rose-50 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-800/60 flex items-center justify-center text-rose-600 dark:text-rose-400">
+              <AlertCircle className="h-4 w-4" />
+            </div>
           ) : (
-            <Archive className="h-4 w-4 text-zinc-500 dark:text-zinc-400" />
+            <div className="w-7 h-7 rounded-lg bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 flex items-center justify-center text-zinc-500 dark:text-zinc-400">
+              <Archive className="h-4 w-4" />
+            </div>
           )}
           <span>
             {activeMainTab === "IN_HOUSE"
               ? "In-House Rooms"
               : activeMainTab === "OUTSTANDING_DUES"
-              ? "Outstanding Dues"
+              ? "Debtors Ledger"
               : "Settled Archive"}
           </span>
         </div>
 
-        <div className="flex items-center gap-2">
-          {filteredDirectoryItems.length > 0 && (
-            <button
-              onClick={onSelectAllRooms}
-              className="text-[10px] text-blue-600 dark:text-blue-400 hover:underline font-bold"
-            >
-              {selectedRoomKeys.length === filteredDirectoryItems.length ? "Deselect All" : "Select All"}
-            </button>
-          )}
-          <span className="text-[10.5px] text-zinc-500 dark:text-zinc-400 font-semibold bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 rounded-md">
-            {filteredDirectoryItems.length}{" "}
-            {activeMainTab === "IN_HOUSE"
-              ? "Occupied"
-              : activeMainTab === "OUTSTANDING_DUES"
-              ? "Debtors"
-              : "Settled"}
-          </span>
-        </div>
+        <span className="text-xs text-zinc-600 dark:text-zinc-400 font-mono font-semibold bg-zinc-100 dark:bg-zinc-800/80 px-2.5 py-1 rounded-lg border border-zinc-200/60 dark:border-zinc-700/60">
+          {filteredDirectoryItems.length}{" "}
+          {activeMainTab === "IN_HOUSE"
+            ? "Active"
+            : activeMainTab === "OUTSTANDING_DUES"
+            ? "Pending"
+            : "Archived"}
+        </span>
       </div>
 
-      {/* Search Bar */}
+      {/* Search Input */}
       <div className="relative">
-        <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-zinc-400 dark:text-zinc-500" />
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400 pointer-events-none" />
         <input
           type="text"
           placeholder={
             activeMainTab === "IN_HOUSE"
-              ? "Search room #, guest name..."
-              : "Search room, invoice #, guest, phone..."
+              ? "Search room #, guest name, phone..."
+              : "Search room, invoice #, guest, company..."
           }
           value={staySearchQuery}
           onChange={(e) => setStaySearchQuery(e.target.value)}
-          className="w-full h-9 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 pl-8.5 pr-8 text-xs text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none focus:border-blue-500 font-medium transition"
+          className="w-full h-9.5 rounded-xl bg-zinc-50 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 pl-9 pr-8 text-xs sm:text-sm text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:border-blue-500 font-medium transition"
         />
         {staySearchQuery && (
           <button
+            type="button"
             onClick={() => setStaySearchQuery("")}
-            className="absolute right-2.5 top-2 text-zinc-400 hover:text-zinc-700 dark:hover:text-white cursor-pointer"
+            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-700 dark:hover:text-white cursor-pointer p-0.5 rounded"
+            title="Clear search"
           >
             <X className="h-3.5 w-3.5" />
           </button>
         )}
       </div>
 
-      {/* Quick Filter Tabs */}
+      {/* Sub-status Quick Filter Segmented Controls */}
       {activeMainTab === "IN_HOUSE" ? (
-        <div className="grid grid-cols-3 gap-1 p-1 rounded-xl bg-zinc-100/80 dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 text-[11px] font-semibold text-center">
+        <div className="grid grid-cols-3 gap-1 p-1 rounded-xl bg-zinc-100 dark:bg-zinc-900/60 border border-zinc-200/70 dark:border-zinc-800/80 text-xs font-semibold text-center">
           <button
+            type="button"
             onClick={() => setStayStatusFilter("ALL")}
             className={`rounded-lg py-1.5 transition cursor-pointer ${
               stayStatusFilter === "ALL"
-                ? "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-xs font-bold"
+                ? "bg-white dark:bg-zinc-800 text-zinc-950 dark:text-white shadow-xs font-bold"
                 : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200"
             }`}
           >
             All ({inHouseCount})
           </button>
           <button
+            type="button"
             onClick={() => setStayStatusFilter("WITH_BALANCE")}
             className={`rounded-lg py-1.5 transition cursor-pointer ${
               stayStatusFilter === "WITH_BALANCE"
@@ -131,6 +131,7 @@ export function BillingSidebar({
             Due ({directoryItems.filter((d) => d.status === "IN_HOUSE" && d.roomBalance > 0.5).length})
           </button>
           <button
+            type="button"
             onClick={() => setStayStatusFilter("SETTLED")}
             className={`rounded-lg py-1.5 transition cursor-pointer ${
               stayStatusFilter === "SETTLED"
@@ -142,18 +143,20 @@ export function BillingSidebar({
           </button>
         </div>
       ) : activeMainTab === "OUTSTANDING_DUES" ? (
-        <div className="grid grid-cols-3 gap-1 p-1 rounded-xl bg-zinc-100/80 dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 text-[11px] font-semibold text-center">
+        <div className="grid grid-cols-3 gap-1 p-1 rounded-xl bg-zinc-100 dark:bg-zinc-900/60 border border-zinc-200/70 dark:border-zinc-800/80 text-xs font-semibold text-center">
           <button
+            type="button"
             onClick={() => setStayStatusFilter("ALL")}
             className={`rounded-lg py-1.5 transition cursor-pointer ${
               stayStatusFilter === "ALL"
-                ? "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-xs font-bold"
+                ? "bg-white dark:bg-zinc-800 text-zinc-950 dark:text-white shadow-xs font-bold"
                 : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200"
             }`}
           >
             All ({outstandingCount})
           </button>
           <button
+            type="button"
             onClick={() => setStayStatusFilter("WITH_BALANCE")}
             className={`rounded-lg py-1.5 transition cursor-pointer ${
               stayStatusFilter === "WITH_BALANCE"
@@ -161,18 +164,10 @@ export function BillingSidebar({
                 : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200"
             }`}
           >
-            Corporate (
-            {
-              directoryItems.filter(
-                (d) =>
-                  (d.status === "CHECKED_OUT" || d.status === "COMPLETED") &&
-                  d.roomBalance > 0.5 &&
-                  d.companyName
-              ).length
-            }
-            )
+            Corporate ({directoryItems.filter((d) => (d.status === "CHECKED_OUT" || d.status === "COMPLETED") && d.roomBalance > 0.5 && d.companyName).length})
           </button>
           <button
+            type="button"
             onClick={() => setStayStatusFilter("SETTLED")}
             className={`rounded-lg py-1.5 transition cursor-pointer ${
               stayStatusFilter === "SETTLED"
@@ -180,31 +175,24 @@ export function BillingSidebar({
                 : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200"
             }`}
           >
-            Guest (
-            {
-              directoryItems.filter(
-                (d) =>
-                  (d.status === "CHECKED_OUT" || d.status === "COMPLETED") &&
-                  d.roomBalance > 0.5 &&
-                  !d.companyName
-              ).length
-            }
-            )
+            Individual ({directoryItems.filter((d) => (d.status === "CHECKED_OUT" || d.status === "COMPLETED") && d.roomBalance > 0.5 && !d.companyName).length})
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-1 p-1 rounded-xl bg-zinc-100/80 dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 text-[11px] font-semibold text-center">
+        <div className="grid grid-cols-2 gap-1 p-1 rounded-xl bg-zinc-100 dark:bg-zinc-900/60 border border-zinc-200/70 dark:border-zinc-800/80 text-xs font-semibold text-center">
           <button
+            type="button"
             onClick={() => setStayStatusFilter("ALL")}
             className={`rounded-lg py-1.5 transition cursor-pointer ${
               stayStatusFilter === "ALL"
-                ? "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-xs font-bold"
+                ? "bg-white dark:bg-zinc-800 text-zinc-950 dark:text-white shadow-xs font-bold"
                 : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200"
             }`}
           >
             All Settled ({settledArchiveCount})
           </button>
           <button
+            type="button"
             onClick={() => setStayStatusFilter("WITH_BALANCE")}
             className={`rounded-lg py-1.5 transition cursor-pointer ${
               stayStatusFilter === "WITH_BALANCE"
@@ -212,127 +200,116 @@ export function BillingSidebar({
                 : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200"
             }`}
           >
-            Corporate (
-            {
-              directoryItems.filter(
-                (d) => (d.status === "CHECKED_OUT" || d.status === "COMPLETED") && d.companyName
-              ).length
-            }
-            )
+            Corporate ({directoryItems.filter((d) => (d.status === "CHECKED_OUT" || d.status === "COMPLETED") && d.companyName).length})
           </button>
         </div>
       )}
 
-      {/* Stays / Rooms List with Separated Individual Cards */}
-      <div className="space-y-2 max-h-[calc(100vh-290px)] overflow-y-auto pr-0.5 flex-1">
+      {/* Room Directory List */}
+      <div className="space-y-2.5 overflow-y-auto flex-1 pr-1 -mr-1 min-h-[160px]">
         {filteredDirectoryItems.map((item) => {
           const isSelected =
             item.stayId === selectedStayId &&
             (selectedRoomNumber ? item.roomNumber === selectedRoomNumber : true);
-          const isGroupChecked = selectedRoomKeys.includes(item.key);
           const hasCompany = Boolean(item.companyName);
+          const isSettled = item.roomBalance <= 0.5;
 
           return (
             <div
               key={item.key}
               onClick={() => onSelectRoom(item.stayId, item.roomNumber)}
-              className={`rounded-xl p-3 border transition-all cursor-pointer flex items-start gap-2.5 shadow-xs ${
+              className={`rounded-xl p-3.5 border transition-all duration-150 cursor-pointer relative ${
                 isSelected
-                  ? "bg-blue-50/80 dark:bg-blue-950/30 border-blue-400 dark:border-blue-700 text-zinc-900 dark:text-zinc-100"
-                  : "bg-zinc-50/50 dark:bg-zinc-900/50 border-zinc-200/80 dark:border-zinc-800/80 text-zinc-600 dark:text-zinc-400 hover:border-zinc-300 dark:hover:border-zinc-700"
+                  ? "bg-blue-50/70 dark:bg-blue-950/25 border-blue-500/80 dark:border-blue-400/80 shadow-xs ring-1 ring-blue-500/20 before:absolute before:left-0 before:top-2 before:bottom-2 before:w-1 before:rounded-r before:bg-blue-600 dark:before:bg-blue-400"
+                  : "bg-white dark:bg-[#121215] border-zinc-200/80 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400 hover:border-zinc-300 dark:hover:border-zinc-700 hover:bg-zinc-50/70 dark:hover:bg-zinc-900/40"
               }`}
             >
-              <input
-                type="checkbox"
-                checked={isGroupChecked}
-                onClick={(e) => e.stopPropagation()}
-                onChange={() => onToggleRoomSelection(item.key)}
-                className="mt-0.5 h-3.5 w-3.5 rounded bg-white dark:bg-zinc-800 border-zinc-300 dark:border-zinc-700 accent-emerald-500 cursor-pointer shrink-0"
-                title="Select for group settlement"
-              />
-
-              <div className="flex-1 min-w-0 space-y-1.5">
-                {/* Row 1: Room Number, Room Type & Status Tag */}
-                <div className="flex items-center justify-between gap-1.5">
-                  <div className="flex items-center gap-1.5 min-w-0">
-                    <span className="text-sm font-black text-zinc-900 dark:text-white shrink-0">
-                      Room {item.roomNumber}
-                    </span>
-                    <span className="text-[11px] text-zinc-500 dark:text-zinc-400 font-medium truncate">
-                      {item.roomType?.name || "Deluxe"}
-                    </span>
-                  </div>
-
-                  <div className="flex items-center gap-1 shrink-0">
-                    {item.isMultiRoom && (
-                      <span className="rounded px-1.5 py-0.2 text-[9px] font-bold bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/60">
-                        Group ({item.allRoomNumbers.length})
-                      </span>
-                    )}
-                    <span
-                      className={`rounded px-1.5 py-0.2 text-[9px] font-bold uppercase ${
-                        item.status === "IN_HOUSE"
-                          ? "bg-emerald-100/70 dark:bg-emerald-500/10 text-emerald-800 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20"
-                          : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700"
-                      }`}
-                    >
-                      {item.status}
-                    </span>
-                  </div>
+              {/* Row 1: Room Identification & Live Balance */}
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="text-base font-bold font-mono text-zinc-950 dark:text-zinc-50 shrink-0">
+                    Room {item.roomNumber}
+                  </span>
+                  <span className="text-xs text-zinc-500 dark:text-zinc-400 font-medium truncate max-w-[130px] sm:max-w-[150px]">
+                    {item.roomType?.name || "Standard Room"}
+                  </span>
                 </div>
 
-                {/* Row 2: Full Guest Name & Corporate Entity */}
-                <div className="text-xs font-bold text-zinc-900 dark:text-zinc-100 truncate">
+                <div className="shrink-0 font-mono text-sm font-bold tabular-nums">
+                  {!isSettled ? (
+                    <span className="text-rose-600 dark:text-rose-400">
+                      {formatINR(item.roomBalance)}
+                    </span>
+                  ) : (
+                    <span className="text-emerald-600 dark:text-emerald-400 text-xs font-semibold inline-flex items-center gap-1">
+                      <Check className="w-3.5 h-3.5" />
+                      <span>Cleared</span>
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Row 2: Guest Name & Company */}
+              <div className="mt-1.5 flex items-center justify-between gap-2">
+                <div className="text-sm font-bold text-zinc-900 dark:text-zinc-100 truncate">
                   {item.guestName}
                 </div>
-
-                {hasCompany && (
-                  <div className="flex items-center gap-1 text-[10.5px] text-amber-800 dark:text-amber-300 font-medium truncate bg-amber-50/80 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/40 px-1.5 py-0.5 rounded-md">
-                    <Building2 className="h-3 w-3 shrink-0 text-amber-600 dark:text-amber-400" />
-                    <span className="truncate">{item.companyName}</span>
-                  </div>
-                )}
-
-                {/* Row 3: Financial Balance & Stay Dates */}
-                <div className="flex items-center justify-between gap-1 text-[10.5px] pt-0.5">
-                  <span className="font-mono text-zinc-500 dark:text-zinc-400 flex items-center gap-1">
-                    <span>{formatShortDate(item.arrivalAt)} → {formatShortDate(item.expectedDepartureAt)}</span>
-                    {item.isExtendedDeparture && (
-                      <span className="text-[9px] font-bold px-1 rounded bg-amber-100 text-amber-900 dark:bg-amber-950/80 dark:text-amber-300">
-                        Ext
-                      </span>
-                    )}
+                {item.isMultiRoom && (
+                  <span className="shrink-0 text-[11px] font-mono font-medium text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/60 px-1.5 py-0.5 rounded border border-amber-200 dark:border-amber-800/50">
+                    Group Stay
                   </span>
+                )}
+              </div>
 
-                  <div className="shrink-0">
-                    {item.roomBalance > 0.5 ? (
-                      <span className="text-[10px] font-bold text-rose-700 dark:text-rose-300 bg-rose-50 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-800/50 px-2 py-0.5 rounded-md">
-                        Due: {formatINR(item.roomBalance)}
-                      </span>
-                    ) : item.groupAdvanceCovered && item.groupAdvanceCovered > 0 ? (
-                      <span className="text-[10px] font-semibold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800/50 px-1.5 py-0.5 rounded-md">
-                        ✓ Group Covered
-                      </span>
-                    ) : (
-                      <span className="text-[10px] font-semibold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800/50 px-1.5 py-0.5 rounded-md">
-                        ✓ Settled
-                      </span>
-                    )}
-                  </div>
+              {hasCompany && (
+                <div className="mt-1 flex items-center gap-1.5 text-xs text-amber-700 dark:text-amber-400 font-medium truncate">
+                  <Building2 className="h-3.5 w-3.5 shrink-0" />
+                  <span className="truncate">{item.companyName}</span>
                 </div>
+              )}
+
+              {/* Row 3: Stay Dates & Lineage Indicator */}
+              <div className="mt-2 pt-2 border-t border-zinc-100 dark:border-zinc-800/60 flex items-center justify-between text-xs font-mono text-zinc-400">
+                <div className="flex items-center gap-1">
+                  <span>{formatShortDate(item.arrivalAt)}</span>
+                  <ArrowRight className="w-3 h-3 text-zinc-300 dark:text-zinc-600" />
+                  <span>{formatShortDate(item.expectedDepartureAt)}</span>
+                </div>
+
+                {item.moveReason?.includes("MOVED_FROM:") && (
+                  <span className="text-[10px] text-amber-600 dark:text-amber-400 uppercase font-semibold">
+                    Transferred
+                  </span>
+                )}
               </div>
             </div>
           );
         })}
 
         {filteredDirectoryItems.length === 0 && (
-          <div className="p-8 text-center text-xs text-zinc-500 space-y-2">
-            <AlertCircle className="h-6 w-6 text-zinc-400 dark:text-zinc-600 mx-auto" />
-            <p className="font-bold text-zinc-800 dark:text-zinc-300 text-xs">No matching folios found</p>
-            <p className="text-zinc-400 text-[11px]">Try changing your search term or filter status.</p>
+          <div className="py-10 px-4 text-center text-sm text-zinc-500 space-y-2">
+            <AlertCircle className="h-8 w-8 text-zinc-400 dark:text-zinc-600 mx-auto" />
+            <p className="font-bold text-zinc-800 dark:text-zinc-300 text-sm">No matching folios found</p>
+            <p className="text-zinc-400 text-xs">Try adjusting your search query or filter tab.</p>
           </div>
         )}
       </div>
-    </div>
+
+      {/* Directory Footer Summary */}
+      {filteredDirectoryItems.length > 0 && (
+        <div className="pt-2.5 border-t border-zinc-100 dark:border-zinc-800/80 flex items-center justify-between text-xs text-zinc-500 font-mono">
+          <span>{filteredDirectoryItems.length} Folios</span>
+          {totalDueInView > 0 ? (
+            <span className="font-bold text-rose-600 dark:text-rose-400">
+              Due: {formatINR(totalDueInView)}
+            </span>
+          ) : (
+            <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+              All Settled
+            </span>
+          )}
+        </div>
+      )}
+    </aside>
   );
 }

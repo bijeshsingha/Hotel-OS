@@ -173,9 +173,36 @@ export function PrintableTaxInvoiceModal({
     addressText = `${primaryGuest.city}, ${primaryGuest.state || "Assam"}, India`;
   }
 
+  // Recipient Snapshot parser (if invoiceData has it)
+  let parsedRecipient: any = null;
+  if (invoiceData?.recipientSnapshot) {
+    try {
+      parsedRecipient = typeof invoiceData.recipientSnapshot === "string"
+        ? JSON.parse(invoiceData.recipientSnapshot)
+        : invoiceData.recipientSnapshot;
+    } catch (e) {}
+  }
+
   // Invoice Numbers & Dates
   const billNo = invoiceData?.invoiceNo || (isLiveTaxBillView ? `LIVE-BILL/${roomNumber}` : `INV-2627-${roomNumber}`);
-  const grcNo = stay?.guestRegistration?.registrationNo || stay?.grcNo || (stay?.reservationRoom?.reservation?.confirmationNo) || `GRC-2627-${roomNumber}`;
+  const grcNo = parsedRecipient?.grcNo || stay?.guestRegistration?.registrationNo || stay?.grcNo || (stay?.reservationRoom?.reservation?.confirmationNo) || `GRC-2627-${roomNumber}`;
+
+  // Room Pax (Adults & Children)
+  let roomPaxAdults = parsedRecipient?.adults !== undefined ? Number(parsedRecipient.adults) : undefined;
+  let roomPaxChildren = parsedRecipient?.children !== undefined ? Number(parsedRecipient.children) : undefined;
+
+  if (roomPaxAdults === undefined && stay?.guestRegistration?.internalNotes) {
+    try {
+      const parsedNotes = JSON.parse(stay.guestRegistration.internalNotes);
+      if (parsedNotes.roomPax?.[roomNumber]) {
+        roomPaxAdults = Number(parsedNotes.roomPax[roomNumber].adults);
+        roomPaxChildren = Number(parsedNotes.roomPax[roomNumber].children);
+      }
+    } catch (e) {}
+  }
+
+  const effectiveAdults = roomPaxAdults !== undefined ? roomPaxAdults : (stay?.adults || 2);
+  const effectiveChildren = roomPaxChildren !== undefined ? roomPaxChildren : (stay?.children || 0);
   
   const invoiceDateStr = invoiceData?.issuedAt
     ? new Date(invoiceData.issuedAt).toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" })
@@ -185,15 +212,44 @@ export function PrintableTaxInvoiceModal({
     ? new Date(stay.arrivalAt).toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" }) +
       " " +
       new Date(stay.arrivalAt).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true })
-    : (stay?.guestRegistration?.arrivalDateTime || "—");
+    : (stay?.guestRegistration?.arrivalDateTime || "-");
 
-  // Room String
+  // Room String & Transfer Resolution
   const displayRoomNo = groupBillingMode === "YES" && isMultiRoomGroup && allRooms.length > 0
     ? allRooms.join(", ")
     : roomNumber;
 
-  // Line items
-  const lines: InvoiceLineItem[] = (invoiceData?.lines && invoiceData.lines.length > 0)
+  const roomAssignments = stay?.roomAssignments || [];
+  const currentRoom = (displayRoomNo || roomNumber || "").trim();
+  const originRoomsSet = new Set<string>();
+
+  if (currentRoom && currentRoom !== "Unassigned") {
+    for (const ra of roomAssignments) {
+      const rNum = ra.room?.number;
+      if (rNum === currentRoom && ra.moveReason) {
+        const match = ra.moveReason.match(/MOVED_FROM:([^|:]+)/i);
+        if (match && match[1] && match[1].trim() !== currentRoom) {
+          originRoomsSet.add(match[1].trim());
+        }
+      }
+      const reasonText = `${ra.moveReason || ""} ${ra.reason || ""}`;
+      if (ra.endsAt && reasonText) {
+        const movedMatch = reasonText.match(/Moved to Room\s+([A-Za-z0-9_-]+)/i);
+        if (movedMatch && movedMatch[1]?.toLowerCase() === currentRoom.toLowerCase()) {
+          if (rNum && rNum !== currentRoom) {
+            originRoomsSet.add(rNum);
+          }
+        }
+      }
+    }
+  }
+  originRoomsSet.delete(currentRoom);
+  const originRooms = Array.from(originRoomsSet);
+  const hasRoomTransfer = originRooms.length > 0;
+  const originRoomStr = originRooms.join(", ");
+
+  // Raw line items
+  const rawLines: InvoiceLineItem[] = (invoiceData?.lines && invoiceData.lines.length > 0)
     ? invoiceData.lines
     : ledgerEntries.length > 0
     ? ledgerEntries
@@ -215,6 +271,21 @@ export function PrintableTaxInvoiceModal({
           discountAmount: 0,
         },
       ];
+
+  // Separate room transfer credit entries from standard taxable charge lines
+  const transferCreditEntries = rawLines.filter((l: any) =>
+    l.chargeCode === "ROOM_TRANSFER_CREDIT" ||
+    (l.sourceType === "ROOM_TRANSFER" && Number(l.totalAmount || l.unitAmount || 0) < 0) ||
+    l.description?.toLowerCase().includes("transferred credit") ||
+    l.description?.toLowerCase().includes("balance transferred from room")
+  );
+
+  // Clean lines for itemized goods/services (excludes audit notes and transfer credit lines)
+  const lines: InvoiceLineItem[] = rawLines.filter((l: any) =>
+    l.chargeCode !== "ROOM_TRANSFER" &&
+    l.chargeCode !== "ROOM_TRANSFER_CREDIT" &&
+    !(l.sourceType === "ROOM_TRANSFER" && Number(l.totalAmount || 0) <= 0)
+  );
 
   // Compute actual billed nights from the invoice line items
   // Count Room Tariff lines (or their qty sum)
@@ -277,8 +348,39 @@ export function PrintableTaxInvoiceModal({
   const totalTaxes = totalCGST + totalSGST + totalIGST;
   const totalPayable = totalGross;
 
+  // Convert Room Transfer Credits to Payment/Credit entries
+  const roomTransferCreditPayments: InvoicePaymentItem[] = transferCreditEntries.map((e: any, idx) => ({
+    id: e.id || `transfer-credit-${idx}`,
+    receivedAt: e.serviceDate || e.postedAt || invoiceDateStr,
+    method: "TRANSFER_CREDIT",
+    receiptNo: originRoomStr ? `From Rm ${originRoomStr}` : undefined,
+    reference: e.description || `Folio balance transferred from Room ${originRoomStr || "previous"}`,
+    amount: Math.abs(Number(e.totalAmount || e.unitAmount || 0)),
+  }));
+
+  // Merge payments with Room Transferred Credits
+  const allPaymentsAndCredits: InvoicePaymentItem[] = [
+    ...payments,
+    ...roomTransferCreditPayments,
+    ...(hasRoomTransfer && roomTransferCreditPayments.length === 0
+      ? [
+          {
+            id: "info-transfer",
+            receivedAt: (() => {
+              const originAssignment = roomAssignments.find((ra: any) => ra.room?.number === originRooms[0]);
+              return originAssignment?.endsAt ? new Date(originAssignment.endsAt).toISOString() : invoiceDateStr;
+            })(),
+            method: "TRANSFER_CREDIT",
+            receiptNo: `From Rm ${originRoomStr}`,
+            reference: `Folio balance & stay transferred from Room ${originRoomStr}`,
+            amount: 0,
+          },
+        ]
+      : []),
+  ];
+
   // Payments calculations
-  const totalPayments = payments.reduce((acc, p) => acc + (Number(p.amount) || 0), 0);
+  const totalPayments = allPaymentsAndCredits.reduce((acc, p) => acc + (Number(p.amount) || 0), 0);
   const balanceDue = Math.max(0, totalPayable - totalPayments);
   const isPaidSettled = balanceDue <= 0.5;
   const wordsAmount = numberToWordsINR(totalPayable);
@@ -330,14 +432,17 @@ export function PrintableTaxInvoiceModal({
       `;
     }).join("");
 
-    const paymentsHtml = payments.length > 0
-      ? payments.map((p) => {
+    const paymentsHtml = allPaymentsAndCredits.length > 0
+      ? allPaymentsAndCredits.map((p) => {
           const pDate = p.receivedAt
             ? new Date(p.receivedAt).toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" })
             : invoiceDateStr;
           const isBTC = p.method === "DIRECT_BILL";
           const isRefund = Number(p.amount) < 0 || p.method?.includes("REFUND") || p.method?.includes("PAYOUT");
-          const desc = isBTC
+          const isTransferCredit = p.method === "TRANSFER_CREDIT" || p.reference?.toLowerCase().includes("transferred from room") || p.reference?.toLowerCase().includes("transfer credit");
+          const desc = isTransferCredit
+            ? `ROOM TRANSFERRED CREDIT (${p.reference || `Folio balance transferred from Room ${originRoomStr || "previous"}`})`
+            : isBTC
             ? "BILL TO COMPANY (BTC)"
             : isRefund
             ? `REFUND / PAYOUT ${p.receiptNo ? `(Ref: ${p.receiptNo})` : ""}`
@@ -345,8 +450,8 @@ export function PrintableTaxInvoiceModal({
           return `
             <tr>
               <td style="padding: 3px 5px; border-right: 1px solid #111; border-bottom: 1px solid #111;">${pDate}</td>
-              <td style="padding: 3px 5px; border-right: 1px solid #111; border-bottom: 1px solid #111; font-weight: 500;">${desc}</td>
-              <td style="padding: 3px 5px; text-align: right; font-weight: bold; border-bottom: 1px solid #111; color: ${isRefund ? '#b91c1c' : '#000'};">${(p.amount || 0).toFixed(2)}</td>
+              <td style="padding: 3px 5px; border-right: 1px solid #111; border-bottom: 1px solid #111; font-weight: ${isTransferCredit ? '700' : '500'}; color: ${isTransferCredit ? '#15803d' : '#000'};">${desc}</td>
+              <td style="padding: 3px 5px; text-align: right; font-weight: bold; border-bottom: 1px solid #111; color: ${isRefund ? '#b91c1c' : isTransferCredit ? '#15803d' : '#000'};">${(p.amount || 0).toFixed(2)}</td>
             </tr>
           `;
         }).join("")
@@ -567,8 +672,8 @@ export function PrintableTaxInvoiceModal({
                 <td style="width: 50%;">
                   <div><strong>Date of Invoice</strong> &nbsp;&nbsp;&nbsp;&nbsp;: ${invoiceDateStr}</div>
                   <div><strong>G.R. Card No</strong> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: <strong>${grcNo}</strong></div>
-                  <div><strong>Room No.</strong> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: <strong style="font-size: 11px;">${displayRoomNo}</strong></div>
-                  <div><strong>No. of Person</strong> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: ${stay?.adults || 2} (A) / ${stay?.children || 0} (C)</div>
+                  <div><strong>Room No.</strong> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: <strong style="font-size: 11px;">${displayRoomNo}</strong>${hasRoomTransfer ? ` &nbsp;<span style="font-size: 9px; font-weight: bold; color: #b45309;">(Transferred from Room ${originRoomStr})</span>` : ""}</div>
+                  <div><strong>No. of Person</strong> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: ${effectiveAdults} (A) / ${effectiveChildren} (C)</div>
                   <div><strong>No. of Nights</strong> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: ${nightsCount} Night${nightsCount > 1 ? "s" : ""}</div>
                   <div><strong>Date of Arrival</strong> &nbsp;&nbsp;&nbsp;&nbsp;: ${arrivalDateStr}</div>
                   <div><strong>Date of Departure</strong> : ${departureDateStr}</div>
@@ -708,6 +813,7 @@ export function PrintableTaxInvoiceModal({
                   <div><strong>NOTICE TO GUESTS:</strong> This property is privately owned and management reserves the right to refuse service to anyone. Management will not be responsible for accidents or injury to guests or for loss of money, jewellery, or valuables of any kind.</div>
                   <div style="margin-top: 2px;"><strong>CHECKOUT TIME: 11:00 AM &bull; SELF REGISTRATION ONLY</strong></div>
                   <div style="margin-top: 2px; opacity: 0.85;">I AGREE that my liability for this bill is not waived and agree to be held personally liable in the event that the indicated person or company failed to pay for any part or full amount of these charges.</div>
+                  ${hasRoomTransfer ? `<div style="margin-top: 3px; font-weight: bold; color: #111;">&bull; ROOM TRANSFER NOTE: Stay transferred from Room ${originRoomStr} to Room ${displayRoomNo}. Previous room charges, advance payments, and folio balance consolidated under this invoice.</div>` : ""}
                 </td>
               </tr>
             </table>
@@ -897,12 +1003,19 @@ export function PrintableTaxInvoiceModal({
                 <span className="w-32 font-bold text-zinc-800 shrink-0">
                   {groupBillingMode === "YES" && isMultiRoomGroup ? "Rooms Included" : "Room No."}
                 </span>
-                <span className="font-bold text-xs">: {displayRoomNo}</span>
+                <span className="font-bold text-xs">
+                  : {displayRoomNo}
+                  {hasRoomTransfer && (
+                    <span className="ml-1 text-[10px] font-semibold text-amber-700 dark:text-amber-400 font-sans">
+                      (Transferred from Room {originRoomStr})
+                    </span>
+                  )}
+                </span>
               </div>
 
               <div className="flex">
                 <span className="w-32 font-bold text-zinc-800 shrink-0">No. of Person</span>
-                <span>: {stay?.adults || 2} (A) / {stay?.children || 0} (C)</span>
+                <span>: {effectiveAdults} (A) / {effectiveChildren} (C)</span>
               </div>
 
               <div className="flex">
@@ -1028,13 +1141,16 @@ export function PrintableTaxInvoiceModal({
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-zinc-300">
-                    {payments.map((p, idx) => {
+                    {allPaymentsAndCredits.map((p, idx) => {
                       const pDate = p.receivedAt
                         ? new Date(p.receivedAt).toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" })
                         : invoiceDateStr;
                       const isBTC = p.method === "DIRECT_BILL";
                       const isRefund = Number(p.amount) < 0 || p.method?.includes("REFUND") || p.method?.includes("PAYOUT");
-                      const desc = isBTC
+                      const isTransferCredit = p.method === "TRANSFER_CREDIT" || p.reference?.toLowerCase().includes("transferred from room") || p.reference?.toLowerCase().includes("transfer credit");
+                      const desc = isTransferCredit
+                        ? `ROOM TRANSFERRED CREDIT (${p.reference || `Folio balance transferred from Room ${originRoomStr || "previous"}`})`
+                        : isBTC
                         ? "BILL TO COMPANY (BTC)"
                         : isRefund
                         ? `REFUND / PAYOUT ${p.receiptNo ? `(Ref: ${p.receiptNo})` : ""}`
@@ -1043,15 +1159,15 @@ export function PrintableTaxInvoiceModal({
                       return (
                         <tr key={idx} className="divide-x divide-zinc-300">
                           <td className="p-1 whitespace-nowrap">{pDate}</td>
-                          <td className="p-1 font-medium">{desc}</td>
-                          <td className={`p-1 text-right font-bold tabular-nums ${isRefund ? "text-rose-700 font-black" : ""}`}>
+                          <td className={`p-1 font-medium ${isTransferCredit ? "font-bold text-emerald-700 dark:text-emerald-400" : ""}`}>{desc}</td>
+                          <td className={`p-1 text-right font-bold tabular-nums ${isRefund ? "text-rose-700 font-black" : isTransferCredit ? "text-emerald-700 dark:text-emerald-400 font-black" : ""}`}>
                             {(p.amount || 0).toFixed(2)}
                           </td>
                         </tr>
                       );
                     })}
 
-                    {payments.length === 0 && (
+                    {allPaymentsAndCredits.length === 0 && (
                       <tr>
                         <td colSpan={3} className="p-1.5 text-center text-zinc-500 italic">
                           No advance payments recorded (Direct Billing / Post-Stay Settle)
@@ -1199,6 +1315,11 @@ export function PrintableTaxInvoiceModal({
               <div className="text-[8px] opacity-80 leading-snug">
                 I AGREE that my liability for this bill is not waived and agree to be held personally liable in the event that the indicated person or company failed to pay for any part or full amount of these charges.
               </div>
+              {hasRoomTransfer && (
+                <div className="text-[8.5px] font-semibold text-amber-800 dark:text-amber-300 pt-0.5">
+                  • ROOM TRANSFER NOTE: Stay transferred from Room {originRoomStr} to Room {displayRoomNo}. Prior room charges, advance payments, and folio balance consolidated under this invoice.
+                </div>
+              )}
             </div>
 
           </div>

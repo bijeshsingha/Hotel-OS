@@ -239,13 +239,27 @@ export async function recordPayment({
     },
   });
 
-  if (folio.status !== "OPEN") {
+  const isDebtSettlement =
+    folio.status === "CLOSED_OUTSTANDING" ||
+    folio.status === "OUTSTANDING" ||
+    (folio.status === "CLOSED" && folio.balance > 0.05);
+
+  if (folio.status !== "OPEN" && !isDebtSettlement) {
     throw new Error(`Folio is ${folio.status}. Cannot record payments.`);
   }
 
-  const windowId = folioWindowId || folio.windows[0]?.id;
+  let windowId = folioWindowId || folio.windows[0]?.id;
   if (!windowId) {
-    throw new Error("No folio window available.");
+    const newWindow = await prisma.folioWindow.create({
+      data: {
+        folioId: folio.id,
+        name: "Guest Window",
+        windowNumber: 1,
+        payerType: "GUEST",
+        status: "OPEN",
+      },
+    });
+    windowId = newWindow.id;
   }
 
   const isActuallyRefund = isRefund || amount < 0 || method.toUpperCase().includes("REFUND") || method.toUpperCase().includes("PAYOUT");
@@ -299,10 +313,19 @@ export async function recordPayment({
   // Check if this folio was checked out with outstanding and is now settled
   try {
     const updatedFolio = await prisma.folio.findUnique({ where: { id: folio.id } });
-    if (updatedFolio && updatedFolio.status === "CLOSED_OUTSTANDING" && updatedFolio.balance <= 0.5) {
+    if (
+      updatedFolio &&
+      (updatedFolio.status === "CLOSED_OUTSTANDING" ||
+        updatedFolio.status === "OUTSTANDING" ||
+        updatedFolio.status === "CLOSED") &&
+      updatedFolio.balance <= 0.05
+    ) {
       await prisma.folio.update({
         where: { id: folio.id },
-        data: { status: "CLOSED" },
+        data: {
+          status: "CLOSED",
+          balance: Math.max(0, updatedFolio.balance),
+        },
       });
     }
     markOutstandingSettled(folio.id, finalAmount, method, reference);
@@ -462,9 +485,9 @@ export async function checkoutAndIssueInvoice({
       targetPaid += immediatePaymentAmount;
     }
 
-    // 2. Check if applying advance from Group Advance Deposit Pool (auto-apply under Master-Sub Folio standard)
+    // 2. Check if applying advance from Group Advance Deposit Pool (explicit choice by cashier)
     let advanceToApply = 0;
-    const shouldCheckGroupAdvance = applyGroupAdvance || (!allowOutstanding && !transferBalanceToGroup && (targetCharges - targetPaid) > 0.05);
+    const shouldCheckGroupAdvance = Boolean(applyGroupAdvance);
     if (shouldCheckGroupAdvance) {
       const currentDue = Math.max(0, Math.round((targetCharges - targetPaid) * 100) / 100);
       if (currentDue > 0.05) {
@@ -543,6 +566,44 @@ export async function checkoutAndIssueInvoice({
       },
     }).catch((e) => console.error("HK task error:", e));
 
+    // Find linked registration to preserve GRC and room-specific pax
+    const linkedGrc = await prisma.guestRegistration.findFirst({
+      where: {
+        OR: [
+          { stayId: stay.id },
+          {
+            guestId: stay.primaryGuestId,
+            assignedRoomNumber: { contains: targetRoomNo },
+            createdAt: {
+              gte: new Date(stay.arrivalAt.getTime() - 3 * 86400000),
+              lte: new Date(stay.arrivalAt.getTime() + 3 * 86400000),
+            },
+          },
+        ],
+      },
+      select: {
+        id: true,
+        registrationNo: true,
+        internalNotes: true,
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    let targetRoomAdults = 1;
+    let targetRoomChildren = 0;
+    if (linkedGrc?.internalNotes) {
+      try {
+        const parsedNotes = JSON.parse(linkedGrc.internalNotes);
+        if (parsedNotes.roomPax?.[targetRoomNo]) {
+          targetRoomAdults = Number(parsedNotes.roomPax[targetRoomNo].adults) || 1;
+          targetRoomChildren = Number(parsedNotes.roomPax[targetRoomNo].children) || 0;
+        }
+      } catch {}
+    } else {
+      const standardCap = (targetAssignment.room as any)?.roomType?.capacity || 2;
+      targetRoomAdults = Math.min(stay.adults, standardCap);
+    }
+
     // 4. Create dedicated CHECKED_OUT Stay for this individual room
     const checkedOutStay = await prisma.stay.create({
       data: {
@@ -553,10 +614,21 @@ export async function checkoutAndIssueInvoice({
         arrivalAt: stay.arrivalAt,
         expectedDepartureAt: stay.expectedDepartureAt,
         actualDepartureAt: new Date(),
-        adults: 1,
-        children: 0,
+        adults: targetRoomAdults,
+        children: targetRoomChildren,
       },
     });
+
+    // Deduct checked-out room pax from remaining parent stay
+    const remainingAdults = Math.max(1, stay.adults - targetRoomAdults);
+    const remainingChildren = Math.max(0, stay.children - targetRoomChildren);
+    await prisma.stay.update({
+      where: { id: stay.id },
+      data: {
+        adults: remainingAdults,
+        children: remainingChildren,
+      },
+    }).catch(() => {});
 
     // Re-link the ended room assignment to checkedOutStay
     await prisma.roomAssignment.update({
@@ -598,6 +670,9 @@ export async function checkoutAndIssueInvoice({
           companyName: stay.primaryGuest.companyName || "",
           gstin: stay.primaryGuest.gstin || "",
           roomNumber: targetRoomNo,
+          grcNo: linkedGrc?.registrationNo || null,
+          adults: targetRoomAdults,
+          children: targetRoomChildren,
           checkedOutWithOutstanding: !isTransferredToGroup && targetBalance > 1.0,
           outstandingAmount: !isTransferredToGroup && targetBalance > 1.0 ? targetBalance : 0,
           transferredToGroupMaster: isTransferredToGroup,
@@ -688,6 +763,22 @@ export async function checkoutAndIssueInvoice({
             totalAmount: advanceToApply,
             sourceType: "ADVANCE_ALLOCATION",
             status: "POSTED",
+          },
+        });
+      }
+
+      // Synchronize Deposit model if present
+      const activeDeposit = await prisma.deposit.findFirst({
+        where: { folioId: folio.id, status: "AVAILABLE" },
+        orderBy: { createdAt: "asc" },
+      });
+      if (activeDeposit) {
+        const nextAvail = Math.max(0, activeDeposit.availableAmount - advanceToApply);
+        await prisma.deposit.update({
+          where: { id: activeDeposit.id },
+          data: {
+            availableAmount: nextAvail,
+            status: nextAvail <= 0.01 ? "APPLIED" : "AVAILABLE",
           },
         });
       }
@@ -810,6 +901,9 @@ export async function checkoutAndIssueInvoice({
       companyName: stay.primaryGuest.companyName,
       nationality: stay.primaryGuest.nationality,
       roomNumber: targetRoomNo,
+      grcNo: linkedGrc?.registrationNo || null,
+      adults: targetRoomAdults,
+      children: targetRoomChildren,
     });
 
     const invoice = await prisma.invoice.create({
@@ -996,6 +1090,24 @@ export async function checkoutAndIssueInvoice({
     address: stay.property.address || "Guwahati, Assam",
   });
 
+  // Find linked GRC for full checkout
+  const fullCheckoutGrc = await prisma.guestRegistration.findFirst({
+    where: {
+      OR: [
+        { stayId: stay.id },
+        {
+          guestId: stay.primaryGuestId,
+          createdAt: {
+            gte: new Date(stay.arrivalAt.getTime() - 3 * 86400000),
+            lte: new Date(stay.arrivalAt.getTime() + 3 * 86400000),
+          },
+        },
+      ],
+    },
+    select: { registrationNo: true },
+    orderBy: { createdAt: "desc" },
+  });
+
   const recipientSnapshot = JSON.stringify({
     name: stay.primaryGuest.name,
     phone: stay.primaryGuest.phone,
@@ -1003,6 +1115,9 @@ export async function checkoutAndIssueInvoice({
     gstin: stay.primaryGuest.gstin,
     companyName: stay.primaryGuest.companyName,
     nationality: stay.primaryGuest.nationality,
+    grcNo: fullCheckoutGrc?.registrationNo || null,
+    adults: stay.adults,
+    children: stay.children,
   });
 
   const invoice = await prisma.invoice.create({
@@ -1088,13 +1203,19 @@ export async function checkoutAndIssueInvoice({
     },
   });
 
-  // 2.5 Update linked GRC registration status to CHECKED_OUT
+  // 2.5 Update linked GRC registration status to CHECKED_OUT (only for this stay)
   await prisma.guestRegistration.updateMany({
     where: {
       propertyId: stay.propertyId,
       OR: [
         { stayId: stay.id },
-        { guestId: stay.primaryGuestId },
+        {
+          guestId: stay.primaryGuestId,
+          createdAt: {
+            gte: new Date(stay.arrivalAt.getTime() - 3 * 86400000),
+            lte: new Date(stay.arrivalAt.getTime() + 3 * 86400000),
+          },
+        },
       ],
     },
     data: {
@@ -1228,8 +1349,8 @@ export async function sync24HourFolioCharges({
       stay: {
         include: {
           roomAssignments: {
-            where: { endsAt: null },
             include: { room: true },
+            orderBy: { startsAt: "desc" },
           },
         },
       },
@@ -1283,18 +1404,57 @@ export async function sync24HourFolioCharges({
     const room = assignment.room;
     const roomNo = room?.number;
 
+    // Trace any predecessor rooms that were moved into this room within the stay
+    const predecessorRooms: string[] = [];
+    if (assignment.moveReason?.includes("MOVED_FROM:")) {
+      const match = assignment.moveReason.match(/MOVED_FROM:([^|]+)/);
+      if (match && match[1]) {
+        predecessorRooms.push(match[1].trim());
+      }
+    }
+    stay.roomAssignments.forEach((ra: any) => {
+      if (ra.endsAt && ra.moveReason && roomNo && ra.moveReason.includes(`Moved to Room ${roomNo}`) && ra.room?.number) {
+        if (!predecessorRooms.includes(ra.room.number)) {
+          predecessorRooms.push(ra.room.number);
+        }
+      }
+    });
+
     // Determine agreed rate for this room
     let roomBasePrice = 3200;
     let isComp = false;
     let isRateInclusive = true;
-    if (assignment.rateHandling === "COMPLIMENTARY" || assignment.moveReason === "AGREED_RATE:0") {
+    if (assignment.rateHandling === "COMPLIMENTARY" || assignment.moveReason?.includes("AGREED_RATE:0")) {
       roomBasePrice = 0;
       isComp = true;
-    } else if (assignment.moveReason?.startsWith("AGREED_RATE:")) {
-      const parts = assignment.moveReason.replace("AGREED_RATE:", "").split(":");
+    } else if (assignment.moveReason?.includes("AGREED_RATE:")) {
+      const ratePart = assignment.moveReason.slice(assignment.moveReason.indexOf("AGREED_RATE:"));
+      const parts = ratePart.replace("AGREED_RATE:", "").split(":");
       roomBasePrice = Number(parts[0]) || 3200;
       if (parts[1] === "EXC") {
         isRateInclusive = false;
+      }
+    } else {
+      // Fallback: check room's category base price or existing entry
+      const existingEntry = (primaryWindow.entries || []).find((e: any) =>
+        e.chargeCode === "ROOM_TARIFF" &&
+        e.status === "POSTED" &&
+        (roomNo ? e.description?.includes(roomNo) : true)
+      );
+      if (existingEntry && existingEntry.unitAmount !== undefined) {
+        roomBasePrice = Number(existingEntry.unitAmount);
+        if (roomBasePrice === 0) isComp = true;
+      } else if (room?.roomTypeId) {
+        const rateVersion = await prisma.ratePlanVersion.findFirst({
+          where: { roomTypeId: room.roomTypeId, active: true },
+          orderBy: { createdAt: "desc" },
+        });
+        if (rateVersion?.pricingJson) {
+          try {
+            const pricing = JSON.parse(rateVersion.pricingJson);
+            if (pricing.basePrice) roomBasePrice = Number(pricing.basePrice);
+          } catch {}
+        }
       }
     }
 
@@ -1328,17 +1488,22 @@ export async function sync24HourFolioCharges({
     const billableCalc = calculate24HrBillableDays(arrivalTime, now, checkoutType, graceMinutes);
     const billableNights = billableCalc.billableDays;
 
-    // Filter existing entries belonging to this specific room
+    // Filter existing entries belonging to this specific room or its transferred predecessor rooms
     const otherRoomNumbers = allRoomNumbers.filter((r: any) => r !== roomNo);
     const roomEntries = (primaryWindow.entries || []).filter((e: any) => {
+      if (e.chargeCode !== "ROOM_TARIFF" || e.type !== "CHARGE") return false;
       if (!roomNo || roomNo === "Unassigned") return true;
       const desc = e.description || "";
-      // If description explicitly mentions another room in the group, it's not this room
+      // If description explicitly mentions another active room in the group, it's not this room
       if (otherRoomNumbers.some((o: any) => new RegExp(`\\bRoom\\s*#?\\s*${o}\\b`, "i").test(desc))) {
         return false;
       }
-      // If description mentions this room, it belongs here
-      if (new RegExp(`\\bRoom\\s*#?\\s*${roomNo}\\b`, "i").test(desc)) {
+      // If description mentions this room or any predecessor room that moved into this room, it belongs here
+      const matchesCurrent = new RegExp(`\\bRoom\\s*#?\\s*${roomNo}\\b`, "i").test(desc);
+      const matchesPredecessor = predecessorRooms.some((p) =>
+        new RegExp(`\\bRoom\\s*#?\\s*${p}\\b`, "i").test(desc)
+      );
+      if (matchesCurrent || matchesPredecessor) {
         return true;
       }
       // If only 1 room in stay, it belongs here
@@ -1362,8 +1527,12 @@ export async function sync24HourFolioCharges({
       };
     }
 
-    // 1. Synchronize any existing room tariff charges if the rate was adjusted
+    // 1. Synchronize any existing room tariff charges for this specific room if the rate was adjusted
+    // Only synchronize entries for the current room, preserving historical charges from predecessor rooms!
     for (const entry of roomEntries) {
+      const isForCurrentRoom = roomNo ? new RegExp(`\\bRoom\\s*#?\\s*${roomNo}\\b`, "i").test(entry.description || "") : true;
+      if (!isForCurrentRoom) continue;
+
       const isEntryComp = roomBasePrice === 0 || isComp;
       const isPriceMismatched = isEntryComp
         ? entry.totalAmount !== 0 || entry.unitAmount !== 0
@@ -1402,7 +1571,7 @@ export async function sync24HourFolioCharges({
 
         const desc = isComp || roomBasePrice === 0
           ? `Room Tariff - Room ${room?.number || "Stay"} (Night ${n} - COMPLIMENTARY)`
-          : billableCalc.isEarlyBird
+          : checkoutType === "FIXED_TIME"
           ? `Room Tariff - Room ${room?.number || "Stay"} (Night ${n} - 12 PM Rollover)`
           : `Room Tariff - Room ${room?.number || "Stay"} (Night ${n} - 24hr Cycle Rollover)`;
 
@@ -1445,11 +1614,12 @@ export async function sync24HourFolioCharges({
     if (currentChargedNights > billableNights) {
       const excessCount = currentChargedNights - billableNights;
       // Sort newest to oldest so we remove only the latest night(s)
-      const sortedEntries = [...roomEntries].sort(
-        (a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-      );
-      // Guarantee the initial night of the stay is never deleted
-      const canDeleteCount = Math.min(excessCount, Math.max(0, roomEntries.length - 1));
+      const sortedEntries = [...roomEntries]
+        .filter((e: any) => e.chargeCode === "ROOM_TARIFF" && e.sourceType === "PMS_24HR_AUTO_CHARGE")
+        .sort(
+          (a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        );
+      const canDeleteCount = Math.min(excessCount, sortedEntries.length);
       const toDelete = sortedEntries.slice(0, canDeleteCount);
 
       for (const e of toDelete) {

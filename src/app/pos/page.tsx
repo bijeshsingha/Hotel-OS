@@ -17,7 +17,6 @@ import {
   Wine,
   Store,
   Layers,
-  Sparkles,
   RefreshCw,
   X,
   AlertCircle,

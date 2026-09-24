@@ -8,16 +8,29 @@ export async function POST(
   try {
     const { id: stayId } = await params;
     const body = await request.json();
-    const { fromRoomId, targetRoomId, reason, rateHandling, customRate, actorId } = body;
-
-    const result = await moveRoom({
-      stayId,
+    const {
       fromRoomId,
+      sourceRoomId,
       targetRoomId,
       reason,
       rateHandling,
       customRate,
       actorId,
+      transferCreditAmount,
+      transferRemarks,
+    } = body;
+
+    const result = await moveRoom({
+      stayId,
+      fromRoomId: fromRoomId || sourceRoomId,
+      sourceRoomId,
+      targetRoomId,
+      reason,
+      rateHandling,
+      customRate,
+      actorId,
+      transferCreditAmount: transferCreditAmount !== undefined ? Number(transferCreditAmount) : undefined,
+      transferRemarks,
     });
 
     return NextResponse.json(result);

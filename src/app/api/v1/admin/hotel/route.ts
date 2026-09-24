@@ -84,6 +84,10 @@ export async function PATCH(request: Request) {
       startingGrcNumber,
       grcPrefix,
       owners,
+      openingCashBalance,
+      openingBalanceReason,
+      actorName,
+      actorId,
     } = body;
 
     if (!id) {
@@ -91,8 +95,17 @@ export async function PATCH(request: Request) {
     }
 
     const updated = await prisma.$transaction(async (tx) => {
+      const existingProp = await tx.property.findUnique({
+        where: { id },
+        select: { openingCashBalance: true, organizationId: true },
+      });
+
       const ownersJsonValue = owners !== undefined
         ? (Array.isArray(owners) ? JSON.stringify(owners.filter(Boolean)) : String(owners))
+        : undefined;
+
+      const newOpeningBalance = openingCashBalance !== undefined && openingCashBalance !== ""
+        ? Math.max(0, Number(openingCashBalance) || 0)
         : undefined;
 
       const prop = await tx.property.update({
@@ -112,9 +125,36 @@ export async function PATCH(request: Request) {
           businessDate: businessDate || undefined,
           currency: currency || undefined,
           ...(ownersJsonValue !== undefined ? { ownersJson: ownersJsonValue } : {}),
+          ...(newOpeningBalance !== undefined ? { openingCashBalance: newOpeningBalance } : {}),
         },
         include: { organization: true },
       });
+
+      // Explicit Audit Trail for Opening Cash Balance change
+      if (newOpeningBalance !== undefined) {
+        const prevBal = existingProp?.openingCashBalance || 0;
+        if (Math.abs(newOpeningBalance - prevBal) > 0.001) {
+          await tx.auditLog.create({
+            data: {
+              organizationId: prop.organizationId,
+              propertyId: prop.id,
+              actorId: actorId || "usr_admin",
+              actorName: actorName || "Administrator",
+              action: "OPENING_CASH_BALANCE_SET",
+              targetType: "PROPERTY",
+              targetId: prop.id,
+              reason: openingBalanceReason || `Opening cash balance adjusted to ₹${newOpeningBalance.toLocaleString("en-IN")}`,
+              beforeJson: JSON.stringify({ openingCashBalance: prevBal }),
+              afterJson: JSON.stringify({
+                openingCashBalance: newOpeningBalance,
+                reason: openingBalanceReason || "Manual opening balance configuration at mid-operation start",
+                businessDate: prop.businessDate,
+                configuredAt: new Date().toISOString(),
+              }),
+            },
+          });
+        }
+      }
 
       // Update or Upsert GRC sequence if startingGrcNumber is provided
       if (startingGrcNumber !== undefined && startingGrcNumber !== null && String(startingGrcNumber).trim() !== "") {

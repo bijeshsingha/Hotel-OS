@@ -14,6 +14,7 @@ import {
   Search,
   X,
   Calendar,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   DollarSign,
@@ -30,10 +31,11 @@ import {
   Layers,
   Banknote,
   UtensilsCrossed,
-  Sparkles,
   Copy,
   Check,
+  Mail,
 } from "lucide-react";
+import { EmailReportModal } from "@/components/reports/email-report-modal";
 
 export default function CashierShiftPage() {
   const { activeProperty, refreshKey, triggerRefresh } = useHotel();
@@ -55,6 +57,7 @@ export default function CashierShiftPage() {
   const [showAddExpenseModal, setShowAddExpenseModal] = useState(false);
   const [showAddOwnerPayoutModal, setShowAddOwnerPayoutModal] = useState(false);
   const [showPrintHandoverModal, setShowPrintHandoverModal] = useState(false);
+  const [showEmailModal, setShowEmailModal] = useState(false);
   const [selectedTx, setSelectedTx] = useState<any | null>(null);
   const [copiedTxId, setCopiedTxId] = useState(false);
 
@@ -411,6 +414,9 @@ export default function CashierShiftPage() {
           reference: expenseForm.reference,
           notes: expenseForm.notes,
           businessDate: selectedDate || activeProperty?.businessDate,
+          paidAt: (selectedDate || activeProperty?.businessDate)
+            ? new Date(`${selectedDate || activeProperty?.businessDate}T12:00:00.000Z`).toISOString()
+            : undefined,
           createdByName: "Front Desk Cashier",
         }),
       });
@@ -480,6 +486,9 @@ export default function CashierShiftPage() {
           reference: ownerPayoutForm.reference || "Owner Drawing",
           notes: ownerPayoutForm.notes,
           businessDate: selectedDate || activeProperty?.businessDate,
+          paidAt: (selectedDate || activeProperty?.businessDate)
+            ? new Date(`${selectedDate || activeProperty?.businessDate}T12:00:00.000Z`).toISOString()
+            : undefined,
           createdByName: "Front Desk Cashier / Owner Portal",
         }),
       });
@@ -555,66 +564,74 @@ export default function CashierShiftPage() {
   };
 
   return (
-    <div className="space-y-4 max-w-[1600px] mx-auto w-full text-zinc-900 dark:text-zinc-100 pb-16">
-      {/* Top Banner Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 p-5 rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200/80 dark:border-zinc-800/80 shadow-xs print:hidden">
+    <div className="space-y-6 max-w-[1600px] mx-auto w-full text-zinc-900 dark:text-zinc-100 pb-16">
+      {/* Top Bar: Title & Primary Front Office Actions */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 print:hidden">
         <div>
-          <div className="flex items-center gap-2.5">
-            <div className="h-10 w-10 rounded-xl bg-blue-50 dark:bg-blue-950/60 border border-blue-200/70 dark:border-blue-800/60 flex items-center justify-center">
-              <Wallet className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-base sm:text-lg font-bold text-zinc-900 dark:text-white tracking-tight">
-                  Cashier Shift Entry Ledger
-                </h1>
-                <span className="rounded-md px-2 py-0.5 text-[10px] font-semibold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/50 border border-blue-200 dark:border-blue-800 uppercase tracking-wider">
-                  Active Shift & Till Reconciler
-                </span>
-              </div>
-              <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-                Front office operational entry ledger for dining income, petty cash vouchers, folio receipts & physical drawer handover
-              </p>
-            </div>
+          <div className="flex items-center gap-3 flex-wrap">
+            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-zinc-950 dark:text-zinc-50">
+              Cashier Shift Entry Ledger
+            </h1>
+            {activeProperty?.displayName && (
+              <span className="text-xs font-semibold text-zinc-600 dark:text-zinc-300 bg-zinc-100 dark:bg-zinc-800/80 px-2.5 py-1 rounded-lg">
+                {activeProperty.displayName}
+              </span>
+            )}
+            <span className="text-xs font-mono font-medium text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 px-2.5 py-1 rounded-lg border border-emerald-200/80 dark:border-emerald-800/60">
+              Audit Date: {selectedDate || activeProperty?.businessDate || "Live"}
+            </span>
           </div>
+          <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">
+            Front office operational entry ledger for dining income, petty cash vouchers, folio receipts, and drawer handover
+          </p>
         </div>
 
         {/* Action Controls */}
         <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={() => setShowAddIncomeModal(true)}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white shadow-xs transition cursor-pointer"
+            className="h-10 px-4 rounded-xl text-xs sm:text-sm font-semibold bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-100 dark:hover:bg-white text-white dark:text-zinc-900 shadow-xs transition flex items-center gap-2 cursor-pointer"
           >
             <Plus className="h-4 w-4" />
-            Record Income
+            <span>Record Income</span>
           </button>
           <button
             onClick={() => setShowAddExpenseModal(true)}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-rose-600 hover:bg-rose-500 text-white shadow-xs transition cursor-pointer"
+            className="h-10 px-4 rounded-xl text-xs sm:text-sm font-semibold bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/80 text-zinc-800 dark:text-zinc-200 shadow-2xs transition flex items-center gap-2 cursor-pointer"
           >
             <Plus className="h-4 w-4" />
-            Record Expense
+            <span>Record Expense</span>
           </button>
           <button
             onClick={() => setShowAddOwnerPayoutModal(true)}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-purple-600 hover:bg-purple-500 text-white shadow-xs transition cursor-pointer"
+            className="h-10 px-4 rounded-xl text-xs sm:text-sm font-semibold bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/80 text-zinc-800 dark:text-zinc-200 shadow-2xs transition flex items-center gap-2 cursor-pointer"
           >
             <Building className="h-4 w-4" />
-            Owner Payout
+            <span>Owner Payout</span>
+          </button>
+          <button
+            onClick={() => setShowEmailModal(true)}
+            className="h-10 px-3.5 rounded-xl text-xs sm:text-sm font-semibold bg-blue-600 hover:bg-blue-700 text-white transition cursor-pointer flex items-center gap-1.5 shadow-xs active:scale-98"
+            title="Email Shift Report"
+          >
+            <Mail className="h-4 w-4" />
+            <span>Email Shift</span>
           </button>
           <button
             onClick={() => setShowPrintHandoverModal(true)}
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition shadow-2xs cursor-pointer"
+            className="h-10 px-3.5 rounded-xl text-xs sm:text-sm font-medium bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition cursor-pointer flex items-center gap-1.5"
+            title="Print Shift Handover Sheet"
           >
-            <Printer className="h-3.5 w-3.5 text-zinc-500" />
-            Shift Handover Sheet
+            <Printer className="h-4 w-4 text-zinc-500" />
+            <span className="hidden xl:inline">Handover Sheet</span>
           </button>
           <button
             onClick={exportLedgerCSV}
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition shadow-2xs cursor-pointer"
+            className="h-10 px-3.5 rounded-xl text-xs sm:text-sm font-medium bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition cursor-pointer flex items-center gap-1.5"
+            title="Export CSV"
           >
-            <Download className="h-3.5 w-3.5 text-zinc-500" />
-            Export CSV
+            <Download className="h-4 w-4 text-zinc-500" />
+            <span className="hidden xl:inline">Export CSV</span>
           </button>
           <button
             onClick={() => {
@@ -622,7 +639,7 @@ export default function CashierShiftPage() {
               loadLedgerData();
             }}
             disabled={loading}
-            className="p-2 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition cursor-pointer disabled:opacity-50"
+            className="h-10 w-10 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition flex items-center justify-center cursor-pointer disabled:opacity-50"
             title="Refresh Shift Ledger"
           >
             <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin text-blue-600" : ""}`} />
@@ -630,13 +647,15 @@ export default function CashierShiftPage() {
         </div>
       </div>
 
-      {/* Shift Date Filter Bar (matching Revenue Ledger UX) */}
-      <div className="p-3 sm:p-4 rounded-xl bg-white dark:bg-[#111114] border border-zinc-200/80 dark:border-zinc-800/80 shadow-xs flex flex-col gap-3 print:hidden">
+      {/* Shift Date Filter Bar */}
+      <div className="p-3 sm:p-4 rounded-2xl bg-white dark:bg-[#121215] border border-zinc-200/80 dark:border-zinc-800 shadow-xs flex flex-col gap-3 print:hidden">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-2">
             {/* Date Range Selector Dropdown */}
-            <div className="flex items-center gap-1.5">
-              <Calendar className="h-3.5 w-3.5 text-zinc-400 shrink-0" />
+            <div className="relative inline-flex items-center h-10 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 transition shadow-2xs">
+              <div className="pl-3.5 pr-2 pointer-events-none text-zinc-400 dark:text-zinc-500 flex items-center">
+                <Calendar className="h-4 w-4" />
+              </div>
               <select
                 value={datePreset}
                 onChange={(e) => {
@@ -651,7 +670,7 @@ export default function CashierShiftPage() {
                     setSelectedDate(y.toISOString().split("T")[0]);
                   }
                 }}
-                className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 px-2.5 py-1.5 text-xs font-semibold text-zinc-800 dark:text-zinc-200 focus:outline-none focus:border-emerald-500 cursor-pointer"
+                className="h-full bg-transparent border-0 border-none outline-none ring-0 appearance-none font-semibold text-xs sm:text-sm text-zinc-900 dark:text-zinc-100 pl-0 pr-8 cursor-pointer focus:ring-0"
               >
                 <option value="TODAY">Today's Shift ({activeProperty?.businessDate || "Live"})</option>
                 <option value="YESTERDAY">Yesterday</option>
@@ -660,61 +679,68 @@ export default function CashierShiftPage() {
                 <option value="ALL_TIME">All Time (Master Ledger)</option>
                 <option value="CUSTOM">Custom Date Range</option>
               </select>
+              <div className="absolute right-3 pointer-events-none text-zinc-400 dark:text-zinc-500 flex items-center">
+                <ChevronDown className="h-3.5 w-3.5" />
+              </div>
             </div>
 
-            {/* Quick Day Stepper (Active for Daily Auditing) */}
+            {/* Quick Day Stepper */}
             {(datePreset === "TODAY" || datePreset === "YESTERDAY") && (
-              <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-800/80 p-1 rounded-xl border border-zinc-200/60 dark:border-zinc-700/60">
+              <div className="inline-flex items-center h-10 p-1 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-2xs">
                 <button
+                  type="button"
                   onClick={handlePrevDay}
-                  className="p-1 rounded-lg hover:bg-white dark:hover:bg-zinc-700 text-zinc-600 dark:text-zinc-300 transition cursor-pointer"
+                  className="h-8 w-8 rounded-lg flex items-center justify-center text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white hover:bg-white dark:hover:bg-zinc-800 transition cursor-pointer"
                   title="Previous Business Day"
                 >
-                  <ChevronLeft className="h-3.5 w-3.5" />
+                  <ChevronLeft className="h-4 w-4" />
                 </button>
-                <input
-                  type="date"
-                  value={selectedDate}
-                  onChange={(e) => setSelectedDate(e.target.value)}
-                  className="bg-transparent text-xs font-mono font-bold text-zinc-900 dark:text-zinc-100 focus:outline-none cursor-pointer"
-                />
+                <div className="flex items-center px-1">
+                  <input
+                    type="date"
+                    value={selectedDate}
+                    onChange={(e) => setSelectedDate(e.target.value)}
+                    className="h-8 bg-transparent border-0 border-none outline-none ring-0 text-xs sm:text-sm font-mono font-bold text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-0 cursor-pointer px-1.5"
+                  />
+                </div>
                 <button
+                  type="button"
                   onClick={handleNextDay}
-                  className="p-1 rounded-lg hover:bg-white dark:hover:bg-zinc-700 text-zinc-600 dark:text-zinc-300 transition cursor-pointer"
+                  className="h-8 w-8 rounded-lg flex items-center justify-center text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white hover:bg-white dark:hover:bg-zinc-800 transition cursor-pointer"
                   title="Next Business Day"
                 >
-                  <ChevronRight className="h-3.5 w-3.5" />
+                  <ChevronRight className="h-4 w-4" />
                 </button>
               </div>
             )}
           </div>
 
           {/* Operating Window Note */}
-          <div className="flex items-center gap-2 text-xs font-mono text-zinc-500 dark:text-zinc-400">
+          <div className="flex items-center gap-2 text-xs font-mono text-zinc-500 dark:text-zinc-400 px-2">
             <span className="inline-block h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-            Audit Cycle: 12:00 AM – 12:00 AM Midnight
+            <span>Audit Cycle: 12:00 AM to 12:00 AM Midnight</span>
           </div>
         </div>
 
-        {/* Custom Date Range Card (matching Revenue Ledger) */}
+        {/* Custom Date Range Card */}
         {datePreset === "CUSTOM" && (
-          <div className="flex items-center gap-3 p-3 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs animate-in fade-in">
+          <div className="flex items-center gap-3 p-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 text-xs animate-in fade-in">
             <div className="flex items-center gap-1.5">
-              <span className="text-zinc-500 font-mono text-[11px]">From:</span>
+              <span className="text-zinc-500 font-mono text-xs">From:</span>
               <input
                 type="date"
                 value={customStartDate}
                 onChange={(e) => setCustomStartDate(e.target.value)}
-                className="rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-2 py-1 font-mono text-xs text-zinc-900 dark:text-zinc-100"
+                className="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-2.5 py-1.5 font-mono text-xs text-zinc-900 dark:text-zinc-100"
               />
             </div>
             <div className="flex items-center gap-1.5">
-              <span className="text-zinc-500 font-mono text-[11px]">To:</span>
+              <span className="text-zinc-500 font-mono text-xs">To:</span>
               <input
                 type="date"
                 value={customEndDate}
                 onChange={(e) => setCustomEndDate(e.target.value)}
-                className="rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-2 py-1 font-mono text-xs text-zinc-900 dark:text-zinc-100"
+                className="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-2.5 py-1.5 font-mono text-xs text-zinc-900 dark:text-zinc-100"
               />
             </div>
             {(customStartDate || customEndDate) && (
@@ -725,7 +751,7 @@ export default function CashierShiftPage() {
                   setDatePreset("TODAY");
                   setSelectedDate(activeProperty?.businessDate || new Date().toISOString().split("T")[0]);
                 }}
-                className="text-[11px] text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 underline cursor-pointer"
+                className="text-xs text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 underline cursor-pointer ml-2"
               >
                 Reset to Today
               </button>
@@ -735,76 +761,68 @@ export default function CashierShiftPage() {
       </div>
 
       {/* KPI Overview Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 print:hidden">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 print:hidden">
         {/* Cash in Drawer Hero Card */}
         <div
           onClick={() => setOnlyCashDrawer(!onlyCashDrawer)}
-          className={`p-4 rounded-xl border transition cursor-pointer ${
+          className={`p-5 rounded-2xl border transition-all cursor-pointer bg-white dark:bg-[#121215] shadow-xs ${
             onlyCashDrawer
-              ? "bg-emerald-700 text-white border-emerald-700 shadow-md ring-2 ring-emerald-400"
-              : "bg-emerald-50/70 dark:bg-emerald-950/30 border-emerald-300 dark:border-emerald-800/60 hover:border-emerald-400"
+              ? "border-blue-500 ring-2 ring-blue-500/20"
+              : "border-zinc-200/80 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700"
           }`}
         >
           <div className="flex items-center justify-between">
-            <span
-              className={`text-[11px] font-bold uppercase tracking-wider ${
-                onlyCashDrawer ? "text-white" : "text-emerald-800 dark:text-emerald-300"
-              }`}
-            >
+            <span className="text-xs font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
               Cash In Drawer Handover
             </span>
-            <Banknote
-              className={`h-4 w-4 ${onlyCashDrawer ? "text-white" : "text-emerald-600 dark:text-emerald-400"}`}
-            />
+            <Banknote className="h-4 w-4 text-zinc-400" />
           </div>
           <div
-            className={`text-2xl font-black font-mono mt-2 ${
-              onlyCashDrawer ? "text-white" : "text-emerald-900 dark:text-emerald-100"
+            className={`text-3xl sm:text-4xl font-black font-mono tracking-tight mt-2.5 ${
+              (data?.cashDrawer?.netCashHandover || 0) < 0
+                ? "text-rose-600 dark:text-rose-400"
+                : "text-zinc-950 dark:text-white"
             }`}
           >
             {formatINR(data?.cashDrawer?.netCashHandover || 0)}
           </div>
-          <div
-            className={`text-[11px] mt-1.5 pt-1.5 border-t border-emerald-200/50 dark:border-emerald-800/50 space-y-0.5 font-mono ${
-              onlyCashDrawer ? "text-emerald-100" : "text-emerald-700/80 dark:text-emerald-400"
-            }`}
-          >
+          <div className="text-xs mt-3 pt-2.5 border-t border-zinc-100 dark:border-zinc-800/80 space-y-1 font-mono text-zinc-500 dark:text-zinc-400">
             {(data?.cashDrawer?.openingBalance || 0) > 0 && (
-              <div className="flex items-center justify-between text-[10.5px]">
-                <span className="opacity-85">Opening Float (Brought Fwd):</span>
+              <div className="flex items-center justify-between">
+                <span>Opening Float:</span>
                 <span>{formatINR(data?.cashDrawer?.openingBalance || 0)}</span>
               </div>
             )}
-            <div className="flex items-center justify-between text-[10.5px]">
+            <div className="flex items-center justify-between">
               <span>Collections (In): +{formatINR(data?.cashDrawer?.cashIn || 0)}</span>
               <span>Paid Out: -{formatINR(data?.cashDrawer?.cashOut || 0)}</span>
             </div>
           </div>
-          <div className="text-[10px] mt-1.5 opacity-80 flex items-center gap-1">
+          <div className="text-xs mt-2 text-zinc-400 flex items-center gap-1.5">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-            {onlyCashDrawer ? "Filtering Cash in Drawer (Click to reset)" : "Carries forward until banked or withdrawn"}
+            <span>{onlyCashDrawer ? "Filtered by Drawer (Click to reset)" : "Carries forward until banked"}</span>
           </div>
         </div>
 
         {/* Total Inflows */}
         <div
           onClick={() => setFlowFilter(flowFilter === "INFLOW" ? "ALL" : "INFLOW")}
-          className={`p-4 rounded-xl border transition cursor-pointer bg-white dark:bg-[#111114] ${
+          className={`p-5 rounded-2xl border transition-all cursor-pointer bg-white dark:bg-[#121215] shadow-xs ${
             flowFilter === "INFLOW"
               ? "border-emerald-500 ring-2 ring-emerald-500/20"
-              : "border-zinc-200/80 dark:border-zinc-800/80 hover:border-zinc-300"
+              : "border-zinc-200/80 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700"
           }`}
         >
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
-              Total Inflows (Income & Receipts)
+            <span className="text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+              Total Inflows (Receipts)
             </span>
             <ArrowDownLeft className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
           </div>
-          <div className="text-2xl font-black font-mono text-zinc-900 dark:text-white mt-2">
+          <div className="text-3xl sm:text-4xl font-black font-mono tracking-tight text-zinc-950 dark:text-white mt-2.5">
             {formatINR(data?.totalCollections || 0)}
           </div>
-          <div className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1">
+          <div className="text-xs text-zinc-500 dark:text-zinc-400 mt-3 pt-2.5 border-t border-zinc-100 dark:border-zinc-800/80">
             {data?.collectionsCount || 0} Total Receipts Collected
           </div>
         </div>
@@ -815,41 +833,41 @@ export default function CashierShiftPage() {
             setCategoryFilter("ALL");
             setFlowFilter(flowFilter === "OUTFLOW" ? "ALL" : "OUTFLOW");
           }}
-          className={`p-4 rounded-xl border transition cursor-pointer bg-white dark:bg-[#111114] ${
+          className={`p-5 rounded-2xl border transition-all cursor-pointer bg-white dark:bg-[#121215] shadow-xs ${
             flowFilter === "OUTFLOW" && categoryFilter === "ALL"
               ? "border-rose-500 ring-2 ring-rose-500/20"
-              : "border-zinc-200/80 dark:border-zinc-800/80 hover:border-zinc-300"
+              : "border-zinc-200/80 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700"
           }`}
         >
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400">
-              Total Outflows (Expenses & Payouts)
+            <span className="text-xs font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400">
+              Total Outflows (Expenses)
             </span>
             <ArrowUpRight className="h-4 w-4 text-rose-600 dark:text-rose-400" />
           </div>
-          <div className="text-2xl font-black font-mono text-zinc-900 dark:text-white mt-2">
+          <div className="text-3xl sm:text-4xl font-black font-mono tracking-tight text-zinc-950 dark:text-white mt-2.5">
             {formatINR(data?.totalExpenses || 0)}
           </div>
-          <div className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1 flex items-center justify-between">
+          <div className="text-xs text-zinc-500 dark:text-zinc-400 mt-3 pt-2.5 border-t border-zinc-100 dark:border-zinc-800/80 flex items-center justify-between">
             <span>{data?.expensesCount || 0} Total Vouchers Paid</span>
             {ownerPayoutsSummary.total > 0 && (
               <span className="text-purple-600 dark:text-purple-400 font-semibold font-mono">
-                👑 Owner: {formatINR(ownerPayoutsSummary.total)}
+                Owner: {formatINR(ownerPayoutsSummary.total)}
               </span>
             )}
           </div>
         </div>
 
         {/* Net Shift Cash Flow */}
-        <div className="p-4 rounded-xl border bg-white dark:bg-[#111114] border-zinc-200/80 dark:border-zinc-800/80">
+        <div className="p-5 rounded-2xl border bg-white dark:bg-[#121215] border-zinc-200/80 dark:border-zinc-800 shadow-xs">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">
+            <span className="text-xs font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">
               Net Day Cash Flow
             </span>
             <DollarSign className="h-4 w-4 text-blue-600 dark:text-blue-400" />
           </div>
           <div
-            className={`text-2xl font-black font-mono mt-2 ${
+            className={`text-3xl sm:text-4xl font-black font-mono tracking-tight mt-2.5 ${
               (data?.netCashFlow || 0) >= 0
                 ? "text-emerald-600 dark:text-emerald-400"
                 : "text-rose-600 dark:text-rose-400"
@@ -857,73 +875,74 @@ export default function CashierShiftPage() {
           >
             {formatINR(data?.netCashFlow || 0)}
           </div>
-          <div className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1">
+          <div className="text-xs text-zinc-500 dark:text-zinc-400 mt-3 pt-2.5 border-t border-zinc-100 dark:border-zinc-800/80">
             Gross Collections minus Total Expenses
           </div>
         </div>
       </div>
 
-      {/* Digital Payment Channel Breakdown Chips */}
+      {/* Digital Payment Channel Breakdown */}
       {data?.collectionsByMethod && (
-        <div className="flex flex-wrap items-center gap-2 p-3 rounded-xl bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200/60 dark:border-zinc-800/60 print:hidden text-xs">
-          <span className="font-semibold text-zinc-500 uppercase tracking-wider text-[10px]">
-            Inflow Channels:
+        <div className="flex flex-wrap items-center gap-3 p-3.5 sm:p-4 rounded-2xl bg-white dark:bg-[#121215] border border-zinc-200/80 dark:border-zinc-800 shadow-xs print:hidden text-xs">
+          <div className="flex items-center gap-1.5 font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider text-xs">
+            <CreditCard className="h-3.5 w-3.5" />
+            <span>Inflow Channels:</span>
+          </div>
+          <span className="px-3 py-1 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 font-mono text-zinc-700 dark:text-zinc-300">
+            Cash: <strong className="font-bold text-zinc-900 dark:text-white">{formatINR(data.collectionsByMethod.CASH || 0)}</strong>
           </span>
-          <span className="px-2 py-0.5 rounded-md bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 font-mono text-zinc-800 dark:text-zinc-200">
-            Cash: <strong>{formatINR(data.collectionsByMethod.CASH || 0)}</strong>
+          <span className="px-3 py-1 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 font-mono text-zinc-700 dark:text-zinc-300">
+            UPI: <strong className="font-bold text-zinc-900 dark:text-white">{formatINR(data.collectionsByMethod.UPI || 0)}</strong>
           </span>
-          <span className="px-2 py-0.5 rounded-md bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 font-mono text-emerald-700 dark:text-emerald-300">
-            UPI: <strong>{formatINR(data.collectionsByMethod.UPI || 0)}</strong>
+          <span className="px-3 py-1 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 font-mono text-zinc-700 dark:text-zinc-300">
+            Card: <strong className="font-bold text-zinc-900 dark:text-white">{formatINR(data.collectionsByMethod.CARD || 0)}</strong>
           </span>
-          <span className="px-2 py-0.5 rounded-md bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 font-mono text-blue-700 dark:text-blue-300">
-            Card: <strong>{formatINR(data.collectionsByMethod.CARD || 0)}</strong>
-          </span>
-          <span className="px-2 py-0.5 rounded-md bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 font-mono text-purple-700 dark:text-purple-300">
-            Bank Transfer: <strong>{formatINR(data.collectionsByMethod.BANK_TRANSFER || 0)}</strong>
+          <span className="px-3 py-1 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 font-mono text-zinc-700 dark:text-zinc-300">
+            Bank Transfer: <strong className="font-bold text-zinc-900 dark:text-white">{formatINR(data.collectionsByMethod.BANK_TRANSFER || 0)}</strong>
           </span>
           {data.collectionsByMethod.DIRECT_BILL > 0 && (
-            <span className="px-2 py-0.5 rounded-md bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 font-mono text-amber-700 dark:text-amber-300">
-              BTC: <strong>{formatINR(data.collectionsByMethod.DIRECT_BILL)}</strong>
+            <span className="px-3 py-1 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 font-mono text-zinc-700 dark:text-zinc-300">
+              BTC: <strong className="font-bold text-zinc-900 dark:text-white">{formatINR(data.collectionsByMethod.DIRECT_BILL)}</strong>
             </span>
           )}
         </div>
       )}
 
-      {/* Filter Bar */}
-      <div className="p-3 sm:p-4 rounded-xl bg-white dark:bg-[#111114] border border-zinc-200/80 dark:border-zinc-800/80 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3 print:hidden">
-        <div className="flex flex-wrap items-center gap-2 flex-1">
+      {/* Filter & Search Bar */}
+      <div className="p-3 sm:p-4 rounded-2xl bg-white dark:bg-[#121215] border border-zinc-200/80 dark:border-zinc-800 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3 print:hidden">
+        <div className="flex flex-wrap items-center gap-2.5 flex-1">
           {/* Search Box */}
           <div className="relative flex-1 min-w-[260px] max-w-md">
-            <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-zinc-400 pointer-events-none" />
+            <Search className="absolute left-3.5 top-3 h-4 w-4 text-zinc-400 pointer-events-none" />
             <input
               type="text"
               placeholder="Search voucher #, receipt #, guest, payee, room, UTR..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="h-9 w-full rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 pl-9 pr-8 text-xs text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+              className="h-10 w-full rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 pl-10 pr-8 text-xs sm:text-sm text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
             />
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery("")}
-                className="absolute right-2.5 top-2.5 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"
+                className="absolute right-3 top-3 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"
               >
-                <X className="h-3.5 w-3.5" />
+                <X className="h-4 w-4" />
               </button>
             )}
           </div>
 
-          {/* Flow Filter Pills */}
-          <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-800 p-1 rounded-lg border border-zinc-200 dark:border-zinc-700 text-xs font-medium">
+          {/* Flow Filter Segmented Control */}
+          <div className="inline-flex items-center h-10 p-1 rounded-xl bg-zinc-100 dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 text-xs font-semibold shadow-2xs">
             <button
               onClick={() => {
                 setFlowFilter("ALL");
                 setCategoryFilter("ALL");
                 setOnlyCashDrawer(false);
               }}
-              className={`px-2.5 py-1 rounded-md transition cursor-pointer ${
+              className={`h-8 px-3.5 rounded-lg flex items-center transition cursor-pointer ${
                 flowFilter === "ALL" && categoryFilter === "ALL" && !onlyCashDrawer
-                  ? "bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white font-semibold shadow-2xs"
-                  : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900"
+                  ? "bg-white dark:bg-zinc-800 text-zinc-950 dark:text-white font-bold shadow-xs"
+                  : "text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white"
               }`}
             >
               All Flows
@@ -934,10 +953,10 @@ export default function CashierShiftPage() {
                 setCategoryFilter("ALL");
                 setOnlyCashDrawer(false);
               }}
-              className={`px-2.5 py-1 rounded-md transition cursor-pointer ${
+              className={`h-8 px-3.5 rounded-lg flex items-center transition cursor-pointer ${
                 flowFilter === "INFLOW"
-                  ? "bg-emerald-600 text-white font-semibold shadow-2xs"
-                  : "text-emerald-700 dark:text-emerald-400 hover:text-emerald-800"
+                  ? "bg-white dark:bg-zinc-800 text-emerald-600 dark:text-emerald-400 font-bold shadow-xs"
+                  : "text-zinc-500 hover:text-emerald-600 dark:text-zinc-400 dark:hover:text-emerald-400"
               }`}
             >
               Inflows (+)
@@ -948,10 +967,10 @@ export default function CashierShiftPage() {
                 setCategoryFilter("ALL");
                 setOnlyCashDrawer(false);
               }}
-              className={`px-2.5 py-1 rounded-md transition cursor-pointer ${
+              className={`h-8 px-3.5 rounded-lg flex items-center transition cursor-pointer ${
                 flowFilter === "OUTFLOW" && categoryFilter !== "OWNER_PAYOUT"
-                  ? "bg-rose-600 text-white font-semibold shadow-2xs"
-                  : "text-rose-700 dark:text-rose-400 hover:text-rose-800"
+                  ? "bg-white dark:bg-zinc-800 text-rose-600 dark:text-rose-400 font-bold shadow-xs"
+                  : "text-zinc-500 hover:text-rose-600 dark:text-zinc-400 dark:hover:text-rose-400"
               }`}
             >
               Expenses (-)
@@ -962,23 +981,26 @@ export default function CashierShiftPage() {
                 setCategoryFilter(categoryFilter === "OWNER_PAYOUT" ? "ALL" : "OWNER_PAYOUT");
                 setOnlyCashDrawer(false);
               }}
-              className={`px-2.5 py-1 rounded-md transition cursor-pointer flex items-center gap-1 ${
+              className={`h-8 px-3 rounded-lg flex items-center gap-1.5 transition cursor-pointer ${
                 categoryFilter === "OWNER_PAYOUT"
-                  ? "bg-purple-600 text-white font-semibold shadow-2xs"
-                  : "text-purple-700 dark:text-purple-400 hover:text-purple-800"
+                  ? "bg-white dark:bg-zinc-800 text-purple-600 dark:text-purple-400 font-bold shadow-xs"
+                  : "text-zinc-500 hover:text-purple-600 dark:text-zinc-400 dark:hover:text-purple-400"
               }`}
             >
-              <span>👑</span>
+              <Building className="h-3.5 w-3.5" />
               <span>Owner Payouts</span>
             </button>
           </div>
 
           {/* Payment Method Dropdown */}
-          <div className="relative">
+          <div className="relative inline-flex items-center h-10 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 transition shadow-2xs">
+            <div className="pl-3.5 pr-2 pointer-events-none text-zinc-400 dark:text-zinc-500 flex items-center">
+              <Filter className="h-3.5 w-3.5" />
+            </div>
             <select
               value={methodFilter}
               onChange={(e) => setMethodFilter(e.target.value)}
-              className="h-9 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 px-3 pr-8 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition cursor-pointer appearance-none"
+              className="h-full bg-transparent border-0 border-none outline-none ring-0 appearance-none text-xs sm:text-sm font-semibold text-zinc-900 dark:text-zinc-100 pl-0 pr-8 cursor-pointer focus:ring-0"
             >
               <option value="ALL">All Payment Methods</option>
               <option value="CASH">Cash Only</option>
@@ -988,32 +1010,34 @@ export default function CashierShiftPage() {
               <option value="DIRECT_BILL">Direct Bill (BTC)</option>
               <option value="CHEQUE">Cheque</option>
             </select>
-            <Filter className="absolute right-2.5 top-2.5 h-3.5 w-3.5 text-zinc-400 pointer-events-none" />
+            <div className="absolute right-3 pointer-events-none text-zinc-400 dark:text-zinc-500 flex items-center">
+              <ChevronDown className="h-3.5 w-3.5" />
+            </div>
           </div>
         </div>
 
         <div className="text-xs font-mono text-zinc-500 dark:text-zinc-400 shrink-0">
-          Showing <span className="font-semibold text-zinc-900 dark:text-white">{filteredTransactions.length}</span> entries
+          Showing <span className="font-bold text-zinc-900 dark:text-white">{filteredTransactions.length}</span> entries
         </div>
       </div>
 
       {/* Main Ledger Entries Table */}
-      <div className="rounded-xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-[#111114] overflow-hidden shadow-xs">
+      <div className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-[#121215] overflow-hidden shadow-xs">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs border-collapse">
-            <thead className="bg-zinc-50/90 dark:bg-zinc-900/90 text-zinc-500 dark:text-zinc-400 text-[10.5px] uppercase tracking-wider font-semibold border-b border-zinc-200 dark:border-zinc-800 sticky top-0 z-10 backdrop-blur-xs">
+          <table className="w-full text-left text-xs sm:text-sm border-collapse">
+            <thead className="bg-zinc-50/80 dark:bg-zinc-900/60 text-zinc-500 dark:text-zinc-400 text-xs uppercase tracking-wider font-semibold border-b border-zinc-200/80 dark:border-zinc-800 sticky top-0 z-10 backdrop-blur-xs">
               <tr>
-                <th className="px-4 py-3 font-semibold whitespace-nowrap">Voucher / Receipt</th>
-                <th className="px-4 py-3 font-semibold whitespace-nowrap">Time</th>
-                <th className="px-4 py-3 font-semibold whitespace-nowrap">Type & Flow</th>
-                <th className="px-4 py-3 font-semibold whitespace-nowrap">Party / Payee / Guest</th>
-                <th className="px-4 py-3 font-semibold whitespace-nowrap">Particulars & Category</th>
-                <th className="px-4 py-3 font-semibold whitespace-nowrap">Method</th>
-                <th className="px-4 py-3 font-semibold whitespace-nowrap text-right">Amount (INR)</th>
-                <th className="px-4 py-3 font-semibold whitespace-nowrap text-right print:hidden">Action</th>
+                <th className="px-4 py-3.5 font-bold whitespace-nowrap">Voucher / Receipt</th>
+                <th className="px-4 py-3.5 font-bold whitespace-nowrap">Time</th>
+                <th className="px-4 py-3.5 font-bold whitespace-nowrap">Type & Flow</th>
+                <th className="px-4 py-3.5 font-bold whitespace-nowrap">Party / Payee / Guest</th>
+                <th className="px-4 py-3.5 font-bold whitespace-nowrap">Particulars & Category</th>
+                <th className="px-4 py-3.5 font-bold whitespace-nowrap">Method</th>
+                <th className="px-4 py-3.5 font-bold whitespace-nowrap text-right">Amount (INR)</th>
+                <th className="px-4 py-3.5 font-bold whitespace-nowrap text-right print:hidden">Action</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-zinc-200/60 dark:divide-zinc-800/60 text-zinc-800 dark:text-zinc-200">
+            <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/60 text-zinc-800 dark:text-zinc-200">
               {filteredTransactions.map((tx: any, idx: number) => {
                 const isInflow = tx.flow === "INFLOW";
 
@@ -1024,40 +1048,40 @@ export default function CashierShiftPage() {
                     className="hover:bg-zinc-50/80 dark:hover:bg-zinc-900/40 transition-colors cursor-pointer group"
                   >
                     {/* Record / Voucher */}
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <div className="font-mono font-bold text-zinc-900 dark:text-zinc-100 text-[11.5px]">
+                    <td className="px-4 py-3.5 whitespace-nowrap">
+                      <div className="font-mono font-bold text-zinc-900 dark:text-zinc-100 text-xs sm:text-sm">
                         {tx.recordId}
                       </div>
                     </td>
 
                     {/* Time */}
-                    <td className="px-4 py-3 font-mono text-zinc-500 dark:text-zinc-400 whitespace-nowrap text-[11px]">
+                    <td className="px-4 py-3.5 font-mono text-zinc-500 dark:text-zinc-400 whitespace-nowrap text-xs">
                       {tx.time}
                     </td>
 
                     {/* Type & Flow Badge */}
-                    <td className="px-4 py-3 whitespace-nowrap">
+                    <td className="px-4 py-3.5 whitespace-nowrap">
                       {tx.category === "OWNER_PAYOUT" ? (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800/60">
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border-purple-200/80 dark:border-purple-800/60">
                           <Building className="h-3 w-3 text-purple-600 dark:text-purple-400" />
-                          <span>👑 OWNER PAYOUT</span>
+                          <span>OWNER PAYOUT</span>
                         </span>
                       ) : (
                         <span
-                          className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${
+                          className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold border ${
                             isInflow
-                              ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/60"
-                              : "bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800/60"
+                              ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200/80 dark:border-emerald-800/60"
+                              : "bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border-rose-200/80 dark:border-rose-800/60"
                           }`}
                         >
                           {isInflow ? (
                             <>
-                              <ArrowDownLeft className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
+                              <ArrowDownLeft className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
                               <span>+ RECEIPT</span>
                             </>
                           ) : (
                             <>
-                              <ArrowUpRight className="h-3 w-3 text-rose-600 dark:text-rose-400" />
+                              <ArrowUpRight className="h-3.5 w-3.5 text-rose-600 dark:text-rose-400" />
                               <span>- EXPENSE</span>
                             </>
                           )}
@@ -1066,30 +1090,30 @@ export default function CashierShiftPage() {
                     </td>
 
                     {/* Party / Payee / Guest */}
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <div className="font-medium text-zinc-900 dark:text-zinc-100 text-xs">
+                    <td className="px-4 py-3.5 whitespace-nowrap">
+                      <div className="font-bold text-zinc-900 dark:text-zinc-100 text-xs sm:text-sm">
                         {tx.party || tx.payerName || tx.payeeName || "Direct Guest"}
                       </div>
                       {tx.companyName && (
-                        <div className="text-[10.5px] text-zinc-500 dark:text-zinc-400">
+                        <div className="text-xs text-zinc-500 dark:text-zinc-400">
                           {tx.companyName}
                         </div>
                       )}
                       {tx.roomNumber && (
-                        <div className="text-[10px] font-mono text-blue-600 dark:text-blue-400">
+                        <div className="text-xs font-mono font-medium text-blue-600 dark:text-blue-400">
                           Room {tx.roomNumber}
                         </div>
                       )}
                     </td>
 
                     {/* Particulars & Category */}
-                    <td className="px-4 py-3 max-w-sm">
-                      <div className="text-xs text-zinc-800 dark:text-zinc-200 font-medium truncate" title={tx.particulars || tx.description}>
+                    <td className="px-4 py-3.5 max-w-sm">
+                      <div className="text-xs sm:text-sm text-zinc-800 dark:text-zinc-200 font-medium truncate" title={tx.particulars || tx.description}>
                         {tx.particulars || tx.description || "General entry"}
                       </div>
-                      <div className="text-[10px] text-zinc-400 flex items-center gap-2 mt-0.5">
-                        <span className={`uppercase tracking-wider font-semibold text-[9.5px] ${tx.category === "OWNER_PAYOUT" ? "text-purple-600 dark:text-purple-400 font-bold" : ""}`}>
-                          {tx.category === "OWNER_PAYOUT" ? "👑 OWNER DRAWING / PAYOUT" : (tx.sourceLabel || tx.category?.replace(/_/g, " ") || "TRANSACTION")}
+                      <div className="text-xs text-zinc-400 flex items-center gap-2 mt-0.5">
+                        <span className={`uppercase tracking-wider font-semibold text-xs ${tx.category === "OWNER_PAYOUT" ? "text-purple-600 dark:text-purple-400 font-bold" : ""}`}>
+                          {tx.category === "OWNER_PAYOUT" ? "OWNER DRAWING / PAYOUT" : (tx.sourceLabel || tx.category?.replace(/_/g, " ") || "TRANSACTION")}
                         </span>
                         {tx.kotNo && (
                           <span className="font-mono font-bold text-amber-600 dark:text-amber-400">
@@ -1100,30 +1124,30 @@ export default function CashierShiftPage() {
                     </td>
 
                     {/* Payment Method Badge */}
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10.5px] font-mono font-medium bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300">
+                    <td className="px-4 py-3.5 whitespace-nowrap">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-mono font-medium bg-zinc-100 dark:bg-zinc-800 border border-zinc-200/80 dark:border-zinc-700/80 text-zinc-700 dark:text-zinc-300">
                         {tx.method}
                       </span>
                     </td>
 
                     {/* Amount */}
-                    <td className="px-4 py-3 text-right font-mono font-black text-xs whitespace-nowrap">
+                    <td className="px-4 py-3.5 text-right font-mono font-black text-xs sm:text-sm whitespace-nowrap">
                       <span className={isInflow ? "text-emerald-700 dark:text-emerald-400" : tx.category === "OWNER_PAYOUT" ? "text-purple-700 dark:text-purple-400" : "text-rose-700 dark:text-rose-400"}>
                         {isInflow ? "+" : "-"}{formatINR(tx.amount)}
                       </span>
                     </td>
 
                     {/* Inspect Button */}
-                    <td className="px-4 py-3 text-right whitespace-nowrap print:hidden">
+                    <td className="px-4 py-3.5 text-right whitespace-nowrap print:hidden">
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
                           setSelectedTx(tx);
                         }}
-                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition"
+                        className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-semibold bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 transition cursor-pointer"
                       >
-                        <Eye className="h-3 w-3" />
-                        Details
+                        <Eye className="h-3.5 w-3.5" />
+                        <span>Details</span>
                       </button>
                     </td>
                   </tr>
@@ -1341,7 +1365,7 @@ export default function CashierShiftPage() {
 
                 {incomeForm.category === "BAR_FOOD_BILL" && (
                   <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-1 font-medium flex items-center gap-1">
-                    <Sparkles className="h-3 w-3 shrink-0" />
+                    <AlertCircle className="h-3 w-3 shrink-0" />
                     Bar liquor is untracked. Only record food orders served to the bar counter.
                   </p>
                 )}
@@ -2033,6 +2057,13 @@ export default function CashierShiftPage() {
           </div>
         </div>
       )}
+      {/* Email Report Modal */}
+      <EmailReportModal
+        isOpen={showEmailModal}
+        onClose={() => setShowEmailModal(false)}
+        defaultReportType="CASHIER_SHIFT"
+        targetDate={selectedDate || activeProperty?.businessDate}
+      />
     </div>
   );
 }
