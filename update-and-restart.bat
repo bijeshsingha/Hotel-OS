@@ -30,7 +30,7 @@ if exist "stop-server.bat" (
     call stop-server.bat >nul 2>nul
 )
 
-echo [INFO] Starting server on http://localhost:3000 ...
+echo [INFO] Starting server on http://localhost:3001 ...
 start "Hotel OS Server" cmd /k "cd /d ""%~dp0"" && npm run dev"
 
 echo.
