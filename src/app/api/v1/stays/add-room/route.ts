@@ -11,7 +11,7 @@ export async function POST(request: Request) {
       agreedTariff,
       isComplimentary,
       extraBeds = 0,
-      extraBedRate = 500,
+      extraBedRate,
       actorId,
     } = body;
 
@@ -93,6 +93,25 @@ export async function POST(request: Request) {
       }
     }
 
+    // 3b. Determine Extra Bed Rate dynamically
+    let resolvedExtraRate = 300;
+    if (isFree) {
+      resolvedExtraRate = 0;
+    } else if (extraBedRate !== undefined && extraBedRate !== null && extraBedRate !== "") {
+      resolvedExtraRate = Math.max(0, Number(extraBedRate) || 0);
+    } else if (room.roomTypeId) {
+      const rateVersion = await prisma.ratePlanVersion.findFirst({
+        where: { roomTypeId: room.roomTypeId, active: true },
+        orderBy: { createdAt: "desc" },
+      });
+      if (rateVersion?.pricingJson) {
+        try {
+          const pricing = JSON.parse(rateVersion.pricingJson);
+          if (pricing.extraAdult !== undefined) resolvedExtraRate = Number(pricing.extraAdult);
+        } catch {}
+      }
+    }
+
     // 4. Create RoomAssignment
     const assignment = await prisma.roomAssignment.create({
       data: {
@@ -170,8 +189,8 @@ export async function POST(request: Request) {
       totalBalanceAdded += roomGst.totalAmount;
 
       // Post Extra Bed if requested
-      if (extraBeds > 0) {
-        const extraBedTotal = extraBeds * extraBedRate * nights;
+      if (extraBeds > 0 && resolvedExtraRate > 0) {
+        const extraBedTotal = extraBeds * resolvedExtraRate * nights;
         const extraBedGst = calculateGST({
           grossOrBaseAmount: extraBedTotal,
           isInclusive: true,
@@ -189,9 +208,9 @@ export async function POST(request: Request) {
             serviceDate: serviceDateStr,
             type: "CHARGE",
             chargeCode: "EXTRA_PAX",
-            description: `Extra Pax - Room ${room.number} (${extraBeds} Pax x ₹${extraBedRate}/night x ${nights} Night${nights > 1 ? "s" : ""})`,
+            description: `Extra Pax - Room ${room.number} (${extraBeds} Pax x ₹${resolvedExtraRate}/night x ${nights} Night${nights > 1 ? "s" : ""})`,
             qty: extraBeds * nights,
-            unitAmount: extraBedRate,
+            unitAmount: resolvedExtraRate,
             taxableAmount: extraBedGst.taxableAmount,
             taxComponentsJson: JSON.stringify(extraBedGst.components),
             totalAmount: extraBedGst.totalAmount,

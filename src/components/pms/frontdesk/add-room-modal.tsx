@@ -22,6 +22,7 @@ export function AddRoomModal({
   const [stayId, setStayId] = useState("");
   const [roomId, setRoomId] = useState("");
   const [agreedTariff, setAgreedTariff] = useState("");
+  const [extraBedRate, setExtraBedRate] = useState("300");
   const [isComplimentary, setIsComplimentary] = useState(false);
   const [extraBeds, setExtraBeds] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -35,10 +36,29 @@ export function AddRoomModal({
   );
 
   const selectedRoom = rooms.find((rm) => rm.id === roomId);
-  const extraAdultRate =
-    selectedRoom?.roomType?.extraAdult !== undefined
-      ? Number(selectedRoom.roomType.extraAdult)
-      : 500;
+  const selectedStay = stays.find((st) => st.id === stayId);
+
+  // Helper to extract stay's existing extra pax rate if available
+  const getStayExtraPaxRate = (sId: string): number | null => {
+    const s = stays.find((st) => st.id === sId);
+    if (!s?.folio?.windows) return null;
+    for (const win of s.folio.windows) {
+      const paxEntry = win.entries?.find(
+        (e: any) =>
+          (e.chargeCode === "EXTRA_PAX" || e.chargeCode === "EXTRA_BED") &&
+          e.status === "POSTED"
+      );
+      if (paxEntry?.unitAmount !== undefined && Number(paxEntry.unitAmount) > 0) {
+        return Number(paxEntry.unitAmount);
+      }
+    }
+    return null;
+  };
+
+  const getRoomDefaultExtraRate = (rm: any): number => {
+    if (rm?.roomType?.extraAdult !== undefined) return Number(rm.roomType.extraAdult);
+    return 300;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -53,6 +73,12 @@ export function AddRoomModal({
 
     setLoading(true);
     try {
+      const finalExtraRate = isComplimentary
+        ? 0
+        : extraBedRate !== ""
+        ? Math.max(0, Number(extraBedRate) || 0)
+        : (selectedRoom?.roomType?.extraAdult ?? 300);
+
       const res = await fetch("/api/v1/stays/add-room", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -66,7 +92,7 @@ export function AddRoomModal({
             : undefined,
           isComplimentary,
           extraBeds,
-          extraBedRate: extraAdultRate,
+          extraBedRate: finalExtraRate,
         }),
       });
 
@@ -106,7 +132,14 @@ export function AddRoomModal({
             <select
               required
               value={stayId}
-              onChange={(e) => setStayId(e.target.value)}
+              onChange={(e) => {
+                const nextStayId = e.target.value;
+                setStayId(nextStayId);
+                const stayExtra = getStayExtraPaxRate(nextStayId);
+                if (stayExtra !== null) {
+                  setExtraBedRate(String(stayExtra));
+                }
+              }}
               className="w-full h-9 px-2.5 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none"
             >
               <option value="">-- Choose In-House Guest --</option>
@@ -141,6 +174,9 @@ export function AddRoomModal({
                 setRoomId(rid);
                 const r = rooms.find((rm) => rm.id === rid);
                 if (r?.roomType?.basePrice) setAgreedTariff(String(r.roomType.basePrice));
+                const stayExtra = getStayExtraPaxRate(stayId);
+                const defaultExtra = stayExtra !== null ? stayExtra : getRoomDefaultExtraRate(r);
+                setExtraBedRate(String(defaultExtra));
               }}
               className="w-full h-9 px-2.5 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none"
             >
@@ -153,7 +189,7 @@ export function AddRoomModal({
             </select>
           </div>
 
-          <div className="grid grid-cols-2 gap-3 items-end">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
             <div>
               <label className="block text-zinc-700 dark:text-zinc-300 font-medium mb-1">
                 Agreed Rate / Night (₹)
@@ -164,33 +200,60 @@ export function AddRoomModal({
                 value={isComplimentary ? "0" : agreedTariff}
                 onChange={(e) => setAgreedTariff(e.target.value)}
                 placeholder="0"
-                className="w-full h-9 px-2.5 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 font-mono text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none disabled:opacity-50"
+                className="w-full h-9 px-2.5 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 font-mono text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none disabled:opacity-50 font-bold"
               />
             </div>
 
             <div>
               <label className="block text-zinc-700 dark:text-zinc-300 font-medium mb-1">
-                Extra Pax (₹{extraAdultRate}/ea)
+                Extra Pax (Count)
               </label>
               <div className="h-9 flex items-center justify-between px-2 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800">
                 <button
                   type="button"
                   onClick={() => setExtraBeds((b) => Math.max(0, b - 1))}
-                  className="p-1 text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200"
+                  className="p-1 text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 cursor-pointer"
+                  title="Decrease Extra Pax"
                 >
                   <Minus className="h-3 w-3" />
                 </button>
-                <span className="font-mono font-bold">{extraBeds}</span>
+                <span className="font-mono font-bold text-xs">{extraBeds} Pax</span>
                 <button
                   type="button"
                   onClick={() => setExtraBeds((b) => b + 1)}
-                  className="p-1 text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200"
+                  className="p-1 text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 cursor-pointer"
+                  title="Increase Extra Pax"
                 >
                   <Plus className="h-3 w-3" />
                 </button>
               </div>
             </div>
+
+            <div>
+              <label className="block text-zinc-700 dark:text-zinc-300 font-medium mb-1">
+                Extra Pax Rate (₹/Nt)
+              </label>
+              <input
+                type="number"
+                disabled={isComplimentary}
+                value={isComplimentary ? "0" : extraBedRate}
+                onChange={(e) => setExtraBedRate(e.target.value)}
+                placeholder="300"
+                className="w-full h-9 px-2.5 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 font-mono text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none disabled:opacity-50 font-bold"
+              />
+            </div>
           </div>
+
+          {extraBeds > 0 && (
+            <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200/80 dark:border-amber-800/60 text-xs">
+              <span className="text-amber-800 dark:text-amber-300 font-medium">
+                Extra Pax Surcharge:
+              </span>
+              <span className="font-mono font-bold text-amber-900 dark:text-amber-200">
+                {extraBeds} Pax x ₹{isComplimentary ? 0 : Number(extraBedRate) || 0} = +₹{extraBeds * (isComplimentary ? 0 : Number(extraBedRate) || 0)} / night
+              </span>
+            </div>
+          )}
 
           <label className="flex items-center gap-2 cursor-pointer pt-1">
             <input
