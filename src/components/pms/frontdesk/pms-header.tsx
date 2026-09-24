@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Plus, UserPlus } from "lucide-react";
+import { Plus, UserPlus, BedDouble } from "lucide-react";
 
 interface PmsHeaderProps {
   propertyName?: string;
@@ -17,6 +17,7 @@ interface PmsHeaderProps {
   };
   onNewReservation: () => void;
   onGrcCheckIn: () => void;
+  onAddRoom?: () => void;
 }
 
 export function PmsHeader({
@@ -25,6 +26,7 @@ export function PmsHeader({
   metrics,
   onNewReservation,
   onGrcCheckIn,
+  onAddRoom,
 }: PmsHeaderProps) {
   return (
     <div className="space-y-6 pb-6 border-b border-zinc-200/80 dark:border-zinc-800">
@@ -52,6 +54,16 @@ export function PmsHeader({
         </div>
 
         <div className="flex items-center gap-3">
+          {onAddRoom && (
+            <button
+              onClick={onAddRoom}
+              className="h-10 px-4 rounded-xl bg-purple-50 hover:bg-purple-100 dark:bg-purple-950/40 dark:hover:bg-purple-900/60 border border-purple-200/80 dark:border-purple-800/80 text-purple-700 dark:text-purple-300 text-sm font-semibold flex items-center gap-2 transition cursor-pointer"
+            >
+              <BedDouble className="h-4 w-4" />
+              <span>Add Room to Guest</span>
+            </button>
+          )}
+
           <button
             onClick={onNewReservation}
             className="h-10 px-4 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 text-sm font-semibold flex items-center gap-2 transition cursor-pointer"

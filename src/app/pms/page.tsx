@@ -49,6 +49,7 @@ function PMSFrontDeskContent() {
         propertyName={pms.activeProperty?.displayName}
         businessDate={pms.activeProperty?.businessDate}
         metrics={pms.metrics}
+        onAddRoom={() => pms.setShowAddRoomModal(true)}
         onNewReservation={() => pms.setShowNewResModal(true)}
         onGrcCheckIn={() => {
           setQuickCheckInRoom(null);
