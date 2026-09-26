@@ -78,12 +78,17 @@ export function CheckoutSettlementModal({
   loading,
 }: CheckoutSettlementModalProps) {
   const [selectedCompanyId, setSelectedCompanyId] = useState("");
+  const [remainderHandling, setRemainderHandling] = useState<"PAY_NOW" | "TRANSFER" | "DEBTOR">("PAY_NOW");
+  const [remainderPaymentMethod, setRemainderPaymentMethod] = useState<string>("UPI");
+  const [remainderPaymentRef, setRemainderPaymentRef] = useState<string>("");
 
   if (!isOpen) return null;
 
-  const appliedAdvance =
-    Number(checkoutAdvanceAmount) || Math.min(currentBalance, groupAdvanceMetrics.available);
-  const netAdvanceSettlement = Math.max(0, currentBalance - appliedAdvance);
+  const appliedAdvance = Math.min(
+    Number(checkoutAdvanceAmount) || Math.min(currentBalance, groupAdvanceMetrics.available),
+    groupAdvanceMetrics.available
+  );
+  const netAdvanceSettlement = Math.max(0, Math.round((currentBalance - appliedAdvance) * 100) / 100);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in">
@@ -96,11 +101,17 @@ export function CheckoutSettlementModal({
             </div>
             <div>
               <h2 className="text-base sm:text-lg font-bold text-zinc-900 dark:text-white flex items-center gap-2">
-                <span>Check Out Room {activeRoomNumber}</span>
+                <span>
+                  {isMultiRoomGroup && groupBillingMode === "YES"
+                    ? `Check Out Group Stay (${allGroupRooms.length} Rooms)`
+                    : `Check Out Room ${activeRoomNumber}`}
+                </span>
               </h2>
               <p className="text-xs text-zinc-500 font-medium">
                 {formatGuestDisplayName(activeStay?.primaryGuest?.name)} •{" "}
-                {isMultiRoomGroup && groupBillingMode === "NO"
+                {isMultiRoomGroup && groupBillingMode === "YES"
+                  ? `Combined Billing: Rooms ${allGroupRooms.join(", ")}`
+                  : isMultiRoomGroup
                   ? `Group Stay (${allGroupRooms.length} Rooms)`
                   : "Standard Room Checkout"}
               </p>
@@ -333,6 +344,92 @@ export function CheckoutSettlementModal({
                 <strong className="font-mono text-zinc-950 dark:text-zinc-50">{activeRoomNumber}</strong>. The room will check out with a complete GST Tax Invoice.
               </p>
             </div>
+
+            {/* Remainder Settlement Options when Advance does not cover 100% of Room Due */}
+            {netAdvanceSettlement > 0.05 && (
+              <div className="space-y-3 pt-3 border-t border-zinc-200 dark:border-zinc-800">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400">
+                    Remaining Balance to Settle: {formatINR(netAdvanceSettlement)}
+                  </label>
+                  <span className="text-[11px] text-zinc-500">Choose remainder settlement</span>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs font-semibold">
+                  <button
+                    type="button"
+                    onClick={() => setRemainderHandling("PAY_NOW")}
+                    className={`h-9 px-2.5 rounded-xl border text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                      remainderHandling === "PAY_NOW"
+                        ? "bg-zinc-950 dark:bg-white text-white dark:text-zinc-950 border-zinc-950 dark:border-white shadow-xs"
+                        : "bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300"
+                    }`}
+                  >
+                    <CreditCard className="w-3.5 h-3.5" />
+                    <span>Pay Remainder</span>
+                  </button>
+                  {isMultiRoomGroup && groupBillingMode === "NO" && (
+                    <button
+                      type="button"
+                      onClick={() => setRemainderHandling("TRANSFER")}
+                      className={`h-9 px-2.5 rounded-xl border text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                        remainderHandling === "TRANSFER"
+                          ? "bg-zinc-950 dark:bg-white text-white dark:text-zinc-950 border-zinc-950 dark:border-white shadow-xs"
+                          : "bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300"
+                      }`}
+                    >
+                      <Layers className="w-3.5 h-3.5" />
+                      <span>Bill to Group</span>
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setRemainderHandling("DEBTOR")}
+                    className={`h-9 px-2.5 rounded-xl border text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                      remainderHandling === "DEBTOR"
+                        ? "bg-zinc-950 dark:bg-white text-white dark:text-zinc-950 border-zinc-950 dark:border-white shadow-xs"
+                        : "bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300"
+                    }`}
+                  >
+                    <AlertCircle className="w-3.5 h-3.5" />
+                    <span>City Ledger</span>
+                  </button>
+                </div>
+
+                {remainderHandling === "PAY_NOW" && (
+                  <div className="p-3 rounded-xl bg-zinc-100 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700 space-y-2.5">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-semibold text-zinc-700 dark:text-zinc-300">
+                        Payment Mode ({formatINR(netAdvanceSettlement)}):
+                      </span>
+                      <div className="flex items-center gap-1.5">
+                        {["UPI", "CASH", "CARD"].map((m) => (
+                          <button
+                            key={m}
+                            type="button"
+                            onClick={() => setRemainderPaymentMethod(m)}
+                            className={`px-2.5 py-1 rounded-md text-[11px] font-bold cursor-pointer transition ${
+                              remainderPaymentMethod === m
+                                ? "bg-zinc-950 text-white dark:bg-white dark:text-zinc-950"
+                                : "bg-white dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-600"
+                            }`}
+                          >
+                            {m}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="Transaction Ref / UTR / Note (Optional)"
+                      value={remainderPaymentRef}
+                      onChange={(e) => setRemainderPaymentRef(e.target.value)}
+                      className="w-full h-8 px-2.5 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none"
+                    />
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 
@@ -717,12 +814,34 @@ export function CheckoutSettlementModal({
                 type="button"
                 disabled={loading}
                 onClick={() => {
-                  const advAmt =
-                    Number(checkoutAdvanceAmount) || Math.min(currentBalance, groupAdvanceMetrics.available);
-                  onPerformCheckout({
+                  const maxAllowed = groupAdvanceMetrics.available;
+                  const advAmt = Math.min(
+                    Number(checkoutAdvanceAmount) || Math.min(currentBalance, maxAllowed),
+                    maxAllowed
+                  );
+                  const remDue = Math.max(0, currentBalance - advAmt);
+
+                  const checkoutOptions: any = {
                     applyGroupAdvance: true,
                     groupAdvanceAmount: advAmt,
-                  });
+                  };
+
+                  if (remDue > 0.05) {
+                    if (remainderHandling === "PAY_NOW") {
+                      checkoutOptions.paymentNow = {
+                        amount: remDue,
+                        method: remainderPaymentMethod,
+                        reference: remainderPaymentRef || `Settlement remainder for Room ${activeRoomNumber}`,
+                      };
+                    } else if (remainderHandling === "TRANSFER") {
+                      checkoutOptions.transferBalanceToGroup = true;
+                      checkoutOptions.transferRemarks = `Transferred remaining balance after advance deduction (${formatINR(advAmt)})`;
+                    } else if (remainderHandling === "DEBTOR") {
+                      checkoutOptions.allowOutstanding = true;
+                    }
+                  }
+
+                  onPerformCheckout(checkoutOptions);
                 }}
                 className="h-11 px-6 rounded-xl bg-zinc-950 hover:bg-zinc-800 dark:bg-white dark:hover:bg-zinc-200 active:scale-[0.98] text-white dark:text-zinc-950 text-xs sm:text-sm font-bold transition disabled:opacity-50 shadow-xs flex items-center justify-center gap-2 cursor-pointer"
               >
@@ -730,9 +849,13 @@ export function CheckoutSettlementModal({
                 <span>
                   {loading
                     ? "Processing..."
-                    : `Apply ${formatINR(
-                        Number(checkoutAdvanceAmount) || Math.min(currentBalance, groupAdvanceMetrics.available)
-                      )} Advance & Check Out`}
+                    : netAdvanceSettlement > 0.05
+                    ? remainderHandling === "PAY_NOW"
+                      ? `Apply ${formatINR(appliedAdvance)} + Collect ${formatINR(netAdvanceSettlement)} & Check Out`
+                      : remainderHandling === "TRANSFER"
+                      ? `Apply ${formatINR(appliedAdvance)} + Transfer ${formatINR(netAdvanceSettlement)} to Group & Check Out`
+                      : `Apply ${formatINR(appliedAdvance)} + Post to Debtors & Check Out`
+                    : `Apply ${formatINR(appliedAdvance)} Advance & Check Out`}
                 </span>
               </button>
             )}

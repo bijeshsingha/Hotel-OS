@@ -20,7 +20,7 @@ export async function POST(request: Request) {
       include: {
         folio: {
           include: {
-            windows: true,
+            windows: { include: { entries: true } },
             payments: true,
           },
         },
@@ -44,31 +44,45 @@ export async function POST(request: Request) {
       "Unassigned";
 
     // 2. Discover related stays in the same group or registration
-    const relatedStays = await prisma.stay.findMany({
-      where: {
-        propertyId: targetStay.propertyId,
-        OR: [
-          { id: targetStay.id },
-          { primaryGuestId: targetStay.primaryGuestId },
-        ],
-      },
-      include: {
-        folio: {
-          include: {
-            windows: { include: { entries: true } },
-            payments: true,
-          },
+    const isConsolidated = (targetStay.roomAssignments?.length || 0) > 1;
+    let relatedStays: any[] = [targetStay];
+
+    if (!isConsolidated && targetStay.primaryGuestId) {
+      const candidateStays = await prisma.stay.findMany({
+        where: {
+          propertyId: targetStay.propertyId,
+          primaryGuestId: targetStay.primaryGuestId,
+          status: "IN_HOUSE",
         },
-        roomAssignments: { include: { room: true } },
-      },
-    });
+        include: {
+          folio: {
+            include: {
+              windows: { include: { entries: true } },
+              payments: true,
+            },
+          },
+          roomAssignments: { include: { room: true } },
+        },
+      });
+
+      const targetArrival = new Date(targetStay.arrivalAt).getTime();
+      relatedStays = candidateStays.filter((s) => {
+        if (s.id === targetStay.id) return true;
+        if (targetStay.reservationRoomId && s.reservationRoomId === targetStay.reservationRoomId) return true;
+        const arr = new Date(s.arrivalAt).getTime();
+        return Math.abs(arr - targetArrival) < 4 * 3600 * 1000;
+      });
+      if (!relatedStays.some((s) => s.id === targetStay.id)) {
+        relatedStays.unshift(targetStay);
+      }
+    }
 
     // Collect all group room numbers
     const allGroupRooms = Array.from(
       new Set(
         relatedStays
-          .flatMap((s) => s.roomAssignments || [])
-          .map((ra) => ra.room?.number)
+          .flatMap((s: any) => s.roomAssignments || [])
+          .map((ra: any) => ra.room?.number)
           .filter(Boolean)
       )
     ) as string[];
@@ -77,24 +91,24 @@ export async function POST(request: Request) {
     const allPayments = Array.from(
       new Map(
         relatedStays
-          .flatMap((s) => s.folio?.payments || [])
-          .map((p) => [p.id, p])
+          .flatMap((s: any) => s.folio?.payments || [])
+          .map((p: any) => [p.id, p])
       ).values()
     );
 
     const allEntries = Array.from(
       new Map(
         relatedStays
-          .flatMap((s) => s.folio?.windows?.flatMap((w) => w.entries) || [])
-          .map((e) => [e.id, e])
+          .flatMap((s: any) => s.folio?.windows?.flatMap((w: any) => w.entries) || [])
+          .map((e: any) => [e.id, e])
       ).values()
     );
 
     // Calculate unallocated advance pool across the group
-    const unallocatedPayments = allPayments.filter((p) => {
+    const unallocatedPayments = allPayments.filter((p: any) => {
       if (p.status !== "SUCCEEDED") return false;
       if (p.method === "ADVANCE_ALLOCATION") return false;
-      if (p.reference?.includes("Settlement for Room")) return false;
+      if (p.reference?.toLowerCase().includes("settlement")) return false;
 
       const text = `${p.reference || ""} ${p.payerSnapshot || ""} ${(p as any).notes || ""}`;
       const isGroupPool = text.includes("isGroupAdvancePool") || text.includes("GROUP_ADVANCE_POOL");

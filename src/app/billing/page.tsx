@@ -638,8 +638,32 @@ function BillingContent() {
           }
         });
 
-        const effectiveRoomPaid = isMultiRoom ? (allocatedPayment + groupAdvanceCovered) : totalGroupPayments;
-        const roomBalance = Math.max(0, Math.round((roomCharges - effectiveRoomPaid) * 100) / 100);
+        const isStayCheckedOut = s.status === "CHECKED_OUT" || s.status === "COMPLETED";
+        const folioBal = s.folio?.balance ?? 0;
+        const isFolioCleared = folioBal <= 0.05 && s.folio?.status !== "CLOSED_OUTSTANDING";
+        const isGroupPaidInFull = totalGroupPayments >= totalGroupCharges - 0.05;
+
+        let effectiveRoomPaid = 0;
+        let roomBalance = 0;
+
+        if (isStayCheckedOut && isFolioCleared) {
+          // If stay is checked out and folio was cleared to zero / CLOSED, all rooms are 100% cleared
+          effectiveRoomPaid = roomCharges;
+          roomBalance = 0;
+        } else if (!isStayCheckedOut && isGroupPaidInFull) {
+          // In-house stay where group payments have fully cleared all group charges
+          effectiveRoomPaid = roomCharges;
+          roomBalance = 0;
+        } else if (!isMultiRoom) {
+          // Single room stay: room payments equal total payments on stay
+          effectiveRoomPaid = totalGroupPayments;
+          roomBalance = Math.max(0, Math.round((roomCharges - effectiveRoomPaid) * 100) / 100);
+        } else {
+          // Multi-room stay: room-specific direct payments + allocated group advance
+          const roomDirect = allocatedPayment + groupAdvanceCovered;
+          effectiveRoomPaid = roomDirect;
+          roomBalance = Math.max(0, Math.round((roomCharges - effectiveRoomPaid) * 100) / 100);
+        }
 
         items.push({
           key: `${s.id}-${roomNo}`,
@@ -681,18 +705,21 @@ function BillingContent() {
   // Filtered Directory Items based on Active Main Tab (In-House vs Outstanding Dues vs Settled Archive) + Search + Sub-filters
   const filteredDirectoryItems = useMemo(() => {
     return directoryItems.filter((item) => {
+      const folioBal = item.stay?.folio?.balance ?? 0;
+      const isFolioOutstanding = folioBal > 0.5 || item.stay?.folio?.status === "CLOSED_OUTSTANDING";
+
       // 1. Main Tab Filter
       if (activeMainTab === "IN_HOUSE" && item.status !== "IN_HOUSE") {
         return false;
       }
       if (activeMainTab === "OUTSTANDING_DUES") {
         const isCheckedOut = item.status === "CHECKED_OUT" || item.status === "COMPLETED";
-        const hasDue = item.roomBalance > 0.5;
+        const hasDue = item.roomBalance > 0.5 && isFolioOutstanding;
         if (!isCheckedOut || !hasDue) return false;
       }
       if (activeMainTab === "SETTLED_ARCHIVE") {
         const isCheckedOut = item.status === "CHECKED_OUT" || item.status === "COMPLETED";
-        const isOutstanding = item.roomBalance > 0.5;
+        const isOutstanding = item.roomBalance > 0.5 && isFolioOutstanding;
         if (!isCheckedOut || isOutstanding) return false;
       }
 
@@ -726,8 +753,28 @@ function BillingContent() {
 
   // Counts for Top Tab Badges
   const inHouseCount = useMemo(() => directoryItems.filter((d) => d.status === "IN_HOUSE").length, [directoryItems]);
-  const outstandingCount = useMemo(() => directoryItems.filter((d) => (d.status === "CHECKED_OUT" || d.status === "COMPLETED") && d.roomBalance > 0.5).length, [directoryItems]);
-  const settledArchiveCount = useMemo(() => directoryItems.filter((d) => (d.status === "CHECKED_OUT" || d.status === "COMPLETED") && d.roomBalance <= 0.5).length, [directoryItems]);
+  const outstandingCount = useMemo(
+    () =>
+      directoryItems.filter(
+        (d) =>
+          (d.status === "CHECKED_OUT" || d.status === "COMPLETED") &&
+          d.roomBalance > 0.5 &&
+          ((d.stay?.folio?.balance ?? 0) > 0.5 || d.stay?.folio?.status === "CLOSED_OUTSTANDING")
+      ).length,
+    [directoryItems]
+  );
+  const settledArchiveCount = useMemo(
+    () =>
+      directoryItems.filter(
+        (d) =>
+          (d.status === "CHECKED_OUT" || d.status === "COMPLETED") &&
+          !(
+            d.roomBalance > 0.5 &&
+            ((d.stay?.folio?.balance ?? 0) > 0.5 || d.stay?.folio?.status === "CLOSED_OUTSTANDING")
+          )
+      ).length,
+    [directoryItems]
+  );
 
   // Respond immediately when sidebar sub-tabs are clicked (/billing?tab=settled, /billing?tab=outstanding, or /billing?tab=in-house)
   useEffect(() => {
@@ -788,17 +835,9 @@ function BillingContent() {
       if (matchedStay.status === "IN_HOUSE") {
         if (activeMainTab !== "IN_HOUSE") setActiveMainTab("IN_HOUSE");
       } else if (matchedStay.status === "CHECKED_OUT" || matchedStay.status === "COMPLETED") {
-        const rawEntries = (matchedStay.folio?.windows?.flatMap((w: any) => w.entries || w.lineItems || []) || []).filter(
-          (e: any) => e.chargeCode !== "ROOM_TRANSFER_CREDIT"
-        );
-        const totCharges = rawEntries
-          .filter((e: any) => e.type === "DEBIT" || !e.type)
-          .reduce((s: number, e: any) => s + (e.totalAmount || 0), 0);
-        const totCredits = rawEntries
-          .filter((e: any) => e.type === "CREDIT")
-          .reduce((s: number, e: any) => s + (e.totalAmount || 0), 0);
-        const bal = totCharges - totCredits;
-        if (bal > 0.5) {
+        const folioBal = matchedStay.folio?.balance ?? 0;
+        const hasOutstanding = folioBal > 0.5 || matchedStay.folio?.status === "CLOSED_OUTSTANDING";
+        if (hasOutstanding) {
           if (activeMainTab !== "OUTSTANDING_DUES") setActiveMainTab("OUTSTANDING_DUES");
         } else {
           if (activeMainTab !== "SETTLED_ARCHIVE") setActiveMainTab("SETTLED_ARCHIVE");
@@ -849,26 +888,31 @@ function BillingContent() {
 
   // Group Advance Pool Metrics (For Multi-Room Groups)
   const groupAdvanceMetrics = useMemo(() => {
-    if (!isMultiRoomGroup) {
+    if (!isMultiRoomGroup || activeStay?.status !== "IN_HOUSE") {
       return { totalReceived: 0, consumed: 0, available: 0, unallocatedPayments: [] as any[] };
     }
 
-    // Collect all related stays belonging to this specific group and guest
-    const relatedStays = stays.filter((s) => {
-      if (s.id === activeStay?.id) return true;
-      // Stays MUST belong to the same primary guest profile to prevent leaking other guests' advance funds
-      if (s.primaryGuestId !== activeStay?.primaryGuestId) return false;
-      // Shared reservation linkage or shared group room numbers
-      if (activeStay?.reservationId && s.reservationId === activeStay?.reservationId) return true;
-      const sRooms = s.roomAssignments?.map((ra: any) => ra.room?.number).filter(Boolean) || [];
-      return sRooms.some((r: string) => allGroupRooms.includes(r));
-    });
+    // Consolidated billing: all rooms are on activeStay!
+    // Split billing: other IN_HOUSE stays for the same reservation / check-in session
+    const isConsolidatedGroup = (activeStay.roomAssignments?.length || 0) > 1;
+    const relatedStays = isConsolidatedGroup
+      ? [activeStay]
+      : stays.filter((s) => {
+          if (s.id === activeStay.id) return true;
+          if (s.status !== "IN_HOUSE") return false;
+          if (s.primaryGuestId !== activeStay.primaryGuestId) return false;
+          if (activeStay.reservationId && s.reservationId === activeStay.reservationId) return true;
+          // If no reservationId, ensure checked in on same date/session (within 4 hours)
+          const arrA = new Date(activeStay.arrivalAt).getTime();
+          const arrB = new Date(s.arrivalAt).getTime();
+          return Math.abs(arrA - arrB) < 4 * 3600 * 1000;
+        });
 
     const paymentsList = Array.from(
       new Map(
         relatedStays
           .flatMap((s) => s.folio?.payments || [])
-          .concat(folioData?.payments || [])
+          .concat(folioData?.id === activeStay.folio?.id ? (folioData?.payments || []) : [])
           .map((p: any) => [p.id, p])
       ).values()
     );
@@ -877,7 +921,7 @@ function BillingContent() {
       new Map(
         relatedStays
           .flatMap((s) => s.folio?.windows?.flatMap((w: any) => w.entries || w.lineItems || []) || [])
-          .concat(folioData?.windows?.flatMap((w: any) => w.entries || w.lineItems || []) || [])
+          .concat(folioData?.id === activeStay.folio?.id ? (folioData?.windows?.flatMap((w: any) => w.entries || w.lineItems || []) || []) : [])
           .map((e: any) => [e.id, e])
       ).values()
     );
@@ -887,13 +931,17 @@ function BillingContent() {
       if (p.status !== "SUCCEEDED") return false;
       // Exclude internal allocation accounting vouchers
       if (p.method === "ADVANCE_ALLOCATION") return false;
-      // Exclude individual room checkout settlement receipts
-      if (p.reference?.includes("Settlement for Room")) return false;
+      // Exclude checkout settlement receipts
+      if (p.reference?.toLowerCase().includes("settlement")) return false;
 
       const text = `${p.reference || ""} ${p.payerSnapshot || ""} ${p.notes || ""}`;
-      const isGroupPool = text.includes("isGroupAdvancePool") || text.includes("GROUP_ADVANCE_POOL");
-      const isSpecific = allGroupRooms.some((r) => new RegExp(`\\b(?:Room|Rm)\\s*#?\\s*${r}\\b`, "i").test(text));
-      return isGroupPool || !isSpecific;
+      const isGroupPool = text.includes("isGroupAdvancePool") || text.includes("GROUP_ADVANCE_POOL") || text.includes("ADVANCE_DEPOSIT");
+      const isSpecificToSingleRoom = allGroupRooms.some((r) => {
+        const hasThis = new RegExp(`\\b(?:Room|Rm)\\s*#?\\s*${r}\\b`, "i").test(text);
+        const hasAll = text.includes("groupRoomNumbers") || text.includes("totalGroupRooms");
+        return hasThis && !hasAll;
+      });
+      return isGroupPool || !isSpecificToSingleRoom;
     });
     const totalReceived = unallocated.reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
 
@@ -1598,6 +1646,13 @@ function BillingContent() {
       const transferBalanceToGroup = Boolean(options?.transferBalanceToGroup);
       const applyGroupAdvance = Boolean(options?.applyGroupAdvance);
 
+      let effectivePaymentNow = options?.paymentNow;
+      if (effectivePaymentNow && !effectivePaymentNow.reference) {
+        effectivePaymentNow.reference = isSingleRoomOfGroup
+          ? `Settlement for Room ${activeRoomNumber}`
+          : `Group Settlement (Rooms ${allGroupRooms.join(", ")})`;
+      }
+
       const payload: any = {
         allowOutstanding,
         outstandingReason: allowOutstanding ? outstandingForm.reason : undefined,
@@ -1607,7 +1662,7 @@ function BillingContent() {
         transferRemarks: options?.transferRemarks || undefined,
         applyGroupAdvance,
         groupAdvanceAmount: options?.groupAdvanceAmount,
-        paymentNow: options?.paymentNow,
+        paymentNow: effectivePaymentNow,
       };
 
       if (isSingleRoomOfGroup && activeDirectoryItem?.roomId) {

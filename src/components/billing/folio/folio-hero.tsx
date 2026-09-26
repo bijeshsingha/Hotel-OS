@@ -463,7 +463,7 @@ export function FolioHero({
       </div>
 
       {/* Group Advance Pool Notification Card (if applicable) */}
-      {isMultiRoomGroup && groupAdvanceMetrics.totalReceived > 0 && (
+      {isInHouse && isMultiRoomGroup && groupAdvanceMetrics.totalReceived > 0 && (
         <div className="p-4 rounded-xl bg-blue-50/60 dark:bg-blue-950/30 border border-blue-200/70 dark:border-blue-900/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-sm">
           <div className="flex items-center gap-2.5 min-w-0">
             <Coins className="h-5 w-5 text-blue-600 dark:text-blue-400 shrink-0" />

@@ -493,10 +493,13 @@ export async function checkoutAndIssueInvoice({
       if (currentDue > 0.05) {
         // Calculate available unallocated advance in parent group
         const parentUnallocatedPayments = folio.payments.filter((p) => {
+          if (p.status !== "SUCCEEDED") return false;
+          if (p.method === "ADVANCE_ALLOCATION") return false;
+          if (p.reference?.toLowerCase().includes("settlement")) return false;
           const text = `${p.reference || ""} ${p.payerSnapshot || ""} ${(p as any).notes || ""}`;
           const isOther = otherRoomNumbers.some((o) => new RegExp(`\\b(?:Room|Rm)\\s*#?\\s*${o}\\b`, "i").test(text));
           const isThis = new RegExp(`\\b(?:Room|Rm)\\s*#?\\s*${targetRoomNo}\\b`, "i").test(text);
-          return !isOther && !isThis && p.status === "SUCCEEDED";
+          return !isOther && !isThis;
         });
         const totalUnallocatedAdvance = parentUnallocatedPayments.reduce((sum, p) => sum + p.amount, 0);
         const parentEntries = folio.windows.flatMap((w) => w.entries);
