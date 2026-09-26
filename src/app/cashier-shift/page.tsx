@@ -566,9 +566,9 @@ export default function CashierShiftPage() {
   return (
     <div className="space-y-6 max-w-[1600px] mx-auto w-full text-zinc-900 dark:text-zinc-100 pb-16">
       {/* Top Bar: Title & Primary Front Office Actions */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 print:hidden">
+      <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 pb-3 print:hidden border-b border-zinc-200/60 dark:border-zinc-800/60">
         <div>
-          <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex items-center gap-2.5 flex-wrap">
             <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-zinc-950 dark:text-zinc-50">
               Cashier Shift Entry Ledger
             </h1>
@@ -580,70 +580,81 @@ export default function CashierShiftPage() {
             <span className="text-xs font-mono font-medium text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 px-2.5 py-1 rounded-lg border border-emerald-200/80 dark:border-emerald-800/60">
               Audit Date: {selectedDate || activeProperty?.businessDate || "Live"}
             </span>
+            <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400 bg-zinc-100/80 dark:bg-zinc-800/70 px-2.5 py-1 rounded-lg border border-zinc-200/60 dark:border-zinc-700/60">
+              Active Shift & Till Reconciler
+            </span>
           </div>
-          <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">
+          <p className="text-xs sm:text-sm text-zinc-500 dark:text-zinc-400 mt-1">
             Front office operational entry ledger for dining income, petty cash vouchers, folio receipts, and drawer handover
           </p>
         </div>
 
-        {/* Action Controls */}
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            onClick={() => setShowAddIncomeModal(true)}
-            className="h-10 px-4 rounded-xl text-xs sm:text-sm font-semibold bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-100 dark:hover:bg-white text-white dark:text-zinc-900 shadow-xs transition flex items-center gap-2 cursor-pointer"
-          >
-            <Plus className="h-4 w-4" />
-            <span>Record Income</span>
-          </button>
-          <button
-            onClick={() => setShowAddExpenseModal(true)}
-            className="h-10 px-4 rounded-xl text-xs sm:text-sm font-semibold bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/80 text-zinc-800 dark:text-zinc-200 shadow-2xs transition flex items-center gap-2 cursor-pointer"
-          >
-            <Plus className="h-4 w-4" />
-            <span>Record Expense</span>
-          </button>
-          <button
-            onClick={() => setShowAddOwnerPayoutModal(true)}
-            className="h-10 px-4 rounded-xl text-xs sm:text-sm font-semibold bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/80 text-zinc-800 dark:text-zinc-200 shadow-2xs transition flex items-center gap-2 cursor-pointer"
-          >
-            <Building className="h-4 w-4" />
-            <span>Owner Payout</span>
-          </button>
-          <button
-            onClick={() => setShowEmailModal(true)}
-            className="h-10 px-3.5 rounded-xl text-xs sm:text-sm font-semibold bg-blue-600 hover:bg-blue-700 text-white transition cursor-pointer flex items-center gap-1.5 shadow-xs active:scale-98"
-            title="Email Shift Report"
-          >
-            <Mail className="h-4 w-4" />
-            <span>Email Shift</span>
-          </button>
-          <button
-            onClick={() => setShowPrintHandoverModal(true)}
-            className="h-10 px-3.5 rounded-xl text-xs sm:text-sm font-medium bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition cursor-pointer flex items-center gap-1.5"
-            title="Print Shift Handover Sheet"
-          >
-            <Printer className="h-4 w-4 text-zinc-500" />
-            <span className="hidden xl:inline">Handover Sheet</span>
-          </button>
-          <button
-            onClick={exportLedgerCSV}
-            className="h-10 px-3.5 rounded-xl text-xs sm:text-sm font-medium bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition cursor-pointer flex items-center gap-1.5"
-            title="Export CSV"
-          >
-            <Download className="h-4 w-4 text-zinc-500" />
-            <span className="hidden xl:inline">Export CSV</span>
-          </button>
-          <button
-            onClick={() => {
-              triggerRefresh();
-              loadLedgerData();
-            }}
-            disabled={loading}
-            className="h-10 w-10 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition flex items-center justify-center cursor-pointer disabled:opacity-50"
-            title="Refresh Shift Ledger"
-          >
-            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin text-blue-600" : ""}`} />
-          </button>
+        {/* Action Controls - Semantically Grouped & Clean Hierarchy */}
+        <div className="flex flex-wrap items-center gap-2.5">
+          {/* Drawer Operations Group: Income, Expense, Owner Payout */}
+          <div className="inline-flex items-center gap-1 p-1 rounded-xl bg-zinc-100 dark:bg-zinc-800/80 border border-zinc-200/80 dark:border-zinc-700/70">
+            <button
+              onClick={() => setShowAddIncomeModal(true)}
+              className="h-8 sm:h-9 px-3 sm:px-3.5 rounded-lg text-xs font-bold bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-100 dark:hover:bg-white text-white dark:text-zinc-900 shadow-xs transition flex items-center gap-1.5 cursor-pointer"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              <span>Record Income</span>
+            </button>
+            <button
+              onClick={() => setShowAddExpenseModal(true)}
+              className="h-8 sm:h-9 px-3 sm:px-3.5 rounded-lg text-xs font-bold bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800/80 text-zinc-800 dark:text-zinc-200 border border-zinc-200/80 dark:border-zinc-700/60 shadow-2xs transition flex items-center gap-1.5 cursor-pointer"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              <span>Record Expense</span>
+            </button>
+            <button
+              onClick={() => setShowAddOwnerPayoutModal(true)}
+              className="h-8 sm:h-9 px-3 sm:px-3.5 rounded-lg text-xs font-semibold bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800/80 text-zinc-700 dark:text-zinc-300 border border-zinc-200/80 dark:border-zinc-700/60 shadow-2xs transition flex items-center gap-1.5 cursor-pointer"
+            >
+              <Building className="h-3.5 w-3.5 text-zinc-500" />
+              <span>Owner Payout</span>
+            </button>
+          </div>
+
+          {/* Shift Documents & Utilities Group */}
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => setShowPrintHandoverModal(true)}
+              className="h-8 sm:h-9 px-3 rounded-xl text-xs font-semibold bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/80 text-zinc-700 dark:text-zinc-300 shadow-2xs transition cursor-pointer flex items-center gap-1.5"
+              title="Print Shift Handover Sheet"
+            >
+              <Printer className="h-3.5 w-3.5 text-zinc-500 dark:text-zinc-400" />
+              <span>Shift Handover Sheet</span>
+            </button>
+            <button
+              onClick={() => setShowEmailModal(true)}
+              className="h-8 sm:h-9 px-3 rounded-xl text-xs font-semibold bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/80 text-zinc-700 dark:text-zinc-300 shadow-2xs transition cursor-pointer flex items-center gap-1.5"
+              title="Email Shift Report"
+            >
+              <Mail className="h-3.5 w-3.5 text-zinc-500 dark:text-zinc-400" />
+              <span>Email Shift</span>
+            </button>
+            <button
+              onClick={exportLedgerCSV}
+              className="h-8 sm:h-9 px-3 rounded-xl text-xs font-semibold bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/80 text-zinc-700 dark:text-zinc-300 shadow-2xs transition cursor-pointer flex items-center gap-1.5"
+              title="Export CSV"
+            >
+              <Download className="h-3.5 w-3.5 text-zinc-500 dark:text-zinc-400" />
+              <span>Export CSV</span>
+            </button>
+            <button
+              onClick={() => {
+                triggerRefresh();
+                loadLedgerData();
+              }}
+              disabled={loading}
+              className="h-8 sm:h-9 w-8 sm:w-9 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-50 dark:hover:bg-zinc-800/80 shadow-2xs transition flex items-center justify-center cursor-pointer disabled:opacity-50"
+              title="Refresh Shift Ledger"
+              aria-label="Refresh Shift Ledger"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin text-zinc-900 dark:text-zinc-100" : ""}`} />
+            </button>
+          </div>
         </div>
       </div>
 
@@ -815,7 +826,7 @@ export default function CashierShiftPage() {
         >
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
-              Total Inflows (Receipts)
+              Total Inflows (Income & Receipts)
             </span>
             <ArrowDownLeft className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
           </div>
@@ -841,7 +852,7 @@ export default function CashierShiftPage() {
         >
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400">
-              Total Outflows (Expenses)
+              Total Outflows (Expenses & Payouts)
             </span>
             <ArrowUpRight className="h-4 w-4 text-rose-600 dark:text-rose-400" />
           </div>
@@ -973,7 +984,7 @@ export default function CashierShiftPage() {
                   : "text-zinc-500 hover:text-rose-600 dark:text-zinc-400 dark:hover:text-rose-400"
               }`}
             >
-              Expenses (-)
+              Outflows (-)
             </button>
             <button
               onClick={() => {
