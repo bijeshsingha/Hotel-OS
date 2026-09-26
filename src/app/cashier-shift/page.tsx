@@ -798,12 +798,10 @@ export default function CashierShiftPage() {
             {formatINR(data?.cashDrawer?.netCashHandover || 0)}
           </div>
           <div className="text-xs mt-3 pt-2.5 border-t border-zinc-100 dark:border-zinc-800/80 space-y-1 font-mono text-zinc-500 dark:text-zinc-400">
-            {(data?.cashDrawer?.openingBalance || 0) > 0 && (
-              <div className="flex items-center justify-between">
-                <span>Opening Float:</span>
-                <span>{formatINR(data?.cashDrawer?.openingBalance || 0)}</span>
-              </div>
-            )}
+            <div className="flex items-center justify-between">
+              <span>Opening Float:</span>
+              <span className="font-bold text-zinc-900 dark:text-zinc-100">{formatINR(data?.cashDrawer?.openingBalance || 0)}</span>
+            </div>
             <div className="flex items-center justify-between">
               <span>Collections (In): +{formatINR(data?.cashDrawer?.cashIn || 0)}</span>
               <span>Paid Out: -{formatINR(data?.cashDrawer?.cashOut || 0)}</span>
