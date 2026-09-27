@@ -1329,9 +1329,11 @@ import { calculate24HrBillableDays, calculateDynamicDepartureDate } from "./pms-
 export async function sync24HourFolioCharges({
   folioId,
   overrideGraceMinutes,
+  targetRoomNumber,
 }: {
   folioId: string;
   overrideGraceMinutes?: number;
+  targetRoomNumber?: string;
 }) {
   const folio = await prisma.folio.findUnique({
     where: { id: folioId },
@@ -1465,7 +1467,7 @@ export async function sync24HourFolioCharges({
     let checkoutType: "24_HOURS" | "FIXED_TIME" = "FIXED_TIME";
     let graceMinutes = 0;
 
-    if (overrideGraceMinutes !== undefined) {
+    if (overrideGraceMinutes !== undefined && (!targetRoomNumber || roomNo === targetRoomNumber)) {
       graceMinutes = overrideGraceMinutes;
     } else if (assignment.rateHandling?.includes("24_HOURS:")) {
       checkoutType = "24_HOURS";
@@ -1641,7 +1643,7 @@ export async function sync24HourFolioCharges({
     let stayCheckoutType: "24_HOURS" | "FIXED_TIME" = "FIXED_TIME";
     let stayGraceMinutes = 0;
 
-    if (overrideGraceMinutes !== undefined) {
+    if (overrideGraceMinutes !== undefined && (!targetRoomNumber || firstAssignment?.room?.number === targetRoomNumber)) {
       stayGraceMinutes = overrideGraceMinutes;
     } else if (firstAssignment?.rateHandling?.includes("24_HOURS:")) {
       stayCheckoutType = "24_HOURS";
@@ -1729,16 +1731,18 @@ export async function updateStayGracePeriod({
   gracePeriodMinutes,
   actorId,
   applyToGroup,
+  roomNumber,
 }: {
   stayId: string;
   gracePeriodMinutes: number;
   actorId?: string;
   applyToGroup?: boolean;
+  roomNumber?: string;
 }) {
   const stay = await prisma.stay.findUniqueOrThrow({
     where: { id: stayId },
     include: {
-      roomAssignments: { where: { endsAt: null } },
+      roomAssignments: { include: { room: true } },
       folio: true,
     },
   });
@@ -1751,13 +1755,18 @@ export async function updateStayGracePeriod({
         primaryGuestId: stay.primaryGuestId,
         id: { not: stay.id },
         status: "IN_HOUSE",
-        createdAt: {
-          gte: new Date(new Date(stay.createdAt).getTime() - 1000 * 60 * 60 * 6),
-          lte: new Date(new Date(stay.createdAt).getTime() + 1000 * 60 * 60 * 6),
-        },
+        OR: [
+          ...(stay.reservationRoomId ? [{ reservationRoomId: stay.reservationRoomId }] : []),
+          {
+            arrivalAt: {
+              gte: new Date(new Date(stay.arrivalAt).getTime() - 1000 * 60 * 60 * 24),
+              lte: new Date(new Date(stay.arrivalAt).getTime() + 1000 * 60 * 60 * 24),
+            },
+          },
+        ],
       },
       include: {
-        roomAssignments: { where: { endsAt: null } },
+        roomAssignments: { include: { room: true } },
         folio: true,
       },
     });
@@ -1767,12 +1776,20 @@ export async function updateStayGracePeriod({
   let primaryCycleMetrics: any = null;
 
   for (const s of staysToUpdate) {
-    const is24Hr = s.roomAssignments.some((ra) => ra.rateHandling?.includes("24_HOURS"));
+    const activeAssignments = (s.roomAssignments || []).filter((ra) => !ra.endsAt);
+    const candidateAssignments = activeAssignments.length > 0 ? activeAssignments : (s.roomAssignments || []);
+
+    // When not applying to the whole group, focus strictly on the targeted roomNumber
+    const targetAssignments = (!applyToGroup && roomNumber)
+      ? candidateAssignments.filter((ra) => ra.room?.number === roomNumber)
+      : candidateAssignments;
+
+    const is24Hr = targetAssignments.some((ra) => ra.rateHandling?.includes("24_HOURS"));
     const rateHandling = gracePeriodMinutes >= 1440
       ? (is24Hr ? "24_HOURS:1440" : "FIXED_TIME:1440")
       : (is24Hr ? `24_HOURS:${gracePeriodMinutes}` : `FIXED_TIME:${gracePeriodMinutes}`);
 
-    for (const ra of s.roomAssignments) {
+    for (const ra of targetAssignments) {
       if (ra.rateHandling !== "COMPLIMENTARY") {
         await prisma.roomAssignment.update({
           where: { id: ra.id },
@@ -1785,6 +1802,7 @@ export async function updateStayGracePeriod({
       const cycleMetrics = await sync24HourFolioCharges({
         folioId: s.folio.id,
         overrideGraceMinutes: gracePeriodMinutes,
+        targetRoomNumber: applyToGroup ? undefined : roomNumber,
       });
       if (s.id === stay.id) {
         primaryCycleMetrics = cycleMetrics;
@@ -1804,6 +1822,7 @@ export async function updateStayGracePeriod({
           gracePeriodMinutes,
           rateHandling,
           appliedToGroup: Boolean(applyToGroup),
+          roomNumber,
         }),
       },
     });

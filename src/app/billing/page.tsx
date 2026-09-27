@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useMemo, Suspense } from "react";
+import React, { useEffect, useState, useMemo, useRef, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useHotel } from "@/lib/context/hotel-context";
 import { formatINR, ACTIVE_TAX_RATES, getTaxRateForSac } from "@/lib/gst/calculator";
@@ -298,6 +298,7 @@ function BillingContent() {
 
   // Grace Period control state (in minutes) - Default: 0 mins (Strict 11 AM - 12 PM Checkout)
   const [gracePeriodMinutes, setGracePeriodMinutes] = useState<number>(0);
+  const lastLoadedStayKeyRef = useRef<string>("");
 
   // In-Folio Room Transfer modal state & rooms cache
   const [showTransferRoomModal, setShowTransferRoomModal] = useState(false);
@@ -334,6 +335,10 @@ function BillingContent() {
       return;
     }
     const staysUrl = `/api/v1/stays?propertyId=${activeProperty.id}`;
+
+    if (forceFresh) {
+      apiCache.invalidate(staysUrl);
+    }
 
     // Instant SWR cache lookup (0ms render)
     if (!forceFresh) {
@@ -412,8 +417,10 @@ function BillingContent() {
   // Load specific folio for selected stay with dynamic 24h synchronization
   const loadFolio = async (folioId: string, grace?: number) => {
     try {
-      const g = grace !== undefined ? grace : gracePeriodMinutes;
-      const res = await fetch(`/api/v1/folios/${folioId}?graceMinutes=${g}`);
+      const url = grace !== undefined
+        ? `/api/v1/folios/${folioId}?graceMinutes=${grace}`
+        : `/api/v1/folios/${folioId}`;
+      const res = await fetch(url);
       const data = await res.json();
       setFolioData(data);
     } catch (e) {
@@ -426,6 +433,28 @@ function BillingContent() {
     if (!selectedStayId) return;
 
     try {
+      // Invalidate apiCache to guarantee fresh data on subsequent reads
+      apiCache.invalidate("/api/v1/stays");
+      apiCache.invalidate("/api/v1/folios");
+
+      // Optimistically update matching room assignment rateHandling in local stays state
+      setStays((prevStays) =>
+        prevStays.map((s) => {
+          const isTargetStay = s.id === selectedStayId;
+          const isSiblingStay = groupBillingMode === "YES" && s.primaryGuestId === activeStay?.primaryGuestId;
+          if (!isTargetStay && !isSiblingStay) return s;
+
+          const updatedAssignments = (s.roomAssignments || []).map((ra: any) => {
+            if (ra.rateHandling === "COMPLIMENTARY") return ra;
+            if (groupBillingMode !== "YES" && activeRoomNumber && ra.room?.number !== activeRoomNumber) return ra;
+            const is24Hr = ra.rateHandling?.includes("24_HOURS");
+            const newRh = is24Hr ? `24_HOURS:${newGrace}` : `FIXED_TIME:${newGrace}`;
+            return { ...ra, rateHandling: newRh };
+          });
+          return { ...s, roomAssignments: updatedAssignments };
+        })
+      );
+
       // Persist grace period to the stay, propagating to group stays when in combined billing mode
       await fetch(`/api/v1/stays/${selectedStayId}/grace-period`, {
         method: "PATCH",
@@ -433,6 +462,7 @@ function BillingContent() {
         body: JSON.stringify({
           gracePeriodMinutes: newGrace,
           applyToGroup: groupBillingMode === "YES",
+          roomNumber: activeRoomNumber,
         }),
       });
 
@@ -470,36 +500,48 @@ function BillingContent() {
     setFolioData(null);
     setSelectedInvoice(null);
     setSelectedRoomKeys([]);
+    lastLoadedStayKeyRef.current = "";
     loadStays();
     loadPropertyRooms();
   }, [activeProperty?.id, refreshKey]);
 
-  // When selected stay changes, fetch its live folio and sync saved grace period
+  // When selected stay or room changes, fetch its live folio and sync saved grace period
   useEffect(() => {
     if (!selectedStayId || stays.length === 0) {
       setFolioData(null);
+      lastLoadedStayKeyRef.current = "";
       return;
     }
+    const currentKey = `${selectedStayId}:${selectedRoomNumber || ""}`;
     const activeStay = stays.find((s) => s.id === selectedStayId);
     if (!activeStay) {
       setFolioData(null);
       return;
     }
-    let stayGrace = 0;
-    const rh = activeStay?.roomAssignments?.[0]?.rateHandling;
-    if (rh?.includes("24_HOURS:")) {
-      stayGrace = Number(rh.split(":")[1]) || 0;
-    } else if (rh?.includes("FIXED_TIME:")) {
-      stayGrace = Number(rh.split(":")[1]) || 0;
-    }
-    setGracePeriodMinutes(stayGrace);
 
-    if (activeStay?.folio?.id) {
-      loadFolio(activeStay.folio.id, stayGrace);
-    } else {
-      setFolioData(null);
+    // Only re-initialize grace period and load folio when switching to a different stay or room
+    if (lastLoadedStayKeyRef.current !== currentKey) {
+      lastLoadedStayKeyRef.current = currentKey;
+
+      let stayGrace = 0;
+      const activeAssign = activeStay?.roomAssignments?.find((ra: any) =>
+        !ra.endsAt && (selectedRoomNumber ? ra.room?.number === selectedRoomNumber : true)
+      ) || activeStay?.roomAssignments?.find((ra: any) => !ra.endsAt) || activeStay?.roomAssignments?.[0];
+      const rh = activeAssign?.rateHandling;
+      if (rh?.includes("24_HOURS:")) {
+        stayGrace = Number(rh.split(":")[1]) || 0;
+      } else if (rh?.includes("FIXED_TIME:")) {
+        stayGrace = Number(rh.split(":")[1]) || 0;
+      }
+      setGracePeriodMinutes(stayGrace);
+
+      if (activeStay?.folio?.id) {
+        loadFolio(activeStay.folio.id, stayGrace);
+      } else {
+        setFolioData(null);
+      }
     }
-  }, [selectedStayId, stays]);
+  }, [selectedStayId, selectedRoomNumber, stays]);
 
   // Handle URL checkout action trigger
   useEffect(() => {
