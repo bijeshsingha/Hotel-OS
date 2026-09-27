@@ -370,7 +370,7 @@ export async function syncGrcEditsEverywhere(updatedGrc: any) {
             let entryRate = numTariff;
 
             // If entry description specifies a particular room number, extract that room's tariff
-            const matchRoom = entry.description?.match(/Room\s+([A-Za-z0-9_-]+)/i);
+            const matchRoom = entry.description?.match(/(?:Room|Rm)\s*#?\s*(?!Tariff\b)([A-Za-z0-9_-]+)/i);
             const entryRoomNum = matchRoom ? matchRoom[1] : null;
 
             if (entryRoomNum && primaryRoomNumber && entryRoomNum === primaryRoomNumber) {

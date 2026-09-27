@@ -1092,8 +1092,18 @@ function BillingContent() {
     // Tally nights posted per room to prevent summing multiple distinct rooms as elapsed nights
     const roomNightsMap: Record<string, number> = {};
     allRoomEntries.forEach((i: any) => {
-      const match = i.description?.match(/Room\s+([A-Za-z0-9_-]+)/i);
-      const rKey = match ? match[1] : activeRoomNumber;
+      let rKey = activeRoomNumber;
+      const matchedGroupRoom = allGroupRooms.find((r) =>
+        new RegExp(`\\b(?:Room|Rm)?\\s*#?\\s*${r}\\b`, "i").test(i.description || "")
+      );
+      if (matchedGroupRoom) {
+        rKey = matchedGroupRoom;
+      } else {
+        const match = i.description?.match(/(?:Room|Rm)\s*#?\s*(?!Tariff\b)([A-Za-z0-9_-]+)/i);
+        if (match) {
+          rKey = match[1];
+        }
+      }
       roomNightsMap[rKey] = (roomNightsMap[rKey] || 0) + (i.qty || 1);
     });
 
