@@ -8,7 +8,7 @@ export async function PATCH(
   try {
     const { id: stayId } = await params;
     const body = await request.json();
-    const { gracePeriodMinutes, actorId } = body;
+    const { gracePeriodMinutes, actorId, applyToGroup } = body;
 
     if (gracePeriodMinutes === undefined || isNaN(Number(gracePeriodMinutes))) {
       return NextResponse.json({ error: "gracePeriodMinutes is required" }, { status: 400 });
@@ -18,6 +18,7 @@ export async function PATCH(
       stayId,
       gracePeriodMinutes: Number(gracePeriodMinutes),
       actorId,
+      applyToGroup: Boolean(applyToGroup),
     });
 
     return NextResponse.json(result);

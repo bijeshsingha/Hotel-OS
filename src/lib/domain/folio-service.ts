@@ -1728,10 +1728,12 @@ export async function updateStayGracePeriod({
   stayId,
   gracePeriodMinutes,
   actorId,
+  applyToGroup,
 }: {
   stayId: string;
   gracePeriodMinutes: number;
   actorId?: string;
+  applyToGroup?: boolean;
 }) {
   const stay = await prisma.stay.findUniqueOrThrow({
     where: { id: stayId },
@@ -1741,49 +1743,73 @@ export async function updateStayGracePeriod({
     },
   });
 
-  const is24Hr = stay.roomAssignments.some((ra) => ra.rateHandling?.includes("24_HOURS"));
-  const rateHandling = gracePeriodMinutes >= 1440
-    ? (is24Hr ? "24_HOURS:1440" : "FIXED_TIME:1440")
-    : (is24Hr ? `24_HOURS:${gracePeriodMinutes}` : `FIXED_TIME:${gracePeriodMinutes}`);
-
-  // Update active room assignments with new grace period
-  for (const ra of stay.roomAssignments) {
-    if (ra.rateHandling !== "COMPLIMENTARY") {
-      await prisma.roomAssignment.update({
-        where: { id: ra.id },
-        data: { rateHandling },
-      });
-    }
+  const staysToUpdate: typeof stay[] = [stay];
+  if (applyToGroup && stay.primaryGuestId) {
+    const siblingStays = await prisma.stay.findMany({
+      where: {
+        propertyId: stay.propertyId,
+        primaryGuestId: stay.primaryGuestId,
+        id: { not: stay.id },
+        status: "IN_HOUSE",
+        createdAt: {
+          gte: new Date(new Date(stay.createdAt).getTime() - 1000 * 60 * 60 * 6),
+          lte: new Date(new Date(stay.createdAt).getTime() + 1000 * 60 * 60 * 6),
+        },
+      },
+      include: {
+        roomAssignments: { where: { endsAt: null } },
+        folio: true,
+      },
+    });
+    staysToUpdate.push(...siblingStays);
   }
 
-  // Synchronize folio charges immediately with new grace period
-  let cycleMetrics: any = null;
-  if (stay.folio?.id) {
-    cycleMetrics = await sync24HourFolioCharges({
-      folioId: stay.folio.id,
-      overrideGraceMinutes: gracePeriodMinutes,
+  let primaryCycleMetrics: any = null;
+
+  for (const s of staysToUpdate) {
+    const is24Hr = s.roomAssignments.some((ra) => ra.rateHandling?.includes("24_HOURS"));
+    const rateHandling = gracePeriodMinutes >= 1440
+      ? (is24Hr ? "24_HOURS:1440" : "FIXED_TIME:1440")
+      : (is24Hr ? `24_HOURS:${gracePeriodMinutes}` : `FIXED_TIME:${gracePeriodMinutes}`);
+
+    for (const ra of s.roomAssignments) {
+      if (ra.rateHandling !== "COMPLIMENTARY") {
+        await prisma.roomAssignment.update({
+          where: { id: ra.id },
+          data: { rateHandling },
+        });
+      }
+    }
+
+    if (s.folio?.id) {
+      const cycleMetrics = await sync24HourFolioCharges({
+        folioId: s.folio.id,
+        overrideGraceMinutes: gracePeriodMinutes,
+      });
+      if (s.id === stay.id) {
+        primaryCycleMetrics = cycleMetrics;
+      }
+    }
+
+    await prisma.auditLog.create({
+      data: {
+        organizationId: s.organizationId,
+        propertyId: s.propertyId,
+        actorId: actorId || "usr_cashier",
+        action: "UPDATE_GRACE_PERIOD",
+        targetType: "STAY",
+        targetId: s.id,
+        reason: `Updated grace period to ${gracePeriodMinutes} minutes`,
+        afterJson: JSON.stringify({
+          gracePeriodMinutes,
+          rateHandling,
+          appliedToGroup: Boolean(applyToGroup),
+        }),
+      },
     });
   }
 
-  // Audit log
-  await prisma.auditLog.create({
-    data: {
-      organizationId: stay.organizationId,
-      propertyId: stay.propertyId,
-      actorId: actorId || "usr_cashier",
-      action: "UPDATE_GRACE_PERIOD",
-      targetType: "STAY",
-      targetId: stay.id,
-      reason: `Updated grace period to ${gracePeriodMinutes} minutes`,
-      afterJson: JSON.stringify({
-        gracePeriodMinutes,
-        rateHandling,
-        cycleMetrics,
-      }),
-    },
-  });
-
-  return { success: true, gracePeriodMinutes, cycleMetrics };
+  return { success: true, gracePeriodMinutes, cycleMetrics: primaryCycleMetrics };
 }
 
 export async function transferRoomBalanceMidStay({

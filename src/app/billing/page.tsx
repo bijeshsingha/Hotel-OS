@@ -426,19 +426,21 @@ function BillingContent() {
     if (!selectedStayId) return;
 
     try {
-      // 1. Persist new grace period to the stay in the database
+      // Persist grace period to the stay, propagating to group stays when in combined billing mode
       await fetch(`/api/v1/stays/${selectedStayId}/grace-period`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ gracePeriodMinutes: newGrace }),
+        body: JSON.stringify({
+          gracePeriodMinutes: newGrace,
+          applyToGroup: groupBillingMode === "YES",
+        }),
       });
 
-      // 2. Reload folio and stays fresh to update ledger charges and balance
+      // Reload active folio and stays fresh while retaining focus on the selected folio
       if (folioData?.id) {
         await loadFolio(folioData.id, newGrace);
       }
       await loadStays(true);
-      await refreshData();
     } catch (e) {
       console.error("Error updating grace period:", e);
     }
@@ -1044,15 +1046,20 @@ function BillingContent() {
 
     const items = folioData?.windows?.[0]?.entries || folioData?.windows?.[0]?.lineItems || [];
     const allRoomEntries = items.filter((i: any) => i.chargeCode?.includes("ROOM_TARIFF") && i.status === "POSTED" && i.sourceType !== "MANUAL_CHARGE");
-    const chargedRoomEntries = allRoomEntries.filter((i: any) => {
-      if (groupBillingMode === "YES" || !isMultiRoomGroup) return true;
-      if (allRoomEntries.length <= 1) return true;
-      const desc = i.description || "";
-      return desc.includes(activeRoomNumber) || predecessors.some((pred: string) => desc.includes(pred));
+    
+    // Tally nights posted per room to prevent summing multiple distinct rooms as elapsed nights
+    const roomNightsMap: Record<string, number> = {};
+    allRoomEntries.forEach((i: any) => {
+      const match = i.description?.match(/Room\s+([A-Za-z0-9_-]+)/i);
+      const rKey = match ? match[1] : activeRoomNumber;
+      roomNightsMap[rKey] = (roomNightsMap[rKey] || 0) + (i.qty || 1);
     });
-    const chargedNights = chargedRoomEntries.length > 0
-      ? chargedRoomEntries.reduce((sum: number, i: any) => sum + (i.qty || 1), 0)
-      : billableCalc.billableDays;
+
+    const activeRoomChargedNights = roomNightsMap[activeRoomNumber] || (allRoomEntries.length > 0 && !isMultiRoomGroup ? allRoomEntries.length : 0);
+    const maxGroupRoomNights = Object.values(roomNightsMap).length > 0 ? Math.max(...Object.values(roomNightsMap)) : 0;
+    const chargedNights = groupBillingMode === "YES"
+      ? (maxGroupRoomNights || billableCalc.billableDays)
+      : (activeRoomChargedNights || billableCalc.billableDays);
 
     const unWaivedCalc = calculate24HrBillableDays(
       arr,
@@ -1060,7 +1067,7 @@ function BillingContent() {
       assignment?.rateHandling?.startsWith("24_HOURS") ? "24_HOURS" : "FIXED_TIME",
       0
     );
-    const unWaivedNights = Math.max(unWaivedCalc.billableDays, chargedRoomEntries.length || 1);
+    const unWaivedNights = Math.max(unWaivedCalc.billableDays, chargedNights || 1);
 
     const dynamicDep = calculateDynamicDepartureDate({
       arrivalAt: arr,

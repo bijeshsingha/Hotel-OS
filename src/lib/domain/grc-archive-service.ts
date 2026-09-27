@@ -3,6 +3,7 @@ import * as path from "path";
 import { prisma } from "../db/prisma";
 import { calculateGST } from "../gst/calculator";
 import { getNextDocumentNumber } from "../sequence/generator";
+import { sync24HourFolioCharges } from "./folio-service";
 
 const ARCHIVES_DIR = path.join(process.cwd(), "prisma", "backups", "grc_archives");
 const MASTER_BACKUP_FILE = path.join(process.cwd(), "prisma", "backups", "grc_master_backup.json");
@@ -109,6 +110,7 @@ export async function syncGrcEditsEverywhere(updatedGrc: any) {
     country,
     idDocumentType,
     idDocumentNumber,
+    arrivalDateTime,
     expectedDepartureDate,
     preAssignedRoom,
     depositAmount,
@@ -124,44 +126,95 @@ export async function syncGrcEditsEverywhere(updatedGrc: any) {
     country: country || "India",
   });
 
-  // 1. Update the linked Stay & Guest profile for this specific registration only
-  let targetStayId = updatedGrc.stayId || updatedGrc.linkedStayId;
-  if (!targetStayId && id) {
-    const reg = await prisma.guestRegistration.findUnique({ where: { id } });
-    targetStayId = reg?.stayId;
+  // Resolve new check-in arrival timestamp if provided
+  let newArrivalDate: Date | null = null;
+  if (arrivalDateTime) {
+    const cleanStr = String(arrivalDateTime).trim().replace(" ", "T");
+    const parsed = new Date(cleanStr);
+    if (!isNaN(parsed.getTime())) {
+      newArrivalDate = parsed;
+    }
   }
-  const linkedStays = targetStayId
-    ? await prisma.stay.findMany({
-        where: { id: targetStayId },
-        include: {
-          property: true,
-          primaryGuest: true,
-          roomAssignments: {
-            include: {
-              room: {
-                include: {
-                  roomType: {
-                    include: {
-                      rateVersions: {
-                        where: { active: true },
-                        orderBy: { createdAt: "desc" },
-                        take: 1,
-                      },
-                    },
-                  },
+
+  const stayInclude = {
+    property: true,
+    primaryGuest: true,
+    roomAssignments: {
+      include: {
+        room: {
+          include: {
+            roomType: {
+              include: {
+                rateVersions: {
+                  where: { active: true },
+                  orderBy: { createdAt: "desc" as const },
+                  take: 1,
                 },
               },
             },
           },
-          folio: {
-            include: {
-              windows: { include: { entries: true } },
-              payments: { include: { allocations: true } },
+        },
+      },
+    },
+    folio: {
+      include: {
+        windows: { include: { entries: true } },
+        payments: { include: { allocations: true } },
+      },
+    },
+  };
+
+  // 1. Fetch primary stay and all related sibling stays in the group
+  let targetStayId = updatedGrc.stayId || updatedGrc.linkedStayId;
+  let regRecord: any = null;
+  if (id) {
+    regRecord = await prisma.guestRegistration.findUnique({ where: { id } });
+    if (!targetStayId) {
+      targetStayId = regRecord?.stayId;
+    }
+  }
+
+  const linkedStays: any[] = [];
+  if (targetStayId) {
+    const primaryStay = await prisma.stay.findUnique({
+      where: { id: targetStayId },
+      include: stayInclude,
+    });
+    if (primaryStay) {
+      linkedStays.push(primaryStay);
+      if (primaryStay.primaryGuestId) {
+        const siblingStays = await prisma.stay.findMany({
+          where: {
+            propertyId: primaryStay.propertyId,
+            primaryGuestId: primaryStay.primaryGuestId,
+            id: { not: primaryStay.id },
+            status: "IN_HOUSE",
+            createdAt: {
+              gte: new Date(new Date(primaryStay.createdAt).getTime() - 1000 * 60 * 60 * 6),
+              lte: new Date(new Date(primaryStay.createdAt).getTime() + 1000 * 60 * 60 * 6),
             },
           },
+          include: stayInclude,
+        });
+        linkedStays.push(...siblingStays);
+      }
+    }
+  } else if (regRecord) {
+    const fallbackStays = await prisma.stay.findMany({
+      where: {
+        propertyId: regRecord.propertyId,
+        status: "IN_HOUSE",
+        primaryGuest: {
+          OR: [
+            ...(regRecord.mobilePhone ? [{ phone: regRecord.mobilePhone }] : []),
+            ...(regRecord.fullName ? [{ name: regRecord.fullName }] : []),
+          ],
         },
-      })
-    : [];
+      },
+      include: stayInclude,
+    });
+    linkedStays.push(...fallbackStays);
+  }
 
   for (const stay of linkedStays) {
     // Parse internal notes and common stay properties once
@@ -178,14 +231,31 @@ export async function syncGrcEditsEverywhere(updatedGrc: any) {
 
     const isRateInclusive = notesObj.isRateInclusive !== false && updatedGrc.isRateInclusive !== false;
 
-    // A. Update stay's expected departure if modified
+    // A. Update stay's check-in (arrivalAt) and departure (expectedDepartureAt) schedule
+    const stayDateUpdates: any = {};
+    if (newArrivalDate) {
+      stayDateUpdates.arrivalAt = newArrivalDate;
+    }
     if (expectedDepartureDate) {
+      stayDateUpdates.expectedDepartureAt = new Date(`${expectedDepartureDate}T11:00:00`);
+    }
+    if (Object.keys(stayDateUpdates).length > 0) {
       await prisma.stay.update({
         where: { id: stay.id },
-        data: {
-          expectedDepartureAt: new Date(`${expectedDepartureDate}T11:00:00`),
-        },
+        data: stayDateUpdates,
       });
+    }
+
+    // Synchronize active room assignment start timestamps
+    if (newArrivalDate && stay.roomAssignments) {
+      for (const assignment of stay.roomAssignments) {
+        if (!assignment.endsAt) {
+          await prisma.roomAssignment.update({
+            where: { id: assignment.id },
+            data: { startsAt: newArrivalDate },
+          });
+        }
+      }
     }
 
     // B. Update primary guest profile linked to stay
@@ -262,10 +332,10 @@ export async function syncGrcEditsEverywhere(updatedGrc: any) {
       }
 
       // Calculate total daily room tariff for folio update using ACTIVE room assignments only
-      const activeAssignments = (stay.roomAssignments || []).filter(a => !a.endsAt);
+      const activeAssignments = (stay.roomAssignments || []).filter((a: any) => !a.endsAt);
       let totalDailyTariff = numTariff;
       if (activeAssignments.length > 0) {
-        totalDailyTariff = activeAssignments.reduce((sum, a) => {
+        totalDailyTariff = activeAssignments.reduce((sum: number, a: any) => {
           const isPrimaryAssignment = primaryRoomNumber
             ? (a.room.number === primaryRoomNumber || a.room.id === primaryRoomNumber)
             : a === activeAssignments[0];
@@ -497,7 +567,7 @@ export async function syncGrcEditsEverywhere(updatedGrc: any) {
 
       // Find any advance deposit payment (including group advance pool)
       const existingAdvancePayment = stay.folio.payments.find(
-        (p) => p.reference?.includes("GROUP_ADVANCE_POOL") || p.reference === "ADVANCE_DEPOSIT" || p.reference?.startsWith("ADVANCE") || stay.folio?.payments.length === 1
+        (p: any) => p.reference?.includes("GROUP_ADVANCE_POOL") || p.reference === "ADVANCE_DEPOSIT" || p.reference?.startsWith("ADVANCE") || stay.folio?.payments.length === 1
       );
 
       if (numDeposit > 0) {
@@ -567,6 +637,15 @@ export async function syncGrcEditsEverywhere(updatedGrc: any) {
             where: { id: existingAdvancePayment.id },
           });
         }
+      }
+    }
+
+    // Auto-reconcile nightly room tariffs and rollover charges for updated arrival/departure schedule
+    if (stay.folio?.id) {
+      try {
+        await sync24HourFolioCharges({ folioId: stay.folio.id });
+      } catch (e) {
+        console.error("Failed to auto-sync folio charges on stay schedule update:", e);
       }
     }
 

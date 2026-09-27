@@ -344,7 +344,7 @@ export function FolioHero({
                 Grace Period
               </span>
               <select
-                value={gracePeriodMinutes >= 1440 && !stayCalculations?.canWaiveNextNight ? 0 : gracePeriodMinutes}
+                value={gracePeriodMinutes >= 1440 ? 1440 : gracePeriodMinutes}
                 onChange={(e) => onGracePeriodChange(Number(e.target.value))}
                 className="w-full h-8.5 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 px-2 text-xs font-semibold text-zinc-800 dark:text-zinc-200 focus:outline-none focus:border-blue-500 cursor-pointer"
               >
@@ -355,8 +355,8 @@ export function FolioHero({
                 <option value={240}>4 Hours</option>
                 <option value={300}>5 Hours</option>
                 <option value={360}>6 Hours</option>
-                <option value={1440} disabled={!stayCalculations?.canWaiveNextNight}>
-                  {stayCalculations?.canWaiveNextNight ? "Waive Next Night" : "Waive Next Night (N/A)"}
+                <option value={1440} disabled={!stayCalculations?.canWaiveNextNight && gracePeriodMinutes < 1440}>
+                  {gracePeriodMinutes >= 1440 ? "Waived Next Night" : stayCalculations?.canWaiveNextNight ? "Waive Next Night" : "Waive Next Night (N/A)"}
                 </option>
               </select>
             </div>
