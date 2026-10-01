@@ -1,5 +1,5 @@
 import React from "react";
-import { Pencil, Trash2, CheckCircle2, X } from "lucide-react";
+import { Pencil, Trash2, CheckCircle2, X, Calendar } from "lucide-react";
 
 interface EditPaymentModalProps {
   isOpen: boolean;
@@ -81,15 +81,30 @@ export function EditPaymentModal({
             </div>
           </div>
 
-          <div>
-            <label className="text-xs font-bold text-zinc-700 dark:text-zinc-300 block mb-1">Payer Name</label>
-            <input
-              type="text"
-              placeholder="Guest / Payer Name"
-              value={editingPayment.payerName}
-              onChange={(e) => setEditingPayment({ ...editingPayment, payerName: e.target.value })}
-              className="w-full h-10 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 px-3 text-xs text-zinc-900 dark:text-white focus:outline-none focus:border-blue-500 font-medium"
-            />
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-bold text-zinc-700 dark:text-zinc-300 block mb-1.5 flex items-center gap-1.5">
+                <Calendar className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
+                <span>Payment Date *</span>
+              </label>
+              <input
+                type="date"
+                required
+                value={editingPayment.paymentDate || ""}
+                onChange={(e) => setEditingPayment({ ...editingPayment, paymentDate: e.target.value })}
+                className="w-full h-11 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 px-3 text-xs text-zinc-900 dark:text-white font-mono focus:outline-none focus:border-blue-500 cursor-pointer"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-zinc-700 dark:text-zinc-300 block mb-1.5">Payer Name</label>
+              <input
+                type="text"
+                placeholder="Guest / Payer Name"
+                value={editingPayment.payerName || ""}
+                onChange={(e) => setEditingPayment({ ...editingPayment, payerName: e.target.value })}
+                className="w-full h-11 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 px-3 text-xs text-zinc-900 dark:text-white focus:outline-none focus:border-blue-500 font-medium"
+              />
+            </div>
           </div>
 
           <div>

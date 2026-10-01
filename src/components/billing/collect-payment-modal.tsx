@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { CreditCard, Building2, X, Coins } from "lucide-react";
-import { PaymentFormState, GroupAdvanceMetrics } from "./billing-types";
+import { CreditCard, Building2, X, Coins, Calendar } from "lucide-react";
+import { PaymentFormState, GroupAdvanceMetrics, getTodayLocalDate } from "./billing-types";
 import { formatINR } from "@/lib/gst/calculator";
 import initialCompaniesJson from "@/data/initial-companies.json";
 
@@ -154,6 +154,58 @@ export function CollectPaymentModal({
             </div>
           </div>
 
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="text-zinc-700 dark:text-zinc-300 font-bold block mb-1.5 flex items-center gap-1.5">
+                <Calendar className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                <span>Payment Date *</span>
+              </label>
+              <input
+                type="date"
+                required
+                value={paymentForm.date || getTodayLocalDate()}
+                onChange={(e) => setPaymentForm({ ...paymentForm, date: e.target.value })}
+                className="w-full h-11 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 px-3.5 text-zinc-900 dark:text-white focus:outline-none focus:border-blue-500 font-mono text-xs sm:text-sm cursor-pointer"
+              />
+            </div>
+            {paymentForm.method !== "DIRECT_BILL" ? (
+              <div>
+                <label className="text-zinc-700 dark:text-zinc-300 font-bold block mb-1.5">Reference / UTR / Auth Code</label>
+                <input
+                  type="text"
+                  placeholder="e.g. UTR/98127391823 or Cash Ref"
+                  value={paymentForm.reference}
+                  onChange={(e) => setPaymentForm({ ...paymentForm, reference: e.target.value })}
+                  className="w-full h-11 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 px-3.5 text-zinc-900 dark:text-white focus:outline-none focus:border-blue-500 font-mono text-xs sm:text-sm"
+                />
+              </div>
+            ) : (
+              <div>
+                <label className="text-zinc-700 dark:text-zinc-300 font-bold block mb-1.5">
+                  Authorized Guest / Employee Name
+                </label>
+                <input
+                  type="text"
+                  value={paymentForm.payerName}
+                  onChange={(e) => setPaymentForm({ ...paymentForm, payerName: e.target.value })}
+                  className="w-full h-11 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 px-3.5 text-zinc-900 dark:text-white focus:outline-none focus:border-blue-500 font-medium text-xs sm:text-sm"
+                />
+              </div>
+            )}
+          </div>
+
+          {paymentForm.method !== "DIRECT_BILL" && (
+            <div>
+              <label className="text-zinc-700 dark:text-zinc-300 font-bold block mb-1.5">Payer Name</label>
+              <input
+                type="text"
+                value={paymentForm.payerName}
+                onChange={(e) => setPaymentForm({ ...paymentForm, payerName: e.target.value })}
+                className="w-full h-11 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 px-3.5 text-zinc-900 dark:text-white focus:outline-none focus:border-blue-500 font-medium text-xs sm:text-sm"
+              />
+            </div>
+          )}
+
           {/* Group Advance Pool Deduction Notice */}
           {paymentForm.method === "ADVANCE_ALLOCATION" && (
             <div className="p-3.5 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800/60 space-y-1 animate-in fade-in">
@@ -275,30 +327,7 @@ export function CollectPaymentModal({
             </div>
           )}
 
-          {paymentForm.method !== "DIRECT_BILL" && (
-            <div>
-              <label className="text-zinc-700 dark:text-zinc-300 font-bold block mb-1.5">Reference / UTR / Auth Code</label>
-              <input
-                type="text"
-                placeholder="e.g. UTR/98127391823 or Cash Ref"
-                value={paymentForm.reference}
-                onChange={(e) => setPaymentForm({ ...paymentForm, reference: e.target.value })}
-                className="w-full h-11 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 px-3.5 text-zinc-900 dark:text-white focus:outline-none focus:border-blue-500 font-mono"
-              />
-            </div>
-          )}
 
-          <div>
-            <label className="text-zinc-700 dark:text-zinc-300 font-bold block mb-1.5">
-              {paymentForm.method === "DIRECT_BILL" ? "Authorized Guest / Employee Name" : "Payer Name"}
-            </label>
-            <input
-              type="text"
-              value={paymentForm.payerName}
-              onChange={(e) => setPaymentForm({ ...paymentForm, payerName: e.target.value })}
-              className="w-full h-11 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 px-3.5 text-zinc-900 dark:text-white focus:outline-none focus:border-blue-500 font-medium"
-            />
-          </div>
 
           <div className="pt-3 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-end gap-3">
             <button

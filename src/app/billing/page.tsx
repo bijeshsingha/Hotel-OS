@@ -49,6 +49,8 @@ import {
   GroupPaymentFormState,
   OutstandingFormState,
   GroupAdvanceMetrics,
+  getTodayLocalDate,
+  EditPaymentFormState,
 } from "@/components/billing/billing-types";
 import { PostChargeModal } from "@/components/billing/post-charge-modal";
 import { PostDiscountModal } from "@/components/billing/post-discount-modal";
@@ -265,7 +267,8 @@ function BillingContent() {
     sacHsn: "996311",
   });
 
-  const [paymentForm, setPaymentForm] = useState({
+  const [paymentForm, setPaymentForm] = useState<PaymentFormState>({
+    date: getTodayLocalDate(),
     amount: "0",
     method: "UPI",
     reference: "",
@@ -284,16 +287,7 @@ function BillingContent() {
   });
 
   const [showEditPaymentModal, setShowEditPaymentModal] = useState(false);
-  const [editingPayment, setEditingPayment] = useState<{
-    id: string;
-    receiptNo: string;
-    amount: string;
-    method: string;
-    reference: string;
-    payerName: string;
-    companyName?: string;
-    gstin?: string;
-  } | null>(null);
+  const [editingPayment, setEditingPayment] = useState<EditPaymentFormState | null>(null);
   const [editPaymentLoading, setEditPaymentLoading] = useState(false);
 
   // Grace Period control state (in minutes) - Default: 0 mins (Strict 11 AM - 12 PM Checkout)
@@ -551,6 +545,7 @@ function BillingContent() {
         const bal = folioData.balance ?? 0;
         if (bal > 0) {
           setPaymentForm({
+            date: getTodayLocalDate(),
             amount: String(Math.max(0, bal)),
             method: activeStay?.primaryGuest?.companyName ? "DIRECT_BILL" : "UPI",
             reference: "",
@@ -1388,6 +1383,24 @@ function BillingContent() {
     }
   };
 
+  // Helper to build full ISO string while preserving chosen calendar date and local time
+  const buildPaymentDateTime = (dateStr?: string, existingDateStr?: string) => {
+    if (!dateStr) return new Date().toISOString();
+    if (dateStr.includes("T")) return dateStr;
+    const [y, m, d] = dateStr.split("-").map(Number);
+    const base = existingDateStr ? new Date(existingDateStr) : new Date();
+    const combined = new Date(
+      y,
+      m - 1,
+      d,
+      base.getHours(),
+      base.getMinutes(),
+      base.getSeconds(),
+      base.getMilliseconds()
+    );
+    return isNaN(combined.getTime()) ? new Date().toISOString() : combined.toISOString();
+  };
+
   // Record Single Payment
   const handleRecordPayment = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1419,6 +1432,7 @@ function BillingContent() {
           gstin: paymentForm.gstin || undefined,
           creditPeriod: paymentForm.creditPeriod || undefined,
           billingRemarks: paymentForm.billingRemarks || undefined,
+          paymentDate: buildPaymentDateTime(paymentForm.date),
         }),
       });
 
@@ -1427,6 +1441,8 @@ function BillingContent() {
         throw new Error(errData.error || "Payment recording failed");
       }
 
+      apiCache.invalidate("/api/v1/folios");
+      apiCache.invalidate("/api/v1/stays");
       await loadFolio(folioData.id);
       await loadStays();
       setShowPaymentModal(false);
@@ -1455,12 +1471,15 @@ function BillingContent() {
           payerName: editingPayment.payerName,
           companyName: editingPayment.companyName,
           gstin: editingPayment.gstin,
+          paymentDate: buildPaymentDateTime(editingPayment.paymentDate, editingPayment.originalReceivedAt),
         }),
       });
 
       const result = await res.json();
       if (!res.ok) throw new Error(result.error || "Failed to update payment");
 
+      apiCache.invalidate("/api/v1/folios");
+      apiCache.invalidate("/api/v1/stays");
       await loadFolio(folioData.id);
       await loadStays(true);
       setShowEditPaymentModal(false);
@@ -1933,6 +1952,7 @@ function BillingContent() {
                 onOpenPaymentModal={() => {
                   const hasCompany = Boolean(activeStay?.primaryGuest?.companyName);
                   setPaymentForm({
+                    date: getTodayLocalDate(),
                     amount: String(Math.max(0, currentBalance)),
                     method: hasCompany ? "DIRECT_BILL" : "UPI",
                     reference: hasCompany ? `PO-${(activeStay.primaryGuest.companyName || "").slice(0, 10)}` : "",
@@ -2006,9 +2026,18 @@ function BillingContent() {
                   try {
                     if (p.payerSnapshot) parsedSnap = typeof p.payerSnapshot === "string" ? JSON.parse(p.payerSnapshot) : p.payerSnapshot;
                   } catch {}
+
+                  const rawDate = p.receivedAt || p.createdAt;
+                  const d = rawDate ? new Date(rawDate) : new Date();
+                  const formattedDate = !isNaN(d.getTime())
+                    ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
+                    : getTodayLocalDate();
+
                   setEditingPayment({
                     id: p.id,
                     receiptNo: p.receiptNo || "Payment",
+                    paymentDate: formattedDate,
+                    originalReceivedAt: rawDate,
                     amount: String(Math.abs(p.amount || 0)),
                     method: p.method || "CASH",
                     reference: p.reference || "",

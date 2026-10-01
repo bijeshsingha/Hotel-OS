@@ -47,7 +47,16 @@ export interface DiscountFormState {
   sacHsn: string;
 }
 
+export const getTodayLocalDate = (): string => {
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
 export interface PaymentFormState {
+  date: string;
   amount: string;
   method: string;
   reference: string;
@@ -56,6 +65,19 @@ export interface PaymentFormState {
   gstin: string;
   creditPeriod: string;
   billingRemarks: string;
+}
+
+export interface EditPaymentFormState {
+  id: string;
+  receiptNo: string;
+  paymentDate: string;
+  originalReceivedAt?: string;
+  amount: string;
+  method: string;
+  reference: string;
+  payerName: string;
+  companyName: string;
+  gstin: string;
 }
 
 export interface RefundFormState {

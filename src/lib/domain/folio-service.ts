@@ -219,6 +219,8 @@ export async function recordPayment({
   payerSnapshot,
   isRefund = false,
   actorId,
+  paymentDate,
+  receivedAt,
 }: {
   folioId: string;
   folioWindowId?: string;
@@ -229,6 +231,8 @@ export async function recordPayment({
   payerSnapshot?: string;
   isRefund?: boolean;
   actorId?: string;
+  paymentDate?: string | Date;
+  receivedAt?: string | Date;
 }) {
   const folio = await prisma.folio.findUniqueOrThrow({
     where: { id: folioId },
@@ -269,6 +273,21 @@ export async function recordPayment({
   const docSeq = await getNextDocumentNumber(folio.propertyId, docType);
   const isBTC = method === "DIRECT_BILL";
 
+  let finalReceivedAt = new Date();
+  const dateInput = paymentDate || receivedAt;
+  if (dateInput) {
+    if (typeof dateInput === "string" && dateInput.length === 10 && dateInput.includes("-")) {
+      const [y, m, d] = dateInput.split("-").map(Number);
+      const now = new Date();
+      finalReceivedAt = new Date(y, m - 1, d, now.getHours(), now.getMinutes(), now.getSeconds(), now.getMilliseconds());
+    } else {
+      const parsed = new Date(dateInput);
+      if (!isNaN(parsed.getTime())) {
+        finalReceivedAt = parsed;
+      }
+    }
+  }
+
   const pSnapshot =
     payerSnapshot ||
     JSON.stringify({
@@ -291,6 +310,7 @@ export async function recordPayment({
       reference: reference || (isActuallyRefund ? "Advance Surplus Refund Payout" : (isBTC ? `BTC-${folio.stay?.primaryGuest?.companyName || "CORP"}` : undefined)),
       payerSnapshot: pSnapshot,
       status: "SUCCEEDED",
+      receivedAt: finalReceivedAt,
       createdById: actorId,
     },
   });
@@ -300,6 +320,7 @@ export async function recordPayment({
       paymentId: payment.id,
       folioWindowId: windowId,
       amount: finalAmount,
+      allocatedAt: finalReceivedAt,
     },
   });
 

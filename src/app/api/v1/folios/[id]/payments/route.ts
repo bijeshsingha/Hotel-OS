@@ -22,6 +22,8 @@ export async function POST(
       billingRemarks,
       isRefund,
       actorId,
+      paymentDate,
+      receivedAt,
     } = body;
 
     let snapshotStr: string | undefined = undefined;
@@ -47,6 +49,7 @@ export async function POST(
       payerSnapshot: snapshotStr,
       isRefund: Boolean(isRefund),
       actorId,
+      paymentDate: paymentDate || receivedAt,
     });
 
     return NextResponse.json(payment);
@@ -73,6 +76,8 @@ export async function PUT(
       gstin,
       creditPeriod,
       billingRemarks,
+      paymentDate,
+      receivedAt,
     } = body;
 
     if (!paymentId) {
@@ -111,6 +116,21 @@ export async function PUT(
       billToCompany: method === "DIRECT_BILL" || currentSnap.billToCompany,
     });
 
+    let updatedReceivedAt = payment.receivedAt;
+    const dateInput = paymentDate || receivedAt;
+    if (dateInput) {
+      if (typeof dateInput === "string" && /^\d{4}-\d{2}-\d{2}$/.test(dateInput)) {
+        const [y, m, d] = dateInput.split("-").map(Number);
+        const base = payment.receivedAt ? new Date(payment.receivedAt) : new Date();
+        updatedReceivedAt = new Date(y, m - 1, d, base.getHours(), base.getMinutes(), base.getSeconds(), base.getMilliseconds());
+      } else {
+        const parsed = new Date(dateInput);
+        if (!isNaN(parsed.getTime())) {
+          updatedReceivedAt = parsed;
+        }
+      }
+    }
+
     const updatedPayment = await prisma.payment.update({
       where: { id: paymentId },
       data: {
@@ -118,13 +138,17 @@ export async function PUT(
         method: method || payment.method,
         reference: reference !== undefined ? reference : payment.reference,
         payerSnapshot: snapshotStr,
+        receivedAt: updatedReceivedAt,
       },
     });
 
     // Update allocations
     await prisma.paymentAllocation.updateMany({
       where: { paymentId },
-      data: { amount: numAmount },
+      data: {
+        amount: numAmount,
+        allocatedAt: updatedReceivedAt,
+      },
     });
 
     // Recalculate Folio Balance
@@ -134,11 +158,11 @@ export async function PUT(
     const totalCharges = allCharges.reduce((sum, e) => sum + (e.type === "CHARGE" ? e.totalAmount : -e.totalAmount), 0);
 
     const allPayments = await prisma.payment.findMany({
-      where: { folioId, status: "POSTED" },
+      where: { folioId, status: { in: ["SUCCEEDED", "POSTED"] } },
     });
     const totalPayments = allPayments.reduce((sum, p) => sum + p.amount, 0);
 
-    const newBalance = Math.round((totalCharges - totalPayments) * 100) / 100;
+    const newBalance = Math.max(0, Math.round((totalCharges - totalPayments) * 100) / 100);
 
     await prisma.folio.update({
       where: { id: folioId },
@@ -154,18 +178,20 @@ export async function PUT(
       action: "PAYMENT_EDIT",
       targetType: "FOLIO_PAYMENT",
       targetId: paymentId,
-      reason: "Payment amount or payment method edited",
+      reason: "Payment details or date edited",
       beforeJson: {
         receiptNo: payment.receiptNo,
         amount: payment.amount,
         method: payment.method,
         reference: payment.reference,
+        receivedAt: payment.receivedAt?.toISOString(),
       },
       afterJson: {
         receiptNo: updatedPayment.receiptNo,
         amount: updatedPayment.amount,
         method: updatedPayment.method,
         reference: updatedPayment.reference,
+        receivedAt: updatedPayment.receivedAt?.toISOString(),
         newFolioBalance: newBalance,
       },
     });
@@ -205,11 +231,11 @@ export async function DELETE(
     const totalCharges = allCharges.reduce((sum, e) => sum + (e.type === "CHARGE" ? e.totalAmount : -e.totalAmount), 0);
 
     const allPayments = await prisma.payment.findMany({
-      where: { folioId, status: "POSTED" },
+      where: { folioId, status: { in: ["SUCCEEDED", "POSTED"] } },
     });
     const totalPayments = allPayments.reduce((sum, p) => sum + p.amount, 0);
 
-    const newBalance = Math.round((totalCharges - totalPayments) * 100) / 100;
+    const newBalance = Math.max(0, Math.round((totalCharges - totalPayments) * 100) / 100);
 
     await prisma.folio.update({
       where: { id: folioId },
