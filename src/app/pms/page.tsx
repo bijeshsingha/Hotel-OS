@@ -81,6 +81,13 @@ function PMSFrontDeskContent() {
           pms.registrations.filter((r) => r.status === "PENDING_REVIEW").length
         }
         reservationsCount={pms.reservations.length}
+        statusCounts={{
+          total: pms.metrics?.total ?? 0,
+          vacantClean: pms.metrics?.vacantClean ?? 0,
+          occupied: pms.metrics?.occupied ?? 0,
+          vacantDirty: pms.metrics?.vacantDirty ?? 0,
+          outOfOrder: pms.metrics?.outOfOrder ?? 0,
+        }}
       />
 
       {/* 3. Main Views */}
