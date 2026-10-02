@@ -3,6 +3,7 @@ import { calculateGST } from "../gst/calculator";
 import { getNextDocumentNumber } from "../sequence/generator";
 import { logAuditEvent } from "./audit-service";
 import { saveOutstandingRecord, markOutstandingSettled } from "./outstanding-ledger-service";
+import { archivePaymentSnapshot } from "./payment-archive-service";
 
 export async function postManualFolioCharge({
   folioId,
@@ -314,6 +315,13 @@ export async function recordPayment({
       createdById: actorId,
     },
   });
+
+  // Persistent filesystem archive mirror (guarantees survival through crashes / DB resets)
+  try {
+    archivePaymentSnapshot(payment, isActuallyRefund ? "REFUNDED" : "COLLECTED", actorId || "Staff");
+  } catch (archErr) {
+    console.warn("[Payment Archive] Failed to archive payment snapshot:", archErr);
+  }
 
   await prisma.paymentAllocation.create({
     data: {

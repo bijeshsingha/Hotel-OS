@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
+import { archiveExpenseSnapshot } from "@/lib/domain/expense-archive-service";
 
 export async function GET(
   request: Request,
@@ -94,6 +95,12 @@ export async function PUT(
       },
     });
 
+    try {
+      archiveExpenseSnapshot(updated, "EDITED");
+    } catch (archiveErr) {
+      console.warn("[Expense Archive] Failed to archive edit snapshot:", archiveErr);
+    }
+
     return NextResponse.json({ success: true, expense: updated });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -119,6 +126,11 @@ export async function DELETE(
 
     if (hardDelete) {
       await prisma.expense.delete({ where: { id } });
+      try {
+        archiveExpenseSnapshot(existing, "DELETED");
+      } catch (archiveErr) {
+        console.warn("[Expense Archive] Failed to archive delete snapshot:", archiveErr);
+      }
       return NextResponse.json({ success: true, message: "Expense permanently deleted" });
     } else {
       // Soft-void
@@ -126,6 +138,11 @@ export async function DELETE(
         where: { id },
         data: { status: "VOIDED" },
       });
+      try {
+        archiveExpenseSnapshot(voided, "VOIDED");
+      } catch (archiveErr) {
+        console.warn("[Expense Archive] Failed to archive void snapshot:", archiveErr);
+      }
       return NextResponse.json({ success: true, message: "Expense marked as voided", expense: voided });
     }
   } catch (error: any) {

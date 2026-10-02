@@ -17,13 +17,14 @@ async function backupDatabase() {
     fs.mkdirSync(backupsDir, { recursive: true });
   }
 
-  // 1. Verify SQLite integrity and checkpoint
+  // 1. Flush WAL transactions to main db and verify SQLite integrity
   try {
+    await prisma.$queryRawUnsafe("PRAGMA wal_checkpoint(TRUNCATE);");
     const integrityResult = await prisma.$queryRawUnsafe<any[]>("PRAGMA integrity_check;");
     const status = integrityResult?.[0]?.integrity_check || "ok";
     console.log(`🔍 SQLite Integrity Check: ${status === "ok" ? "OK (Healthy)" : status}`);
   } catch (err: any) {
-    console.warn("⚠️ Warning: Could not run PRAGMA integrity_check:", err.message);
+    console.warn("⚠️ Warning: Could not run PRAGMA wal_checkpoint/integrity_check:", err.message);
   }
 
   const now = new Date();

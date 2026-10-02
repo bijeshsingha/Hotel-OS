@@ -342,7 +342,7 @@ export async function ensurePropertyDateSynchronized(propertyId: string): Promis
     try {
       const property = await prisma.property.findUnique({
         where: { id: propertyId },
-        select: { id: true, businessDate: true },
+        select: { id: true, businessDate: true, organizationId: true },
       });
 
       if (!property) return null;
@@ -350,25 +350,101 @@ export async function ensurePropertyDateSynchronized(propertyId: string): Promis
       const todayStr = getHotelTodayDate();
       let currentBizDate = property.businessDate;
 
-      // If business date is behind today, auto close each day and advance
-      while (currentBizDate < todayStr) {
+      if (!currentBizDate) {
+        await prisma.property.update({
+          where: { id: propertyId },
+          data: { businessDate: todayStr },
+        });
+        return todayStr;
+      }
+
+      // Calculate calendar day difference
+      const d1 = new Date(currentBizDate + "T00:00:00Z").getTime();
+      const d2 = new Date(todayStr + "T00:00:00Z").getTime();
+      const daysDiff = Math.round((d2 - d1) / (1000 * 60 * 60 * 24));
+
+      // CASE 1: Already up to date or ahead
+      if (daysDiff <= 0) {
+        return currentBizDate;
+      }
+
+      // CASE 2: Multi-day gap (> 1 day) - CIRCUIT BREAKER TRIPPED
+      // PREVENTS PHANTOM DEBT: If system was offline, crashed, or restored from a past snapshot,
+      // DO NOT blindly post automated multi-night room tariffs to in-house guests!
+      if (daysDiff > 1) {
+        console.warn(`🚨 [CIRCUIT BREAKER] System was offline/behind by ${daysDiff} days (${currentBizDate} -> ${todayStr}).`);
+        console.warn(`🚨 [CIRCUIT BREAKER] Automatic room charge posting BLOCKED to prevent false folio debt.`);
+
+        // Safely fast-forward businessDate to today WITHOUT charging guests
+        await prisma.property.update({
+          where: { id: propertyId },
+          data: { businessDate: todayStr },
+        });
+
+        // Ensure current operational day exists and is OPEN
+        await prisma.operationalDay.upsert({
+          where: {
+            propertyId_businessDate: {
+              propertyId,
+              businessDate: todayStr,
+            },
+          },
+          create: {
+            organizationId: property.organizationId,
+            propertyId,
+            businessDate: todayStr,
+            status: "OPEN",
+            openedById: "SYSTEM_CIRCUIT_BREAKER",
+          },
+          update: {
+            status: "OPEN",
+          },
+        });
+
+        // Create immutable audit log
         try {
-          await postNightlyRoomCharges(propertyId);
-        } catch (e) {
-          console.warn(`[Auto-Audit] Charge posting error for ${currentBizDate}:`, e);
+          await prisma.auditLog.create({
+            data: {
+              organizationId: property.organizationId,
+              propertyId,
+              actorId: "SYSTEM_CIRCUIT_BREAKER",
+              actorName: "System Safety Circuit Breaker",
+              action: "DOWNTIME_CIRCUIT_BREAKER_TRIGGERED",
+              targetType: "PROPERTY",
+              targetId: propertyId,
+              reason: `System downtime detected (${daysDiff} days: ${currentBizDate} to ${todayStr}). Multi-day automated room charges were safely blocked to prevent phantom debt. Business date advanced directly to ${todayStr}.`,
+              afterJson: JSON.stringify({
+                previousBusinessDate: currentBizDate,
+                syncedBusinessDate: todayStr,
+                daysDiff,
+                phantomChargesPrevented: true,
+              }),
+            },
+          });
+        } catch (auditErr) {
+          console.warn("[Circuit Breaker] Could not write audit log:", auditErr);
         }
 
-        try {
-          const res = await closeOperationalDay(propertyId, "SYSTEM_AUTO_MIDNIGHT");
-          currentBizDate = res.nextBusinessDate;
-        } catch (e) {
-          console.warn(`[Auto-Audit] Day close rollover error for ${currentBizDate}:`, e);
-          await prisma.property.update({
-            where: { id: propertyId },
-            data: { businessDate: todayStr },
-          });
-          break;
-        }
+        return todayStr;
+      }
+
+      // CASE 3: Standard single-day midnight rollover (daysDiff === 1)
+      // Normal operational rollover: close yesterday and open today
+      try {
+        await postNightlyRoomCharges(propertyId);
+      } catch (e) {
+        console.warn(`[Auto-Audit] Charge posting error for ${currentBizDate}:`, e);
+      }
+
+      try {
+        const res = await closeOperationalDay(propertyId, "SYSTEM_AUTO_MIDNIGHT");
+        currentBizDate = res.nextBusinessDate;
+      } catch (e) {
+        console.warn(`[Auto-Audit] Day close rollover error for ${currentBizDate}:`, e);
+        await prisma.property.update({
+          where: { id: propertyId },
+          data: { businessDate: todayStr },
+        });
       }
 
       return todayStr;

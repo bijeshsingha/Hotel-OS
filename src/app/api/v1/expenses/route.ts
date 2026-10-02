@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { logAuditEvent } from "@/lib/domain/audit-service";
+import { archiveExpenseSnapshot } from "@/lib/domain/expense-archive-service";
 
 export async function GET(request: Request) {
   try {
@@ -140,6 +141,13 @@ export async function POST(request: Request) {
         status: "PAID",
       },
     });
+
+    // Persistent filesystem archive mirror (guarantees survival through crashes / DB resets)
+    try {
+      archiveExpenseSnapshot(expense, "CREATED", createdByName || "Staff");
+    } catch (archiveErr) {
+      console.warn("[Expense Archive] Failed to archive snapshot:", archiveErr);
+    }
 
     // Audit log for expense voucher
     await logAuditEvent({
