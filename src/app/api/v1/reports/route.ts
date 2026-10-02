@@ -125,6 +125,12 @@ export async function GET(request: Request) {
         let sourceLabel = "Room Folio Settlement";
 
         if (
+          incomeCategory === "PAST_ROOM_SETTLEMENT" ||
+          (!p.folioId && (refLower.includes("grc #") || refLower.includes("past room") || refLower.includes("grc")))
+        ) {
+          sourceCategory = "PAST_ROOM_SETTLEMENT";
+          sourceLabel = incomeCategoryLabel || "Past Room Settlement (Physical GRC)";
+        } else if (
           incomeCategory === "BAR_FOOD_BILL" ||
           incomeCategory === "BAR_BEVERAGE_DIRECT" ||
           (!p.folioId && (refLower.includes("bar food") || refLower.includes("bar")))
@@ -191,7 +197,10 @@ export async function GET(request: Request) {
           companyName: snapshot.companyName || null,
           gstin: snapshot.gstin || null,
           kotNo: snapshot.kotNo || null,
-          roomNumber,
+          grcNo: snapshot.grcNo || null,
+          payerPhone: snapshot.phone || null,
+          stayDates: snapshot.stayDates || null,
+          roomNumber: snapshot.roomNumber || roomNumber,
           stayId,
           folioId: p.folioId || "—",
           amount: p.amount,
@@ -242,6 +251,7 @@ export async function GET(request: Request) {
       const collectionsBySource: Record<string, number> = {
         ADVANCE_DEPOSIT: 0,
         FOLIO_SETTLEMENT: 0,
+        PAST_ROOM_SETTLEMENT: 0,
         POS_RESTAURANT: 0,
         BAR_BEVERAGE: 0,
         BANQUET_ADVANCE: 0,

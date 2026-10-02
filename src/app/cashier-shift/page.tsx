@@ -73,11 +73,14 @@ export default function CashierShiftPage() {
 
   // Income Form State
   const [incomeForm, setIncomeForm] = useState({
-    category: "BAR_FOOD_BILL",
+    category: "PAST_ROOM_SETTLEMENT",
     payerName: "",
     payerPhone: "",
     amount: "",
     paymentMethod: "CASH",
+    grcNo: "",
+    roomNumber: "",
+    stayDates: "",
     kotNo: "",
     clientType: "INDIVIDUAL",
     companyName: "",
@@ -257,6 +260,7 @@ export default function CashierShiftPage() {
         const room = (tx.roomNumber || "").toLowerCase();
         const desc = (tx.description || tx.particulars || "").toLowerCase();
         const kot = (tx.kotNo || "").toLowerCase();
+        const grc = (tx.grcNo || "").toLowerCase();
 
         if (
           !party.includes(q) &&
@@ -264,7 +268,8 @@ export default function CashierShiftPage() {
           !ref.includes(q) &&
           !room.includes(q) &&
           !desc.includes(q) &&
-          !kot.includes(q)
+          !kot.includes(q) &&
+          !grc.includes(q)
         ) {
           return false;
         }
@@ -314,6 +319,17 @@ export default function CashierShiftPage() {
       return;
     }
 
+    if (incomeForm.category === "PAST_ROOM_SETTLEMENT") {
+      if (!incomeForm.grcNo.trim()) {
+        setIncomeError("Physical GRC Number is required for past room settlement.");
+        return;
+      }
+      if (!incomeForm.payerName.trim()) {
+        setIncomeError("Guest Name is required for past room settlement.");
+        return;
+      }
+    }
+
     if (incomeForm.category === "BANQUET_EVENT_ADVANCE") {
       if (!incomeForm.payerName.trim()) {
         setIncomeError("Guest / Contact Name is required for Banquet & Event Advances.");
@@ -337,6 +353,9 @@ export default function CashierShiftPage() {
           payerPhone: incomeForm.payerPhone,
           amount: Number(incomeForm.amount),
           paymentMethod: incomeForm.paymentMethod,
+          grcNo: incomeForm.grcNo,
+          roomNumber: incomeForm.roomNumber,
+          stayDates: incomeForm.stayDates,
           kotNo: incomeForm.kotNo,
           clientType: incomeForm.clientType,
           companyName: incomeForm.companyName,
@@ -356,11 +375,14 @@ export default function CashierShiftPage() {
 
       setIncomeSuccess(`Receipt #${json.receiptNo || "Generated"} recorded successfully!`);
       setIncomeForm({
-        category: "BAR_FOOD_BILL",
+        category: "PAST_ROOM_SETTLEMENT",
         payerName: "",
         payerPhone: "",
         amount: "",
         paymentMethod: "CASH",
+        grcNo: "",
+        roomNumber: "",
+        stayDates: "",
         kotNo: "",
         clientType: "INDIVIDUAL",
         companyName: "",
@@ -1087,19 +1109,31 @@ export default function CashierShiftPage() {
 
                     {/* Party / Payee / Guest */}
                     <td className="px-4 py-3.5 whitespace-nowrap">
-                      <div className="font-bold text-zinc-900 dark:text-zinc-100 text-xs sm:text-sm">
-                        {tx.party || tx.payerName || tx.payeeName || "Direct Guest"}
+                      <div className="font-bold text-zinc-900 dark:text-zinc-100 text-xs sm:text-sm flex items-center gap-1.5">
+                        <span>{tx.party || tx.payerName || tx.payeeName || "Direct Guest"}</span>
+                        {tx.grcNo && (
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                            GRC #{tx.grcNo}
+                          </span>
+                        )}
                       </div>
                       {tx.companyName && (
                         <div className="text-xs text-zinc-500 dark:text-zinc-400">
                           {tx.companyName}
                         </div>
                       )}
-                      {tx.roomNumber && (
-                        <div className="text-xs font-mono font-medium text-blue-600 dark:text-blue-400">
-                          Room {tx.roomNumber}
-                        </div>
-                      )}
+                      <div className="flex items-center gap-2 mt-0.5">
+                        {tx.roomNumber && (
+                          <span className="text-xs font-mono font-medium text-blue-600 dark:text-blue-400">
+                            Room {tx.roomNumber}
+                          </span>
+                        )}
+                        {tx.stayDates && (
+                          <span className="text-[11px] font-mono text-zinc-400">
+                            ({tx.stayDates})
+                          </span>
+                        )}
+                      </div>
                     </td>
 
                     {/* Particulars & Category */}
@@ -1239,6 +1273,27 @@ export default function CashierShiftPage() {
                   </span>
                 </div>
 
+                {selectedTx.grcNo && (
+                  <div className="flex justify-between py-1.5 border-b border-zinc-100 dark:border-zinc-800">
+                    <span className="text-zinc-500">Physical GRC #:</span>
+                    <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">GRC #{selectedTx.grcNo}</span>
+                  </div>
+                )}
+
+                {selectedTx.payerPhone && (
+                  <div className="flex justify-between py-1.5 border-b border-zinc-100 dark:border-zinc-800">
+                    <span className="text-zinc-500">Guest / Contact Phone:</span>
+                    <span className="font-mono text-zinc-900 dark:text-white">{selectedTx.payerPhone}</span>
+                  </div>
+                )}
+
+                {selectedTx.stayDates && (
+                  <div className="flex justify-between py-1.5 border-b border-zinc-100 dark:border-zinc-800">
+                    <span className="text-zinc-500">Stay Period:</span>
+                    <span className="font-mono text-zinc-800 dark:text-zinc-200">{selectedTx.stayDates}</span>
+                  </div>
+                )}
+
                 {selectedTx.companyName && (
                   <div className="flex justify-between py-1.5 border-b border-zinc-100 dark:border-zinc-800">
                     <span className="text-zinc-500">Company Name:</span>
@@ -1309,14 +1364,14 @@ export default function CashierShiftPage() {
             <div className="p-4 sm:p-5 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between bg-zinc-50/50 dark:bg-zinc-900/30">
               <div className="flex items-center gap-2.5">
                 <div className="p-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 text-emerald-600 dark:text-emerald-400">
-                  <UtensilsCrossed className="h-5 w-5" />
+                  <Banknote className="h-5 w-5" />
                 </div>
                 <div>
                   <h3 className="text-sm sm:text-base font-bold text-zinc-900 dark:text-white">
-                    Record Direct Income / Non-Resident Collection
+                    Record Direct Income / Collection
                   </h3>
                   <p className="text-xs text-zinc-500 mt-0.5">
-                    Restaurant Food Orders, Bar Food Bills, Banquet Advances & Walk-in Dining
+                    Past Room Income, Banquet Advances, Bar Food Bills &amp; Walk-in Dining
                   </p>
                 </div>
               </div>
@@ -1353,12 +1408,19 @@ export default function CashierShiftPage() {
                   onChange={(e) => setIncomeForm({ ...incomeForm, category: e.target.value })}
                   className="w-full h-9 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 text-xs font-semibold text-zinc-900 dark:text-zinc-100 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
                 >
+                  <option value="PAST_ROOM_SETTLEMENT">Past Room Income / Settlement (Physical GRC)</option>
                   <option value="BAR_FOOD_BILL">Bar Food Bill (Kitchen Food Orders Only)</option>
-                  <option value="BANQUET_EVENT_ADVANCE">Banquet & Event Advance Booking</option>
+                  <option value="BANQUET_EVENT_ADVANCE">Banquet &amp; Event Advance Booking</option>
                   <option value="OUTSIDER_WALKIN_DINING">Direct Non-Resident Walk-In Dining</option>
                   <option value="MISC_OUTLET_REVENUE">Other Outlet / Ancillary Revenue</option>
                 </select>
 
+                {incomeForm.category === "PAST_ROOM_SETTLEMENT" && (
+                  <p className="text-[11px] text-emerald-600 dark:text-emerald-400 mt-1 font-medium flex items-center gap-1">
+                    <CheckCircle2 className="h-3 w-3 shrink-0" />
+                    For historical stays, past checkouts, or bookings settled against physical GRC register.
+                  </p>
+                )}
                 {incomeForm.category === "BAR_FOOD_BILL" && (
                   <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-1 font-medium flex items-center gap-1">
                     <AlertCircle className="h-3 w-3 shrink-0" />
@@ -1366,6 +1428,89 @@ export default function CashierShiftPage() {
                   </p>
                 )}
               </div>
+
+              {/* Mandatory Physical GRC & Guest Information for Past Room Settlement */}
+              {incomeForm.category === "PAST_ROOM_SETTLEMENT" && (
+                <div className="p-3.5 rounded-xl bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800/60 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-emerald-900 dark:text-emerald-300 uppercase tracking-wider">
+                      Physical GRC &amp; Guest Details
+                    </span>
+                    <span className="text-[10.5px] text-emerald-700 dark:text-emerald-400 font-medium">
+                      Historical Stay
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[10.5px] font-semibold text-emerald-900 dark:text-emerald-300 uppercase mb-1">
+                        Physical GRC Number *
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. GRC-1042 / 508"
+                        value={incomeForm.grcNo}
+                        onChange={(e) => setIncomeForm({ ...incomeForm, grcNo: e.target.value })}
+                        required
+                        className="w-full h-8.5 rounded-lg border border-emerald-300 dark:border-emerald-700 bg-white dark:bg-zinc-900 px-3 text-xs font-mono font-bold text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10.5px] font-semibold text-emerald-900 dark:text-emerald-300 uppercase mb-1">
+                        Room Number (Optional)
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. 104, 201"
+                        value={incomeForm.roomNumber}
+                        onChange={(e) => setIncomeForm({ ...incomeForm, roomNumber: e.target.value })}
+                        className="w-full h-8.5 rounded-lg border border-emerald-300 dark:border-emerald-700 bg-white dark:bg-zinc-900 px-3 text-xs font-mono text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[10.5px] font-semibold text-emerald-900 dark:text-emerald-300 uppercase mb-1">
+                        Guest Full Name *
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Amitav Sen"
+                        value={incomeForm.payerName}
+                        onChange={(e) => setIncomeForm({ ...incomeForm, payerName: e.target.value })}
+                        required
+                        className="w-full h-8.5 rounded-lg border border-emerald-300 dark:border-emerald-700 bg-white dark:bg-zinc-900 px-3 text-xs text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10.5px] font-semibold text-emerald-900 dark:text-emerald-300 uppercase mb-1">
+                        Guest Mobile Phone (Optional)
+                      </label>
+                      <input
+                        type="tel"
+                        placeholder="e.g. 9876543210"
+                        value={incomeForm.payerPhone}
+                        onChange={(e) => setIncomeForm({ ...incomeForm, payerPhone: e.target.value })}
+                        className="w-full h-8.5 rounded-lg border border-emerald-300 dark:border-emerald-700 bg-white dark:bg-zinc-900 px-3 text-xs font-mono text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10.5px] font-semibold text-emerald-900 dark:text-emerald-300 uppercase mb-1">
+                      Stay Dates / Period (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. 12 Sep 2026 - 15 Sep 2026"
+                      value={incomeForm.stayDates}
+                      onChange={(e) => setIncomeForm({ ...incomeForm, stayDates: e.target.value })}
+                      className="w-full h-8.5 rounded-lg border border-emerald-300 dark:border-emerald-700 bg-white dark:bg-zinc-900 px-3 text-xs text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400"
+                    />
+                  </div>
+                </div>
+              )}
 
               {/* Amount and Payment Method */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1397,12 +1542,13 @@ export default function CashierShiftPage() {
                     <option value="UPI">UPI / QR Code</option>
                     <option value="CARD">Credit / Debit Card</option>
                     <option value="BANK_TRANSFER">Bank Transfer / NEFT</option>
+                    <option value="CHEQUE">Cheque / Demand Draft</option>
                   </select>
                 </div>
               </div>
 
               {/* Conditional KOT input for Bar & Walk-in Dining */}
-              {incomeForm.category !== "BANQUET_EVENT_ADVANCE" && (
+              {incomeForm.category !== "BANQUET_EVENT_ADVANCE" && incomeForm.category !== "PAST_ROOM_SETTLEMENT" && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-1">
@@ -1503,7 +1649,11 @@ export default function CashierShiftPage() {
                 </label>
                 <input
                   type="text"
-                  placeholder="e.g. Banquet Advance Deposit - Wedding Reception / UTR #"
+                  placeholder={
+                    incomeForm.category === "PAST_ROOM_SETTLEMENT"
+                      ? "e.g. Offline Balance Settlement / Bank UTR # / Register Folio Note"
+                      : "e.g. Banquet Advance Deposit - Wedding Reception / UTR #"
+                  }
                   value={incomeForm.reference}
                   onChange={(e) => setIncomeForm({ ...incomeForm, reference: e.target.value })}
                   className="w-full h-9 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 text-xs"

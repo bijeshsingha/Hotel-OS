@@ -3,8 +3,10 @@ import { prisma } from "@/lib/db/prisma";
 import { getNextDocumentNumber } from "@/lib/sequence/generator";
 import { getMidnightDayBoundaries } from "@/lib/domain/daily-report-service";
 import { logAuditEvent } from "@/lib/domain/audit-service";
+import { archivePaymentSnapshot } from "@/lib/domain/payment-archive-service";
 
 export const CATEGORY_LABELS: Record<string, string> = {
+  PAST_ROOM_SETTLEMENT: "Past Stay Room Settlement (Physical GRC)",
   BAR_FOOD_BILL: "Bar Food Orders (Kitchen Food Bill)",
   BAR_BEVERAGE_DIRECT: "Bar Food Orders (Kitchen Food Bill)", // Legacy alias
   BANQUET_EVENT_ADVANCE: "Banquet & Event Advance Deposit",
@@ -58,8 +60,11 @@ export async function GET(request: Request) {
         reference: p.reference,
         category,
         categoryLabel,
-        payerName: snapshot.name || (category.startsWith("BAR") ? "Bar Counter (Food)" : "Walk-In Guest"),
+        payerName: snapshot.name || (category === "PAST_ROOM_SETTLEMENT" ? "Past Guest" : category.startsWith("BAR") ? "Bar Counter (Food)" : "Walk-In Guest"),
         phone: snapshot.phone || null,
+        grcNo: snapshot.grcNo || null,
+        roomNumber: snapshot.roomNumber || null,
+        stayDates: snapshot.stayDates || null,
         kotNo: snapshot.kotNo || null,
         clientType: snapshot.clientType || "INDIVIDUAL",
         companyName: snapshot.companyName || null,
@@ -83,11 +88,14 @@ export async function POST(request: Request) {
     const body = await request.json();
     const {
       propertyId,
-      category = "BAR_FOOD_BILL",
+      category = "PAST_ROOM_SETTLEMENT",
       payerName,
       payerPhone,
       amount,
       paymentMethod = "CASH",
+      grcNo,
+      roomNumber,
+      stayDates,
       kotNo,
       clientType = "INDIVIDUAL",
       companyName,
@@ -108,7 +116,24 @@ export async function POST(request: Request) {
     }
 
     const isBanquet = category === "BANQUET_EVENT_ADVANCE";
+    const isPastRoom = category === "PAST_ROOM_SETTLEMENT";
     const isCompany = clientType === "COMPANY" || Boolean(companyName?.trim());
+
+    // Past room settlement business validation
+    if (isPastRoom) {
+      if (!grcNo?.trim()) {
+        return NextResponse.json(
+          { error: "Physical GRC Number is mandatory for past room settlement." },
+          { status: 400 }
+        );
+      }
+      if (!payerName?.trim()) {
+        return NextResponse.json(
+          { error: "Guest Name is mandatory for past room settlement." },
+          { status: 400 }
+        );
+      }
+    }
 
     // Banquet advance business validation
     if (isBanquet) {
@@ -150,13 +175,20 @@ export async function POST(request: Request) {
 
     const resolvedPayerName =
       payerName?.trim() ||
-      (category.startsWith("BAR") ? "Bar Counter (Food)" : "Walk-In Guest");
+      (category === "PAST_ROOM_SETTLEMENT"
+        ? "Past Guest"
+        : category.startsWith("BAR")
+        ? "Bar Counter (Food)"
+        : "Walk-In Guest");
 
     const payerSnapshot = JSON.stringify({
       name: resolvedPayerName,
       phone: payerPhone?.trim() || null,
       category,
       categoryLabel,
+      grcNo: grcNo?.trim() || null,
+      roomNumber: roomNumber?.trim() || null,
+      stayDates: stayDates?.trim() || null,
       kotNo: kotNo?.trim() || null,
       clientType: isCompany ? "COMPANY" : "INDIVIDUAL",
       companyName: companyName?.trim() || null,
@@ -176,11 +208,19 @@ export async function POST(request: Request) {
     let computedReference = reference?.trim();
     if (!computedReference) {
       const parts = [categoryLabel];
+      if (grcNo?.trim()) parts.push(`GRC #${grcNo.trim()}`);
+      if (roomNumber?.trim()) parts.push(`Room ${roomNumber.trim()}`);
+      if (stayDates?.trim()) parts.push(`(${stayDates.trim()})`);
       if (formattedKot) parts.push(formattedKot);
       if (companyName?.trim()) parts.push(`(${companyName.trim()})`);
       computedReference = parts.join(" - ");
-    } else if (formattedKot && !computedReference.toUpperCase().includes("KOT")) {
-      computedReference = `${computedReference} [${formattedKot}]`;
+    } else {
+      if (grcNo?.trim() && !computedReference.toUpperCase().includes("GRC")) {
+        computedReference = `${computedReference} [GRC #${grcNo.trim()}]`;
+      }
+      if (formattedKot && !computedReference.toUpperCase().includes("KOT")) {
+        computedReference = `${computedReference} [${formattedKot}]`;
+      }
     }
 
     const payment = await prisma.payment.create({
@@ -198,6 +238,9 @@ export async function POST(request: Request) {
       },
     });
 
+    // Permanent JSON backup archive (safe against power loss / DB resets)
+    archivePaymentSnapshot(payment, "COLLECTED", createdByName);
+
     // Audit log for direct income collection
     await logAuditEvent({
       organizationId: property.organizationId,
@@ -214,6 +257,8 @@ export async function POST(request: Request) {
         amount: payment.amount,
         paymentMethod: payment.method,
         reference: payment.reference,
+        grcNo: grcNo?.trim() || null,
+        roomNumber: roomNumber?.trim() || null,
         kotNo: kotNo?.trim() || null,
         guestName: resolvedPayerName,
         companyName: companyName?.trim() || null,
@@ -232,6 +277,8 @@ export async function POST(request: Request) {
         reference: payment.reference,
         category,
         categoryLabel,
+        grcNo: grcNo?.trim() || null,
+        roomNumber: roomNumber?.trim() || null,
         kotNo: kotNo?.trim() || null,
         payerName: resolvedPayerName,
         companyName: companyName?.trim() || null,
