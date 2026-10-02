@@ -54,6 +54,10 @@ export function RoomCard({
   const inHouseGuest = activeStay?.primaryGuest;
   const isOccupied = Boolean(activeStay);
 
+  // Clean category name by removing parenthetical bed duplicates if present (e.g. "Deluxe Room (Queen Bed)" -> "Deluxe Room")
+  const rawCategoryName = room.roomType?.name || "Standard";
+  const cleanCategoryName = rawCategoryName.replace(/\s*\([^)]*\)/g, "").trim() || rawCategoryName;
+
   // Status visual treatment: colored cards with clean contrast in light & dark mode
   const statusTheme = isOutOfOrder
     ? {
@@ -108,16 +112,11 @@ export function RoomCard({
       onClick={() => onSelectInspect(room)}
       className={`group relative flex flex-col justify-between p-5 rounded-2xl border transition-all duration-150 hover:shadow-xs cursor-pointer ${statusTheme.card}`}
     >
-      <div className="space-y-3.5">
-        {/* Header: Room Number & Status Pill */}
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <div className={`text-3xl sm:text-4xl font-extrabold font-mono tracking-tight leading-none ${statusTheme.number}`}>
-              {room.number}
-            </div>
-            <div className={`text-sm font-medium mt-1 ${statusTheme.subtext}`}>
-              Floor {room.floor} • {room.roomType?.name || "Standard"}
-            </div>
+      <div className="space-y-2.5">
+        {/* Header Row: Room Number on Left & Status Badge on Right */}
+        <div className="flex items-center justify-between gap-2">
+          <div className={`text-3xl sm:text-4xl font-extrabold font-mono tracking-tight leading-none ${statusTheme.number}`}>
+            {room.number}
           </div>
 
           <div
@@ -128,8 +127,16 @@ export function RoomCard({
           </div>
         </div>
 
+        {/* Subtitle Row: Full-width Floor & Clean Room Category (Never wraps awkwardly) */}
+        <div
+          className={`text-xs sm:text-[13px] font-medium truncate ${statusTheme.subtext}`}
+          title={`Floor ${room.floor} • ${rawCategoryName}`}
+        >
+          Floor {room.floor} • {cleanCategoryName}
+        </div>
+
         {/* Content Area: Large, readable guest / occupancy details */}
-        <div className="min-h-[58px] flex flex-col justify-center">
+        <div className="min-h-[50px] flex flex-col justify-center pt-0.5">
           {isOccupied && inHouseGuest ? (
             <div className="space-y-1">
               <div className="flex items-center gap-2 text-base font-bold text-zinc-950 dark:text-white truncate">
@@ -137,12 +144,12 @@ export function RoomCard({
                 <span className="truncate">{inHouseGuest.name}</span>
               </div>
               <div className="flex items-center gap-3 text-sm text-zinc-600 dark:text-zinc-300">
-                <span className="flex items-center gap-1 font-medium">
+                <span className="flex items-center gap-1 font-medium shrink-0">
                   <Users className="h-3.5 w-3.5 text-zinc-400 shrink-0" />
                   {activeStay.adults || 1} Pax
                 </span>
                 {activeStay.folio?.balance > 0.5 && (
-                  <span className="font-mono font-semibold text-rose-600 dark:text-rose-400">
+                  <span className="font-mono font-semibold text-rose-600 dark:text-rose-400 truncate">
                     Bal: ₹{Math.round(activeStay.folio.balance).toLocaleString("en-IN")}
                   </span>
                 )}
@@ -156,16 +163,16 @@ export function RoomCard({
                   {activeIssue?.description || (room.blocks?.[0]?.reason ?? "Room Out of Service")}
                 </span>
               </div>
-              <div className="text-xs text-rose-600/80 dark:text-rose-400/80 font-medium">
+              <div className="text-xs text-rose-600/80 dark:text-rose-400/80 font-medium truncate">
                 {isBlocked ? "Room blocked from reservations" : "Room out of service"}
               </div>
             </div>
           ) : (
             <div className="space-y-0.5">
-              <div className={`text-sm font-semibold ${hkStatus === "DIRTY" ? "text-amber-900 dark:text-amber-200" : "text-emerald-900 dark:text-emerald-200"}`}>
+              <div className={`text-sm font-semibold truncate ${hkStatus === "DIRTY" ? "text-amber-900 dark:text-amber-200" : "text-emerald-900 dark:text-emerald-200"}`}>
                 {bedInfo.label || "Double Bed"}
               </div>
-              <div className={`text-xs ${hkStatus === "DIRTY" ? "text-amber-700/80 dark:text-amber-300/80" : "text-emerald-700/80 dark:text-emerald-300/80"}`}>
+              <div className={`text-xs truncate ${hkStatus === "DIRTY" ? "text-amber-700/80 dark:text-amber-300/80" : "text-emerald-700/80 dark:text-emerald-300/80"}`}>
                 {hkStatus === "DIRTY" ? "Needs housekeeping cleaning" : "Ready for guest check-in"}
               </div>
             </div>
