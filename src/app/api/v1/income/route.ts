@@ -64,7 +64,13 @@ export async function GET(request: Request) {
         phone: snapshot.phone || null,
         grcNo: snapshot.grcNo || null,
         roomNumber: snapshot.roomNumber || null,
-        stayDates: snapshot.stayDates || null,
+        checkInDate: snapshot.checkInDate || null,
+        checkOutDate: snapshot.checkOutDate || null,
+        stayDates:
+          snapshot.stayDates ||
+          (snapshot.checkInDate && snapshot.checkOutDate
+            ? `${snapshot.checkInDate} to ${snapshot.checkOutDate}`
+            : snapshot.checkInDate || snapshot.checkOutDate || null),
         kotNo: snapshot.kotNo || null,
         clientType: snapshot.clientType || "INDIVIDUAL",
         companyName: snapshot.companyName || null,
@@ -95,6 +101,8 @@ export async function POST(request: Request) {
       paymentMethod = "CASH",
       grcNo,
       roomNumber,
+      checkInDate,
+      checkOutDate,
       stayDates,
       kotNo,
       clientType = "INDIVIDUAL",
@@ -181,6 +189,12 @@ export async function POST(request: Request) {
         ? "Bar Counter (Food)"
         : "Walk-In Guest");
 
+    const resolvedStayDates =
+      stayDates?.trim() ||
+      (checkInDate && checkOutDate
+        ? `${checkInDate} to ${checkOutDate}`
+        : checkInDate || checkOutDate || null);
+
     const payerSnapshot = JSON.stringify({
       name: resolvedPayerName,
       phone: payerPhone?.trim() || null,
@@ -188,7 +202,9 @@ export async function POST(request: Request) {
       categoryLabel,
       grcNo: grcNo?.trim() || null,
       roomNumber: roomNumber?.trim() || null,
-      stayDates: stayDates?.trim() || null,
+      checkInDate: checkInDate?.trim() || null,
+      checkOutDate: checkOutDate?.trim() || null,
+      stayDates: resolvedStayDates,
       kotNo: kotNo?.trim() || null,
       clientType: isCompany ? "COMPANY" : "INDIVIDUAL",
       companyName: companyName?.trim() || null,
@@ -210,7 +226,7 @@ export async function POST(request: Request) {
       const parts = [categoryLabel];
       if (grcNo?.trim()) parts.push(`GRC #${grcNo.trim()}`);
       if (roomNumber?.trim()) parts.push(`Room ${roomNumber.trim()}`);
-      if (stayDates?.trim()) parts.push(`(${stayDates.trim()})`);
+      if (resolvedStayDates) parts.push(`(${resolvedStayDates})`);
       if (formattedKot) parts.push(formattedKot);
       if (companyName?.trim()) parts.push(`(${companyName.trim()})`);
       computedReference = parts.join(" - ");

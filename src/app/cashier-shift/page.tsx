@@ -74,12 +74,15 @@ export default function CashierShiftPage() {
   // Income Form State
   const [incomeForm, setIncomeForm] = useState({
     category: "PAST_ROOM_SETTLEMENT",
+    receiptDate: "",
     payerName: "",
     payerPhone: "",
     amount: "",
     paymentMethod: "CASH",
     grcNo: "",
     roomNumber: "",
+    checkInDate: "",
+    checkOutDate: "",
     stayDates: "",
     kotNo: "",
     clientType: "INDIVIDUAL",
@@ -341,6 +344,13 @@ export default function CashierShiftPage() {
       }
     }
 
+    const receiptDateToUse = incomeForm.receiptDate || selectedDate || activeProperty?.businessDate;
+    const computedStayDates =
+      incomeForm.stayDates ||
+      (incomeForm.checkInDate && incomeForm.checkOutDate
+        ? `${incomeForm.checkInDate} to ${incomeForm.checkOutDate}`
+        : incomeForm.checkInDate || incomeForm.checkOutDate || "");
+
     setIncomeSubmitting(true);
     try {
       const res = await fetch("/api/v1/income", {
@@ -355,7 +365,9 @@ export default function CashierShiftPage() {
           paymentMethod: incomeForm.paymentMethod,
           grcNo: incomeForm.grcNo,
           roomNumber: incomeForm.roomNumber,
-          stayDates: incomeForm.stayDates,
+          checkInDate: incomeForm.checkInDate,
+          checkOutDate: incomeForm.checkOutDate,
+          stayDates: computedStayDates,
           kotNo: incomeForm.kotNo,
           clientType: incomeForm.clientType,
           companyName: incomeForm.companyName,
@@ -363,7 +375,7 @@ export default function CashierShiftPage() {
           billingAddress: incomeForm.billingAddress,
           reference: incomeForm.reference,
           notes: incomeForm.notes,
-          receivedAt: selectedDate ? `${selectedDate}T${new Date().toTimeString().split(" ")[0]}` : undefined,
+          receivedAt: receiptDateToUse ? `${receiptDateToUse}T${new Date().toTimeString().split(" ")[0]}` : undefined,
           createdByName: "Front Desk Cashier",
         }),
       });
@@ -376,12 +388,15 @@ export default function CashierShiftPage() {
       setIncomeSuccess(`Receipt #${json.receiptNo || "Generated"} recorded successfully!`);
       setIncomeForm({
         category: "PAST_ROOM_SETTLEMENT",
+        receiptDate: selectedDate || activeProperty?.businessDate || new Date().toISOString().split("T")[0],
         payerName: "",
         payerPhone: "",
         amount: "",
         paymentMethod: "CASH",
         grcNo: "",
         roomNumber: "",
+        checkInDate: "",
+        checkOutDate: "",
         stayDates: "",
         kotNo: "",
         clientType: "INDIVIDUAL",
@@ -608,7 +623,13 @@ export default function CashierShiftPage() {
           {/* Operations: Income, Expense, Payout */}
           <div className="inline-flex items-center gap-1 p-1 rounded-xl bg-zinc-100 dark:bg-zinc-800/80 border border-zinc-200/80 dark:border-zinc-700/70">
             <button
-              onClick={() => setShowAddIncomeModal(true)}
+              onClick={() => {
+                setIncomeForm((prev) => ({
+                  ...prev,
+                  receiptDate: prev.receiptDate || selectedDate || activeProperty?.businessDate || new Date().toISOString().split("T")[0],
+                }));
+                setShowAddIncomeModal(true);
+              }}
               className="h-8.5 px-3 rounded-lg text-xs font-bold bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-100 dark:hover:bg-white text-white dark:text-zinc-900 shadow-xs transition flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0"
             >
               <Plus className="h-3.5 w-3.5" />
@@ -1497,23 +1518,61 @@ export default function CashierShiftPage() {
                     </div>
                   </div>
 
-                  <div>
-                    <label className="block text-[10.5px] font-semibold text-emerald-900 dark:text-emerald-300 uppercase mb-1">
-                      Stay Dates / Period (Optional)
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="e.g. 12 Sep 2026 - 15 Sep 2026"
-                      value={incomeForm.stayDates}
-                      onChange={(e) => setIncomeForm({ ...incomeForm, stayDates: e.target.value })}
-                      className="w-full h-8.5 rounded-lg border border-emerald-300 dark:border-emerald-700 bg-white dark:bg-zinc-900 px-3 text-xs text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400"
-                    />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[10.5px] font-semibold text-emerald-900 dark:text-emerald-300 uppercase mb-1">
+                        Stay Check-In Date (Optional)
+                      </label>
+                      <input
+                        type="date"
+                        value={incomeForm.checkInDate}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setIncomeForm((prev) => {
+                            const newDates = val && prev.checkOutDate ? `${val} to ${prev.checkOutDate}` : (val || prev.checkOutDate || "");
+                            return { ...prev, checkInDate: val, stayDates: newDates };
+                          });
+                        }}
+                        className="w-full h-8.5 rounded-lg border border-emerald-300 dark:border-emerald-700 bg-white dark:bg-zinc-900 px-3 text-xs font-mono text-zinc-900 dark:text-zinc-100"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10.5px] font-semibold text-emerald-900 dark:text-emerald-300 uppercase mb-1">
+                        Stay Check-Out Date (Optional)
+                      </label>
+                      <input
+                        type="date"
+                        value={incomeForm.checkOutDate}
+                        min={incomeForm.checkInDate || undefined}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setIncomeForm((prev) => {
+                            const newDates = prev.checkInDate && val ? `${prev.checkInDate} to ${val}` : (val || prev.checkInDate || "");
+                            return { ...prev, checkOutDate: val, stayDates: newDates };
+                          });
+                        }}
+                        className="w-full h-8.5 rounded-lg border border-emerald-300 dark:border-emerald-700 bg-white dark:bg-zinc-900 px-3 text-xs font-mono text-zinc-900 dark:text-zinc-100"
+                      />
+                    </div>
                   </div>
                 </div>
               )}
 
-              {/* Amount and Payment Method */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* Receipt Date, Amount and Payment Method */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-1">
+                    Receipt Date *
+                  </label>
+                  <input
+                    type="date"
+                    value={incomeForm.receiptDate || selectedDate || activeProperty?.businessDate || ""}
+                    onChange={(e) => setIncomeForm({ ...incomeForm, receiptDate: e.target.value })}
+                    required
+                    className="w-full h-9 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 text-xs font-mono font-medium text-zinc-900 dark:text-zinc-100"
+                  />
+                </div>
+
                 <div>
                   <label className="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-1">
                     Amount Collected (INR) *

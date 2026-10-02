@@ -199,7 +199,13 @@ export async function GET(request: Request) {
           kotNo: snapshot.kotNo || null,
           grcNo: snapshot.grcNo || null,
           payerPhone: snapshot.phone || null,
-          stayDates: snapshot.stayDates || null,
+          stayDates:
+            snapshot.stayDates ||
+            (snapshot.checkInDate && snapshot.checkOutDate
+              ? `${snapshot.checkInDate} to ${snapshot.checkOutDate}`
+              : snapshot.checkInDate || snapshot.checkOutDate || null),
+          checkInDate: snapshot.checkInDate || null,
+          checkOutDate: snapshot.checkOutDate || null,
           roomNumber: snapshot.roomNumber || roomNumber,
           stayId,
           folioId: p.folioId || "—",
