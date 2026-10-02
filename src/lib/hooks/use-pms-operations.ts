@@ -28,7 +28,7 @@ export function usePmsOperations() {
   const [roomTypeFilter, setRoomTypeFilter] = useState<string>("ALL");
   const [statusFilter, setStatusFilter] = useState<"ALL" | "VACANT_READY" | "OCCUPIED" | "DIRTY" | "MAINTENANCE">("ALL");
   const [bedFilter, setBedFilter] = useState<"ALL" | "TWIN" | "KING" | "SUITE">("ALL");
-  const [sortBy, setSortBy] = useState<"ROOM_NUMBER" | "FLOOR" | "CATEGORY" | "STATUS">("ROOM_NUMBER");
+  const [sortBy, setSortBy] = useState<"ROOM_NUMBER" | "FLOOR" | "CATEGORY" | "STATUS">("CATEGORY");
 
   // Selection & Modal States
   const [selectedRoomForInspect, setSelectedRoomForInspect] = useState<any | null>(null);

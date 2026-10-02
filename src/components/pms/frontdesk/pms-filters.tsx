@@ -39,7 +39,7 @@ export function PmsFilters({
   roomTypeFilter,
   onRoomTypeChange,
   roomTypes,
-  sortBy = "ROOM_NUMBER",
+  sortBy = "CATEGORY",
   onSortByChange,
   viewMode,
   onViewModeChange,
