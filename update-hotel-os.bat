@@ -44,18 +44,11 @@ git pull origin main
 echo ---------------------------------------------------
 echo.
 
-:: 4. Check if Prisma or Packages changed and sync
-echo [3/4] Checking Prisma Schema ^& Dependencies...
-if exist "node_modules" (
-    call npx prisma db push
-    call npx prisma generate >nul 2>nul
-    echo [OK] Database schema and Prisma client synchronized.
-) else (
-    echo [INFO] Installing required node modules...
-    call npm install
-    call npx prisma db push
-    call npx prisma generate
-)
+:: 4. Install Dependencies and Synchronize Prisma Client
+echo [3/4] Installing Dependencies ^& Synchronizing Prisma Client...
+call npm install
+call npx prisma generate >nul 2>nul
+echo [OK] Dependencies and Prisma client synchronized.
 
 :: 5. Summary & Completion
 echo.

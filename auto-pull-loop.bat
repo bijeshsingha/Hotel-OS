@@ -14,6 +14,7 @@ echo.
 echo [%date% %time%] Checking for updates from origin/main...
 git pull origin main
 if %errorlevel% equ 0 (
+    call npm install
     call npx prisma generate >nul 2>nul
 )
 echo [%date% %time%] Sync check done. Next check in 5 minutes...

@@ -17,10 +17,10 @@ if %errorlevel% neq 0 (
     exit /b 1
 )
 
-:: 2. Synchronize Database & Regenerate Prisma Client
+:: 2. Synchronize Dependencies & Regenerate Prisma Client
 echo.
-echo [2/3] Synchronizing Database Schema ^& Prisma Client...
-call npx prisma db push
+echo [2/3] Installing Dependencies ^& Synchronizing Prisma Client...
+call npm install
 call npx prisma generate >nul 2>nul
 
 :: 3. Restart Server
