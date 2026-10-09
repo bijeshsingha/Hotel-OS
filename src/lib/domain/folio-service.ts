@@ -918,11 +918,11 @@ export async function checkoutAndIssueInvoice({
     const taxTotal = targetEntries.reduce((sum, e) => sum + (e.totalAmount - e.taxableAmount), 0);
 
     const supplierSnapshot = JSON.stringify({
-      legalName: stay.property.legalName,
+      legalName: stay.property.legalName || stay.property.displayName,
       displayName: stay.property.displayName,
-      gstin: stay.property.gstin || "18AACCB2447F1ZX",
-      stateCode: stay.property.stateCode || "18",
-      address: stay.property.address || "Guwahati, Assam",
+      gstin: stay.property.gstin || "",
+      stateCode: stay.property.stateCode || (stay.property.gstin && stay.property.gstin.length >= 2 ? stay.property.gstin.slice(0, 2) : ""),
+      address: stay.property.address || "",
     });
 
     const recipientSnapshot = JSON.stringify({
@@ -1115,11 +1115,11 @@ export async function checkoutAndIssueInvoice({
   const taxTotal = allEntries.reduce((sum, e) => sum + (e.totalAmount - e.taxableAmount), 0);
 
   const supplierSnapshot = JSON.stringify({
-    legalName: stay.property.legalName,
+    legalName: stay.property.legalName || stay.property.displayName,
     displayName: stay.property.displayName,
-    gstin: stay.property.gstin || "18AACCB2447F1ZX",
-    stateCode: stay.property.stateCode || "18",
-    address: stay.property.address || "Guwahati, Assam",
+    gstin: stay.property.gstin || "",
+    stateCode: stay.property.stateCode || (stay.property.gstin && stay.property.gstin.length >= 2 ? stay.property.gstin.slice(0, 2) : ""),
+    address: stay.property.address || "",
   });
 
   // Find linked GRC for full checkout

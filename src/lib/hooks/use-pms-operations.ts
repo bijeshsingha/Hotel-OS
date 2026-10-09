@@ -581,5 +581,6 @@ export function usePmsOperations() {
     setResForCheckIn,
     checkInRoomId,
     setCheckInRoomId,
+    setRegistrations,
   };
 }

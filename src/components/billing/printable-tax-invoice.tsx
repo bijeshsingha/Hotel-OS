@@ -113,6 +113,56 @@ export function numberToWordsINR(amount: number): string {
   return "Rs " + words.trim() + " and Zero Only";
 }
 
+// Indian State Codes dictionary for GST Place of Supply resolution
+export const INDIAN_STATE_CODES: Record<string, string> = {
+  "01": "Jammu & Kashmir",
+  "02": "Himachal Pradesh",
+  "03": "Punjab",
+  "04": "Chandigarh",
+  "05": "Uttarakhand",
+  "06": "Haryana",
+  "07": "Delhi",
+  "08": "Rajasthan",
+  "09": "Uttar Pradesh",
+  "10": "Bihar",
+  "11": "Sikkim",
+  "12": "Arunachal Pradesh",
+  "13": "Nagaland",
+  "14": "Manipur",
+  "15": "Mizoram",
+  "16": "Tripura",
+  "17": "Meghalaya",
+  "18": "Assam",
+  "19": "West Bengal",
+  "20": "Jharkhand",
+  "21": "Odisha",
+  "22": "Chhattisgarh",
+  "23": "Madhya Pradesh",
+  "24": "Gujarat",
+  "26": "Dadra & Nagar Haveli and Daman & Diu",
+  "27": "Maharashtra",
+  "29": "Karnataka",
+  "30": "Goa",
+  "31": "Lakshadweep",
+  "32": "Kerala",
+  "33": "Tamil Nadu",
+  "34": "Puducherry",
+  "35": "Andaman & Nicobar Islands",
+  "36": "Telangana",
+  "37": "Andhra Pradesh",
+  "38": "Ladakh",
+  "97": "Other Territory",
+};
+
+export function getIndianFinancialYear(dateInput?: string | Date | null): string {
+  const d = dateInput ? new Date(dateInput) : new Date();
+  const year = isNaN(d.getTime()) ? new Date().getFullYear() : d.getFullYear();
+  const month = isNaN(d.getTime()) ? new Date().getMonth() : d.getMonth();
+  const startYr = month >= 3 ? year : year - 1;
+  const endYr = startYr + 1;
+  return `${String(startYr).slice(-2)}${String(endYr).slice(-2)}`;
+}
+
 export function PrintableTaxInvoiceModal({
   isOpen,
   onClose,
@@ -127,7 +177,7 @@ export function PrintableTaxInvoiceModal({
   ledgerEntries = [],
   payments = [],
   cashierName = "Front Desk Cashier",
-  receptionistName = "Gobin Tamang",
+  receptionistName,
 }: PrintableTaxInvoiceProps) {
   const printSheetRef = useRef<HTMLDivElement>(null);
 
@@ -154,8 +204,16 @@ export function PrintableTaxInvoiceModal({
   const companyName = primaryGuest.companyName || btcSnapshot?.companyName || null;
   const guestGstin = primaryGuest.gstin || btcSnapshot?.gstin || null;
 
+  // Dynamic Staff Attribution
+  const effectiveCashier = cashierName?.trim() || "Front Desk Cashier";
+  const effectiveReceptionist =
+    receptionistName?.trim() ||
+    (stay?.guestRegistration as any)?.processedByUser?.name ||
+    effectiveCashier ||
+    "Front Desk Reception";
+
   // Address: Prefer corporate address if billing to company, otherwise guest personal address
-  let addressText = "MD Shah Road, Paltan Bazar, Guwahati, Assam - 781008";
+  let addressText = "Not Provided / Walk-In";
   if (companyName && (btcSnapshot?.companyAddress || btcSnapshot?.address)) {
     addressText = btcSnapshot.companyAddress || btcSnapshot.address;
   } else if (primaryGuest.addressJson) {
@@ -165,13 +223,58 @@ export function PrintableTaxInvoiceModal({
         .filter(Boolean)
         .join(", ");
     } catch (e) {
-      if (primaryGuest.city) {
-        addressText = `${primaryGuest.city}, ${primaryGuest.state || "Assam"}, India`;
+      if (primaryGuest.city || primaryGuest.state) {
+        addressText = [primaryGuest.city, primaryGuest.state, primaryGuest.country || "India"].filter(Boolean).join(", ");
       }
     }
-  } else if (primaryGuest.city) {
-    addressText = `${primaryGuest.city}, ${primaryGuest.state || "Assam"}, India`;
+  } else if (primaryGuest.address) {
+    addressText = primaryGuest.address;
+  } else if (primaryGuest.city || primaryGuest.state) {
+    addressText = [primaryGuest.city, primaryGuest.state, primaryGuest.country || "India"].filter(Boolean).join(", ");
   }
+
+  // Property GST and Source of Supply Resolution
+  const propertyStateCode =
+    property.stateCode ||
+    (property.gstin && property.gstin.length >= 2 ? property.gstin.slice(0, 2) : "18");
+  const propertyStateName = INDIAN_STATE_CODES[propertyStateCode] || "Local State";
+
+  let propertyCity = "";
+  if (property.address) {
+    const parts = property.address.split(",").map((s: string) => s.trim()).filter(Boolean);
+    if (parts.length >= 2) {
+      propertyCity = parts[parts.length - 2].replace(/\b\d{6}\b/, "").trim();
+    } else if (parts.length === 1) {
+      propertyCity = parts[0];
+    }
+  }
+
+  const sourceOfSupplyText = `${propertyCity ? `${propertyCity}, ` : ""}${propertyStateName} (${propertyStateCode})`;
+
+  // Recipient State Resolution
+  let guestStateCode = "";
+  let guestStateName = primaryGuest.state || "";
+
+  if (guestGstin && guestGstin.length >= 2) {
+    guestStateCode = guestGstin.slice(0, 2);
+    if (!guestStateName && INDIAN_STATE_CODES[guestStateCode]) {
+      guestStateName = INDIAN_STATE_CODES[guestStateCode];
+    }
+  }
+
+  if (!guestStateCode && guestStateName) {
+    const foundCode = Object.keys(INDIAN_STATE_CODES).find(
+      (code) => INDIAN_STATE_CODES[code].toLowerCase() === guestStateName.toLowerCase()
+    );
+    if (foundCode) guestStateCode = foundCode;
+  }
+
+  if (!guestStateName && !guestStateCode) {
+    guestStateName = propertyStateName;
+    guestStateCode = propertyStateCode;
+  }
+
+  const recipientStateText = `${guestStateName}${guestStateCode ? ` (State Code: ${guestStateCode})` : ""}`;
 
   // Recipient Snapshot parser (if invoiceData has it)
   let parsedRecipient: any = null;
@@ -183,9 +286,10 @@ export function PrintableTaxInvoiceModal({
     } catch (e) {}
   }
 
-  // Invoice Numbers & Dates
-  const billNo = invoiceData?.invoiceNo || (isLiveTaxBillView ? `LIVE-BILL/${roomNumber}` : `INV-2627-${roomNumber}`);
-  const grcNo = parsedRecipient?.grcNo || stay?.guestRegistration?.registrationNo || stay?.grcNo || (stay?.reservationRoom?.reservation?.confirmationNo) || `GRC-2627-${roomNumber}`;
+  // Invoice Numbers & Dates (Dynamically resolving Financial Year)
+  const currentFy = getIndianFinancialYear(invoiceData?.issuedAt || stay?.arrivalAt);
+  const billNo = invoiceData?.invoiceNo || (isLiveTaxBillView ? `LIVE-BILL/${roomNumber}` : `INV-${currentFy}-${roomNumber || "001"}`);
+  const grcNo = parsedRecipient?.grcNo || stay?.guestRegistration?.registrationNo || stay?.grcNo || (stay?.reservationRoom?.reservation?.confirmationNo) || `GRC-${currentFy}-${roomNumber || "001"}`;
 
   // Room Pax (Adults & Children)
   let roomPaxAdults = parsedRecipient?.adults !== undefined ? Number(parsedRecipient.adults) : undefined;
@@ -201,8 +305,8 @@ export function PrintableTaxInvoiceModal({
     } catch (e) {}
   }
 
-  const effectiveAdults = roomPaxAdults !== undefined ? roomPaxAdults : (stay?.adults || 2);
-  const effectiveChildren = roomPaxChildren !== undefined ? roomPaxChildren : (stay?.children || 0);
+  const effectiveAdults = roomPaxAdults !== undefined ? roomPaxAdults : (stay?.adults ?? 1);
+  const effectiveChildren = roomPaxChildren !== undefined ? roomPaxChildren : (stay?.children ?? 0);
   
   const invoiceDateStr = invoiceData?.issuedAt
     ? new Date(invoiceData.issuedAt).toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" })
@@ -251,26 +355,7 @@ export function PrintableTaxInvoiceModal({
   // Raw line items
   const rawLines: InvoiceLineItem[] = (invoiceData?.lines && invoiceData.lines.length > 0)
     ? invoiceData.lines
-    : ledgerEntries.length > 0
-    ? ledgerEntries
-    : [
-        {
-          description: "Room Rent",
-          sacHsn: "996311",
-          qty: 1,
-          rate: 1800,
-          totalAmount: 1800 * 1.05,
-          taxableAmount: 1800,
-          taxAmount: 1800 * 0.05,
-          cgstAmount: (1800 * 0.05) / 2,
-          sgstAmount: (1800 * 0.05) / 2,
-          igstAmount: 0,
-          cgstRate: 2.5,
-          sgstRate: 2.5,
-          igstRate: 0,
-          discountAmount: 0,
-        },
-      ];
+    : ledgerEntries;
 
   // Separate room transfer credit entries from standard taxable charge lines
   const transferCreditEntries = rawLines.filter((l: any) =>
@@ -393,44 +478,48 @@ export function PrintableTaxInvoiceModal({
       return;
     }
 
-    const linesHtml = lines.map((item, idx) => {
-      const total = Number(item.totalAmount || 0);
-      const taxable = Number(
-        item.taxableAmount !== undefined && item.taxableAmount !== null && item.taxableAmount > 0
-          ? item.taxableAmount
-          : total
-      );
-      const taxHalf = Math.max(0, (total - taxable) / 2);
-      const discount = Number(item.discountAmount || 0);
-      const rateVal = Number(
-        item.rate ??
-        (item as any).unitAmount ??
-        (item.qty && taxable ? taxable / item.qty : (total ? total / (item.qty || 1) : 0))
-      );
+    const linesHtml = lines.length > 0
+      ? lines.map((item, idx) => {
+          const total = Number(item.totalAmount || 0);
+          const taxable = Number(
+            item.taxableAmount !== undefined && item.taxableAmount !== null && item.taxableAmount > 0
+              ? item.taxableAmount
+              : total
+          );
+          const taxHalf = Math.max(0, (total - taxable) / 2);
+          const discount = Number(item.discountAmount || 0);
+          const rateVal = Number(
+            item.rate ??
+            (item as any).unitAmount ??
+            (item.qty && taxable ? taxable / item.qty : (total ? total / (item.qty || 1) : 0))
+          );
+          const itemCgstRate = item.cgstRate !== undefined ? item.cgstRate : (taxable > 0 ? (taxHalf / taxable) * 100 : 2.5);
+          const itemSgstRate = item.sgstRate !== undefined ? item.sgstRate : (taxable > 0 ? (taxHalf / taxable) * 100 : 2.5);
 
-      return `
-        <tr>
-          <td style="text-align: center; font-weight: bold; padding: 4px 5px; border-right: 1px solid #111; border-bottom: 1px solid #111;">${idx + 1}</td>
-          <td style="font-weight: 600; padding: 4px 5px; border-right: 1px solid #111; border-bottom: 1px solid #111;">${item.description}</td>
-          <td style="text-align: center; padding: 4px 5px; border-right: 1px solid #111; border-bottom: 1px solid #111;">${item.sacHsn || "996311"}</td>
-          <td style="text-align: center; font-weight: bold; padding: 4px 5px; border-right: 1px solid #111; border-bottom: 1px solid #111;">${item.qty || 1}</td>
-          <td style="text-align: right; padding: 4px 5px; border-right: 1px solid #111; border-bottom: 1px solid #111;">${rateVal.toFixed(2)}</td>
-          <td style="text-align: right; padding: 4px 5px; border-right: 1px solid #111; border-bottom: 1px solid #111;">${taxable.toFixed(2)}</td>
-          <td style="text-align: right; padding: 4px 5px; border-right: 1px solid #111; border-bottom: 1px solid #111;">${discount.toFixed(2)}</td>
-          <td style="text-align: right; font-weight: bold; padding: 4px 5px; border-right: 1px solid #111; border-bottom: 1px solid #111;">${taxable.toFixed(2)}</td>
-          <td style="text-align: right; padding: 4px 5px; border-right: 1px solid #111; border-bottom: 1px solid #111;">
-            <div>${taxHalf.toFixed(2)}</div>
-            <div style="font-size: 8px; color: #555;">2.50%</div>
-          </td>
-          <td style="text-align: right; padding: 4px 5px; border-right: 1px solid #111; border-bottom: 1px solid #111;">
-            <div>${taxHalf.toFixed(2)}</div>
-            <div style="font-size: 8px; color: #555;">2.50%</div>
-          </td>
-          <td style="text-align: right; padding: 4px 5px; border-right: 1px solid #111; border-bottom: 1px solid #111;">0.00</td>
-          <td style="text-align: right; padding: 4px 5px; border-bottom: 1px solid #111;">0.00</td>
-        </tr>
-      `;
-    }).join("");
+          return `
+            <tr>
+              <td style="text-align: center; font-weight: bold; padding: 4px 5px; border-right: 1px solid #111; border-bottom: 1px solid #111;">${idx + 1}</td>
+              <td style="font-weight: 600; padding: 4px 5px; border-right: 1px solid #111; border-bottom: 1px solid #111;">${item.description}</td>
+              <td style="text-align: center; padding: 4px 5px; border-right: 1px solid #111; border-bottom: 1px solid #111;">${item.sacHsn || "996311"}</td>
+              <td style="text-align: center; font-weight: bold; padding: 4px 5px; border-right: 1px solid #111; border-bottom: 1px solid #111;">${item.qty || 1}</td>
+              <td style="text-align: right; padding: 4px 5px; border-right: 1px solid #111; border-bottom: 1px solid #111;">${rateVal.toFixed(2)}</td>
+              <td style="text-align: right; padding: 4px 5px; border-right: 1px solid #111; border-bottom: 1px solid #111;">${taxable.toFixed(2)}</td>
+              <td style="text-align: right; padding: 4px 5px; border-right: 1px solid #111; border-bottom: 1px solid #111;">${discount.toFixed(2)}</td>
+              <td style="text-align: right; font-weight: bold; padding: 4px 5px; border-right: 1px solid #111; border-bottom: 1px solid #111;">${taxable.toFixed(2)}</td>
+              <td style="text-align: right; padding: 4px 5px; border-right: 1px solid #111; border-bottom: 1px solid #111;">
+                <div>${taxHalf.toFixed(2)}</div>
+                <div style="font-size: 8px; color: #555;">${itemSgstRate.toFixed(2)}%</div>
+              </td>
+              <td style="text-align: right; padding: 4px 5px; border-right: 1px solid #111; border-bottom: 1px solid #111;">
+                <div>${taxHalf.toFixed(2)}</div>
+                <div style="font-size: 8px; color: #555;">${itemCgstRate.toFixed(2)}%</div>
+              </td>
+              <td style="text-align: right; padding: 4px 5px; border-right: 1px solid #111; border-bottom: 1px solid #111;">0.00</td>
+              <td style="text-align: right; padding: 4px 5px; border-bottom: 1px solid #111;">0.00</td>
+            </tr>
+          `;
+        }).join("")
+      : `<tr><td colspan="12" style="text-align: center; padding: 8px; color: #666; font-style: italic; border-bottom: 1px solid #111;">No billable charges recorded on folio</td></tr>`;
 
     const paymentsHtml = allPaymentsAndCredits.length > 0
       ? allPaymentsAndCredits.map((p) => {
@@ -665,9 +754,9 @@ export function PrintableTaxInvoiceModal({
                   <div><strong>Guest Name</strong> &nbsp;&nbsp;&nbsp;&nbsp;: <span style="text-transform: uppercase; font-weight: bold;">${guestFullName}</span></div>
                   <div><strong>Bill To</strong> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: <strong>${companyName ? companyName.toUpperCase() : guestFullName}</strong></div>
                   <div><strong>Address</strong> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: <span style="text-transform: uppercase; font-size: 9px;">${addressText}</span></div>
-                  <div><strong>State</strong> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: Assam (State Code: 18)</div>
+                  <div><strong>State</strong> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: ${recipientStateText}</div>
                   <div><strong>GSTIN</strong> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: <strong>${guestGstin || "Unregistered / Consumer"}</strong></div>
-                  <div><strong>Source of Supply</strong> : Guwahati, Assam (18)</div>
+                  <div><strong>Source of Supply</strong> : ${sourceOfSupplyText}</div>
                 </td>
                 <td style="width: 50%;">
                   <div><strong>Date of Invoice</strong> &nbsp;&nbsp;&nbsp;&nbsp;: ${invoiceDateStr}</div>
@@ -802,8 +891,8 @@ export function PrintableTaxInvoiceModal({
               <tr>
                 <td style="width: 42%; vertical-align: top; padding-right: 8px;">
                   <div><strong>This Folio is in:</strong> Rs (INR)</div>
-                  <div style="margin-top: 1px;"><strong>Reception (C/I):</strong> ${receptionistName}</div>
-                  <div style="margin-top: 1px;"><strong>Cashier (C/O):</strong> ${cashierName}</div>
+                  <div style="margin-top: 1px;"><strong>Reception (C/I):</strong> ${effectiveReceptionist}</div>
+                  <div style="margin-top: 1px;"><strong>Cashier (C/O):</strong> ${effectiveCashier}</div>
                   <div style="margin-top: 1px;"><strong>Date & Time:</strong> ${new Date().toLocaleDateString("en-GB")} ${new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}</div>
                   <div style="margin-top: 24px; border-top: 1px solid #000; padding-top: 2px; text-align: center; font-weight: bold; width: 140px;">
                     ( Guest Signature )
@@ -811,7 +900,7 @@ export function PrintableTaxInvoiceModal({
                 </td>
                 <td style="width: 58%; vertical-align: top; border-left: 1px solid #ccc; padding-left: 8px; font-size: 8px; color: #333; line-height: 1.25;">
                   <div><strong>NOTICE TO GUESTS:</strong> This property is privately owned and management reserves the right to refuse service to anyone. Management will not be responsible for accidents or injury to guests or for loss of money, jewellery, or valuables of any kind.</div>
-                  <div style="margin-top: 2px;"><strong>CHECKOUT TIME: 11:00 AM &bull; SELF REGISTRATION ONLY</strong></div>
+                  <div style="margin-top: 2px;"><strong>CHECKOUT TIME: ${(property as any).checkoutTime || "11:00 AM"} &bull; SELF REGISTRATION ONLY</strong></div>
                   <div style="margin-top: 2px; opacity: 0.85;">I AGREE that my liability for this bill is not waived and agree to be held personally liable in the event that the indicated person or company failed to pay for any part or full amount of these charges.</div>
                   ${hasRoomTransfer ? `<div style="margin-top: 3px; font-weight: bold; color: #111;">&bull; ROOM TRANSFER NOTE: Stay transferred from Room ${originRoomStr} to Room ${displayRoomNo}. Previous room charges, advance payments, and folio balance consolidated under this invoice.</div>` : ""}
                 </td>
@@ -973,7 +1062,7 @@ export function PrintableTaxInvoiceModal({
 
               <div className="flex">
                 <span className="w-28 font-bold text-zinc-800 shrink-0">State</span>
-                <span>: Assam (State Code: 18)</span>
+                <span>: {recipientStateText}</span>
               </div>
 
               <div className="flex">
@@ -983,7 +1072,7 @@ export function PrintableTaxInvoiceModal({
 
               <div className="flex">
                 <span className="w-28 font-bold text-zinc-800 shrink-0">Source of Supply</span>
-                <span>: Guwahati, Assam (18)</span>
+                <span>: {sourceOfSupplyText}</span>
               </div>
             </div>
 
@@ -1075,6 +1164,8 @@ export function PrintableTaxInvoiceModal({
                     (item as any).unitAmount ??
                     (item.qty && taxable ? taxable / item.qty : (total ? total / (item.qty || 1) : 0))
                   );
+                  const itemCgstRate = item.cgstRate !== undefined ? item.cgstRate : (taxable > 0 ? (taxHalf / taxable) * 100 : 2.5);
+                  const itemSgstRate = item.sgstRate !== undefined ? item.sgstRate : (taxable > 0 ? (taxHalf / taxable) * 100 : 2.5);
 
                   return (
                     <tr key={idx} className="divide-x divide-zinc-300 hover:bg-zinc-50/50">
@@ -1088,17 +1179,25 @@ export function PrintableTaxInvoiceModal({
                       <td className="p-1.5 text-right font-bold tabular-nums">{taxable.toFixed(2)}</td>
                       <td className="p-1.5 text-right tabular-nums">
                         <div>{taxHalf.toFixed(2)}</div>
-                        <div className="text-[8.5px] text-zinc-500">2.50%</div>
+                        <div className="text-[8.5px] text-zinc-500">{itemSgstRate.toFixed(2)}%</div>
                       </td>
                       <td className="p-1.5 text-right tabular-nums">
                         <div>{taxHalf.toFixed(2)}</div>
-                        <div className="text-[8.5px] text-zinc-500">2.50%</div>
+                        <div className="text-[8.5px] text-zinc-500">{itemCgstRate.toFixed(2)}%</div>
                       </td>
                       <td className="p-1.5 text-right tabular-nums">0.00</td>
                       <td className="p-1.5 text-right tabular-nums">0.00</td>
                     </tr>
                   );
                 })}
+
+                {lines.length === 0 && (
+                  <tr>
+                    <td colSpan={12} className="p-3 text-center text-zinc-500 italic">
+                      No billable charges recorded on folio
+                    </td>
+                  </tr>
+                )}
 
                 {/* Total Summary Row */}
                 <tr className="bg-zinc-100 border-t-2 border-zinc-900 font-bold divide-x divide-zinc-400">
@@ -1289,10 +1388,10 @@ export function PrintableTaxInvoiceModal({
                 <strong>This Folio is in:</strong> Rs (INR)
               </div>
               <div>
-                <strong>Reception (C/I):</strong> {receptionistName}
+                <strong>Reception (C/I):</strong> {effectiveReceptionist}
               </div>
               <div>
-                <strong>Cashier (C/O):</strong> {cashierName}
+                <strong>Cashier (C/O):</strong> {effectiveCashier}
               </div>
               <div>
                 <strong>Date & Time:</strong> {new Date().toLocaleDateString("en-GB")} {new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
@@ -1310,7 +1409,7 @@ export function PrintableTaxInvoiceModal({
                 <strong>NOTICE TO GUESTS:</strong> This property is privately owned and management reserves the right to refuse service to anyone. Management will not be responsible for accidents or injury to guests or for loss of money, jewellery, or valuables of any kind.
               </div>
               <div>
-                <strong>CHECKOUT TIME: 11:00 AM • SELF REGISTRATION ONLY</strong>
+                <strong>CHECKOUT TIME: {(property as any).checkoutTime || "11:00 AM"} • SELF REGISTRATION ONLY</strong>
               </div>
               <div className="text-[8px] opacity-80 leading-snug">
                 I AGREE that my liability for this bill is not waived and agree to be held personally liable in the event that the indicated person or company failed to pay for any part or full amount of these charges.

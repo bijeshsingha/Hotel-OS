@@ -186,7 +186,7 @@ function BillingContent() {
   const initialStayId = searchParams.get("stayId") || "";
   const initialAction = searchParams.get("action") || "";
 
-  const { activeProperty, refreshKey, refreshData } = useHotel();
+  const { activeProperty, user, refreshKey, refreshData } = useHotel();
   const [stays, setStays] = useState<any[]>([]);
   const [selectedStayId, setSelectedStayId] = useState<string>(initialStayId);
   const [selectedRoomNumber, setSelectedRoomNumber] = useState<string>("");
@@ -2286,8 +2286,8 @@ function BillingContent() {
           invoiceData={selectedInvoice}
           ledgerEntries={modeFilteredEntries}
           payments={payments}
-          cashierName="Front Desk Cashier"
-          receptionistName="Gobin Tamang"
+          cashierName={user?.name || "Front Desk Cashier"}
+          receptionistName={(activeStay?.guestRegistration as any)?.processedByUser?.name || user?.name || "Front Desk Reception"}
         />
       )}
     </>

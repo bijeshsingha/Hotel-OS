@@ -724,7 +724,7 @@ export function generateComprehensiveHotelReportEmailHtml(data: {
 
     <!-- FOOTER -->
     <div style="background-color: #f8fafc; padding: 18px 24px; border-top: 1px solid #e2e8f0; font-size: 11px; color: #64748b; text-align: center; line-height: 1.5;">
-      <div><strong>${property.displayName}</strong> &bull; ${property.address || "MD Shah Road, Paltan Bazar, Guwahati"}</div>
+      <div><strong>${property.displayName}</strong>${property.address ? ` &bull; ${property.address}` : ""}</div>
       <div style="margin-top: 4px;">Hotel OS Automated Intelligence Audit &bull; Generated ${report.generatedAt}</div>
     </div>
   </div>

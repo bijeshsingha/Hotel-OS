@@ -104,23 +104,21 @@ export function ComprehensiveHotelReportView({
             </div>
             <p className="text-xs text-zinc-500 flex items-center gap-2 mt-0.5">
               <span>GSTIN: <span className="font-mono font-semibold">{property.gstin || "N/A"}</span></span>
-              <span>&bull;</span>
-              <span>Selected in <code className="px-1 py-0.5 bg-zinc-100 dark:bg-zinc-800 rounded text-[11px]">.env</code></span>
             </p>
           </div>
         </div>
 
         {/* Action Controls */}
-        <div className="flex flex-wrap items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2">
           {/* Business Date Picker */}
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 text-xs">
-            <Calendar className="h-4 w-4 text-zinc-400" />
+          <div className="flex items-center gap-1.5 h-8.5 px-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 text-xs">
+            <Calendar className="h-3.5 w-3.5 text-zinc-400" />
             <span className="text-zinc-500 font-medium">Date:</span>
             <input
               type="date"
               value={selectedDate || report.reportDate}
               onChange={(e) => onDateChange(e.target.value)}
-              className="bg-transparent font-mono font-bold text-zinc-900 dark:text-white focus:outline-none cursor-pointer"
+              className="bg-transparent font-mono font-semibold text-zinc-900 dark:text-white focus:outline-none cursor-pointer"
             />
           </div>
 
@@ -128,28 +126,28 @@ export function ComprehensiveHotelReportView({
             type="button"
             onClick={onRefresh}
             disabled={loading}
-            className="h-9 px-3 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700/60 text-xs font-semibold text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5 transition cursor-pointer disabled:opacity-50"
+            className="h-8.5 px-2.5 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700/60 text-xs font-medium text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5 transition cursor-pointer disabled:opacity-50 select-none"
           >
-            <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin text-blue-600" : ""}`} />
+            <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin text-zinc-900 dark:text-zinc-100" : "text-zinc-500"}`} />
             <span className="hidden sm:inline">Refresh</span>
           </button>
 
           <button
             type="button"
             onClick={() => setShowEmailModal(true)}
-            className="h-9 px-3.5 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700/60 text-xs font-bold text-zinc-800 dark:text-zinc-200 flex items-center gap-1.5 transition cursor-pointer shadow-xs"
+            className="h-8.5 px-3 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700/60 text-xs font-medium text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5 transition cursor-pointer select-none"
           >
-            <Mail className="h-3.5 w-3.5 text-blue-500" />
-            <span>Email Report</span>
+            <Mail className="h-3.5 w-3.5 text-zinc-500" />
+            <span>Email</span>
           </button>
 
           <button
             type="button"
             onClick={() => setShowPrintModal(true)}
-            className="h-9 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold flex items-center gap-2 transition cursor-pointer shadow-sm active:scale-98"
+            className="h-8.5 px-3 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-zinc-100 dark:hover:bg-white dark:text-zinc-900 text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer shadow-2xs select-none"
           >
             <Printer className="h-3.5 w-3.5" />
-            <span>Print / PDF Sheet</span>
+            <span>Print Sheet</span>
           </button>
         </div>
       </div>

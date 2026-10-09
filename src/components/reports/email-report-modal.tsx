@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Mail, Send, X, CheckCircle2, AlertCircle, RefreshCw, Calendar, FileText, Shield } from "lucide-react";
 import { useHotel } from "@/lib/context/hotel-context";
 
@@ -19,12 +19,18 @@ export function EmailReportModal({
   defaultReportType = "COMPREHENSIVE_AUDIT",
   targetDate,
 }: EmailReportModalProps) {
-  const { activeProperty } = useHotel();
+  const { activeProperty, user } = useHotel();
   const [reportType, setReportType] = useState<ReportEmailType>(defaultReportType);
-  const [recipientEmail, setRecipientEmail] = useState("singhabijesh7@gmail.com");
+  const [recipientEmail, setRecipientEmail] = useState(activeProperty?.email || user?.email || "");
   const [memo, setMemo] = useState("");
   const [sending, setSending] = useState(false);
   const [statusMsg, setStatusMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  useEffect(() => {
+    if (!recipientEmail && (activeProperty?.email || user?.email)) {
+      setRecipientEmail(activeProperty?.email || user?.email || "");
+    }
+  }, [activeProperty?.email, user?.email]);
 
   if (!isOpen) return null;
 
@@ -44,7 +50,7 @@ export function EmailReportModal({
           recipientEmail: recipientEmail.trim(),
           date: targetDate || activeProperty.businessDate,
           memo: memo.trim() || undefined,
-          actorName: "Master Administrator",
+          actorName: user?.name || "Hotel Management",
         }),
       });
 
@@ -175,7 +181,7 @@ export function EmailReportModal({
               required
               value={recipientEmail}
               onChange={(e) => setRecipientEmail(e.target.value)}
-              placeholder="singhabijesh7@gmail.com"
+              placeholder={activeProperty?.email || user?.email || "management@hotel.com"}
               className="w-full h-11 px-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700 text-xs font-medium text-zinc-900 dark:text-white focus:border-blue-600 focus:outline-none transition"
             />
           </div>

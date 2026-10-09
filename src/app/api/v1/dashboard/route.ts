@@ -232,7 +232,7 @@ export async function GET(request: Request) {
         id: p.id,
         name: p.displayName,
         code: p.code,
-        city: p.stateCode === "18" ? "Guwahati, Assam" : "Shillong, Meghalaya",
+        city: p.address ? p.address.split(",").slice(-2).join(", ").trim() : (p.stateCode ? `State Code ${p.stateCode}` : "Hotel Location"),
         totalRooms: pTotal,
         inHouseStays: pInHouse,
         occupancyPct: pOcc,

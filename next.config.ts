@@ -15,6 +15,10 @@ const nextConfig: NextConfig = {
     "192.168.*",
     "172.*",
     "10.*",
+    "ambarishbydivineview.com",
+    "*.ambarishbydivineview.com",
+    "divineview.in",
+    "*.divineview.in",
   ],
 };
 

@@ -187,3 +187,44 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: error.message }, { status: 500, headers: corsHeaders });
   }
 }
+
+// PATCH /api/v1/registrations - Update signature or details on existing GRC
+export async function PATCH(request: Request) {
+  try {
+    const body = await request.json();
+    const { id, registrationNo, signatureDataUrl } = body;
+
+    if (!id && !registrationNo) {
+      return NextResponse.json({ error: "id or registrationNo is required" }, { status: 400, headers: corsHeaders });
+    }
+
+    const reg = await prisma.guestRegistration.findFirst({
+      where: id
+        ? { id }
+        : {
+            OR: [
+              { registrationNo },
+              { registrationNo: `GRC-${registrationNo}` },
+              { registrationNo: registrationNo.replace(/^GRC-/, "") },
+            ],
+          },
+    });
+
+    if (!reg) {
+      return NextResponse.json({ error: "Guest registration not found" }, { status: 404, headers: corsHeaders });
+    }
+
+    const updated = await prisma.guestRegistration.update({
+      where: { id: reg.id },
+      data: {
+        ...(signatureDataUrl !== undefined ? { signatureDataUrl } : {}),
+      },
+    });
+
+    return NextResponse.json({ success: true, registration: updated }, { headers: corsHeaders });
+  } catch (error: any) {
+    console.error("Update registration error:", error);
+    return NextResponse.json({ error: error.message }, { status: 500, headers: corsHeaders });
+  }
+}
+

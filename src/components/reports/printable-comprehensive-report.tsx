@@ -92,7 +92,7 @@ export function PrintableComprehensiveReport({
                 </h1>
                 <div className="text-xs text-zinc-600 dark:text-zinc-400 print:text-zinc-700 mt-1 space-y-0.5">
                   <div>Legal Entity: <span className="font-semibold text-zinc-900 dark:text-zinc-200 print:text-black">{property.legalName}</span></div>
-                  <div>Address: {property.address || "Paltan Bazar, Guwahati, Assam - 781008"}</div>
+                  {property.address && <div>Address: {property.address}</div>}
                   <div>GSTIN: <span className="font-mono font-bold text-zinc-900 dark:text-zinc-200 print:text-black">{property.gstin || "N/A"}</span> &bull; Phone: {property.phone || "N/A"}</div>
                 </div>
               </div>

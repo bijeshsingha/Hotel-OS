@@ -412,11 +412,11 @@ export function DigitalCheckInReviewModal({
                   <div className="space-y-1.5">
                     <span className="text-zinc-600 dark:text-zinc-400 text-[11px] font-bold block">Guest E-Signature</span>
                     {registration.signatureDataUrl ? (
-                      <div className="rounded-xl overflow-hidden border border-zinc-300 dark:border-zinc-700 bg-white p-2.5 aspect-video flex items-center justify-center shadow-inner">
+                      <div className="rounded-xl overflow-hidden border border-zinc-200 dark:border-zinc-700 bg-white p-2.5 aspect-video flex items-center justify-center shadow-xs">
                         <img
                           src={registration.signatureDataUrl}
-                          alt="Signature"
-                          className="max-h-full max-w-full object-contain filter invert"
+                          alt="Guest E-Signature"
+                          className="max-h-full max-w-full object-contain"
                         />
                       </div>
                     ) : (

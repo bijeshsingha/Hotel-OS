@@ -14,6 +14,7 @@ import { MoveRoomModal } from "@/components/pms/frontdesk/move-room-modal";
 import { AddRoomModal } from "@/components/pms/frontdesk/add-room-modal";
 
 import { PrintableGrcModal } from "@/components/pms/printable-grc";
+import { formatRegistrationToGrcData } from "@/lib/domain/grc-utils";
 import { GrcIntakeModal } from "@/components/pms/grc-intake-modal";
 import { DigitalCheckInReviewModal } from "@/components/pms/digital-checkin-review-modal";
 import { NewReservationModal } from "@/components/pms/new-reservation-modal";
@@ -24,10 +25,12 @@ function PMSFrontDeskContent() {
   const pms = usePmsOperations();
   const [showCompanyDirectoryModal, setShowCompanyDirectoryModal] = useState(false);
   const [quickCheckInRoom, setQuickCheckInRoom] = useState<any | null>(null);
+  const [showPrintableGrcModal, setShowPrintableGrcModal] = useState(false);
 
   const handleStartQuickCheckIn = (room: any) => {
     pms.setSelectedRoomForInspect(null);
     setQuickCheckInRoom(room);
+    pms.setResForCheckIn(null);
     pms.setShowGrcModal(true);
   };
 
@@ -136,7 +139,7 @@ function PMSFrontDeskContent() {
           }}
           onPrintGrc={(reg) => {
             pms.setSelectedRegForPrint(reg);
-            pms.setShowGrcModal(true);
+            setShowPrintableGrcModal(true);
           }}
         />
       )}
@@ -147,12 +150,13 @@ function PMSFrontDeskContent() {
           onCheckIn={(res) => {
             pms.setResForCheckIn(res);
             pms.setCheckInRoomId(res.rooms?.[0]?.assignedRoomId || "");
-            pms.setShowCheckInModal(true);
+            pms.setShowGrcModal(true);
           }}
           onViewVoucher={(res) => {
             pms.setSelectedResForVoucher(res);
             pms.setShowVoucherModal(true);
           }}
+          onNewBooking={() => pms.setShowNewResModal(true)}
         />
       )}
 
@@ -169,7 +173,7 @@ function PMSFrontDeskContent() {
           onToggleHK={pms.handleQuickHKToggle}
           onPrintGrc={(reg) => {
             pms.setSelectedRegForPrint(reg);
-            pms.setShowGrcModal(true);
+            setShowPrintableGrcModal(true);
           }}
           onQuickCheckIn={handleStartQuickCheckIn}
         />
@@ -210,6 +214,7 @@ function PMSFrontDeskContent() {
           rooms={pms.rooms}
           activeProperty={pms.activeProperty}
           onSuccess={() => {
+            pms.setShowNewResModal(false);
             pms.loadData(true);
             pms.refreshData();
           }}
@@ -223,17 +228,44 @@ function PMSFrontDeskContent() {
             pms.setShowGrcModal(false);
             setQuickCheckInRoom(null);
             pms.setSelectedRegForPrint(null);
+            pms.setResForCheckIn(null);
           }}
           rooms={pms.rooms}
           activeProperty={pms.activeProperty}
-          initialRoomId={quickCheckInRoom?.id}
-          initialReservation={pms.selectedRegForPrint}
+          initialRoomId={quickCheckInRoom?.id || pms.checkInRoomId}
+          initialReservation={pms.resForCheckIn}
           onSuccess={() => {
             pms.setShowGrcModal(false);
             setQuickCheckInRoom(null);
             pms.setSelectedRegForPrint(null);
+            pms.setResForCheckIn(null);
             pms.loadData(true);
             pms.refreshData();
+          }}
+        />
+      )}
+
+      {showPrintableGrcModal && pms.selectedRegForPrint && (
+        <PrintableGrcModal
+          isOpen={showPrintableGrcModal}
+          onClose={() => {
+            setShowPrintableGrcModal(false);
+            pms.setSelectedRegForPrint(null);
+          }}
+          data={formatRegistrationToGrcData(pms.selectedRegForPrint)}
+          property={pms.activeProperty || {}}
+          onSignatureSaved={(newSigUrl) => {
+            pms.setRegistrations((prev: any[]) =>
+              prev.map((r: any) =>
+                r.id === pms.selectedRegForPrint?.id ||
+                r.registrationNo === pms.selectedRegForPrint?.registrationNo
+                  ? { ...r, signatureDataUrl: newSigUrl }
+                  : r
+              )
+            );
+            pms.setSelectedRegForPrint((prev: any) =>
+              prev ? { ...prev, signatureDataUrl: newSigUrl } : null
+            );
           }}
         />
       )}
@@ -263,6 +295,12 @@ function PMSFrontDeskContent() {
           }}
           reservation={pms.selectedResForVoucher}
           activeProperty={pms.activeProperty}
+          onCheckInNow={(res) => {
+            pms.setShowVoucherModal(false);
+            pms.setResForCheckIn(res);
+            pms.setCheckInRoomId(res.rooms?.[0]?.assignedRoomId || "");
+            pms.setShowGrcModal(true);
+          }}
         />
       )}
 

@@ -41,6 +41,18 @@ export function NewReservationModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Close on Escape key
+  React.useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, onClose]);
+
+  if (!isOpen) return null;
+
   // Extract unique room categories
   const roomCategories = useMemo(() => {
     const map = new Map<string, any>();
@@ -212,6 +224,7 @@ export function NewReservationModal({
       if (!res.ok) throw new Error(data.error || "Failed to create reservation");
 
       onSuccess(data?.reservation || data);
+      onClose();
     } catch (err: any) {
       setError(err.message || "Failed to book reservation.");
     } finally {
@@ -220,8 +233,13 @@ export function NewReservationModal({
   };
 
   return (
-    <div className="w-full space-y-4 animate-in fade-in duration-150">
-      <div className="rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200/80 dark:border-zinc-800/80 shadow-xs overflow-hidden">
+    <div
+      className="fixed inset-0 z-50 overflow-y-auto bg-black/80 backdrop-blur-sm flex justify-center items-start p-2 sm:p-4 md:py-6 animate-in fade-in"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div className="relative w-full max-w-5xl rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200/80 dark:border-zinc-800/80 shadow-2xl overflow-hidden my-auto sm:my-2">
         
         {/* Top Header */}
         <div className="p-4 sm:p-5 border-b border-zinc-200 dark:border-zinc-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-zinc-50/70 dark:bg-zinc-900/40">

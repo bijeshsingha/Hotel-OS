@@ -22,7 +22,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [toggleSidebar]);
 
+  const isCheckinSubdomain = typeof window !== "undefined" && window.location.hostname.toLowerCase().includes("checkin");
+
   const isKioskOrGuestPage =
+    isCheckinSubdomain ||
     pathname.startsWith("/login") ||
     pathname.startsWith("/checkin") ||
     pathname.startsWith("/order") ||

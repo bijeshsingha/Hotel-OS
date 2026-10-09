@@ -143,11 +143,19 @@ export async function GET(request: Request) {
 
     const envSelectedId = process.env.SELECTED_HOTEL_ID || process.env.NEXT_PUBLIC_DEFAULT_PROPERTY_ID;
     const envSelectedCode = (process.env.SELECTED_HOTEL_CODE || process.env.NEXT_PUBLIC_DEFAULT_PROPERTY_CODE || "").toLowerCase();
+    const hostHeader = (request.headers.get("host") || request.headers.get("x-forwarded-host") || "").toLowerCase();
+
+    const hostDetectedProperty = hostHeader.includes("ambarish")
+      ? availableProperties.find((p) => p.code === "GUW-01" || p.displayName.toLowerCase().includes("ambarish"))
+      : hostHeader.includes("divine") && !hostHeader.includes("ambarish")
+      ? availableProperties.find((p) => p.code.startsWith("HDV") || p.displayName.toLowerCase().includes("divine"))
+      : null;
 
     const activeProperty =
       (requestedPropertyId ? availableProperties.find((p) => p.id === requestedPropertyId) : null) ||
       (envSelectedId ? availableProperties.find((p) => p.id === envSelectedId) : null) ||
       (envSelectedCode ? availableProperties.find((p) => p.code.toLowerCase() === envSelectedCode) : null) ||
+      hostDetectedProperty ||
       availableProperties[0] ||
       null;
 

@@ -1163,7 +1163,11 @@ export async function GET(request: Request) {
 
         const invoices = folio?.windows?.flatMap((w) => w.invoices || []) || [];
         const primaryInvoice = invoices[0] || null;
-        const invoiceNo = primaryInvoice?.invoiceNo || `INV-2627-${stay.id.slice(-4).toUpperCase()}`;
+        const stayDate = stay.arrivalAt || new Date();
+        const sYear = new Date(stayDate).getFullYear();
+        const sMonth = new Date(stayDate).getMonth();
+        const sFy = `${String(sMonth >= 3 ? sYear : sYear - 1).slice(-2)}${String((sMonth >= 3 ? sYear : sYear - 1) + 1).slice(-2)}`;
+        const invoiceNo = primaryInvoice?.invoiceNo || `INV-${sFy}-${stay.id.slice(-4).toUpperCase()}`;
 
         const balance = Math.round((folio?.balance ?? (grossTotal - totalPaid)) * 100) / 100;
         const isOutstanding = balance > 0.5;

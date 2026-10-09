@@ -17,7 +17,7 @@ export async function POST(request: Request) {
     const {
       propertyId: requestedPropId,
       reportType = "COMPREHENSIVE_AUDIT",
-      recipientEmail = process.env.REPORT_RECIPIENT_EMAIL || "singhabijesh7@gmail.com",
+      recipientEmail: rawRecipientEmail,
       date,
       memo,
       actorName = "Hotel Management",
@@ -29,6 +29,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Property not found. Please check SELECTED_HOTEL_ID in .env" }, { status: 404 });
     }
     const propertyId = targetProperty.id;
+
+    const recipientEmail = (rawRecipientEmail?.trim()) || process.env.REPORT_RECIPIENT_EMAIL || targetProperty.email || "";
 
     if (!recipientEmail || !recipientEmail.includes("@")) {
       return NextResponse.json({ error: "A valid recipientEmail is required" }, { status: 400 });

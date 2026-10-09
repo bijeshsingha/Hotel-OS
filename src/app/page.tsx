@@ -33,6 +33,23 @@ export default function DashboardPage() {
   const { activeProperty, isInitialized, data, loading } = useDashboardMetrics();
   const [showEmailModal, setShowEmailModal] = useState(false);
 
+  React.useEffect(() => {
+    if (typeof window !== "undefined" && window.location.hostname.toLowerCase().includes("checkin")) {
+      window.location.replace("/checkin");
+    }
+  }, []);
+
+  if (typeof window !== "undefined" && window.location.hostname.toLowerCase().includes("checkin")) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-50 dark:bg-zinc-950">
+        <div className="flex items-center space-x-3 text-slate-600 dark:text-zinc-300">
+          <RefreshCw className="h-5 w-5 animate-spin text-blue-600" />
+          <span className="text-sm font-medium">Opening Hotel Check-In Portal...</span>
+        </div>
+      </div>
+    );
+  }
+
   if (isInitialized === false) {
     return (
       <div className="flex min-h-[400px] flex-col items-center justify-center p-6 text-center">

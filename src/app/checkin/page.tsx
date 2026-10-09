@@ -45,6 +45,8 @@ function CheckInKioskInner() {
     "";
 
   const [selectedProperty, setSelectedProperty] = useState<PropertySummary | null>(null);
+  const [availableHotels, setAvailableHotels] = useState<PropertySummary[]>([]);
+  const [isDomainDedicated, setIsDomainDedicated] = useState<boolean>(false);
   const [propertyRooms, setPropertyRooms] = useState<RoomOption[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -232,15 +234,46 @@ function CheckInKioskInner() {
         setLoading(true);
         const res = await fetch("/api/v1/auth/session");
         const data = await res.json();
-        const props: PropertySummary[] = data.availableProperties || data.allProperties || [];
+        const props: PropertySummary[] = data.allProperties || data.availableProperties || [];
+        setAvailableHotels(props);
 
-        // Match requested propertyId from QR link, otherwise default
-        let target = props.find((p) => p.id === queryPropertyId);
-        if (!target && queryPropertyId) {
-          target = props.find((p) => p.code.toLowerCase() === queryPropertyId.toLowerCase());
+        const hostname = typeof window !== "undefined" ? window.location.hostname.toLowerCase() : "";
+        const envPropCode = (process.env.NEXT_PUBLIC_DEFAULT_PROPERTY_CODE || process.env.NEXT_PUBLIC_PROPERTY_CODE || "").toLowerCase();
+
+        // 1. Explicit Query Param (?property=... or ?code=...)
+        let target: PropertySummary | null = null;
+        if (queryPropertyId) {
+          const q = queryPropertyId.toLowerCase().trim();
+          target = props.find(
+            (p) =>
+              p.id.toLowerCase() === q ||
+              p.code.toLowerCase() === q ||
+              p.displayName.toLowerCase().includes(q) ||
+              (q.includes("divine") && p.displayName.toLowerCase().includes("divine")) ||
+              (q.includes("ambarish") && p.displayName.toLowerCase().includes("ambarish"))
+          ) || null;
         }
+
+        // 2. Hostname / Domain detection (e.g. ambarishbydivineview.com -> Hotel Ambarish)
+        if (!target && hostname) {
+          if (hostname.includes("ambarish")) {
+            target = props.find((p) => p.code === "GUW-01" || p.displayName.toLowerCase().includes("ambarish")) || null;
+            setIsDomainDedicated(true);
+          } else if (hostname.includes("divine") && !hostname.includes("ambarish")) {
+            target = props.find((p) => p.code.startsWith("HDV") || p.displayName.toLowerCase().includes("divine")) || null;
+            setIsDomainDedicated(true);
+          }
+        }
+
+        // 3. Environment Variable Fallback
+        if (!target && envPropCode) {
+          target = props.find((p) => p.code.toLowerCase() === envPropCode || p.id.toLowerCase() === envPropCode) || null;
+          if (target) setIsDomainDedicated(true);
+        }
+
+        // 4. Default fallback
         if (!target) {
-          target = props.find((p) => p.code === "GUW-01") || props[0] || null;
+          target = props.find((p) => p.code === "HDV-01") || props.find((p) => p.code === "GUW-01") || props[0] || null;
         }
         setSelectedProperty(target);
 
@@ -275,26 +308,118 @@ function CheckInKioskInner() {
     loadProperty();
   }, [queryPropertyId]);
 
-  // Sync Canvas Resolution to exact rendered size
-  const syncCanvasResolution = useCallback(() => {
+  // Handle manual hotel switch between Hotel Divine View & Hotel Ambarish
+  const handleSelectHotel = async (hotel: PropertySummary) => {
+    setSelectedProperty(hotel);
+    setFormData((prev) => ({ ...prev, preAssignedRoom: "" }));
+    try {
+      const roomsRes = await fetch(`/api/v1/rooms?propertyId=${hotel.id}`);
+      if (roomsRes.ok) {
+        const roomsData = await roomsRes.json();
+        if (Array.isArray(roomsData)) {
+          const vacantRooms = roomsData.filter(
+            (r: any) =>
+              (!r.assignments || r.assignments.length === 0) &&
+              r.roomState?.occupancyStatus !== "OCCUPIED"
+          );
+          setPropertyRooms(
+            vacantRooms.map((r: any) => ({
+              id: r.id,
+              number: r.number,
+              floor: r.floor,
+              roomTypeName: r.roomType?.name || "Room",
+            }))
+          );
+        }
+      }
+    } catch (err) {
+      console.error("Failed to load rooms for hotel:", err);
+    }
+  };
+
+  // HD Signature Canvas state & Stroke Memory
+  const strokesRef = useRef<Array<Array<{ x: number; y: number }>>>([]);
+  const currentStrokeRef = useRef<Array<{ x: number; y: number }>>([]);
+
+  // Redraw all strokes in ultra-sharp HD resolution using Quadratic Bézier curves
+  const redrawCanvas = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
     const rect = canvas.getBoundingClientRect();
-    if (rect.width > 0 && rect.height > 0) {
-      if (canvas.width !== rect.width || canvas.height !== rect.height) {
-        canvas.width = rect.width;
-        canvas.height = rect.height;
+    if (rect.width === 0 || rect.height === 0) return;
+
+    // HD DPR multiplier: minimum 2.5x to 3x for razor-sharp retina lines
+    const dpr = Math.max(window.devicePixelRatio || 1, 2.5);
+    const targetWidth = Math.round(rect.width * dpr);
+    const targetHeight = Math.round(rect.height * dpr);
+
+    if (canvas.width !== targetWidth || canvas.height !== targetHeight) {
+      canvas.width = targetWidth;
+      canvas.height = targetHeight;
+    }
+
+    // Reset transform, clear buffer, and scale context to DPR
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    // Master pen styling
+    ctx.strokeStyle = "#09090b";
+    ctx.lineWidth = 2.6;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.imageSmoothingEnabled = true;
+
+    // Replay saved strokes with curve interpolation
+    for (const stroke of strokesRef.current) {
+      if (stroke.length === 0) continue;
+      if (stroke.length === 1) {
+        ctx.beginPath();
+        ctx.arc(stroke[0].x, stroke[0].y, 1.3, 0, Math.PI * 2);
+        ctx.fillStyle = "#09090b";
+        ctx.fill();
+        continue;
       }
+
+      ctx.beginPath();
+      ctx.moveTo(stroke[0].x, stroke[0].y);
+
+      for (let i = 1; i < stroke.length - 1; i++) {
+        const midX = (stroke[i].x + stroke[i + 1].x) / 2;
+        const midY = (stroke[i].y + stroke[i + 1].y) / 2;
+        ctx.quadraticCurveTo(stroke[i].x, stroke[i].y, midX, midY);
+      }
+      const last = stroke[stroke.length - 1];
+      ctx.lineTo(last.x, last.y);
+      ctx.stroke();
     }
   }, []);
 
+  // Sync canvas size on mount, window resize, and layout changes
   useEffect(() => {
-    syncCanvasResolution();
-    window.addEventListener("resize", syncCanvasResolution);
-    return () => window.removeEventListener("resize", syncCanvasResolution);
-  }, [syncCanvasResolution]);
+    redrawCanvas();
+    const handleResize = () => redrawCanvas();
+    window.addEventListener("resize", handleResize);
 
-  // Exact Coordinate Calculation
+    const canvas = canvasRef.current;
+    let observer: ResizeObserver | null = null;
+    if (canvas && typeof ResizeObserver !== "undefined") {
+      observer = new ResizeObserver(() => redrawCanvas());
+      observer.observe(canvas);
+    }
+
+    return () => {
+      window.removeEventListener("resize", handleResize);
+      if (observer && canvas) {
+        observer.unobserve(canvas);
+      }
+    };
+  }, [redrawCanvas]);
+
+  // Exact relative coordinate calculation in CSS pixels
   const getCanvasPoint = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
     if (!canvas) return null;
@@ -302,12 +427,9 @@ function CheckInKioskInner() {
     const clientX = "touches" in e ? e.touches[0].clientX : e.clientX;
     const clientY = "touches" in e ? e.touches[0].clientY : e.clientY;
 
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
-
     return {
-      x: (clientX - rect.left) * scaleX,
-      y: (clientY - rect.top) * scaleY,
+      x: clientX - rect.left,
+      y: clientY - rect.top,
     };
   };
 
@@ -326,8 +448,17 @@ function CheckInKioskInner() {
     setIsDrawing(true);
     setHasSignature(true);
 
+    const newStroke = [pt];
+    currentStrokeRef.current = newStroke;
+    strokesRef.current.push(newStroke);
+
+    // Draw initial dot
+    const dpr = Math.max(window.devicePixelRatio || 1, 2.5);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.fillStyle = "#09090b";
     ctx.beginPath();
-    ctx.moveTo(pt.x, pt.y);
+    ctx.arc(pt.x, pt.y, 1.3, 0, Math.PI * 2);
+    ctx.fill();
   };
 
   const draw = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
@@ -343,16 +474,41 @@ function CheckInKioskInner() {
     const pt = getCanvasPoint(e);
     if (!pt) return;
 
-    ctx.lineWidth = 3;
+    const stroke = currentStrokeRef.current;
+    stroke.push(pt);
+
+    const dpr = Math.max(window.devicePixelRatio || 1, 2.5);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.strokeStyle = "#09090b";
+    ctx.lineWidth = 2.6;
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
-    ctx.strokeStyle = "#0f172a";
-    ctx.lineTo(pt.x, pt.y);
-    ctx.stroke();
+    ctx.imageSmoothingEnabled = true;
+
+    if (stroke.length >= 3) {
+      const p1 = stroke[stroke.length - 2];
+      const p2 = stroke[stroke.length - 1];
+      const p0 = stroke[stroke.length - 3];
+      const prevMidX = (p0.x + p1.x) / 2;
+      const prevMidY = (p0.y + p1.y) / 2;
+      const midX = (p1.x + p2.x) / 2;
+      const midY = (p1.y + p2.y) / 2;
+
+      ctx.beginPath();
+      ctx.moveTo(prevMidX, prevMidY);
+      ctx.quadraticCurveTo(p1.x, p1.y, midX, midY);
+      ctx.stroke();
+    } else if (stroke.length === 2) {
+      ctx.beginPath();
+      ctx.moveTo(stroke[0].x, stroke[0].y);
+      ctx.lineTo(stroke[1].x, stroke[1].y);
+      ctx.stroke();
+    }
   };
 
   const stopDrawing = () => {
     setIsDrawing(false);
+    currentStrokeRef.current = [];
   };
 
   const clearSignature = () => {
@@ -360,8 +516,38 @@ function CheckInKioskInner() {
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
+
+    strokesRef.current = [];
+    currentStrokeRef.current = [];
+
+    const dpr = Math.max(window.devicePixelRatio || 1, 2.5);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     setHasSignature(false);
+  };
+
+  // High-Resolution crisp PNG export with clean white background
+  const getHdSignatureDataUrl = (): string => {
+    const canvas = canvasRef.current;
+    if (!canvas || !hasSignature) return "";
+
+    const totalPoints = strokesRef.current.reduce((acc, s) => acc + s.length, 0);
+    if (strokesRef.current.length === 0 || totalPoints < 4) {
+      return "";
+    }
+
+    const exportCanvas = document.createElement("canvas");
+    exportCanvas.width = canvas.width;
+    exportCanvas.height = canvas.height;
+    const expCtx = exportCanvas.getContext("2d");
+    if (!expCtx) return "";
+
+    // Pure white legal backing for universal document rendering
+    expCtx.fillStyle = "#ffffff";
+    expCtx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
+    expCtx.drawImage(canvas, 0, 0);
+    return exportCanvas.toDataURL("image/png");
   };
 
   // Image compression
@@ -447,7 +633,7 @@ function CheckInKioskInner() {
 
     let signatureDataUrl = "";
     if (canvasRef.current && hasSignature) {
-      signatureDataUrl = canvasRef.current.toDataURL("image/png");
+      signatureDataUrl = getHdSignatureDataUrl();
     }
 
     try {
@@ -614,6 +800,52 @@ function CheckInKioskInner() {
             </p>
           </div>
         </div>
+
+        {/* Multi-Hotel Selector (Hotel Divine View vs Hotel Ambarish Grand Residency) */}
+        {availableHotels.length > 1 && (!isDomainDedicated || searchParams.get("switch") === "true") && (
+          <div className="rounded-2xl bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 p-4 shadow-xs space-y-2.5">
+            <div className="flex items-center justify-between text-xs font-semibold">
+              <span className="uppercase tracking-wider font-bold text-zinc-500 dark:text-zinc-400">
+                Select Your Hotel Property:
+              </span>
+              <span className="text-[11px] font-mono text-zinc-400">
+                Active Code: <strong className="text-zinc-700 dark:text-zinc-300">{selectedProperty?.code || "N/A"}</strong>
+              </span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              {availableHotels.map((h) => {
+                const isSelected = selectedProperty?.id === h.id;
+                return (
+                  <button
+                    key={h.id}
+                    type="button"
+                    onClick={() => handleSelectHotel(h)}
+                    className={`p-3 rounded-xl border text-left transition flex items-center justify-between gap-3 cursor-pointer ${
+                      isSelected
+                        ? "border-blue-600 bg-blue-50/50 dark:bg-blue-950/20 text-zinc-950 dark:text-white shadow-xs ring-1 ring-blue-600"
+                        : "border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 text-zinc-600 dark:text-zinc-400 hover:border-zinc-300 dark:hover:border-zinc-700"
+                    }`}
+                  >
+                    <div className="min-w-0">
+                      <div className="font-bold text-sm truncate flex items-center gap-1.5">
+                        <span className={`h-2 w-2 rounded-full shrink-0 ${isSelected ? "bg-emerald-500" : "bg-zinc-400"}`} />
+                        <span>{h.displayName}</span>
+                      </div>
+                      <div className="text-[11px] font-mono text-zinc-500 dark:text-zinc-400 truncate mt-0.5">
+                        {h.address ? `${h.address.split(",")[0]} • ` : ""}{h.code}
+                      </div>
+                    </div>
+                    {isSelected && (
+                      <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-blue-600 text-white shrink-0">
+                        Selected
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Hotel Details Card */}
         <div className="rounded-2xl bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 p-5 sm:p-6 space-y-2 shadow-xs">
@@ -1174,7 +1406,11 @@ function CheckInKioskInner() {
               <ul className="list-disc list-inside space-y-1 font-medium text-zinc-600 dark:text-zinc-400">
                 <li>Check-out time is strictly 11:00 AM.</li>
                 <li>Physical Government ID must be presented at the front desk upon key card handover.</li>
-                <li>In-room dining is served by Ambarish Restaurant & Room Dining (Dial Ext 9).</li>
+                <li>
+                  {selectedProperty?.code?.startsWith("HDV") || selectedProperty?.displayName?.toLowerCase().includes("divine")
+                    ? "In-room dining is served by Divine View Restaurant (Dial Ext 9)."
+                    : "In-room dining is served by Ambarish Restaurant & Room Dining (Dial Ext 9)."}
+                </li>
               </ul>
             </div>
 
@@ -1191,7 +1427,7 @@ function CheckInKioskInner() {
                 </button>
               </div>
 
-              <div className="relative rounded-2xl border border-zinc-300 dark:border-zinc-500/80 bg-white overflow-hidden touch-none select-none p-1 shadow-inner">
+              <div className="relative rounded-2xl border-2 border-zinc-200 dark:border-zinc-700 bg-white overflow-hidden touch-none select-none p-1 shadow-inner focus-within:border-zinc-400 dark:focus-within:border-zinc-500 transition-colors">
                 <canvas
                   ref={canvasRef}
                   onMouseDown={startDrawing}
@@ -1205,14 +1441,14 @@ function CheckInKioskInner() {
                 />
 
                 {!hasSignature ? (
-                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-sm sm:text-base font-semibold text-zinc-400 gap-1 p-4 text-center">
+                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-sm sm:text-base font-semibold text-zinc-400 gap-1.5 p-4 text-center">
                     <span>✍️ Sign inside this box using finger, stylus, or mouse</span>
-                    <span className="text-[11px] text-zinc-400 font-normal">Official Guest Registration Card Legal Signature</span>
+                    <span className="text-[11px] text-zinc-400 font-normal">Official Guest Registration Card Legal E-Signature (HD Vector Rendering)</span>
                   </div>
                 ) : (
-                  <div className="absolute bottom-2 left-4 right-4 pointer-events-none flex justify-between text-[10px] text-zinc-400 font-mono border-t border-zinc-200 pt-0.5">
+                  <div className="absolute bottom-2 left-4 right-4 pointer-events-none flex justify-between items-center text-[10px] text-zinc-400 font-mono border-t border-zinc-200/80 pt-1">
                     <span>✕ Signed Signature</span>
-                    <span>Legal Verification</span>
+                    <span className="text-emerald-600 dark:text-emerald-500 font-semibold tracking-wide">✓ HD Crystal-Clear Captured</span>
                   </div>
                 )}
               </div>

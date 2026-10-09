@@ -60,7 +60,7 @@ import { EmailReportModal } from "@/components/reports/email-report-modal";
 import { ComprehensiveHotelReportView } from "@/components/reports/comprehensive-hotel-report-view";
 
 export default function ReportsPage() {
-  const { activeProperty, refreshKey, refreshData } = useHotel();
+  const { activeProperty, user, refreshKey, refreshData } = useHotel();
   const [reportType, setReportType] = useState<
     "COMPREHENSIVE_AUDIT" | "INHOUSE_OUTSTANDING" | "ROOM_TRANSFERS" | "FINAL_BILLS" | "EXPENSES" | "REVENUE" | "FNB"
   >("COMPREHENSIVE_AUDIT");
@@ -1185,33 +1185,43 @@ export default function ReportsPage() {
     <div className="space-y-4 max-w-[1700px] mx-auto w-full text-zinc-900 dark:text-zinc-100 pb-16">
       {/* Top Banner */}
       <PageHeader
-        title="Reports, Audits & Master Exports"
-        description="Comprehensive master registers for room transfers, settled final bills, expenses, tax ledgers & F&B collections"
+        title="Reports"
         icon={BarChart3}
-        badge="Live Dynamic Database Sync"
-        badgeVariant="info"
         businessDate={activeProperty?.businessDate}
         actions={
           <div className="flex items-center gap-2 flex-wrap">
             <button
               onClick={() => setShowEmailModal(true)}
-              className="h-9 flex items-center gap-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white px-3.5 text-xs font-semibold transition shadow-xs cursor-pointer active:scale-98"
+              className="h-8.5 flex items-center gap-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 px-3 text-xs font-medium text-zinc-700 dark:text-zinc-300 transition shadow-2xs cursor-pointer select-none"
             >
-              <Mail className="h-4 w-4" /> Email Report
+              <Mail className="h-3.5 w-3.5 text-zinc-500 dark:text-zinc-400" />
+              <span>Email</span>
             </button>
+
+            <Link
+              href="/cashier-shift"
+              className="h-8.5 flex items-center gap-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 px-3 text-xs font-medium text-zinc-700 dark:text-zinc-300 transition shadow-2xs cursor-pointer select-none"
+              title="Open Cashier Shift Ledger"
+            >
+              <Wallet className="h-3.5 w-3.5 text-zinc-500 dark:text-zinc-400" />
+              <span>Shift Ledger</span>
+            </Link>
+
             {reportType === "INHOUSE_OUTSTANDING" && (
               <>
                 <button
                   onClick={() => setShowInhousePrintModal(true)}
-                  className="h-9 flex items-center gap-1.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 border border-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 dark:border-zinc-700 px-3.5 text-xs font-semibold text-zinc-800 dark:text-zinc-200 transition shadow-xs cursor-pointer"
+                  className="h-8.5 flex items-center gap-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 px-3 text-xs font-medium text-zinc-700 dark:text-zinc-300 transition shadow-2xs cursor-pointer select-none"
                 >
-                  <Printer className="h-4 w-4 text-zinc-500 dark:text-zinc-400" /> Print Outstanding Report
+                  <Printer className="h-3.5 w-3.5 text-zinc-500 dark:text-zinc-400" />
+                  <span>Print</span>
                 </button>
                 <button
                   onClick={exportInhouseOutstandingCSV}
-                  className="h-9 flex items-center gap-1.5 rounded-xl bg-emerald-700 hover:bg-emerald-600 text-white px-4 text-xs font-semibold transition shadow-xs cursor-pointer"
+                  className="h-8.5 flex items-center gap-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 px-3 text-xs font-medium text-zinc-700 dark:text-zinc-300 transition shadow-2xs cursor-pointer select-none"
                 >
-                  <FileSpreadsheet className="h-4 w-4" /> Export In-House CSV
+                  <Download className="h-3.5 w-3.5 text-zinc-500 dark:text-zinc-400" />
+                  <span>Export CSV</span>
                 </button>
               </>
             )}
@@ -1220,15 +1230,17 @@ export default function ReportsPage() {
               <>
                 <button
                   onClick={() => setShowTransfersPrintModal(true)}
-                  className="h-9 flex items-center gap-1.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 border border-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 dark:border-zinc-700 px-3.5 text-xs font-semibold text-zinc-800 dark:text-zinc-200 transition shadow-xs cursor-pointer"
+                  className="h-8.5 flex items-center gap-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 px-3 text-xs font-medium text-zinc-700 dark:text-zinc-300 transition shadow-2xs cursor-pointer select-none"
                 >
-                  <Printer className="h-4 w-4 text-zinc-500 dark:text-zinc-400" /> Print Transfer Log
+                  <Printer className="h-3.5 w-3.5 text-zinc-500 dark:text-zinc-400" />
+                  <span>Print</span>
                 </button>
                 <button
                   onClick={exportRoomTransfersCSV}
-                  className="h-9 flex items-center gap-1.5 rounded-xl bg-emerald-700 hover:bg-emerald-600 text-white px-4 text-xs font-semibold transition shadow-xs cursor-pointer"
+                  className="h-8.5 flex items-center gap-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 px-3 text-xs font-medium text-zinc-700 dark:text-zinc-300 transition shadow-2xs cursor-pointer select-none"
                 >
-                  <FileSpreadsheet className="h-4 w-4" /> Export Transfers CSV
+                  <Download className="h-3.5 w-3.5 text-zinc-500 dark:text-zinc-400" />
+                  <span>Export CSV</span>
                 </button>
               </>
             )}
@@ -1237,48 +1249,43 @@ export default function ReportsPage() {
               <>
                 <button
                   onClick={() => setShowFinalBillsPrintModal(true)}
-                  className="h-9 flex items-center gap-1.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 border border-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 dark:border-zinc-700 px-3.5 text-xs font-semibold text-zinc-800 dark:text-zinc-200 transition shadow-xs cursor-pointer"
+                  className="h-8.5 flex items-center gap-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 px-3 text-xs font-medium text-zinc-700 dark:text-zinc-300 transition shadow-2xs cursor-pointer select-none"
                 >
-                  <Printer className="h-4 w-4 text-zinc-500 dark:text-zinc-400" /> Print Bills Register
+                  <Printer className="h-3.5 w-3.5 text-zinc-500 dark:text-zinc-400" />
+                  <span>Print</span>
                 </button>
                 <button
                   onClick={exportFinalBillsCSV}
-                  className="h-9 flex items-center gap-1.5 rounded-xl bg-emerald-700 hover:bg-emerald-600 text-white px-4 text-xs font-semibold transition shadow-xs cursor-pointer"
+                  className="h-8.5 flex items-center gap-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 px-3 text-xs font-medium text-zinc-700 dark:text-zinc-300 transition shadow-2xs cursor-pointer select-none"
                 >
-                  <FileSpreadsheet className="h-4 w-4" /> Export Final Bills CSV
+                  <Download className="h-3.5 w-3.5 text-zinc-500 dark:text-zinc-400" />
+                  <span>Export CSV</span>
                 </button>
               </>
             )}
-
-            {/* Quick Link to Dedicated Cashier Shift Entry Ledger */}
-            <Link
-              href="/cashier-shift"
-              className="h-9 flex items-center gap-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 border border-blue-200 dark:bg-blue-950/40 dark:hover:bg-blue-900/50 dark:border-blue-800/60 px-3.5 text-xs font-semibold text-blue-700 dark:text-blue-300 transition shadow-2xs cursor-pointer"
-              title="Open Dedicated Cashier Shift Entry Ledger & Till Reconciler"
-            >
-              <Wallet className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-              <span>Cashier Shift Ledger →</span>
-            </Link>
 
             {reportType === "EXPENSES" && (
               <>
                 <button
                   onClick={() => setShowAddExpenseModal(true)}
-                  className="h-9 flex items-center gap-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white px-3.5 text-xs font-semibold transition shadow-xs cursor-pointer"
+                  className="h-8.5 flex items-center gap-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-zinc-100 dark:hover:bg-white dark:text-zinc-900 px-3 text-xs font-semibold transition shadow-2xs cursor-pointer select-none"
                 >
-                  <Plus className="h-4 w-4" /> Record Expense
+                  <Plus className="h-3.5 w-3.5" />
+                  <span>New Expense</span>
                 </button>
                 <button
                   onClick={() => setShowExpensesPrintModal(true)}
-                  className="h-9 flex items-center gap-1.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 border border-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 dark:border-zinc-700 px-3.5 text-xs font-semibold text-zinc-800 dark:text-zinc-200 transition shadow-xs cursor-pointer"
+                  className="h-8.5 flex items-center gap-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 px-3 text-xs font-medium text-zinc-700 dark:text-zinc-300 transition shadow-2xs cursor-pointer select-none"
                 >
-                  <Printer className="h-4 w-4 text-zinc-500 dark:text-zinc-400" /> Print Expense Register
+                  <Printer className="h-3.5 w-3.5 text-zinc-500 dark:text-zinc-400" />
+                  <span>Print</span>
                 </button>
                 <button
                   onClick={exportExpensesCSV}
-                  className="h-9 flex items-center gap-1.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-200 dark:text-zinc-950 px-4 text-xs font-semibold transition shadow-xs cursor-pointer"
+                  className="h-8.5 flex items-center gap-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 px-3 text-xs font-medium text-zinc-700 dark:text-zinc-300 transition shadow-2xs cursor-pointer select-none"
                 >
-                  <Download className="h-4 w-4" /> Export Expenses CSV
+                  <Download className="h-3.5 w-3.5 text-zinc-500 dark:text-zinc-400" />
+                  <span>Export CSV</span>
                 </button>
               </>
             )}
@@ -1287,15 +1294,17 @@ export default function ReportsPage() {
               <>
                 <button
                   onClick={() => setShowRevenuePrintModal(true)}
-                  className="h-9 flex items-center gap-1.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 border border-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 dark:border-zinc-700 px-3.5 text-xs font-semibold text-zinc-800 dark:text-zinc-200 transition shadow-xs cursor-pointer"
+                  className="h-8.5 flex items-center gap-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 px-3 text-xs font-medium text-zinc-700 dark:text-zinc-300 transition shadow-2xs cursor-pointer select-none"
                 >
-                  <Printer className="h-4 w-4 text-zinc-500 dark:text-zinc-400" /> Print Tax Ledger
+                  <Printer className="h-3.5 w-3.5 text-zinc-500 dark:text-zinc-400" />
+                  <span>Print</span>
                 </button>
                 <button
                   onClick={exportRevenueCSV}
-                  className="h-9 flex items-center gap-1.5 rounded-xl bg-emerald-700 hover:bg-emerald-600 text-white px-4 text-xs font-semibold transition shadow-xs cursor-pointer"
+                  className="h-8.5 flex items-center gap-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 px-3 text-xs font-medium text-zinc-700 dark:text-zinc-300 transition shadow-2xs cursor-pointer select-none"
                 >
-                  <FileSpreadsheet className="h-4 w-4" /> Export Revenue CSV
+                  <Download className="h-3.5 w-3.5 text-zinc-500 dark:text-zinc-400" />
+                  <span>Export CSV</span>
                 </button>
               </>
             )}
@@ -1304,31 +1313,34 @@ export default function ReportsPage() {
               <>
                 <button
                   onClick={() => setShowAddIncomeModal(true)}
-                  className="h-9 flex items-center gap-1.5 rounded-xl bg-emerald-50 border border-emerald-300 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:border-emerald-800/60 dark:hover:bg-emerald-900/50 px-3.5 text-xs font-semibold text-emerald-800 dark:text-emerald-300 transition shadow-xs cursor-pointer"
+                  className="h-8.5 flex items-center gap-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-zinc-100 dark:hover:bg-white dark:text-zinc-900 px-3 text-xs font-semibold transition shadow-2xs cursor-pointer select-none"
                 >
-                  <Plus className="h-4 w-4" /> Record Direct Income
+                  <Plus className="h-3.5 w-3.5" />
+                  <span>New Income</span>
                 </button>
                 <button
                   onClick={() => setShowKotPrintModal(true)}
-                  className="h-9 flex items-center gap-1.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 border border-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 dark:border-zinc-700 px-3.5 text-xs font-semibold text-zinc-800 dark:text-zinc-200 transition shadow-xs cursor-pointer"
+                  className="h-8.5 flex items-center gap-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 px-3 text-xs font-medium text-zinc-700 dark:text-zinc-300 transition shadow-2xs cursor-pointer select-none"
                 >
-                  <Printer className="h-4 w-4 text-zinc-500 dark:text-zinc-400" /> Print Kitchen Log
+                  <Printer className="h-3.5 w-3.5 text-zinc-500 dark:text-zinc-400" />
+                  <span>Print</span>
                 </button>
                 <button
                   onClick={exportKitchenOrdersCSV}
-                  className="h-9 flex items-center gap-1.5 rounded-xl bg-emerald-700 hover:bg-emerald-600 text-white px-4 text-xs font-semibold transition shadow-xs cursor-pointer"
+                  className="h-8.5 flex items-center gap-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 px-3 text-xs font-medium text-zinc-700 dark:text-zinc-300 transition shadow-2xs cursor-pointer select-none"
                 >
-                  <FileSpreadsheet className="h-4 w-4" /> Export Kitchen CSV
+                  <Download className="h-3.5 w-3.5 text-zinc-500 dark:text-zinc-400" />
+                  <span>Export CSV</span>
                 </button>
               </>
             )}
 
             <button
               onClick={() => loadReportData(true)}
-              className="h-9 w-9 flex items-center justify-center rounded-xl bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 transition cursor-pointer shadow-2xs"
+              className="h-8.5 w-8.5 flex items-center justify-center rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-zinc-500 dark:text-zinc-400 transition shadow-2xs cursor-pointer select-none"
               title="Refresh Data"
             >
-              <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin text-emerald-600" : ""}`} />
+              <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin text-zinc-900 dark:text-zinc-100" : ""}`} />
             </button>
           </div>
         }
@@ -1341,19 +1353,19 @@ export default function ReportsPage() {
         </div>
       )}
 
-      {/* Main Report Navigation Tabs (Full Width Segmented Control) */}
-      <div className="border-b border-zinc-200 dark:border-zinc-800 pb-3">
+      {/* Main Report Navigation Tabs */}
+      <div className="border-b border-zinc-200/80 dark:border-zinc-800 pb-3">
         <SegmentedControl
           value={reportType}
           onChange={(val) => setReportType(val as any)}
           options={[
-            { value: "COMPREHENSIVE_AUDIT", label: "Comprehensive Hotel Audit", icon: Building2 },
-            { value: "INHOUSE_OUTSTANDING", label: "In-House Guest Outstanding", icon: Users },
-            { value: "ROOM_TRANSFERS", label: "Room Transfers & Moves", icon: ArrowRightLeft },
-            { value: "FINAL_BILLS", label: "Final Bills & Invoices", icon: Receipt },
-            { value: "EXPENSES", label: "Expense Register", icon: ArrowUpRight },
-            { value: "REVENUE", label: "Revenue & Tax Ledger", icon: TrendingUp },
-            { value: "FNB", label: "Kitchen & Dining Collections", icon: UtensilsCrossed },
+            { value: "COMPREHENSIVE_AUDIT", label: "Hotel Audit", icon: Building2 },
+            { value: "INHOUSE_OUTSTANDING", label: "Guest Dues", icon: Users },
+            { value: "ROOM_TRANSFERS", label: "Room Transfers", icon: ArrowRightLeft },
+            { value: "FINAL_BILLS", label: "Invoices", icon: Receipt },
+            { value: "EXPENSES", label: "Expenses", icon: ArrowUpRight },
+            { value: "REVENUE", label: "Revenue & Tax", icon: TrendingUp },
+            { value: "FNB", label: "Dining & KOT", icon: UtensilsCrossed },
           ]}
         />
       </div>
@@ -1390,13 +1402,13 @@ export default function ReportsPage() {
       {reportType === "INHOUSE_OUTSTANDING" && (
         <div className="space-y-4 animate-in fade-in">
           {/* Date Selector & Shift Controls */}
-          <div className="p-3 sm:p-4 rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3">
+          <div className="p-3 sm:p-4 rounded-xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3">
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-xs font-bold uppercase tracking-wider text-zinc-500 font-mono flex items-center gap-1.5">
-                <Calendar className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                As Of Date:
+              <span className="text-xs font-semibold text-zinc-500 flex items-center gap-1.5">
+                <Calendar className="h-3.5 w-3.5 text-zinc-400" />
+                As of:
               </span>
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-1">
                 <button
                   type="button"
                   onClick={() => shiftDate(-1)}
@@ -1409,7 +1421,7 @@ export default function ReportsPage() {
                   type="date"
                   value={selectedDate || activeProperty?.businessDate || ""}
                   onChange={(e) => setSelectedDate(e.target.value)}
-                  className="h-8 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 px-2.5 text-xs font-mono font-bold text-zinc-900 dark:text-white focus:outline-none focus:border-blue-500"
+                  className="h-8 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 px-2.5 text-xs font-mono font-semibold text-zinc-900 dark:text-white focus:outline-none focus:border-zinc-500"
                 />
                 <button
                   type="button"
@@ -1423,27 +1435,27 @@ export default function ReportsPage() {
               <button
                 type="button"
                 onClick={handleSetToday}
-                className={`h-8 px-2.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                className={`h-8 px-2.5 rounded-lg text-xs font-medium transition cursor-pointer ${
                   isToday
-                    ? "bg-blue-600 text-white shadow-xs"
+                    ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
                     : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200"
                 }`}
               >
-                Current Business Date
+                Today
               </button>
               <button
                 type="button"
                 onClick={handleSetYesterday}
-                className="h-8 px-2.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 text-xs font-semibold transition cursor-pointer"
+                className="h-8 px-2.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 text-xs font-medium transition cursor-pointer"
               >
                 Yesterday
               </button>
             </div>
 
-            <div className="flex items-center gap-2 text-xs font-medium text-zinc-500">
-              <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+            <div className="flex items-center gap-1.5 text-xs font-medium text-zinc-500">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
               <span>
-                Live Ledger As of: <strong className="font-mono text-zinc-800 dark:text-zinc-200">{data?.asOfDate || selectedDate || activeProperty?.businessDate}</strong>
+                Ledger as of: <strong className="font-mono text-zinc-800 dark:text-zinc-200">{data?.asOfDate || selectedDate || activeProperty?.businessDate}</strong>
               </span>
             </div>
           </div>
@@ -1451,70 +1463,70 @@ export default function ReportsPage() {
           {/* 4 Summary Stat Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             {/* Card 1: Total Occupied */}
-            <div className="p-4 rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-1">
+            <div className="p-4 rounded-xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-1">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">Occupied In-House</span>
-                <BedDouble className="h-4 w-4 text-blue-500" />
+                <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">In-House</span>
+                <BedDouble className="h-4 w-4 text-zinc-400" />
               </div>
               <div className="text-2xl font-black font-mono text-zinc-900 dark:text-zinc-100">
                 {data?.summary?.totalOccupiedRooms ?? 0} Rooms
               </div>
-              <div className="text-[11px] text-zinc-500">Currently in-house guest rooms</div>
+              <div className="text-[11px] text-zinc-500">Currently occupied</div>
             </div>
 
             {/* Card 2: Dues Cleared */}
-            <div className="p-4 rounded-2xl bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800/50 shadow-xs space-y-1">
+            <div className="p-4 rounded-xl bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800/50 shadow-xs space-y-1">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-emerald-800 dark:text-emerald-400 uppercase tracking-wider">Dues Cleared</span>
+                <span className="text-[11px] font-bold text-emerald-800 dark:text-emerald-400 uppercase tracking-wider">Settled</span>
                 <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
               </div>
               <div className="text-2xl font-black font-mono text-emerald-700 dark:text-emerald-300">
                 {data?.summary?.clearedCount ?? 0} Rooms
               </div>
               <div className="text-[11px] text-emerald-700/80 dark:text-emerald-400/80 font-medium">
-                {data?.summary?.clearedPercentage ?? 0}% of in-house guests fully settled
+                {data?.summary?.clearedPercentage ?? 0}% fully settled
               </div>
             </div>
 
             {/* Card 3: Due Remaining */}
-            <div className="p-4 rounded-2xl bg-rose-50/60 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-800/50 shadow-xs space-y-1">
+            <div className="p-4 rounded-xl bg-rose-50/60 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-800/50 shadow-xs space-y-1">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-rose-800 dark:text-rose-400 uppercase tracking-wider">Due Remaining</span>
+                <span className="text-[11px] font-bold text-rose-800 dark:text-rose-400 uppercase tracking-wider">Pending Dues</span>
                 <AlertCircle className="h-4 w-4 text-rose-600 dark:text-rose-400" />
               </div>
               <div className="text-2xl font-black font-mono text-rose-700 dark:text-rose-300">
                 {formatINR(data?.summary?.totalDueRemaining ?? 0)}
               </div>
               <div className="text-[11px] text-rose-700/80 dark:text-rose-400/80 font-medium">
-                Across {data?.summary?.dueCount ?? 0} room{data?.summary?.dueCount === 1 ? "" : "s"} with pending dues
+                {data?.summary?.dueCount ?? 0} rooms with dues
               </div>
             </div>
 
             {/* Card 4: Advance Surplus */}
-            <div className="p-4 rounded-2xl bg-blue-50/60 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800/50 shadow-xs space-y-1">
+            <div className="p-4 rounded-xl bg-blue-50/60 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800/50 shadow-xs space-y-1">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-blue-800 dark:text-blue-400 uppercase tracking-wider">Advance Surplus</span>
+                <span className="text-[11px] font-bold text-blue-800 dark:text-blue-400 uppercase tracking-wider">Advance Credit</span>
                 <Wallet className="h-4 w-4 text-blue-600 dark:text-blue-400" />
               </div>
               <div className="text-2xl font-black font-mono text-blue-700 dark:text-blue-300">
                 {formatINR(data?.summary?.totalSurplusCredit ?? 0)}
               </div>
               <div className="text-[11px] text-blue-700/80 dark:text-blue-400/80 font-medium">
-                Held across {data?.summary?.surplusCount ?? 0} guest account{data?.summary?.surplusCount === 1 ? "" : "s"}
+                {data?.summary?.surplusCount ?? 0} guest accounts
               </div>
             </div>
           </div>
 
           {/* Search & Filter Toolbar */}
-          <div className="p-3 sm:p-4 rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+          <div className="p-3 sm:p-4 rounded-xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
             <div className="relative flex-1 max-w-md">
               <Search className="absolute left-3 top-2.5 h-4 w-4 text-zinc-400" />
               <input
                 type="text"
-                placeholder="Search room #, guest name, phone, residential address, company..."
+                placeholder="Search room, guest name, phone..."
                 value={inhouseSearch}
                 onChange={(e) => setInhouseSearch(e.target.value)}
-                className="w-full h-9 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 pl-9 pr-8 text-xs text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:border-blue-500 font-medium transition"
+                className="w-full h-9 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 pl-9 pr-8 text-xs text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:border-zinc-400 font-medium transition"
               />
               {inhouseSearch && (
                 <button
@@ -2420,21 +2432,21 @@ export default function ReportsPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             <div className="p-4 rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-1">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">Total Expenses (Outflows)</span>
+                <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">Total Expenses</span>
                 <ArrowUpRight className="h-4 w-4 text-rose-500" />
               </div>
               <div className="text-2xl font-black font-mono text-rose-600 dark:text-rose-400">
                 {formatINR(expenseKPIs.totalOutflow)}
               </div>
               <div className="text-[11px] text-zinc-500 font-mono">
-                {expenseKPIs.totalCount} Total Vouchers Recorded
+                {expenseKPIs.totalCount} vouchers
               </div>
             </div>
 
             <div className="p-4 rounded-2xl bg-rose-50/50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-800/50 shadow-xs space-y-1">
               <div className="flex items-center justify-between">
                 <span className="text-[11px] font-bold text-rose-800 dark:text-rose-300 uppercase tracking-wider">
-                  Cash In Drawer Impact
+                  Cash Outflow
                 </span>
                 <Banknote className="h-4 w-4 text-rose-600" />
               </div>
@@ -2442,7 +2454,7 @@ export default function ReportsPage() {
                 {formatINR(expenseKPIs.cashOutflow)}
               </div>
               <div className="text-[11px] text-rose-700/80 dark:text-rose-400 font-mono">
-                Direct petty cash & drawer payments
+                Direct cash payments
               </div>
             </div>
 
@@ -2461,14 +2473,14 @@ export default function ReportsPage() {
 
             <div className="p-4 rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-1">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">Top Expense Category</span>
+                <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">Top Category</span>
                 <Tag className="h-4 w-4 text-amber-500" />
               </div>
               <div className="text-sm font-bold text-zinc-900 dark:text-zinc-100 truncate">
                 {expenseKPIs.topCategory}
               </div>
               <div className="text-[11px] text-zinc-500 font-mono">
-                {expenseKPIs.topCategoryAmount > 0 ? `${formatINR(expenseKPIs.topCategoryAmount)} Total Spent` : "No expenses recorded"}
+                {expenseKPIs.topCategoryAmount > 0 ? `${formatINR(expenseKPIs.topCategoryAmount)} spent` : "No expenses"}
               </div>
             </div>
           </div>
@@ -2480,7 +2492,7 @@ export default function ReportsPage() {
               <Search className="h-4 w-4 absolute left-3 top-2.5 text-zinc-400 pointer-events-none" />
               <input
                 type="text"
-                placeholder="Search by Voucher #, Payee, Description, Reference, Category..."
+                placeholder="Search vouchers, payees, particulars..."
                 value={expenseSearch}
                 onChange={(e) => setExpenseSearch(e.target.value)}
                 className="w-full h-9 pl-9 pr-3 text-xs rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 text-zinc-900 dark:text-white placeholder:text-zinc-400 transition-all"
@@ -2497,7 +2509,7 @@ export default function ReportsPage() {
                   className="text-xs h-9 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 pl-3 pr-7 font-medium text-zinc-900 dark:text-zinc-100 cursor-pointer appearance-none focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500"
                 >
                   <option value="ALL">All Categories</option>
-                  <option value="OWNER_PAYOUT">👑 Owner Payout / Drawing</option>
+                  <option value="OWNER_PAYOUT">Owner Payout / Drawing</option>
                   <option value="DRIVER_COMMISSION">Driver Commission</option>
                   <option value="VENDOR_PAYMENT">Vendor / Supplier</option>
                   <option value="STAFF_ADVANCE">Staff Advance / Salary</option>
@@ -2539,16 +2551,16 @@ export default function ReportsPage() {
                   className="h-9 px-3 rounded-lg bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 font-medium text-xs flex items-center gap-1.5 transition cursor-pointer"
                 >
                   <X className="h-3.5 w-3.5" />
-                  <span>Clear Filters</span>
+                  <span>Clear</span>
                 </button>
               )}
 
               <button
                 onClick={() => setShowAddExpenseModal(true)}
-                className="h-9 px-3.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-medium text-xs flex items-center gap-1.5 transition cursor-pointer shadow-xs"
+                className="h-9 px-3 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-zinc-100 dark:hover:bg-white dark:text-zinc-900 font-medium text-xs flex items-center gap-1.5 transition cursor-pointer shadow-2xs select-none"
               >
                 <Plus className="h-3.5 w-3.5" />
-                <span>Record Expense</span>
+                <span>New Expense</span>
               </button>
             </div>
           </div>
@@ -2558,10 +2570,10 @@ export default function ReportsPage() {
             <div className="flex items-center justify-between pb-3 border-b border-zinc-200 dark:border-zinc-800 text-xs font-bold text-zinc-900 dark:text-zinc-100">
               <span className="flex items-center gap-2">
                 <ArrowUpRight className="h-4 w-4 text-rose-600 dark:text-rose-400" />
-                <span>Operational Expense Register ({filteredExpenseVouchers.length} vouchers)</span>
+                <span>Expense Vouchers ({filteredExpenseVouchers.length})</span>
               </span>
               <span className="text-[11px] font-mono text-zinc-500 font-normal">
-                Filtered Outflows: {formatINR(filteredExpenseVouchers.reduce((s: number, e: any) => s + (e.totalAmount || e.amount || 0), 0))}
+                Total: {formatINR(filteredExpenseVouchers.reduce((s: number, e: any) => s + (e.totalAmount || e.amount || 0), 0))}
               </span>
             </div>
 
@@ -2572,13 +2584,13 @@ export default function ReportsPage() {
                     <th className="px-4 py-3 font-semibold whitespace-nowrap">Voucher #</th>
                     <th className="px-4 py-3 font-semibold whitespace-nowrap">Date & Time</th>
                     <th className="px-4 py-3 font-semibold whitespace-nowrap">Category</th>
-                    <th className="px-4 py-3 font-semibold whitespace-nowrap">Payee / Vendor</th>
-                    <th className="px-4 py-3 font-semibold whitespace-nowrap">Narration / Particulars</th>
+                    <th className="px-4 py-3 font-semibold whitespace-nowrap">Payee</th>
+                    <th className="px-4 py-3 font-semibold whitespace-nowrap">Description</th>
                     <th className="px-4 py-3 font-semibold whitespace-nowrap">Mode</th>
                     <th className="px-4 py-3 font-semibold whitespace-nowrap">Reference</th>
                     <th className="px-4 py-3 font-semibold text-right whitespace-nowrap">Amount</th>
                     <th className="px-4 py-3 font-semibold whitespace-nowrap">Status</th>
-                    <th className="px-4 py-3 font-semibold whitespace-nowrap">Staff / Auth</th>
+                    <th className="px-4 py-3 font-semibold whitespace-nowrap">Staff</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-200/60 dark:divide-zinc-800/60 font-mono">
@@ -2587,7 +2599,7 @@ export default function ReportsPage() {
                       <td colSpan={10} className="py-12 text-center text-zinc-500 font-sans">
                         <ArrowUpRight className="h-8 w-8 mx-auto mb-2 text-zinc-400 opacity-50" />
                         <p className="font-bold text-sm">No expense vouchers found.</p>
-                        <p className="text-xs text-zinc-400 mt-1">Click "+ Record Expense" to create a new expense voucher.</p>
+                        <p className="text-xs text-zinc-400 mt-1">Record a new expense to get started.</p>
                       </td>
                     </tr>
                   ) : (
@@ -2609,7 +2621,7 @@ export default function ReportsPage() {
                                 : "bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-800 dark:text-zinc-200"
                             }`}
                           >
-                            {e.category === "OWNER_PAYOUT" ? "👑 Owner Payout" : e.category.replace(/_/g, " ")}
+                            {e.category === "OWNER_PAYOUT" ? "Owner Payout" : e.category.replace(/_/g, " ")}
                           </span>
                         </td>
                         <td className="px-4 py-3 font-sans font-medium text-zinc-900 dark:text-white whitespace-nowrap">
@@ -4195,8 +4207,8 @@ export default function ReportsPage() {
           invoiceData={selectedInvoiceForModal || selectedBillForModal.primaryInvoice || null}
           ledgerEntries={selectedBillForModal.stayData?.folio?.entries || []}
           payments={selectedBillForModal.stayData?.folio?.payments || []}
-          cashierName="Front Desk Cashier"
-          receptionistName="Gobin Tamang"
+          cashierName={user?.name || "Front Desk Cashier"}
+          receptionistName={(selectedBillForModal.stayData?.guestRegistration as any)?.processedByUser?.name || user?.name || "Front Desk Reception"}
         />
       )}
       {/* Email Report Modal */}

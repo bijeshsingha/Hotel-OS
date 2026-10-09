@@ -148,12 +148,8 @@ export function PmsFilters({
                 : "text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800/60"
             }`}
           >
-            <span>Digital Check-In</span>
-            {registrationsCount > 0 && (
-              <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-blue-600 text-white">
-                {registrationsCount}
-              </span>
-            )}
+            <span>GRC Register</span>
+            <span className="text-xs opacity-75 font-mono">({registrationsCount})</span>
           </button>
 
           <button

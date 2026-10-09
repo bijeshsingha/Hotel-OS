@@ -13,6 +13,7 @@ import {
   SlidersHorizontal,
   UtensilsCrossed,
   Users,
+  TrendingUp,
   LucideIcon,
 } from "lucide-react";
 
@@ -88,6 +89,13 @@ export const NAV_ITEMS: NavItem[] = [
     icon: BarChart3,
     badge: "R",
     description: "Manager reporting, cashier sheet & CSV exports",
+  },
+  {
+    label: "Executive Report",
+    href: "/executive-report",
+    icon: TrendingUp,
+    badge: "EX",
+    description: "Daily management audit, financial performance, collections & cash drawer reconciliation",
   },
   {
     label: "Audit Trail",
