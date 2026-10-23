@@ -1,8 +1,13 @@
+import { authorizeRequest, getApiAccess } from "@/lib/auth/api-access";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { normalizeGuestName } from "@/lib/domain/name-utils";
 
 export async function GET(request: Request) {
+  const access = await authorizeRequest(request);
+  if (access instanceof Response) return access;
+  request = access.request;
+
   try {
     const { searchParams } = new URL(request.url);
     const rawPhone = searchParams.get("phone") || "";
@@ -19,6 +24,7 @@ export async function GET(request: Request) {
     // 1. Search in Guest Registration (GRC Intake history) - freshest intake data
     const registration = await prisma.guestRegistration.findFirst({
       where: {
+        propertyId: getApiAccess(request).property.id,
         mobilePhone: {
           contains: last10Digits,
         },
@@ -29,6 +35,7 @@ export async function GET(request: Request) {
     // 2. Search in Guest Table (Master Guest profiles)
     const guest = await prisma.guest.findFirst({
       where: {
+        organizationId: getApiAccess(request).property.organizationId,
         phone: {
           contains: last10Digits,
         },
@@ -36,6 +43,7 @@ export async function GET(request: Request) {
       include: {
         documents: true,
         stays: {
+          where: { propertyId: getApiAccess(request).property.id },
           include: {
             roomAssignments: { include: { room: true } },
           },
@@ -47,6 +55,7 @@ export async function GET(request: Request) {
     // Count past stays from registrations and stays
     const pastRegCount = await prisma.guestRegistration.count({
       where: {
+        propertyId: getApiAccess(request).property.id,
         mobilePhone: { contains: last10Digits },
       },
     });

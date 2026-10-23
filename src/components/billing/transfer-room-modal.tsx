@@ -87,7 +87,7 @@ export function TransferRoomModal({
     currentRoomRate = 0;
   } else if (activeAssignment?.moveReason?.includes("AGREED_RATE:")) {
     const rateSection = activeAssignment.moveReason.slice(activeAssignment.moveReason.indexOf("AGREED_RATE:"));
-    const match = rateSection.match(/AGREED_RATE:(\d+)/);
+    const match = rateSection.match(/AGREED_RATE:([0-9]+(?:\.[0-9]+)?)/);
     if (match) currentRoomRate = Number(match[1]);
   } else {
     // Check if folio has entries or room has base price
@@ -133,7 +133,7 @@ export function TransferRoomModal({
           targetRoomId,
           reason: effectiveReason,
           rateHandling,
-          customRate: rateHandling === "CUSTOM" && customRate ? parseFloat(customRate) : undefined,
+          customRate: rateHandling === "CUSTOM" && customRate !== "" ? parseFloat(customRate) : undefined,
         }),
       });
 
@@ -152,62 +152,62 @@ export function TransferRoomModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in">
-      <div className="w-full max-w-xl max-h-[90vh] overflow-y-auto rounded-3xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121215] p-6 shadow-2xl space-y-5 text-zinc-900 dark:text-white">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4  ">
+      <div className="w-full max-w-xl max-h-[90vh] overflow-y-auto rounded-3xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121215] p-6 shadow-2xl space-y-5 text-zinc-900 dark:text-white ui-radius-panel ui-dialog-surface ui-surface">
         {/* Header */}
         <div className="flex items-center justify-between pb-4 border-b border-zinc-200 dark:border-zinc-800">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-500">
+            <div className="w-10 h-10 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-500 ui-radius-panel">
               <ArrowRightLeft className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-base font-bold text-zinc-900 dark:text-white">
+              <h2 className="text-base font-bold text-zinc-900 dark:text-white ui-weight-medium ui-section-title">
                 In-Folio Room Transfer
               </h2>
-              <p className="text-xs text-zinc-500 font-mono mt-0.5">
+              <p className="text-xs text-zinc-500 font-mono mt-0.5 ui-text-body ui-font-body">
                 Stay #{stay.id.slice(-6).toUpperCase()} • Guest: {stay.primaryGuest?.name || "In-House Guest"}
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-xl text-zinc-400 hover:text-zinc-700 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+            className="p-1.5 rounded-xl text-zinc-400 hover:text-zinc-700 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors ui-radius-control ui-control"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
 
         {error && (
-          <div className="p-3.5 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 text-xs flex items-center gap-2.5">
+          <div className="p-3.5 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 text-xs flex items-center gap-2.5 ui-radius-panel ui-text-body">
             <AlertCircle className="w-4 h-4 shrink-0" />
             <span>{error}</span>
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4 text-xs sm:text-sm">
+        <form onSubmit={handleSubmit} className="space-y-4 text-xs sm:text-sm ui-text-body">
           {/* Multi-Room Group Booking: Explicit Source Room Selector */}
           {activeAssignments.length > 1 && (
-            <div className="space-y-1.5 p-3.5 rounded-2xl bg-amber-500/5 border border-amber-500/20">
-              <label className="text-xs font-mono uppercase font-bold text-amber-600 dark:text-amber-400 tracking-wider flex items-center justify-between">
+            <div className="space-y-1.5 p-3.5 rounded-2xl bg-amber-500/5 border border-amber-500/20 ui-radius-panel">
+              <label className="text-xs font-mono uppercase font-bold text-amber-600 dark:text-amber-400 tracking-wider flex items-center justify-between ui-text-body ui-font-body ui-weight-medium ui-label">
                 <span className="flex items-center gap-1.5">
                   <Layers className="w-3.5 h-3.5" />
                   <span>Group Booking: Select Room to Transfer</span>
                 </span>
-                <span className="text-[11px] text-zinc-500 font-normal font-sans">
+                <span className="text-[11px] text-zinc-500 font-normal font-sans ui-text-meta">
                   {activeAssignments.length} active rooms in booking
                 </span>
               </label>
               <select
                 value={selectedSourceRoomId}
                 onChange={(e) => setSelectedSourceRoomId(e.target.value)}
-                className="w-full rounded-xl border border-amber-500/30 bg-white dark:bg-zinc-900 px-3 py-2 text-zinc-900 dark:text-white font-medium focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+                className="w-full rounded-xl border border-amber-500/30 bg-white dark:bg-zinc-900 px-3 py-2 text-zinc-900 dark:text-white font-medium focus:outline-none focus:ring-2 focus:ring-amber-500/50 ui-radius-control ui-surface ui-field"
               >
                 {activeAssignments.map((ra: any) => {
                   let rRate = 3200;
                   if (ra.rateHandling === "COMPLIMENTARY" || ra.moveReason?.includes("AGREED_RATE:0")) {
                     rRate = 0;
                   } else if (ra.moveReason?.includes("AGREED_RATE:")) {
-                    const m = ra.moveReason.match(/AGREED_RATE:(\d+)/);
+                    const m = ra.moveReason.match(/AGREED_RATE:([0-9]+(?:\.[0-9]+)?)/);
                     if (m) rRate = Number(m[1]);
                   } else if (ra.room?.roomType?.basePrice) {
                     rRate = Number(ra.room.roomType.basePrice);
@@ -223,29 +223,29 @@ export function TransferRoomModal({
           )}
 
           {/* Room Migration Comparison Card */}
-          <div className="grid grid-cols-2 gap-3 p-3.5 rounded-2xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800">
+          <div className="grid grid-cols-2 gap-3 p-3.5 rounded-2xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 ui-radius-panel">
             <div className="space-y-1">
-              <span className="text-[10px] font-mono uppercase tracking-wider text-zinc-400">Current Room</span>
+              <span className="text-[10px] font-mono uppercase tracking-wider text-zinc-400 ui-text-meta ui-font-body">Current Room</span>
               <div className="flex items-center gap-2">
-                <span className="text-lg font-bold text-zinc-900 dark:text-white">
+                <span className="text-lg font-bold text-zinc-900 dark:text-white ui-weight-medium">
                   Room {activeRoom?.number || "-"}
                 </span>
               </div>
-              <p className="text-[11px] text-zinc-500">
+              <p className="text-[11px] text-zinc-500 ui-text-meta">
                 {activeRoom?.roomType?.name || "Standard Room"} • {formatINR(currentRoomRate)}/night
               </p>
             </div>
 
             <div className="space-y-1 border-l border-zinc-200 dark:border-zinc-800 pl-3">
-              <span className="text-[10px] font-mono uppercase tracking-wider text-amber-500 font-semibold">
+              <span className="text-[10px] font-mono uppercase tracking-wider text-amber-500 font-semibold ui-text-meta ui-font-body">
                 Destination Room
               </span>
               <div className="flex items-center gap-2">
-                <span className="text-lg font-bold text-amber-500">
+                <span className="text-lg font-bold text-amber-500 ui-weight-medium">
                   {selectedTargetRoom ? `Room ${selectedTargetRoom.number}` : "Select Below"}
                 </span>
               </div>
-              <p className="text-[11px] text-zinc-500">
+              <p className="text-[11px] text-zinc-500 ui-text-meta">
                 {selectedTargetRoom
                   ? `${selectedTargetRoom.roomType?.name || "Room"} • ${formatINR(targetRoomBaseRate)}/night`
                   : "Pick a vacant room"}
@@ -255,16 +255,16 @@ export function TransferRoomModal({
 
           {/* 1. Destination Room Selection */}
           <div className="space-y-1.5">
-            <label className="text-xs font-mono uppercase font-bold text-zinc-500 tracking-wider flex items-center justify-between">
+            <label className="text-xs font-mono uppercase font-bold text-zinc-500 tracking-wider flex items-center justify-between ui-text-body ui-font-body ui-weight-medium ui-label">
               <span>Select Destination Room *</span>
-              <span className="text-[11px] text-zinc-400 font-normal font-sans">
+              <span className="text-[11px] text-zinc-400 font-normal font-sans ui-text-meta">
                 {vacantRooms.length} vacant rooms available
               </span>
             </label>
             <select
               value={targetRoomId}
               onChange={(e) => setTargetRoomId(e.target.value)}
-              className="w-full rounded-xl border border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/80 px-3 py-2.5 text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+              className="w-full rounded-xl border border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/80 px-3 py-2.5 text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500/50 ui-radius-control ui-field"
               required
             >
               <option value="">-- Choose Vacant Room --</option>
@@ -278,7 +278,7 @@ export function TransferRoomModal({
 
           {/* 2. Rate Handling (Industry Standard PMS Practice) */}
           <div className="space-y-1.5">
-            <label className="text-xs font-mono uppercase font-bold text-zinc-500 tracking-wider">
+            <label className="text-xs font-mono uppercase font-bold text-zinc-500 tracking-wider ui-text-body ui-font-body ui-weight-medium ui-label">
               Nightly Rate Handling
             </label>
             <div className="grid grid-cols-2 gap-2">
@@ -287,7 +287,7 @@ export function TransferRoomModal({
                   rateHandling === "RETAIN_RATE"
                     ? "border-amber-500/50 bg-amber-500/5 text-zinc-900 dark:text-white"
                     : "border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 text-zinc-600 dark:text-zinc-400"
-                }`}
+                } ui-label`}
               >
                 <input
                   type="radio"
@@ -295,11 +295,11 @@ export function TransferRoomModal({
                   value="RETAIN_RATE"
                   checked={rateHandling === "RETAIN_RATE"}
                   onChange={() => setRateHandling("RETAIN_RATE")}
-                  className="mt-0.5 text-amber-500"
+                  className="mt-0.5 text-amber-500 ui-field" aria-label="Nightly Rate Handling"
                 />
-                <div className="text-xs">
+                <div className="text-xs ui-text-body">
                   <div className="font-semibold text-zinc-900 dark:text-white">Retain Current Rate</div>
-                  <div className="text-[11px] text-zinc-400">Keep {formatINR(currentRoomRate)}/night</div>
+                  <div className="text-[11px] text-zinc-400 ui-text-meta">Keep {formatINR(currentRoomRate)}/night</div>
                 </div>
               </label>
 
@@ -308,7 +308,7 @@ export function TransferRoomModal({
                   rateHandling === "USE_TARGET_BASE"
                     ? "border-amber-500/50 bg-amber-500/5 text-zinc-900 dark:text-white"
                     : "border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 text-zinc-600 dark:text-zinc-400"
-                }`}
+                } ui-label`}
               >
                 <input
                   type="radio"
@@ -316,11 +316,11 @@ export function TransferRoomModal({
                   value="USE_TARGET_BASE"
                   checked={rateHandling === "USE_TARGET_BASE"}
                   onChange={() => setRateHandling("USE_TARGET_BASE")}
-                  className="mt-0.5 text-amber-500"
+                  className="mt-0.5 text-amber-500 ui-field" aria-label="Nightly Rate Handling"
                 />
-                <div className="text-xs">
+                <div className="text-xs ui-text-body">
                   <div className="font-semibold text-zinc-900 dark:text-white">Destination Base Rate</div>
-                  <div className="text-[11px] text-zinc-400">{formatINR(targetRoomBaseRate)}/night</div>
+                  <div className="text-[11px] text-zinc-400 ui-text-meta">{formatINR(targetRoomBaseRate)}/night</div>
                 </div>
               </label>
 
@@ -329,19 +329,22 @@ export function TransferRoomModal({
                   rateHandling === "CUSTOM"
                     ? "border-amber-500/50 bg-amber-500/5 text-zinc-900 dark:text-white"
                     : "border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 text-zinc-600 dark:text-zinc-400"
-                }`}
+                } ui-label`}
               >
                 <input
                   type="radio"
                   name="rateHandling"
                   value="CUSTOM"
                   checked={rateHandling === "CUSTOM"}
-                  onChange={() => setRateHandling("CUSTOM")}
-                  className="mt-0.5 text-amber-500"
+                  onChange={() => {
+                    setRateHandling("CUSTOM");
+                    if (!customRate) setCustomRate(String(targetRoomBaseRate || currentRoomRate));
+                  }}
+                  className="mt-0.5 text-amber-500 ui-field" aria-label="Nightly Rate Handling"
                 />
-                <div className="text-xs">
+                <div className="text-xs ui-text-body">
                   <div className="font-semibold text-zinc-900 dark:text-white">Custom Override</div>
-                  <div className="text-[11px] text-zinc-400">Input negotiated rate</div>
+                  <div className="text-[11px] text-zinc-400 ui-text-meta">Input negotiated rate</div>
                 </div>
               </label>
 
@@ -350,7 +353,7 @@ export function TransferRoomModal({
                   rateHandling === "COMPLIMENTARY"
                     ? "border-amber-500/50 bg-amber-500/5 text-zinc-900 dark:text-white"
                     : "border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 text-zinc-600 dark:text-zinc-400"
-                }`}
+                } ui-label`}
               >
                 <input
                   type="radio"
@@ -358,11 +361,11 @@ export function TransferRoomModal({
                   value="COMPLIMENTARY"
                   checked={rateHandling === "COMPLIMENTARY"}
                   onChange={() => setRateHandling("COMPLIMENTARY")}
-                  className="mt-0.5 text-amber-500"
+                  className="mt-0.5 text-amber-500 ui-field" aria-label="Nightly Rate Handling"
                 />
-                <div className="text-xs">
+                <div className="text-xs ui-text-body">
                   <div className="font-semibold text-zinc-900 dark:text-white">Complimentary</div>
-                  <div className="text-[11px] text-zinc-400">0 rate charge</div>
+                  <div className="text-[11px] text-zinc-400 ui-text-meta">0 rate charge</div>
                 </div>
               </label>
             </div>
@@ -374,8 +377,8 @@ export function TransferRoomModal({
                   placeholder="Custom Rate in INR (e.g. 3500)"
                   value={customRate}
                   onChange={(e) => setCustomRate(e.target.value)}
-                  className="w-full rounded-xl border border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/80 px-3 py-2 text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500/50"
-                  required
+                  className="w-full rounded-xl border border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/80 px-3 py-2 text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500/50 ui-radius-control ui-field"
+                  required aria-label="Custom Rate in INR (e.g. 3500)"
                 />
               </div>
             )}
@@ -383,14 +386,14 @@ export function TransferRoomModal({
 
           {/* 3. Reason for Transfer */}
           <div className="space-y-1.5">
-            <label className="text-xs font-mono uppercase font-bold text-zinc-500 tracking-wider">
+            <label className="text-xs font-mono uppercase font-bold text-zinc-500 tracking-wider ui-text-body ui-font-body ui-weight-medium ui-label">
               Transfer Reason *
             </label>
             <div className="grid grid-cols-2 gap-2">
               <select
                 value={reasonCategory}
                 onChange={(e) => setReasonCategory(e.target.value)}
-                className="rounded-xl border border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/80 px-3 py-2 text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+                className="rounded-xl border border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/80 px-3 py-2 text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500/50 ui-radius-control ui-field" aria-label="Transfer Reason"
               >
                 <option value="Guest Request">Guest Request</option>
                 <option value="Maintenance / AC / Plumbing">Maintenance / AC / Plumbing</option>
@@ -406,31 +409,31 @@ export function TransferRoomModal({
                 placeholder="Additional notes / details..."
                 value={customReason}
                 onChange={(e) => setCustomReason(e.target.value)}
-                className="rounded-xl border border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/80 px-3 py-2 text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+                className="rounded-xl border border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/80 px-3 py-2 text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500/50 ui-radius-control ui-field" aria-label="Transfer Reason"
               />
             </div>
           </div>
 
           {/* 4. Folio Continuity Notice */}
-          <div className="p-3.5 rounded-2xl bg-zinc-50 dark:bg-zinc-900/40 border border-zinc-200 dark:border-zinc-800/80 flex items-center justify-between">
+          <div className="p-3.5 rounded-2xl bg-zinc-50 dark:bg-zinc-900/40 border border-zinc-200 dark:border-zinc-800/80 flex items-center justify-between ui-radius-panel">
             <div className="space-y-0.5">
-              <span className="text-xs font-semibold text-zinc-900 dark:text-white">
+              <span className="text-xs font-semibold text-zinc-900 dark:text-white ui-text-body">
                 Folio Continuity
               </span>
-              <p className="text-[11px] text-zinc-500">
+              <p className="text-[11px] text-zinc-500 ui-text-meta">
                 All existing charges and recorded advance payments remain intact on this stay folio.
               </p>
             </div>
             <div className="text-right pl-3 shrink-0">
-              <span className="text-[10px] font-mono uppercase text-zinc-400 block">Live Balance</span>
-              <span className="text-xs font-mono font-bold text-zinc-800 dark:text-zinc-200">
+              <span className="text-[10px] font-mono uppercase text-zinc-400 block ui-text-meta ui-font-body">Live Balance</span>
+              <span className="text-xs font-mono font-bold text-zinc-800 dark:text-zinc-200 ui-text-body ui-font-body ui-weight-medium">
                 {formatINR(folioBalance)}
               </span>
             </div>
           </div>
 
           {/* Operational notice */}
-          <div className="text-[11px] text-zinc-500 dark:text-zinc-400 flex items-center gap-2 px-1">
+          <div className="text-[11px] text-zinc-500 dark:text-zinc-400 flex items-center gap-2 px-1 ui-text-meta">
             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
             <span>
               Previous Room {activeRoom?.number || "-"} will be set to VACANT DIRTY with an automated Checkout Cleaning housekeeping task created.
@@ -443,14 +446,14 @@ export function TransferRoomModal({
               type="button"
               onClick={onClose}
               disabled={loading}
-              className="px-4 py-2 rounded-xl text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+              className="px-4 py-2 rounded-xl text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors ui-radius-control ui-text-body ui-control"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={loading || !targetRoomId}
-              className="flex items-center gap-2 px-5 py-2 rounded-xl text-xs font-semibold bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white transition-colors cursor-pointer shadow-lg shadow-amber-500/20"
+              className="flex items-center gap-2 px-5 py-2 rounded-xl text-xs font-semibold bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white transition-colors cursor-pointer shadow-lg shadow-amber-500/20 ui-radius-control ui-text-body ui-control"
             >
               <ArrowRightLeft className="w-4 h-4" />
               <span>{loading ? "Transferring..." : "Confirm Room Transfer"}</span>

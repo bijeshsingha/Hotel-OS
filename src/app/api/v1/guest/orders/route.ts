@@ -1,3 +1,4 @@
+import { authorizeRequest, getApiAccess } from "@/lib/auth/api-access";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { calculateGST } from "@/lib/gst/calculator";
@@ -142,6 +143,10 @@ function computeOrderTracker(order: any, propStateCode = "18") {
 }
 
 export async function GET(request: Request) {
+  const access = await authorizeRequest(request);
+  if (access instanceof Response) return access;
+  request = access.request;
+
   try {
     const { searchParams } = new URL(request.url);
     const roomParam = searchParams.get("room");
@@ -213,6 +218,10 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const access = await authorizeRequest(request);
+  if (access instanceof Response) return access;
+  request = access.request;
+
   try {
     const body = await request.json();
     const {
@@ -404,6 +413,10 @@ export async function POST(request: Request) {
 
 // PATCH endpoint to advance / simulate kitchen order status for testing & POS runner updates
 export async function PATCH(request: Request) {
+  const access = await authorizeRequest(request);
+  if (access instanceof Response) return access;
+  request = access.request;
+
   try {
     const body = await request.json();
     const { orderId, status } = body; // "PREPARING", "OUT_FOR_DELIVERY", "DELIVERED", "COMPLETED"

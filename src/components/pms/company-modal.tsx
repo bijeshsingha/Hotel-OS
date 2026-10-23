@@ -117,23 +117,23 @@ export function AddCompanyModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[100] overflow-y-auto bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 animate-in fade-in">
-      <div className="w-full max-w-2xl bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
+    <div className="fixed inset-0 z-[100] overflow-y-auto bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4  ">
+      <div className="w-full max-w-2xl bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh] ui-radius-panel ui-dialog-surface ui-surface">
         
         {/* Modal Header */}
         <div className="p-4 sm:p-5 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between bg-zinc-50/80 dark:bg-zinc-900/50 shrink-0">
           <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-xl bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 flex items-center justify-center shadow-xs">
+            <div className="h-10 w-10 rounded-xl bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 flex items-center justify-center shadow-xs ui-shadow-quiet">
               <Building2 className="h-5 w-5" />
             </div>
             <div>
               <h3 className="text-base sm:text-lg font-semibold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
                 <span>Add Company / Travel Agent Master</span>
-                <span className="text-[10px] font-mono font-medium bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 px-2 py-0.5 rounded-full border border-zinc-200 dark:border-zinc-700">
+                <span className="text-[10px] font-mono font-medium bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 px-2 py-0.5 rounded-full border border-zinc-200 dark:border-zinc-700 ui-text-meta ui-font-body">
                   B2B Corporate
                 </span>
               </h3>
-              <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+              <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5 ui-text-body">
                 Register corporate clients, travel agents, and OTAs for quick selection in GRC & Future Bookings.
               </p>
             </div>
@@ -141,7 +141,7 @@ export function AddCompanyModal({
 
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition cursor-pointer"
+            className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition cursor-pointer ui-control"
           >
             <X className="h-5 w-5" />
           </button>
@@ -149,7 +149,7 @@ export function AddCompanyModal({
 
         {/* Error Alert */}
         {error && (
-          <div className="mx-4 sm:mx-6 mt-3.5 p-3 rounded-lg bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-xs flex items-center gap-2 font-medium">
+          <div className="mx-4 sm:mx-6 mt-3.5 p-3 rounded-lg bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-xs flex items-center gap-2 font-medium ui-text-body">
             <AlertCircle className="h-4 w-4 shrink-0 text-rose-600 dark:text-rose-400" />
             <span>{error}</span>
           </div>
@@ -163,11 +163,11 @@ export function AddCompanyModal({
             <button
               type="button"
               onClick={() => setForm({ ...form, accountType: "COMPANY" })}
-              className={`py-1.5 px-3 rounded-md text-xs font-medium transition flex items-center justify-center gap-2 cursor-pointer ${
+              className={`py-1.5 px-3 rounded-md text-xs font-medium transition flex items-center justify-center gap-2 cursor-pointer  ui-text-body ${
                 form.accountType === "COMPANY"
-                  ? "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-xs border border-zinc-200/80 dark:border-zinc-700 font-semibold"
+                  ? "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-xs border border-zinc-200/80 dark:border-zinc-700 font-semibold ui-shadow-quiet"
                   : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
-              }`}
+              } ui-control`}
             >
               <Briefcase className="h-3.5 w-3.5" />
               <span>Corporate Company</span>
@@ -176,11 +176,11 @@ export function AddCompanyModal({
             <button
               type="button"
               onClick={() => setForm({ ...form, accountType: "TRAVEL_AGENT" })}
-              className={`py-1.5 px-3 rounded-md text-xs font-medium transition flex items-center justify-center gap-2 cursor-pointer ${
+              className={`py-1.5 px-3 rounded-md text-xs font-medium transition flex items-center justify-center gap-2 cursor-pointer  ui-text-body ${
                 form.accountType === "TRAVEL_AGENT"
-                  ? "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-xs border border-zinc-200/80 dark:border-zinc-700 font-semibold"
+                  ? "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-xs border border-zinc-200/80 dark:border-zinc-700 font-semibold ui-shadow-quiet"
                   : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
-              }`}
+              } ui-control`}
             >
               <Building2 className="h-3.5 w-3.5" />
               <span>Travel Agency / Agent</span>
@@ -189,11 +189,11 @@ export function AddCompanyModal({
             <button
               type="button"
               onClick={() => setForm({ ...form, accountType: "OTA" })}
-              className={`py-1.5 px-3 rounded-md text-xs font-medium transition flex items-center justify-center gap-2 cursor-pointer ${
+              className={`py-1.5 px-3 rounded-md text-xs font-medium transition flex items-center justify-center gap-2 cursor-pointer  ui-text-body ${
                 form.accountType === "OTA"
-                  ? "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-xs border border-zinc-200/80 dark:border-zinc-700 font-semibold"
+                  ? "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-xs border border-zinc-200/80 dark:border-zinc-700 font-semibold ui-shadow-quiet"
                   : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
-              }`}
+              } ui-control`}
             >
               <FileText className="h-3.5 w-3.5" />
               <span>Online OTA / Portal</span>
@@ -203,7 +203,7 @@ export function AddCompanyModal({
           {/* Primary Details */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="sm:col-span-2 space-y-1">
-              <label className="text-[11px] font-semibold text-zinc-700 dark:text-zinc-300">
+              <label className="text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 ui-text-meta ui-label">
                 Company / Agency Account Name <span className="text-rose-500">*</span>
               </label>
               <input
@@ -212,12 +212,12 @@ export function AddCompanyModal({
                 placeholder="e.g. ABB INDIA LTD or Asian Paint Ltd."
                 value={form.accountName}
                 onChange={(e) => setForm({ ...form, accountName: e.target.value })}
-                className="w-full h-9 px-3 rounded-lg bg-white dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-zinc-100 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all shadow-xs"
+                className="w-full h-9 px-3 rounded-lg bg-white dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-zinc-100 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors shadow-xs ui-text-body ui-shadow-quiet ui-field" aria-label="Company / Agency Account Name"
               />
             </div>
 
             <div className="space-y-1">
-              <label className="text-[11px] font-semibold text-zinc-700 dark:text-zinc-300">
+              <label className="text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 ui-text-meta ui-label">
                 Short Name / Code
               </label>
               <input
@@ -225,7 +225,7 @@ export function AddCompanyModal({
                 placeholder="e.g. MMT, SCS, YCS"
                 value={form.shortName}
                 onChange={(e) => setForm({ ...form, shortName: e.target.value })}
-                className="w-full h-9 px-3 rounded-lg bg-white dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-zinc-100 font-mono focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all shadow-xs"
+                className="w-full h-9 px-3 rounded-lg bg-white dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-zinc-100 font-mono focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors shadow-xs ui-text-body ui-font-body ui-shadow-quiet ui-field" aria-label="Short Name / Code"
               />
             </div>
           </div>
@@ -233,7 +233,7 @@ export function AddCompanyModal({
           {/* GSTIN & Tax Details */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1">
-              <label className="text-[11px] font-semibold text-zinc-700 dark:text-zinc-300">
+              <label className="text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 ui-text-meta ui-label">
                 GSTIN Number (15-Digit B2B Tax Credit)
               </label>
               <input
@@ -242,12 +242,12 @@ export function AddCompanyModal({
                 placeholder="e.g. 18AAACA3834B1Z7"
                 value={form.gstin}
                 onChange={(e) => setForm({ ...form, gstin: e.target.value.toUpperCase() })}
-                className="w-full h-9 px-3 rounded-lg bg-white dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-zinc-100 font-mono uppercase focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all shadow-xs font-semibold"
+                className="w-full h-9 px-3 rounded-lg bg-white dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-zinc-100 font-mono uppercase focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors shadow-xs font-semibold ui-text-body ui-font-body ui-shadow-quiet ui-field" aria-label="GSTIN Number (15-Digit B2B Tax Credit)"
               />
             </div>
 
             <div className="space-y-1">
-              <label className="text-[11px] font-semibold text-zinc-700 dark:text-zinc-300">
+              <label className="text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 ui-text-meta ui-label">
                 PAN Number
               </label>
               <input
@@ -256,7 +256,7 @@ export function AddCompanyModal({
                 placeholder="e.g. AAACA3834B"
                 value={form.panNo}
                 onChange={(e) => setForm({ ...form, panNo: e.target.value.toUpperCase() })}
-                className="w-full h-9 px-3 rounded-lg bg-white dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-zinc-100 font-mono uppercase focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all shadow-xs"
+                className="w-full h-9 px-3 rounded-lg bg-white dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-zinc-100 font-mono uppercase focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors shadow-xs ui-text-body ui-font-body ui-shadow-quiet ui-field" aria-label="PAN Number"
               />
             </div>
           </div>
@@ -264,7 +264,7 @@ export function AddCompanyModal({
           {/* Contacts */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="space-y-1">
-              <label className="text-[11px] font-semibold text-zinc-700 dark:text-zinc-300">
+              <label className="text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 ui-text-meta ui-label">
                 Mobile Number
               </label>
               <input
@@ -272,12 +272,12 @@ export function AddCompanyModal({
                 placeholder="10-digit phone"
                 value={form.mobile}
                 onChange={(e) => setForm({ ...form, mobile: e.target.value })}
-                className="w-full h-9 px-3 rounded-lg bg-white dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-zinc-100 font-mono focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all shadow-xs"
+                className="w-full h-9 px-3 rounded-lg bg-white dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-zinc-100 font-mono focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors shadow-xs ui-text-body ui-font-body ui-shadow-quiet ui-field" aria-label="Mobile Number"
               />
             </div>
 
             <div className="space-y-1">
-              <label className="text-[11px] font-semibold text-zinc-700 dark:text-zinc-300">
+              <label className="text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 ui-text-meta ui-label">
                 Landline / Phone
               </label>
               <input
@@ -285,12 +285,12 @@ export function AddCompanyModal({
                 placeholder="Landline / office phone"
                 value={form.phone}
                 onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                className="w-full h-9 px-3 rounded-lg bg-white dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-zinc-100 font-mono focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all shadow-xs"
+                className="w-full h-9 px-3 rounded-lg bg-white dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-zinc-100 font-mono focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors shadow-xs ui-text-body ui-font-body ui-shadow-quiet ui-field" aria-label="Landline / Phone"
               />
             </div>
 
             <div className="space-y-1">
-              <label className="text-[11px] font-semibold text-zinc-700 dark:text-zinc-300">
+              <label className="text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 ui-text-meta ui-label">
                 Email Address
               </label>
               <input
@@ -298,7 +298,7 @@ export function AddCompanyModal({
                 placeholder="accounts@company.com"
                 value={form.email}
                 onChange={(e) => setForm({ ...form, email: e.target.value })}
-                className="w-full h-9 px-3 rounded-lg bg-white dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all shadow-xs"
+                className="w-full h-9 px-3 rounded-lg bg-white dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors shadow-xs ui-text-body ui-shadow-quiet ui-field" aria-label="Email Address"
               />
             </div>
           </div>
@@ -306,7 +306,7 @@ export function AddCompanyModal({
           {/* Location & Address */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="space-y-1">
-              <label className="text-[11px] font-semibold text-zinc-700 dark:text-zinc-300">
+              <label className="text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 ui-text-meta ui-label">
                 City / Region
               </label>
               <input
@@ -314,12 +314,12 @@ export function AddCompanyModal({
                 placeholder="e.g. Guwahati / Kolkata / Delhi"
                 value={form.city}
                 onChange={(e) => setForm({ ...form, city: e.target.value })}
-                className="w-full h-9 px-3 rounded-lg bg-white dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all shadow-xs"
+                className="w-full h-9 px-3 rounded-lg bg-white dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors shadow-xs ui-text-body ui-shadow-quiet ui-field" aria-label="City / Region"
               />
             </div>
 
             <div className="sm:col-span-2 space-y-1">
-              <label className="text-[11px] font-semibold text-zinc-700 dark:text-zinc-300">
+              <label className="text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 ui-text-meta ui-label">
                 Full Registered Billing Address
               </label>
               <input
@@ -327,7 +327,7 @@ export function AddCompanyModal({
                 placeholder="Street address, building, pin code"
                 value={form.address}
                 onChange={(e) => setForm({ ...form, address: e.target.value })}
-                className="w-full h-9 px-3 rounded-lg bg-white dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all shadow-xs"
+                className="w-full h-9 px-3 rounded-lg bg-white dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors shadow-xs ui-text-body ui-shadow-quiet ui-field" aria-label="Full Registered Billing Address"
               />
             </div>
           </div>
@@ -335,13 +335,13 @@ export function AddCompanyModal({
           {/* Financial & Commercial Terms */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-zinc-200 dark:border-zinc-800">
             <div className="space-y-1">
-              <label className="text-[11px] font-semibold text-zinc-700 dark:text-zinc-300">
+              <label className="text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 ui-text-meta ui-label">
                 Default Food Plan
               </label>
               <select
                 value={form.foodPlan}
                 onChange={(e) => setForm({ ...form, foodPlan: e.target.value })}
-                className="w-full h-9 px-3 rounded-lg bg-white dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-zinc-100 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all shadow-xs cursor-pointer"
+                className="w-full h-9 px-3 rounded-lg bg-white dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-zinc-100 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors shadow-xs cursor-pointer ui-text-body ui-shadow-quiet ui-field" aria-label="Default Food Plan"
               >
                 <option value="EP">EP (Room Only)</option>
                 <option value="CP">CP (Continental / Breakfast)</option>
@@ -351,7 +351,7 @@ export function AddCompanyModal({
             </div>
 
             <div className="space-y-1">
-              <label className="text-[11px] font-semibold text-zinc-700 dark:text-zinc-300">
+              <label className="text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 ui-text-meta ui-label">
                 Credit Limit (₹ Max BTC)
               </label>
               <input
@@ -359,12 +359,12 @@ export function AddCompanyModal({
                 placeholder="0"
                 value={form.creditLimit}
                 onChange={(e) => setForm({ ...form, creditLimit: Number(e.target.value) })}
-                className="w-full h-9 px-3 rounded-lg bg-white dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-zinc-100 font-mono focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all shadow-xs"
+                className="w-full h-9 px-3 rounded-lg bg-white dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-zinc-100 font-mono focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors shadow-xs ui-text-body ui-font-body ui-shadow-quiet ui-field" aria-label="Credit Limit (₹ Max BTC)"
               />
             </div>
 
             <div className="space-y-1">
-              <label className="text-[11px] font-semibold text-zinc-700 dark:text-zinc-300">
+              <label className="text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 ui-text-meta ui-label">
                 Agent Commission (%)
               </label>
               <input
@@ -374,14 +374,14 @@ export function AddCompanyModal({
                 placeholder="0"
                 value={form.commissionPercent}
                 onChange={(e) => setForm({ ...form, commissionPercent: Number(e.target.value) })}
-                className="w-full h-9 px-3 rounded-lg bg-white dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-zinc-100 font-mono focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all shadow-xs"
+                className="w-full h-9 px-3 rounded-lg bg-white dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-zinc-100 font-mono focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors shadow-xs ui-text-body ui-font-body ui-shadow-quiet ui-field" aria-label="Agent Commission (%)"
               />
             </div>
           </div>
 
           {/* Remarks */}
           <div className="space-y-1">
-            <label className="text-[11px] font-semibold text-zinc-700 dark:text-zinc-300">
+            <label className="text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 ui-text-meta ui-label">
               Remarks / Special Billing Instructions
             </label>
             <input
@@ -389,7 +389,7 @@ export function AddCompanyModal({
               placeholder="e.g. 30-day BTC payment terms, requires manager approval for alcohol"
               value={form.remarks}
               onChange={(e) => setForm({ ...form, remarks: e.target.value })}
-              className="w-full h-9 px-3 rounded-lg bg-white dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all shadow-xs"
+              className="w-full h-9 px-3 rounded-lg bg-white dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors shadow-xs ui-text-body ui-shadow-quiet ui-field" aria-label="Remarks / Special Billing Instructions"
             />
           </div>
 
@@ -400,7 +400,7 @@ export function AddCompanyModal({
           <button
             type="button"
             onClick={onClose}
-            className="px-3.5 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 font-medium text-xs text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition cursor-pointer"
+            className="px-3.5 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 font-medium text-xs text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition cursor-pointer ui-text-body ui-control"
           >
             Cancel
           </button>
@@ -409,7 +409,7 @@ export function AddCompanyModal({
             type="button"
             disabled={loading}
             onClick={handleSubmit}
-            className="px-4 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-100 dark:hover:bg-zinc-200 text-white dark:text-zinc-900 font-medium text-xs transition flex items-center gap-1.5 shadow-xs disabled:opacity-50 cursor-pointer"
+            className="px-4 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-100 dark:hover:bg-zinc-200 text-white dark:text-zinc-900 font-medium text-xs transition flex items-center gap-1.5 shadow-xs disabled:opacity-50 cursor-pointer ui-text-body ui-shadow-quiet ui-control"
           >
             {loading ? (
               <span>Saving Master Profile...</span>

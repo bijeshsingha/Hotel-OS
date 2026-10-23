@@ -1,3 +1,4 @@
+import { authorizeRequest, getApiAccess } from "@/lib/auth/api-access";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { getNextDocumentNumber } from "@/lib/sequence/generator";
@@ -5,7 +6,7 @@ import { getMidnightDayBoundaries } from "@/lib/domain/daily-report-service";
 import { logAuditEvent } from "@/lib/domain/audit-service";
 import { archivePaymentSnapshot } from "@/lib/domain/payment-archive-service";
 
-export const CATEGORY_LABELS: Record<string, string> = {
+const CATEGORY_LABELS: Record<string, string> = {
   PAST_ROOM_SETTLEMENT: "Past Stay Room Settlement (Physical GRC)",
   BAR_FOOD_BILL: "Bar Food Orders (Kitchen Food Bill)",
   BAR_BEVERAGE_DIRECT: "Bar Food Orders (Kitchen Food Bill)", // Legacy alias
@@ -15,6 +16,10 @@ export const CATEGORY_LABELS: Record<string, string> = {
 };
 
 export async function GET(request: Request) {
+  const access = await authorizeRequest(request);
+  if (access instanceof Response) return access;
+  request = access.request;
+
   try {
     const { searchParams } = new URL(request.url);
     const propertyId = searchParams.get("propertyId");
@@ -90,6 +95,10 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const access = await authorizeRequest(request);
+  if (access instanceof Response) return access;
+  request = access.request;
+
   try {
     const body = await request.json();
     const {

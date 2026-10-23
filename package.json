@@ -1,6 +1,6 @@
 {
   "name": "hotel-os",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "",
   "main": "index.js",
   "scripts": {
@@ -12,7 +12,9 @@
     "db:seed": "tsx prisma/seed.ts",
     "db:generate": "prisma generate",
     "db:backup": "tsx scripts/db-backup.ts",
-    "db:restore": "tsx scripts/db-restore.ts"
+    "db:restore": "tsx scripts/db-restore.ts",
+    "test:auth": "tsx scripts/test-auth-security.ts",
+    "test:inventory": "tsx scripts/test-booking-inventory.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

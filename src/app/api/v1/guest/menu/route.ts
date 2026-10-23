@@ -1,7 +1,14 @@
+import { authorizeRequest, getApiAccess } from "@/lib/auth/api-access";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
+import { mayPerform } from "@/lib/auth/session";
+import { PERMISSIONS as P } from "@/lib/auth/roles";
 
 export async function GET(request: Request) {
+  const access = await authorizeRequest(request);
+  if (access instanceof Response) return access;
+  request = access.request;
+
   try {
     const { searchParams } = new URL(request.url);
     const propertyParam =
@@ -11,6 +18,7 @@ export async function GET(request: Request) {
       searchParams.get("propertyId");
 
     const allProperties = await prisma.property.findMany({
+      where: { id: { in: getApiAccess(request).properties.map((property) => property.id) } },
       select: { id: true, code: true, displayName: true, legalName: true, address: true, phone: true, email: true },
       orderBy: { createdAt: "asc" },
     });
@@ -26,6 +34,19 @@ export async function GET(request: Request) {
       matchedProperty = allProperties.find((p) => p.code === "GUW-01") || allProperties[0];
     }
     const propertyId = matchedProperty?.id || "";
+    const context = getApiAccess(request);
+    const capabilities = await Promise.all(context.properties.filter((candidate) => candidate.organizationId === context.property.organizationId).map(async (candidate) => {
+      const [managePos, createOrders, guests, folios] = await Promise.all([
+        mayPerform(context.user, candidate.id, candidate.organizationId, P.POS_MANAGE),
+        mayPerform(context.user, candidate.id, candidate.organizationId, P.POS_ORDER_CREATE),
+        mayPerform(context.user, candidate.id, candidate.organizationId, P.GUEST_PII_VIEW),
+        mayPerform(context.user, candidate.id, candidate.organizationId, P.FOLIO_VIEW),
+      ]);
+      return { propertyId: candidate.id, pos: managePos || createOrders, guests, folios };
+    }));
+    const permittedPosProperties = capabilities.filter((candidate) => candidate.pos).map((candidate) => candidate.propertyId);
+    const capabilityByProperty = new Map(capabilities.map((candidate) => [candidate.propertyId, candidate]));
+    const currentCapabilities = capabilityByProperty.get(propertyId);
 
     const property = await prisma.property.findUnique({
       where: { id: propertyId },
@@ -122,7 +143,7 @@ export async function GET(request: Request) {
 
     if (categories.length === 0) {
       const fallbackOutlet = await prisma.outlet.findFirst({
-        where: { name: { contains: "Ambarish Restaurant" } },
+        where: { propertyId: { in: permittedPosProperties }, name: { contains: "Ambarish Restaurant" } },
         include: {
           categories: {
             where: { active: true },
@@ -166,10 +187,10 @@ export async function GET(request: Request) {
         propertyName: property.displayName,
         stayId: stay?.id || null,
         folioId: folio?.id || null,
-        guestName: guest?.name || null,
-        guestPhone: guest?.phone || null,
+        guestName: currentCapabilities?.guests ? guest?.name || null : null,
+        guestPhone: currentCapabilities?.guests ? guest?.phone || null : null,
         isOccupied: !!activeAssignment && stay?.status === "IN_HOUSE",
-        currentFolioBalance,
+        currentFolioBalance: currentCapabilities?.folios ? currentFolioBalance : null,
       };
     });
 
@@ -178,7 +199,7 @@ export async function GET(request: Request) {
       where: {
         endsAt: null,
         stay: { status: "IN_HOUSE" },
-        room: { propertyId: { not: property.id } },
+        room: { propertyId: { not: property.id, in: permittedPosProperties } },
       },
       include: {
         room: {
@@ -203,6 +224,7 @@ export async function GET(request: Request) {
 
     const otherOccupiedRooms = otherOccupiedAssignments.map((a) => {
       const r = a.room;
+      const roomCapabilities = capabilityByProperty.get(r.propertyId);
       const stay = a.stay;
       const guest = stay.primaryGuest;
       const folio = stay.folio;
@@ -222,10 +244,10 @@ export async function GET(request: Request) {
         propertyName: r.property?.displayName || "Partner Hotel",
         stayId: stay.id,
         folioId: folio?.id || null,
-        guestName: guest?.name || null,
-        guestPhone: guest?.phone || null,
+        guestName: roomCapabilities?.guests ? guest?.name || null : null,
+        guestPhone: roomCapabilities?.guests ? guest?.phone || null : null,
         isOccupied: true,
-        currentFolioBalance,
+        currentFolioBalance: roomCapabilities?.folios ? currentFolioBalance : null,
       };
     });
 

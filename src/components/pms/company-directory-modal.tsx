@@ -178,8 +178,8 @@ export function CompanyDirectoryModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/80 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 md:p-6 animate-in fade-in">
-      <div className="w-full max-w-6xl bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[94vh]">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/80 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 md:p-6  ">
+      <div className="w-full max-w-6xl bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[94vh] ui-radius-panel ui-dialog-surface ui-surface">
         
         {/* ========================================================================= */}
         {/* 1. EXECUTIVE MODAL HEADER & METRICS                                       */}
@@ -187,20 +187,20 @@ export function CompanyDirectoryModal({
         <div className="p-4 sm:p-5 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/80 dark:bg-zinc-900/50 flex flex-col md:flex-row md:items-center justify-between gap-4 shrink-0">
           
           <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-xl bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 flex items-center justify-center shrink-0 shadow-xs">
+            <div className="h-10 w-10 rounded-xl bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 flex items-center justify-center shrink-0 shadow-xs ui-shadow-quiet">
               <Building2 className="h-5 w-5" />
             </div>
             <div>
               <div className="flex items-center gap-2 flex-wrap">
-                <h2 className="text-base sm:text-lg font-semibold text-zinc-900 dark:text-zinc-100 tracking-tight">
+                <h2 className="text-base sm:text-lg font-semibold text-zinc-900 dark:text-zinc-100 tracking-tight ui-section-title">
                   Corporate & Travel Agent Master
                 </h2>
-                <span className="inline-flex items-center gap-1.5 text-[11px] font-medium font-mono px-2.5 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/50">
+                <span className="inline-flex items-center gap-1.5 text-[11px] font-medium font-mono px-2.5 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/50 ui-text-meta ui-font-body">
                   <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
                   {totalCount} Active Master Records
                 </span>
               </div>
-              <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+              <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5 ui-text-body">
                 Central B2B Corporate Ledger • 15-Digit GSTIN ITC Profiles • Travel Agencies & OTA Channels
               </p>
             </div>
@@ -211,7 +211,7 @@ export function CompanyDirectoryModal({
             <button
               type="button"
               onClick={() => setShowAddModal(true)}
-              className="h-9 px-3.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-100 dark:hover:bg-zinc-200 text-white dark:text-zinc-900 font-medium text-xs flex items-center gap-1.5 transition shadow-xs cursor-pointer"
+              className="h-9 px-3.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-100 dark:hover:bg-zinc-200 text-white dark:text-zinc-900 font-medium text-xs flex items-center gap-1.5 transition shadow-xs cursor-pointer ui-text-body ui-shadow-quiet ui-control ui-control-sized"
             >
               <Plus className="h-4 w-4" />
               <span>Add Company / Agent</span>
@@ -219,7 +219,7 @@ export function CompanyDirectoryModal({
 
             <button
               onClick={onClose}
-              className="h-9 w-9 rounded-lg text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 flex items-center justify-center transition cursor-pointer"
+              className="h-9 w-9 rounded-lg text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 flex items-center justify-center transition cursor-pointer ui-control ui-control-sized"
             >
               <X className="h-4 w-4" />
             </button>
@@ -240,12 +240,12 @@ export function CompanyDirectoryModal({
               placeholder="Search by company, short code, GSTIN, phone, city, or address..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full h-9 pl-9 pr-8 rounded-lg bg-white dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all shadow-xs font-medium"
+              className="w-full h-9 pl-9 pr-8 rounded-lg bg-white dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors shadow-xs font-medium ui-text-body ui-shadow-quiet ui-field" aria-label="Search by company, short code, GSTIN, phone, city, or address"
             />
             {search && (
               <button
                 onClick={() => setSearch("")}
-                className="absolute right-2.5 top-2.5 text-zinc-400 hover:text-zinc-700 dark:hover:text-white"
+                className="absolute right-2.5 top-2.5 text-zinc-400 hover:text-zinc-700 dark:hover:text-white ui-control"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -253,15 +253,15 @@ export function CompanyDirectoryModal({
           </div>
 
           {/* Segmented Filter Pills */}
-          <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-900/80 p-1 rounded-lg border border-zinc-200 dark:border-zinc-800 text-xs font-medium overflow-x-auto">
+          <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-900/80 p-1 rounded-lg border border-zinc-200 dark:border-zinc-800 text-xs font-medium overflow-x-auto ui-text-body">
             <button
               type="button"
               onClick={() => setTypeFilter("ALL")}
               className={`px-3 py-1.5 rounded-md transition whitespace-nowrap cursor-pointer ${
                 typeFilter === "ALL"
-                  ? "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-xs font-semibold"
+                  ? "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-xs font-semibold ui-shadow-quiet"
                   : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
-              }`}
+              } ui-control`}
             >
               All ({totalCount})
             </button>
@@ -271,9 +271,9 @@ export function CompanyDirectoryModal({
               onClick={() => setTypeFilter("COMPANY")}
               className={`px-3 py-1.5 rounded-md transition flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
                 typeFilter === "COMPANY"
-                  ? "bg-white dark:bg-zinc-800 text-emerald-700 dark:text-emerald-400 shadow-xs font-semibold"
+                  ? "bg-white dark:bg-zinc-800 text-emerald-700 dark:text-emerald-400 shadow-xs font-semibold ui-shadow-quiet"
                   : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
-              }`}
+              } ui-control`}
             >
               <Briefcase className="h-3.5 w-3.5" />
               <span>Corporates ({corporateCount})</span>
@@ -284,9 +284,9 @@ export function CompanyDirectoryModal({
               onClick={() => setTypeFilter("TRAVEL_AGENT")}
               className={`px-3 py-1.5 rounded-md transition flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
                 typeFilter === "TRAVEL_AGENT"
-                  ? "bg-white dark:bg-zinc-800 text-purple-700 dark:text-purple-400 shadow-xs font-semibold"
+                  ? "bg-white dark:bg-zinc-800 text-purple-700 dark:text-purple-400 shadow-xs font-semibold ui-shadow-quiet"
                   : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
-              }`}
+              } ui-control`}
             >
               <Compass className="h-3.5 w-3.5" />
               <span>Agents ({agentCount})</span>
@@ -297,9 +297,9 @@ export function CompanyDirectoryModal({
               onClick={() => setTypeFilter("OTA")}
               className={`px-3 py-1.5 rounded-md transition flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
                 typeFilter === "OTA"
-                  ? "bg-white dark:bg-zinc-800 text-blue-700 dark:text-blue-400 shadow-xs font-semibold"
+                  ? "bg-white dark:bg-zinc-800 text-blue-700 dark:text-blue-400 shadow-xs font-semibold ui-shadow-quiet"
                   : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
-              }`}
+              } ui-control`}
             >
               <Globe className="h-3.5 w-3.5" />
               <span>OTAs ({otaCount})</span>
@@ -312,11 +312,11 @@ export function CompanyDirectoryModal({
         {/* 3. MASTER DIRECTORY ENTERPRISE TABLE                                      */}
         {/* ========================================================================= */}
         <div className="overflow-x-auto overflow-y-auto flex-1 bg-white dark:bg-[#121215]">
-          <table className="w-full text-left border-collapse text-xs">
+          <table className="w-full text-left border-collapse text-xs ui-text-body ui-data-table">
             
             {/* Header Row */}
             <thead>
-              <tr className="border-b border-zinc-200 dark:border-zinc-800 text-[11px] font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 bg-zinc-50/90 dark:bg-zinc-900/90 sticky top-0 z-10 backdrop-blur-xs">
+              <tr className="border-b border-zinc-200 dark:border-zinc-800 text-[11px] font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 bg-zinc-50/90 dark:bg-zinc-900/90 sticky top-0 z-10 backdrop-blur-xs ui-text-meta">
                 <th className="py-3 px-4">Company / Account Name</th>
                 <th className="py-3 px-4">Account Type</th>
                 <th className="py-3 px-4">GSTIN (B2B Tax Credit)</th>
@@ -331,7 +331,7 @@ export function CompanyDirectoryModal({
             <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800/80">
               {companies.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-16 text-center text-zinc-400 font-mono text-xs">
+                  <td colSpan={7} className="py-16 text-center text-zinc-400 font-mono text-xs ui-font-body ui-text-body">
                     <div className="flex flex-col items-center justify-center space-y-2">
                       <Search className="h-8 w-8 text-zinc-300 dark:text-zinc-700" />
                       <span className="font-semibold text-zinc-700 dark:text-zinc-300">
@@ -342,7 +342,7 @@ export function CompanyDirectoryModal({
                           setSearch("");
                           setTypeFilter("ALL");
                         }}
-                        className="text-blue-600 dark:text-blue-400 text-xs font-medium hover:underline cursor-pointer"
+                        className="text-blue-600 dark:text-blue-400 text-xs font-medium hover:underline cursor-pointer ui-text-body ui-control"
                       >
                         Reset search filters
                       </button>
@@ -368,7 +368,7 @@ export function CompanyDirectoryModal({
                           
                           {/* Monogram Box */}
                           <div
-                            className={`h-8 w-8 rounded-lg flex items-center justify-center text-xs font-semibold shrink-0 border ${
+                            className={`h-8 w-8 rounded-lg flex items-center justify-center text-xs font-semibold shrink-0 border  ui-text-body ${
                               isCorporate
                                 ? "bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/60"
                                 : isOTA
@@ -381,22 +381,22 @@ export function CompanyDirectoryModal({
 
                           <div className="space-y-0.5 min-w-0">
                             <div className="flex items-center gap-1.5 flex-wrap">
-                              <span className="font-semibold text-zinc-900 dark:text-zinc-100 text-xs tracking-tight group-hover:text-blue-600 dark:group-hover:text-blue-400 transition">
+                              <span className="font-semibold text-zinc-900 dark:text-zinc-100 text-xs tracking-tight group-hover:text-blue-600 dark:group-hover:text-blue-400 transition ui-text-body">
                                 {c.accountName}
                               </span>
                               {c.shortName && (
-                                <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700">
+                                <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700 ui-text-meta ui-font-body">
                                   {c.shortName}
                                 </span>
                               )}
                             </div>
 
                             {c.remarks ? (
-                              <p className="text-[11px] text-zinc-500 dark:text-zinc-400 truncate max-w-xs">
+                              <p className="text-[11px] text-zinc-500 dark:text-zinc-400 truncate max-w-xs ui-text-meta">
                                 {c.remarks}
                               </p>
                             ) : (
-                              <p className="text-[11px] text-zinc-400 dark:text-zinc-500 font-mono">
+                              <p className="text-[11px] text-zinc-400 dark:text-zinc-500 font-mono ui-text-meta ui-font-body">
                                 Registered Master B2B Account
                               </p>
                             )}
@@ -408,21 +408,21 @@ export function CompanyDirectoryModal({
                       {/* 2. Account Type Pill */}
                       <td className="py-3 px-4 whitespace-nowrap">
                         {isCorporate && (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/50 font-medium text-[11px]">
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/50 font-medium text-[11px] ui-text-meta">
                             <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
                             <span>Corporate B2B</span>
                           </span>
                         )}
 
                         {isOTA && (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-800/50 font-medium text-[11px]">
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-800/50 font-medium text-[11px] ui-text-meta">
                             <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />
                             <span>OTA Channel</span>
                           </span>
                         )}
 
                         {isAgent && (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-400 border border-purple-200 dark:border-purple-800/50 font-medium text-[11px]">
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-400 border border-purple-200 dark:border-purple-800/50 font-medium text-[11px] ui-text-meta">
                             <span className="h-1.5 w-1.5 rounded-full bg-purple-500" />
                             <span>Travel Agent</span>
                           </span>
@@ -433,15 +433,15 @@ export function CompanyDirectoryModal({
                       <td className="py-3 px-4">
                         {c.gstin ? (
                           <div className="space-y-0.5">
-                            <div className="flex items-center gap-1.5 font-mono">
-                              <span className="font-medium text-zinc-900 dark:text-zinc-100 text-xs tracking-tight bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded border border-zinc-200 dark:border-zinc-700">
+                            <div className="flex items-center gap-1.5 font-mono ui-font-body">
+                              <span className="font-medium text-zinc-900 dark:text-zinc-100 text-xs tracking-tight bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded border border-zinc-200 dark:border-zinc-700 ui-text-body">
                                 {c.gstin}
                               </span>
                               <button
                                 type="button"
                                 onClick={() => handleCopy(c.gstin!)}
                                 title="Copy GSTIN"
-                                className="p-1 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 transition cursor-pointer"
+                                className="p-1 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 transition cursor-pointer ui-control" aria-label="Copy GSTIN"
                               >
                                 {copiedGstin === c.gstin ? (
                                   <Check className="h-3.5 w-3.5 text-emerald-600" />
@@ -451,13 +451,13 @@ export function CompanyDirectoryModal({
                               </button>
                             </div>
                             {stateBadge && (
-                              <div className="text-[10px] text-zinc-500 font-mono">
+                              <div className="text-[10px] text-zinc-500 font-mono ui-text-meta ui-font-body">
                                 {stateBadge}
                               </div>
                             )}
                           </div>
                         ) : (
-                          <span className="text-zinc-400 font-mono text-xs">
+                          <span className="text-zinc-400 font-mono text-xs ui-font-body ui-text-body">
                             —
                           </span>
                         )}
@@ -465,7 +465,7 @@ export function CompanyDirectoryModal({
 
                       {/* 4. Contact Phone & Email */}
                       <td className="py-3 px-4">
-                        <div className="space-y-0.5 font-mono text-xs">
+                        <div className="space-y-0.5 font-mono text-xs ui-font-body ui-text-body">
                           {(c.mobile || c.phone) ? (
                             <a
                               href={`tel:${c.mobile || c.phone}`}
@@ -475,13 +475,13 @@ export function CompanyDirectoryModal({
                               <span>{c.mobile || c.phone}</span>
                             </a>
                           ) : (
-                            <span className="text-zinc-400 font-mono">—</span>
+                            <span className="text-zinc-400 font-mono ui-font-body">—</span>
                           )}
 
                           {c.email && (
                             <a
                               href={`mailto:${c.email}`}
-                              className="text-[11px] text-zinc-500 dark:text-zinc-400 hover:text-blue-600 dark:hover:text-blue-400 flex items-center gap-1.5 truncate max-w-[180px]"
+                              className="text-[11px] text-zinc-500 dark:text-zinc-400 hover:text-blue-600 dark:hover:text-blue-400 flex items-center gap-1.5 truncate max-w-[180px] ui-text-meta"
                             >
                               <Mail className="h-3 w-3 text-zinc-400 shrink-0" />
                               <span className="truncate">{c.email}</span>
@@ -494,34 +494,34 @@ export function CompanyDirectoryModal({
                       <td className="py-3 px-4">
                         <div className="space-y-0.5 max-w-xs">
                           {c.city ? (
-                            <div className="font-semibold text-zinc-900 dark:text-zinc-100 text-xs flex items-center gap-1">
+                            <div className="font-semibold text-zinc-900 dark:text-zinc-100 text-xs flex items-center gap-1 ui-text-body">
                               <MapPin className="h-3 w-3 text-rose-500 shrink-0" />
                               <span>{c.city}</span>
                             </div>
                           ) : null}
 
                           {c.address ? (
-                            <p className="text-[11px] text-zinc-500 dark:text-zinc-400 line-clamp-1" title={c.address}>
+                            <p className="text-[11px] text-zinc-500 dark:text-zinc-400 line-clamp-1 ui-text-meta" title={c.address}>
                               {c.address}
                             </p>
                           ) : (
-                            <span className="text-zinc-400 font-mono">—</span>
+                            <span className="text-zinc-400 font-mono ui-font-body">—</span>
                           )}
                         </div>
                       </td>
 
                       {/* 6. Terms & Food Plan */}
                       <td className="py-3 px-4 whitespace-nowrap">
-                        <div className="space-y-0.5 font-mono">
-                          <span className="inline-block px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 font-medium text-[11px]">
+                        <div className="space-y-0.5 font-mono ui-font-body">
+                          <span className="inline-block px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 font-medium text-[11px] ui-text-meta">
                             {c.foodPlan || "EP"}
                           </span>
                           {c.commissionPercent ? (
-                            <div className="text-[11px] font-medium text-amber-600 dark:text-amber-400">
+                            <div className="text-[11px] font-medium text-amber-600 dark:text-amber-400 ui-text-meta">
                               {c.commissionPercent}% Comm.
                             </div>
                           ) : (
-                            <div className="text-[10px] text-zinc-500">
+                            <div className="text-[10px] text-zinc-500 ui-text-meta">
                               Cr Limit: ₹{c.creditLimit || 0}
                             </div>
                           )}
@@ -540,7 +540,7 @@ export function CompanyDirectoryModal({
                               setSelectedCompanyDetail(c);
                             }
                           }}
-                          className="h-8 px-3 rounded-md bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-100 dark:hover:bg-zinc-200 text-white dark:text-zinc-900 font-medium text-xs transition inline-flex items-center gap-1.5 shadow-xs cursor-pointer"
+                          className="h-8 px-3 rounded-md bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-100 dark:hover:bg-zinc-200 text-white dark:text-zinc-900 font-medium text-xs transition inline-flex items-center gap-1.5 shadow-xs cursor-pointer ui-text-body ui-shadow-quiet ui-control ui-control-sized"
                         >
                           <CalendarPlus className="h-3.5 w-3.5" />
                           <span>Book Stay</span>
@@ -559,9 +559,9 @@ export function CompanyDirectoryModal({
         {/* ========================================================================= */}
         {/* 4. FOOTER STATUS BAR                                                      */}
         {/* ========================================================================= */}
-        <div className="p-3.5 sm:p-4 border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50/60 dark:bg-zinc-900/40 flex items-center justify-between text-xs text-zinc-500 dark:text-zinc-400 shrink-0 font-medium">
+        <div className="p-3.5 sm:p-4 border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50/60 dark:bg-zinc-900/40 flex items-center justify-between text-xs text-zinc-500 dark:text-zinc-400 shrink-0 font-medium ui-text-body">
           <div className="flex items-center gap-2">
-            <span>Showing <strong className="text-zinc-900 dark:text-zinc-100 font-mono">{companies.length}</strong> of <strong className="text-zinc-900 dark:text-zinc-100 font-mono">{totalCount}</strong> Master Accounts</span>
+            <span>Showing <strong className="text-zinc-900 dark:text-zinc-100 font-mono ui-font-body">{companies.length}</strong> of <strong className="text-zinc-900 dark:text-zinc-100 font-mono ui-font-body">{totalCount}</strong> Master Accounts</span>
             <span>•</span>
             <span className="hidden sm:inline">Official GST Rule 46 Registered Entities</span>
           </div>
@@ -569,7 +569,7 @@ export function CompanyDirectoryModal({
           <button
             type="button"
             onClick={onClose}
-            className="px-3.5 py-1.5 rounded-lg bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 font-medium text-xs hover:bg-zinc-100 dark:hover:bg-zinc-700 transition cursor-pointer shadow-xs"
+            className="px-3.5 py-1.5 rounded-lg bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 font-medium text-xs hover:bg-zinc-100 dark:hover:bg-zinc-700 transition cursor-pointer shadow-xs ui-text-body ui-shadow-quiet ui-control"
           >
             Close Directory
           </button>
@@ -598,30 +598,30 @@ export function CompanyDirectoryModal({
       {/* ========================================================================= */}
       {selectedCompanyDetail && (
         <div className="fixed inset-0 z-[60] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-xl p-5 max-w-lg w-full space-y-4 shadow-2xl animate-in zoom-in-95">
+          <div className="bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-xl p-5 max-w-lg w-full space-y-4 shadow-2xl   ui-dialog-surface ui-surface">
             <div className="flex items-start justify-between border-b border-zinc-200 dark:border-zinc-800 pb-3">
               <div className="flex items-center gap-3">
-                <div className="h-9 w-9 rounded-lg bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 font-semibold flex items-center justify-center text-xs">
+                <div className="h-9 w-9 rounded-lg bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 font-semibold flex items-center justify-center text-xs ui-text-body">
                   {getInitials(selectedCompanyDetail.accountName)}
                 </div>
                 <div>
                   <h3 className="font-semibold text-sm text-zinc-900 dark:text-zinc-100">
                     {selectedCompanyDetail.accountName}
                   </h3>
-                  <span className="text-[11px] font-mono text-zinc-500">
+                  <span className="text-[11px] font-mono text-zinc-500 ui-text-meta ui-font-body">
                     {selectedCompanyDetail.accountType} &bull; {selectedCompanyDetail.city || "Assam"}
                   </span>
                 </div>
               </div>
               <button
                 onClick={() => setSelectedCompanyDetail(null)}
-                className="p-1 rounded-lg text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
+                className="p-1 rounded-lg text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 ui-control"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
 
-            <div className="space-y-2 text-xs font-mono bg-zinc-50 dark:bg-zinc-900/60 p-3.5 rounded-lg border border-zinc-200 dark:border-zinc-800">
+            <div className="space-y-2 text-xs font-mono bg-zinc-50 dark:bg-zinc-900/60 p-3.5 rounded-lg border border-zinc-200 dark:border-zinc-800 ui-text-body ui-font-body">
               <div className="flex justify-between">
                 <span className="text-zinc-500">GSTIN:</span>
                 <span className="font-semibold text-zinc-900 dark:text-zinc-100">{selectedCompanyDetail.gstin || "—"}</span>
@@ -653,7 +653,7 @@ export function CompanyDirectoryModal({
             <div className="flex items-center justify-end gap-2 pt-1">
               <button
                 onClick={() => setSelectedCompanyDetail(null)}
-                className="px-3.5 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition"
+                className="px-3.5 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition ui-text-body ui-control"
               >
                 Close
               </button>
@@ -665,7 +665,7 @@ export function CompanyDirectoryModal({
                   setSelectedCompanyDetail(null);
                   onClose();
                 }}
-                className="px-4 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-100 dark:hover:bg-zinc-200 text-white dark:text-zinc-900 text-xs font-medium flex items-center gap-1.5 shadow-xs transition"
+                className="px-4 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-100 dark:hover:bg-zinc-200 text-white dark:text-zinc-900 text-xs font-medium flex items-center gap-1.5 shadow-xs transition ui-text-body ui-shadow-quiet ui-control"
               >
                 <CalendarPlus className="h-3.5 w-3.5" />
                 <span>Create Booking For This Company</span>

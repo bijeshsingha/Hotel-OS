@@ -1,3 +1,4 @@
+import { authorizeRequest, getApiAccess } from "@/lib/auth/api-access";
 import { NextResponse } from "next/server";
 import { recordPayment } from "@/lib/domain/folio-service";
 import { logAuditEvent } from "@/lib/domain/audit-service";
@@ -6,6 +7,10 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const access = await authorizeRequest(request);
+  if (access instanceof Response) return access;
+  request = access.request;
+
   try {
     const { id: folioId } = await params;
     const body = await request.json();
@@ -63,6 +68,10 @@ export async function PUT(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const access = await authorizeRequest(request);
+  if (access instanceof Response) return access;
+  request = access.request;
+
   try {
     const { id: folioId } = await params;
     const body = await request.json();
@@ -208,6 +217,10 @@ export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const access = await authorizeRequest(request);
+  if (access instanceof Response) return access;
+  request = access.request;
+
   try {
     const { id: folioId } = await params;
     const { searchParams } = new URL(request.url);

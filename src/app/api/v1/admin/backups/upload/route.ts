@@ -1,3 +1,4 @@
+import { authorizeRequest, getApiAccess } from "@/lib/auth/api-access";
 import { NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
@@ -9,6 +10,10 @@ export const revalidate = 0;
 const BACKUPS_DIR = path.join(process.cwd(), "prisma", "backups");
 
 export async function POST(request: Request) {
+  const access = await authorizeRequest(request);
+  if (access instanceof Response) return access;
+  request = access.request;
+
   try {
     ensureBackupsDirExists();
 

@@ -1,7 +1,17 @@
+import type { Prisma } from "@prisma/client";
+import { carryReservationAdvance } from "./reservation-advance-service";
+import { additionalCheckinCollection } from "./reservation-advance";
 import { prisma } from "../db/prisma";
 import { calculateGST } from "../gst/calculator";
 import { getNextDocumentNumber } from "../sequence/generator";
 import { normalizeGuestName } from "./name-utils";
+import { sync24HourFolioCharges } from "./folio-service";
+import {
+  validateStayInterval,
+  toServiceDate,
+  intervalsOverlap,
+  DateValidationError,
+} from "./booking-dates";
 
 export interface QuoteRequest {
   propertyId: string;
@@ -36,375 +46,200 @@ export interface QuoteResult {
   availableRoomsCount: number;
 }
 
-export function getLocalHourMinute(date: Date | string): { hour: number; minute: number } {
-  const d = new Date(date);
-  try {
-    const formatter = new Intl.DateTimeFormat("en-US", {
-      timeZone: "Asia/Kolkata",
-      hour: "numeric",
-      minute: "numeric",
-      hour12: false,
-    });
-    const parts = formatter.formatToParts(d);
-    const hourPart = parts.find((p) => p.type === "hour")?.value;
-    const minutePart = parts.find((p) => p.type === "minute")?.value;
-    return {
-      hour: hourPart ? parseInt(hourPart, 10) : d.getHours(),
-      minute: minutePart ? parseInt(minutePart, 10) : d.getMinutes(),
-    };
-  } catch {
-    return { hour: d.getHours(), minute: d.getMinutes() };
-  }
+export {
+  getLocalHourMinute,
+  calculate24HrBillableDays,
+  calculateDynamicDepartureDate,
+  getEffectiveStayDeparture,
+} from "./stay-calculator";
+
+
+
+export interface RoomTypeAvailability {
+  roomTypeId: string;
+  roomTypeCode: string;
+  roomTypeName: string;
+  totalRooms: number;
+  occupiedOrBlocked: number;
+  availableCount: number;
+  capacity: number;
 }
-
-export function calculate24HrBillableDays(
-  arrivalAt: Date | string,
-  departureAt: Date | string,
-  checkoutType: "24_HOURS" | "FIXED_TIME" = "FIXED_TIME",
-  gracePeriodMinutes: number = 0
-): {
-  billableDays: number;
-  hoursElapsed: number;
-  gracePeriodApplied: boolean;
-  isEarlyBird: boolean;
-  checkoutDeadlineText: string;
-} {
-  const start = new Date(arrivalAt).getTime();
-  const end = new Date(departureAt).getTime();
-  const elapsedMinutes = Math.max(0, Math.round((end - start) / (1000 * 60)));
-  const hoursElapsed = Math.round((elapsedMinutes / 60) * 10) / 10;
-
-  // Check if check-in qualifies for Early Bird Offer (5:00 AM to 11:00 AM check-in)
-  const { hour: arrHour } = getLocalHourMinute(arrivalAt);
-  const isEarlyBird = arrHour >= 5 && arrHour < 11;
-
-  const isWaiveNextNight = gracePeriodMinutes >= 1440;
-  // If waiving next night, compute baseline nights without the 1440m grace
-  const effectiveGraceMinutes = isWaiveNextNight ? 0 : gracePeriodMinutes;
-
-  // STANDARD 11:00 AM - 12:00 PM FIXED TIME BILLING (DEFAULT - TWO-WAY GRACE: EARLY CHECK-IN & LATE CHECKOUT):
-  if (checkoutType === "FIXED_TIME" || !checkoutType) {
-    const arrDate = new Date(arrivalAt);
-    const endDate = new Date(departureAt);
-
-    // Base checkout noon on the day following arrival
-    const baseCheckoutNoon = new Date(arrDate);
-    baseCheckoutNoon.setDate(baseCheckoutNoon.getDate() + 1);
-    baseCheckoutNoon.setHours(12, 0, 0, 0);
-
-    // Operational Checkout Grace Buffer:
-    // Hotels provide a standard 60-minute buffer (until 1:00 PM) for guests packing/settling bill at desk,
-    // or the manager-selected grace period if greater.
-    const operationalGraceMinutes = Math.max(effectiveGraceMinutes, 60);
-    const checkoutGraceMs = operationalGraceMinutes * 60 * 1000;
-
-    let currentDeadlineMs = baseCheckoutNoon.getTime();
-    let regularNights = 1;
-
-    while (endDate.getTime() > currentDeadlineMs + checkoutGraceMs) {
-      regularNights++;
-      currentDeadlineMs += 24 * 60 * 60 * 1000;
-    }
-
-    const lateGraceApplied =
-      endDate.getTime() > currentDeadlineMs &&
-      endDate.getTime() <= currentDeadlineMs + checkoutGraceMs;
-
-    const unWaivedNights = regularNights;
-
-    let billableDays = unWaivedNights;
-    let graceApplied = lateGraceApplied;
-    let deadlineText = "";
-
-    if (isWaiveNextNight) {
-      if (unWaivedNights > 1) {
-        // Waive only the latest/next night
-        billableDays = unWaivedNights - 1;
-        graceApplied = true;
-        deadlineText = `Standard 11-12 PM (Next Night Waived • ${billableDays} of ${unWaivedNights} Billed)`;
-      } else {
-        // Not applicable when only 1 night stayed
-        billableDays = 1;
-        graceApplied = false;
-        deadlineText = "Standard 11-12 PM (Waive not applicable: 1 night stay)";
-      }
-    } else {
-      const graceText =
-        gracePeriodMinutes > 0
-          ? ` • ${Math.round(gracePeriodMinutes / 60)}h Grace`
-          : lateGraceApplied
-          ? " • 1h Grace (Until 1:00 PM)"
-          : "";
-      deadlineText = isEarlyBird
-        ? `Standard 11-12 PM Check-Out (Early Bird Offer${graceText})`
-        : `Standard 11-12 PM Check-Out${graceText}`;
-    }
-
-    return {
-      billableDays,
-      hoursElapsed,
-      gracePeriodApplied: graceApplied,
-      isEarlyBird,
-      checkoutDeadlineText: deadlineText,
-    };
-  }
-
-  // OPTIONAL 24_HOURS CYCLE:
-  const completedBlocks = Math.floor(elapsedMinutes / (24 * 60));
-  const remainderMinutes = elapsedMinutes % (24 * 60);
-
-  let unWaivedDays = 1;
-  let within24HrGrace = false;
-
-  if (completedBlocks === 0) {
-    unWaivedDays = 1;
-  } else if (remainderMinutes <= effectiveGraceMinutes) {
-    unWaivedDays = completedBlocks;
-    within24HrGrace = effectiveGraceMinutes > 0;
-  } else {
-    unWaivedDays = completedBlocks + 1;
-  }
-
-  let billableDays = unWaivedDays;
-  let graceApplied = within24HrGrace;
-  let deadlineText = "";
-
-  if (isWaiveNextNight) {
-    if (unWaivedDays > 1) {
-      billableDays = unWaivedDays - 1;
-      graceApplied = true;
-      deadlineText = `24-Hr Cycle (Next Night Waived • ${billableDays} of ${unWaivedDays} Billed)`;
-    } else {
-      billableDays = 1;
-      graceApplied = false;
-      deadlineText = "24-Hr Cycle (Waive not applicable: 1 night stay)";
-    }
-  } else {
-    graceApplied = within24HrGrace;
-    deadlineText = effectiveGraceMinutes > 0
-      ? `24-Hr Cycle • ${Math.round(effectiveGraceMinutes / 60)}h Grace`
-      : completedBlocks > 0 && remainderMinutes > 0
-      ? "24-Hr Cycle (Rollover Billed)"
-      : "24-Hr Cycle Billing";
-  }
-
-  return {
-    billableDays,
-    hoursElapsed,
-    gracePeriodApplied: graceApplied,
-    isEarlyBird: false,
-    checkoutDeadlineText: deadlineText,
-  };
-}
-
-/**
- * Calculates the dynamic departure date for a stay when a guest stays beyond the scheduled departure time.
- * If the current time exceeds the scheduled departure (or passes checkout grace), the departure date
- * automatically advances to match the guest's current active billing cycle / night.
- * If the guest booked future nights in advance, the scheduled departure date is never reduced.
- */
-export function calculateDynamicDepartureDate({
-  arrivalAt,
-  expectedDepartureAt,
-  checkoutType = "FIXED_TIME",
-  gracePeriodMinutes = 0,
-  now = new Date(),
-}: {
-  arrivalAt: Date | string;
-  expectedDepartureAt: Date | string;
-  checkoutType?: "24_HOURS" | "FIXED_TIME";
-  gracePeriodMinutes?: number;
-  now?: Date | string;
-}): {
-  effectiveDepartureAt: Date;
-  isExtended: boolean;
-  extensionNights: number;
-  originalDepartureAt: Date;
-  billableNights: number;
-} {
-  const arr = new Date(arrivalAt);
-  const origExp = new Date(expectedDepartureAt);
-  const currentTime = now ? new Date(now) : new Date();
-
-  // If stay hasn't reached original expected departure, keep original
-  if (currentTime.getTime() <= origExp.getTime()) {
-    return {
-      effectiveDepartureAt: origExp,
-      isExtended: false,
-      extensionNights: 0,
-      originalDepartureAt: origExp,
-      billableNights: 1,
-    };
-  }
-
-  const isWaiveNextNight = gracePeriodMinutes >= 1440;
-  const effectiveGraceMinutes = isWaiveNextNight ? 0 : gracePeriodMinutes;
-
-  if (checkoutType === "24_HOURS") {
-    const elapsedMinutes = Math.max(0, Math.round((currentTime.getTime() - arr.getTime()) / (1000 * 60)));
-    const completedBlocks = Math.floor(elapsedMinutes / (24 * 60));
-    const remainderMinutes = elapsedMinutes % (24 * 60);
-
-    let activeCycles = completedBlocks;
-    if (remainderMinutes > effectiveGraceMinutes) {
-      activeCycles = completedBlocks + 1;
-    }
-    const targetCycles = Math.max(1, activeCycles);
-    const dynamicDeadline = new Date(arr.getTime() + targetCycles * 24 * 60 * 60 * 1000);
-
-    const isExtended = dynamicDeadline.getTime() > origExp.getTime();
-    const extensionNights = isExtended
-      ? Math.max(1, Math.round((dynamicDeadline.getTime() - origExp.getTime()) / (24 * 60 * 60 * 1000)))
-      : 0;
-
-    return {
-      effectiveDepartureAt: isExtended ? dynamicDeadline : origExp,
-      isExtended,
-      extensionNights,
-      originalDepartureAt: origExp,
-      billableNights: targetCycles,
-    };
-  }
-
-  // Standard FIXED_TIME (11:00 AM – 12:00 PM check-out):
-  const arrDate = new Date(arr);
-  const baseCheckoutNoon = new Date(arrDate);
-  baseCheckoutNoon.setDate(baseCheckoutNoon.getDate() + 1);
-  baseCheckoutNoon.setHours(12, 0, 0, 0);
-
-  const operationalGraceMinutes = Math.max(effectiveGraceMinutes, 60);
-  const checkoutGraceMs = operationalGraceMinutes * 60 * 1000;
-
-  let currentDeadlineMs = baseCheckoutNoon.getTime();
-  let regularNights = 1;
-
-  while (currentTime.getTime() > currentDeadlineMs + checkoutGraceMs) {
-    regularNights++;
-    currentDeadlineMs += 24 * 60 * 60 * 1000;
-  }
-
-  // Preserve scheduled checkout time of day (or default to 11:00 AM)
-  const origHour = origExp.getHours();
-  const origMinute = origExp.getMinutes();
-  const targetHour = origHour === 0 && origMinute === 0 ? 11 : origHour;
-  const targetMinute = origHour === 0 && origMinute === 0 ? 0 : origMinute;
-
-  const dynamicDeadline = new Date(currentDeadlineMs);
-  dynamicDeadline.setHours(targetHour, targetMinute, 0, 0);
-
-  // If dynamic deadline (e.g. 11:00 AM) has already passed by more than checkoutGraceMs today, roll to next day
-  if (currentTime.getTime() > dynamicDeadline.getTime() + checkoutGraceMs) {
-    dynamicDeadline.setDate(dynamicDeadline.getDate() + 1);
-  }
-
-  const isExtended = dynamicDeadline.getTime() > origExp.getTime();
-  const extensionNights = isExtended
-    ? Math.max(1, Math.round((dynamicDeadline.getTime() - origExp.getTime()) / (24 * 60 * 60 * 1000)))
-    : 0;
-
-  return {
-    effectiveDepartureAt: isExtended ? dynamicDeadline : origExp,
-    isExtended,
-    extensionNights,
-    originalDepartureAt: origExp,
-    billableNights: regularNights,
-  };
-}
-
-/**
- * Resolves the effective departure date for a Stay record, automatically parsing room assignments
- * for rate handling and grace periods if present.
- */
-export function getEffectiveStayDeparture(
-  stay: {
-    arrivalAt: Date | string;
-    expectedDepartureAt: Date | string;
-    actualDepartureAt?: Date | string | null;
-    status?: string;
-    roomAssignments?: any[];
-  },
-  now: Date = new Date()
-) {
-  if (stay.status !== "IN_HOUSE" || stay.actualDepartureAt) {
-    const dep = stay.actualDepartureAt || stay.expectedDepartureAt;
-    return {
-      effectiveDepartureAt: new Date(dep),
-      isExtended: false,
-      extensionNights: 0,
-      originalDepartureAt: new Date(stay.expectedDepartureAt),
-      billableNights: 1,
-    };
-  }
-
-  let checkoutType: "24_HOURS" | "FIXED_TIME" = "FIXED_TIME";
-  let graceMinutes = 0;
-
-  const activeAssignment =
-    stay.roomAssignments?.find((a: any) => !a.endsAt) || stay.roomAssignments?.[0];
-
-  if (activeAssignment?.rateHandling) {
-    if (activeAssignment.rateHandling.includes("24_HOURS:")) {
-      checkoutType = "24_HOURS";
-      graceMinutes = Number(activeAssignment.rateHandling.split(":")[1]) || 0;
-    } else if (activeAssignment.rateHandling.includes("FIXED_TIME:")) {
-      checkoutType = "FIXED_TIME";
-      graceMinutes = Number(activeAssignment.rateHandling.split(":")[1]) || 0;
-    } else if (activeAssignment.rateHandling === "24_HOURS") {
-      checkoutType = "24_HOURS";
-    }
-  }
-
-  return calculateDynamicDepartureDate({
-    arrivalAt: stay.arrivalAt,
-    expectedDepartureAt: stay.expectedDepartureAt,
-    checkoutType,
-    gracePeriodMinutes: graceMinutes,
-    now,
-  });
-}
-
 
 export async function calculateAvailability(
   propertyId: string,
   arrivalDate: string,
-  departureDate: string
-) {
-  const rooms = await prisma.room.findMany({
+  departureDate: string,
+  db: any = prisma
+): Promise<RoomTypeAvailability[]> {
+  const { serviceDates } = validateStayInterval(arrivalDate, departureDate);
+
+  const property = await db.property.findUniqueOrThrow({ where: { id: propertyId }, select: { timezone: true } });
+  const inventoryDate = (timestamp: Date | string) => toServiceDate(timestamp, property.timezone);
+
+  const rooms = await db.room.findMany({
     where: { propertyId, active: true },
-    include: {
-      roomType: true,
-      roomState: true,
-      blocks: {
-        where: {
-          status: "ACTIVE",
+    select: {
+      id: true,
+      roomTypeId: true,
+      number: true,
+    },
+  });
+
+  const roomTypes = await db.roomType.findMany({
+    where: { propertyId, active: true },
+  });
+
+  if (!roomTypes.length) return [];
+
+  const blocks = await db.roomBlock.findMany({
+    where: {
+      propertyId,
+      status: "ACTIVE",
+    },
+    select: {
+      roomId: true,
+      startsAt: true,
+      endsAt: true,
+    },
+  });
+
+  const stays = await db.stay.findMany({
+    where: {
+      propertyId,
+      status: { in: ["IN_HOUSE", "DUE_IN"] },
+    },
+    select: {
+      id: true,
+      arrivalAt: true,
+      expectedDepartureAt: true,
+      reservationRoomId: true,
+      roomAssignments: {
+        select: {
+          roomId: true,
+          startsAt: true,
+          endsAt: true,
+          room: { select: { roomTypeId: true } },
         },
       },
-      assignments: {
+      reservationRoom: {
+        select: { id: true, roomTypeId: true },
+      },
+    },
+  });
+
+  const reservations = await db.reservation.findMany({
+    where: {
+      propertyId,
+      status: { in: ["CONFIRMED", "TENTATIVE", "DRAFT", "PARTIALLY_CHECKED_IN"] },
+      arrivalDate: { lt: departureDate },
+      departureDate: { gt: arrivalDate },
+    },
+    select: {
+      id: true,
+      arrivalDate: true,
+      departureDate: true,
+      rooms: {
         where: {
-          endsAt: null, // active
+          status: { in: ["CONFIRMED", "HELD"] },
         },
-        include: {
-          stay: true,
+        select: {
+          id: true,
+          roomTypeId: true,
+          assignedRoomId: true,
+          stays: {
+            where: { status: { in: ["IN_HOUSE", "DUE_IN"] } },
+            select: { id: true },
+          },
         },
       },
     },
   });
 
-  // Calculate per room type
-  const roomTypes = await prisma.roomType.findMany({
-    where: { propertyId, active: true },
-  });
+  const checkedInResRoomIds = new Set<string>();
+  for (const s of stays) {
+    if (s.reservationRoomId) checkedInResRoomIds.add(s.reservationRoomId);
+  }
 
-  return roomTypes.map((rt) => {
-    const rtRooms = rooms.filter((r) => r.roomTypeId === rt.id);
+  return roomTypes.map((rt: any) => {
+    const rtRooms = rooms.filter((r: any) => r.roomTypeId === rt.id);
+    const rtRoomIds = new Set<string>(rtRooms.map((r: any) => r.id));
     const totalRooms = rtRooms.length;
-    const occupiedOrBlocked = rtRooms.filter((r) => {
-      const isBlocked = (r.blocks?.length || 0) > 0;
-      const isOccupied = (r.assignments?.length || 0) > 0;
-      return isBlocked || isOccupied;
-    }).length;
 
-    const availableCount = Math.max(0, totalRooms - occupiedOrBlocked);
+    if (totalRooms === 0) {
+      return {
+        roomTypeId: rt.id,
+        roomTypeCode: rt.code,
+        roomTypeName: rt.name,
+        totalRooms: 0,
+        occupiedOrBlocked: 0,
+        availableCount: 0,
+        capacity: rt.capacity,
+      };
+    }
+
+    const nightlyAvailable: number[] = [];
+
+    for (const night of serviceDates) {
+      const occupiedPhysical = new Set<string>();
+      let unassignedCount = 0;
+
+      // 1. Blocks on night
+      for (const b of blocks) {
+        if (!rtRoomIds.has(b.roomId)) continue;
+        const bStart = inventoryDate(b.startsAt);
+        const bEnd = b.endsAt ? inventoryDate(b.endsAt) : "9999-12-31";
+        if (bStart <= night && bEnd > night) {
+          occupiedPhysical.add(b.roomId);
+        }
+      }
+
+      // 2. Stays on night
+      for (const s of stays) {
+        const sArr = inventoryDate(s.arrivalAt);
+        const sDep = inventoryDate(s.expectedDepartureAt);
+        if (sArr <= night && sDep > night) {
+          let assignedOnNight = false;
+          for (const ra of s.roomAssignments) {
+            const raStart = inventoryDate(ra.startsAt);
+            const raEnd = ra.endsAt ? inventoryDate(ra.endsAt) : sDep;
+            if (raStart <= night && raEnd > night) {
+              if (rtRoomIds.has(ra.roomId)) {
+                occupiedPhysical.add(ra.roomId);
+                assignedOnNight = true;
+              }
+            }
+          }
+          if (!assignedOnNight) {
+            const stayRtId = s.reservationRoom?.roomTypeId || s.roomAssignments[0]?.room?.roomTypeId;
+            if (stayRtId === rt.id) {
+              unassignedCount++;
+            }
+          }
+        }
+      }
+
+      // 3. Reservations on night
+      for (const res of reservations) {
+        if (res.arrivalDate <= night && res.departureDate > night) {
+          for (const rm of res.rooms) {
+            if (rm.roomTypeId !== rt.id) continue;
+            if (checkedInResRoomIds.has(rm.id) || rm.stays.length > 0) continue;
+
+            if (rm.assignedRoomId && rtRoomIds.has(rm.assignedRoomId)) {
+              occupiedPhysical.add(rm.assignedRoomId);
+            } else {
+              unassignedCount++;
+            }
+          }
+        }
+      }
+
+      const totalOccupied = occupiedPhysical.size + unassignedCount;
+      nightlyAvailable.push(Math.max(0, totalRooms - totalOccupied));
+    }
+
+    const availableCount = nightlyAvailable.length ? Math.min(...nightlyAvailable) : totalRooms;
+    const occupiedOrBlocked = Math.max(0, totalRooms - availableCount);
 
     return {
       roomTypeId: rt.id,
@@ -418,7 +253,86 @@ export async function calculateAvailability(
   });
 }
 
+export async function isPhysicalRoomAvailable(
+  roomId: string,
+  arrivalDate: string,
+  departureDate: string,
+  db: any = prisma,
+  excludeReservationId?: string
+): Promise<boolean> {
+  const { serviceDates } = validateStayInterval(arrivalDate, departureDate);
+
+  const room = await db.room.findUnique({
+    where: { id: roomId },
+    select: { id: true, active: true, propertyId: true },
+  });
+  if (!room || !room.active) return false;
+  const property = await db.property.findUniqueOrThrow({ where: { id: room.propertyId }, select: { timezone: true } });
+  const inventoryDate = (timestamp: Date | string) => toServiceDate(timestamp, property.timezone);
+
+  const blocks = await db.roomBlock.findMany({
+    where: {
+      roomId,
+      status: "ACTIVE",
+    },
+    select: { startsAt: true, endsAt: true },
+  });
+  for (const b of blocks) {
+    const bStart = inventoryDate(b.startsAt);
+    const bEnd = b.endsAt ? inventoryDate(b.endsAt) : "9999-12-31";
+    for (const night of serviceDates) {
+      if (bStart <= night && bEnd > night) return false;
+    }
+  }
+
+  const assignments = await db.roomAssignment.findMany({
+    where: {
+      roomId,
+      stay: { status: { in: ["IN_HOUSE", "DUE_IN"] } },
+    },
+    select: { startsAt: true, endsAt: true, stay: { select: { arrivalAt: true, expectedDepartureAt: true } } },
+  });
+  for (const a of assignments) {
+    const aStart = [inventoryDate(a.startsAt), inventoryDate(a.stay.arrivalAt)].sort().at(-1)!;
+    const aEnd = [a.endsAt ? inventoryDate(a.endsAt) : "9999-12-31", inventoryDate(a.stay.expectedDepartureAt)].sort()[0];
+    for (const night of serviceDates) {
+      if (aStart <= night && aEnd > night) return false;
+    }
+  }
+
+  const resRooms = await db.reservationRoom.findMany({
+    where: {
+      assignedRoomId: roomId,
+      status: { in: ["CONFIRMED", "HELD"] },
+      reservation: {
+        status: { in: ["CONFIRMED", "TENTATIVE", "DRAFT", "PARTIALLY_CHECKED_IN"] },
+        ...(excludeReservationId ? { id: { not: excludeReservationId } } : {}),
+      },
+    },
+    select: {
+      reservation: { select: { arrivalDate: true, departureDate: true } },
+      stays: {
+        where: { status: { in: ["IN_HOUSE", "DUE_IN"] } },
+        select: { id: true },
+      },
+    },
+  });
+
+  for (const rr of resRooms) {
+    if (rr.stays.length > 0) continue;
+    const rStart = rr.reservation.arrivalDate;
+    const rEnd = rr.reservation.departureDate;
+    for (const night of serviceDates) {
+      if (rStart <= night && rEnd > night) return false;
+    }
+  }
+
+  return true;
+}
+
 export async function quoteStay(req: QuoteRequest): Promise<QuoteResult> {
+  const { nights: nightsCount, serviceDates } = validateStayInterval(req.arrivalDate, req.departureDate);
+
   const roomType = await prisma.roomType.findUniqueOrThrow({
     where: { id: req.roomTypeId },
   });
@@ -427,7 +341,6 @@ export async function quoteStay(req: QuoteRequest): Promise<QuoteResult> {
     where: { id: req.propertyId },
   });
 
-  // Default rate plan
   let ratePlan = req.ratePlanId
     ? await prisma.ratePlan.findUnique({
         where: { id: req.ratePlanId },
@@ -438,22 +351,13 @@ export async function quoteStay(req: QuoteRequest): Promise<QuoteResult> {
         include: { versions: { where: { roomTypeId: req.roomTypeId } } },
       });
 
-  const start = new Date(req.arrivalDate);
-  const end = new Date(req.departureDate);
-  const diffTime = Math.abs(end.getTime() - start.getTime());
-  const nightsCount = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
-
-  const baseRate = 3500; // Base default if version json not found
+  const baseRate = 3500;
   const nights: QuoteNight[] = [];
   let subtotal = 0;
   let totalTax = 0;
   let totalAmount = 0;
 
-  for (let i = 0; i < nightsCount; i++) {
-    const current = new Date(start);
-    current.setDate(current.getDate() + i);
-    const serviceDate = current.toISOString().split("T")[0];
-
+  for (const serviceDate of serviceDates) {
     const gst = calculateGST({
       grossOrBaseAmount: baseRate,
       isInclusive: false,
@@ -489,11 +393,16 @@ export async function quoteStay(req: QuoteRequest): Promise<QuoteResult> {
     subtotal: Math.round(subtotal * 100) / 100,
     totalTax: Math.round(totalTax * 100) / 100,
     totalAmount: Math.round(totalAmount * 100) / 100,
-    availableRoomsCount: rtAvail?.availableCount ?? 1,
+    availableRoomsCount: rtAvail?.availableCount ?? 0,
   };
 }
 
-export async function checkInGuest({
+export async function checkInGuest(input: Parameters<typeof checkInGuestTransaction>[1]) {
+  // The reservation status, stay, folio and advance allocation either all commit or all roll back.
+  return prisma.$transaction(tx => checkInGuestTransaction(tx, input), { maxWait: 10000, timeout: 30000 });
+}
+
+async function checkInGuestTransaction(tx: Prisma.TransactionClient, {
   propertyId,
   reservationId,
   guestData,
@@ -510,6 +419,7 @@ export async function checkInGuest({
   paxC,
   ratePlanId,
   depositAmount = 0,
+  additionalDepositAmount,
   depositMethod = "CASH",
   depositRef,
   agreedTariff,
@@ -569,6 +479,7 @@ export async function checkInGuest({
   paxC?: number;
   ratePlanId?: string;
   depositAmount?: number;
+  additionalDepositAmount?: number;
   depositMethod?: string;
   depositRef?: string;
   agreedTariff?: number;
@@ -585,12 +496,13 @@ export async function checkInGuest({
   kitchenDining?: string;
   diningFixedRate?: number;
 }) {
-  const property = await prisma.property.findUniqueOrThrow({
+  additionalCheckinCollection(depositAmount, 0, additionalDepositAmount);
+  const property = await tx.property.findUniqueOrThrow({
     where: { id: propertyId },
   });
 
   // Verify rooms exist and check cleanliness
-  const rooms = await prisma.room.findMany({
+  const rooms = await tx.room.findMany({
     where: { id: { in: roomIds } },
     include: { roomState: true, roomType: true },
   });
@@ -599,13 +511,39 @@ export async function checkInGuest({
     throw new Error("One or more rooms not found.");
   }
 
+  const effectiveArrDate = toServiceDate(arrivalAt || new Date(), property.timezone);
+  const effectiveDepDate = toServiceDate(expectedDepartureAt, property.timezone);
+  if (effectiveDepDate <= effectiveArrDate) {
+    throw new Error("Departure date must be strictly after arrival date.");
+  }
+
+  const now = new Date();
   for (const room of rooms) {
+    if (room.propertyId !== propertyId) {
+      throw new Error(`Room ${room.number} belongs to a different property.`);
+    }
+    if (!room.active) {
+      throw new Error(`Room ${room.number} is inactive.`);
+    }
     if (room.roomState?.occupancyStatus === "OCCUPIED") {
       throw new Error(`Room ${room.number} is already occupied.`);
     }
-
-    if (room.roomState?.sellabilityStatus !== "SELLABLE" && !overrideReason) {
-      throw new Error(`Room ${room.number} is ${room.roomState?.sellabilityStatus}. Override reason required.`);
+    if (room.roomState?.sellabilityStatus !== "SELLABLE") {
+      throw Object.assign(new Error(`Room ${room.number} must be sellable before check-in.`), { statusCode: 409 });
+    }
+    if (!["CLEAN", "INSPECTED"].includes(room.roomState.housekeepingStatus)) {
+      throw Object.assign(new Error(`Room ${room.number} must be cleaned before check-in.`), { statusCode: 409 });
+    }
+    const activeBlock = await tx.roomBlock.findFirst({
+      where: {
+        roomId: room.id,
+        status: "ACTIVE",
+        startsAt: { lte: now },
+        OR: [{ endsAt: null }, { endsAt: { gt: now } }],
+      },
+    });
+    if (activeBlock) {
+      throw new Error(`Room ${room.number} is currently blocked (${activeBlock.type}: ${activeBlock.reason}).`);
     }
   }
 
@@ -614,7 +552,7 @@ export async function checkInGuest({
   // 1. Find or create Guest (matching by name and phone/email to prevent overwriting different family members/group members)
   let guest: any = null;
   if (canonicalGuestName) {
-    guest = await prisma.guest.findFirst({
+    guest = await tx.guest.findFirst({
       where: {
         organizationId: property.organizationId,
         name: canonicalGuestName,
@@ -640,7 +578,7 @@ export async function checkInGuest({
   });
 
   if (!guest) {
-    guest = await prisma.guest.create({
+    guest = await tx.guest.create({
       data: {
         organizationId: property.organizationId,
         name: canonicalGuestName,
@@ -654,7 +592,7 @@ export async function checkInGuest({
     });
   } else {
     // Safely update details on the same guest profile without modifying other guests
-    await prisma.guest.update({
+    await tx.guest.update({
       where: { id: guest.id },
       data: {
         addressJson: fullAddressJson,
@@ -668,7 +606,7 @@ export async function checkInGuest({
 
   // Record guest document if provided
   if (guestData.idType && guestData.idLast4) {
-    await prisma.guestDocument.create({
+    await tx.guestDocument.create({
       data: {
         guestId: guest.id,
         propertyId,
@@ -680,9 +618,10 @@ export async function checkInGuest({
 
   // 2. Reservation handling or walk-in reservation creation
   let resId = reservationId;
+  let existingReservation: any = null;
   if (!resId) {
-    const seq = await getNextDocumentNumber(propertyId, "RESERVATION");
-    const newRes = await prisma.reservation.create({
+    const seq = await getNextDocumentNumber(propertyId, "RESERVATION", "PROPERTY", tx);
+    const newRes = await tx.reservation.create({
       data: {
         organizationId: property.organizationId,
         propertyId,
@@ -696,8 +635,25 @@ export async function checkInGuest({
     });
     resId = newRes.id;
   } else {
-    await prisma.reservation.update({
+    existingReservation = await tx.reservation.findUnique({
       where: { id: resId },
+      include: { rooms: true },
+    });
+    if (!existingReservation || existingReservation.propertyId !== propertyId) {
+      throw new Error("Reservation not found for this property.");
+    }
+    if (["CANCELLED", "NO_SHOW", "COMPLETED"].includes(existingReservation.status)) {
+      throw new Error(`Cannot check in a ${existingReservation.status.toLowerCase()} reservation.`);
+    }
+    if (existingReservation.status === "CHECKED_IN") {
+      throw new Error("Reservation is already checked in.");
+    }
+    await tx.reservation.update({
+      where: { id: resId },
+      data: { status: "CHECKED_IN" },
+    });
+    await tx.reservationRoom.updateMany({
+      where: { reservationId: resId },
       data: { status: "CHECKED_IN" },
     });
   }
@@ -714,10 +670,11 @@ export async function checkInGuest({
 
   if (groupBilling) {
     // SINGLE STAY & SINGLE FOLIO FOR ALL ROOMS
-    const stay = await prisma.stay.create({
+    const stay = await tx.stay.create({
       data: {
         organizationId: property.organizationId,
         propertyId,
+        reservationRoomId: existingReservation?.rooms[0]?.id || null,
         primaryGuestId: guest.id,
         status: "IN_HOUSE",
         arrivalAt: arrivalAt || new Date(),
@@ -728,7 +685,7 @@ export async function checkInGuest({
     });
     stayIdsForDeposit.push(stay.id);
 
-    const folio = await prisma.folio.create({
+    const folio = await tx.folio.create({
       data: {
         organizationId: property.organizationId,
         propertyId,
@@ -740,7 +697,7 @@ export async function checkInGuest({
     });
     masterFolioId = folio.id;
 
-    const guestWindow = await prisma.folioWindow.create({
+    const guestWindow = await tx.folioWindow.create({
       data: {
         folioId: folio.id,
         name: "Guest Window",
@@ -756,7 +713,7 @@ export async function checkInGuest({
     });
     guestWindowForDeposit = guestWindow;
 
-    await prisma.stay.update({
+    await tx.stay.update({
       where: { id: stay.id },
       data: { folioId: folio.id },
     });
@@ -796,7 +753,7 @@ export async function checkInGuest({
           roomBasePrice = Number(agreedTariff);
           isComp = roomBasePrice === 0;
         } else if (room.roomTypeId) {
-          const rateVersion = await prisma.ratePlanVersion.findFirst({
+          const rateVersion = await tx.ratePlanVersion.findFirst({
             where: { roomTypeId: room.roomTypeId, active: true },
             orderBy: { createdAt: "desc" },
           });
@@ -810,7 +767,7 @@ export async function checkInGuest({
       } else {
         // Additional room without custom entry in roomRates: use room category base price
         if (room.roomTypeId) {
-          const rateVersion = await prisma.ratePlanVersion.findFirst({
+          const rateVersion = await tx.ratePlanVersion.findFirst({
             where: { roomTypeId: room.roomTypeId, active: true },
             orderBy: { createdAt: "desc" },
           });
@@ -825,7 +782,7 @@ export async function checkInGuest({
         }
       }
 
-      await prisma.roomAssignment.create({
+      await tx.roomAssignment.create({
         data: {
           stayId: stay.id,
           roomId: room.id,
@@ -835,7 +792,7 @@ export async function checkInGuest({
         },
       });
 
-      await prisma.roomState.upsert({
+      await tx.roomState.upsert({
         where: { roomId: room.id },
         create: {
           organizationId: property.organizationId, propertyId, roomId: room.id, occupancyStatus: "OCCUPIED",
@@ -852,7 +809,7 @@ export async function checkInGuest({
             supplierStateCode: property.stateCode || "18", customTaxRate: 5,
           });
 
-      await prisma.folioEntry.create({
+      await tx.folioEntry.create({
         data: {
           organizationId: property.organizationId, propertyId, folioId: folio.id, folioWindowId: guestWindow.id,
           serviceDate: serviceDateStr, type: "CHARGE", chargeCode: "ROOM_TARIFF",
@@ -879,7 +836,7 @@ export async function checkInGuest({
         customTaxRate: 5,
       });
 
-      await prisma.folioEntry.create({
+      await tx.folioEntry.create({
         data: {
           organizationId: property.organizationId,
           propertyId,
@@ -912,7 +869,7 @@ export async function checkInGuest({
         customTaxRate: 5,
       });
 
-      await prisma.folioEntry.create({
+      await tx.folioEntry.create({
         data: {
           organizationId: property.organizationId,
           propertyId,
@@ -935,7 +892,7 @@ export async function checkInGuest({
       totalBalanceAdded += diningGst.totalAmount;
     }
 
-    await prisma.folio.update({
+    await tx.folio.update({
       where: { id: folio.id },
       data: { balance: totalBalanceAdded },
     });
@@ -947,9 +904,10 @@ export async function checkInGuest({
       const isPrimaryRoom = room.id === primaryRoomId;
       const roomAssignedAdults = roomPax?.[room.id]?.adults ?? roomPax?.[room.number]?.adults ?? Math.max(1, Math.floor(adults / rooms.length));
       const roomAssignedChildren = roomPax?.[room.id]?.children ?? roomPax?.[room.number]?.children ?? 0;
-      const stay = await prisma.stay.create({
+      const stay = await tx.stay.create({
         data: {
           organizationId: property.organizationId, propertyId, primaryGuestId: guest.id,
+          reservationRoomId: existingReservation?.rooms[rooms.indexOf(room)]?.id || null,
           status: "IN_HOUSE", arrivalAt: arrivalAt || new Date(), expectedDepartureAt,
           adults: roomAssignedAdults, children: roomAssignedChildren,
         },
@@ -987,7 +945,7 @@ export async function checkInGuest({
           roomBasePrice = Number(agreedTariff);
           isComp = roomBasePrice === 0;
         } else if (room.roomTypeId) {
-          const rateVersion = await prisma.ratePlanVersion.findFirst({
+          const rateVersion = await tx.ratePlanVersion.findFirst({
             where: { roomTypeId: room.roomTypeId, active: true }, orderBy: { createdAt: "desc" },
           });
           if (rateVersion?.pricingJson) {
@@ -1000,7 +958,7 @@ export async function checkInGuest({
       } else {
         // Additional room without custom entry in roomRates: use room category base price
         if (room.roomTypeId) {
-          const rateVersion = await prisma.ratePlanVersion.findFirst({
+          const rateVersion = await tx.ratePlanVersion.findFirst({
             where: { roomTypeId: room.roomTypeId, active: true }, orderBy: { createdAt: "desc" },
           });
           if (rateVersion?.pricingJson) {
@@ -1014,17 +972,17 @@ export async function checkInGuest({
         }
       }
 
-      await prisma.roomAssignment.create({
+      await tx.roomAssignment.create({
         data: {
           stayId: stay.id,
           roomId: room.id,
           startsAt: new Date(),
-          moveReason: isComp ? "AGREED_RATE:0" : `AGREED_RATE:${roomBasePrice}`,
+          moveReason: isComp ? "AGREED_RATE:0" : `AGREED_RATE:${roomBasePrice}:${isRateInclusive !== false ? "INC" : "EXC"}`,
           rateHandling: isComp ? "COMPLIMENTARY" : (checkoutType === "24_HOURS" ? `24_HOURS:${gracePeriodMinutes}` : `FIXED_TIME:${gracePeriodMinutes}`),
         },
       });
 
-      await prisma.roomState.upsert({
+      await tx.roomState.upsert({
         where: { roomId: room.id },
         create: {
           organizationId: property.organizationId, propertyId, roomId: room.id, occupancyStatus: "OCCUPIED",
@@ -1033,14 +991,14 @@ export async function checkInGuest({
         update: { occupancyStatus: "OCCUPIED", lastChangedAt: new Date() },
       });
 
-      const folio = await prisma.folio.create({
+      const folio = await tx.folio.create({
         data: { organizationId: property.organizationId, propertyId, stayId: stay.id, status: "OPEN", currency: property.currency, balance: 0 },
       });
       if (!masterFolioId) {
         masterFolioId = folio.id;
       }
 
-      const guestWindow = await prisma.folioWindow.create({
+      const guestWindow = await tx.folioWindow.create({
         data: {
           folioId: folio.id, name: "Guest Window", windowNumber: 1, payerType: "GUEST",
           guestOrCompanySnapshot: JSON.stringify({ name: guest.name, phone: guest.phone, gstin: guest.gstin }), status: "OPEN",
@@ -1050,17 +1008,17 @@ export async function checkInGuest({
         guestWindowForDeposit = guestWindow;
       }
 
-      await prisma.stay.update({ where: { id: stay.id }, data: { folioId: folio.id } });
+      await tx.stay.update({ where: { id: stay.id }, data: { folioId: folio.id } });
 
       const initialNightPrice = roomBasePrice * 1;
       const roomGst = isComp
         ? { taxableAmount: 0, taxAmount: 0, totalAmount: 0, components: [] }
         : calculateGST({
-            grossOrBaseAmount: initialNightPrice, isInclusive: true, sacHsn: "996311",
+            grossOrBaseAmount: initialNightPrice, isInclusive: isRateInclusive !== false, sacHsn: "996311",
             supplierStateCode: property.stateCode || "18", customTaxRate: 5,
           });
 
-      await prisma.folioEntry.create({
+      await tx.folioEntry.create({
         data: {
           organizationId: property.organizationId, propertyId, folioId: folio.id, folioWindowId: guestWindow.id,
           serviceDate: serviceDateStr, type: "CHARGE", chargeCode: "ROOM_TARIFF",
@@ -1073,7 +1031,7 @@ export async function checkInGuest({
         },
       });
 
-      await prisma.folio.update({
+      await tx.folio.update({
         where: { id: folio.id },
         data: { balance: roomGst.totalAmount },
       });
@@ -1081,22 +1039,34 @@ export async function checkInGuest({
     }
   }
 
+  const carriedAdvance = await carryReservationAdvance(tx, {
+    propertyId, reservationId, folioId: masterFolioId!, folioWindowId: guestWindowForDeposit.id,
+    groupPool: rooms.length > 1, applyToBalance: rooms.length === 1 || groupBilling, actorId,
+  });
+  depositAmount = additionalCheckinCollection(depositAmount, carriedAdvance.collectedAmount, additionalDepositAmount);
+  const totalCheckinAdvance = Math.round((carriedAdvance.amount + depositAmount) * 100) / 100;
+
   // 8. Handle advance deposit if provided
   if (depositAmount > 0) {
-    const recSeq = await getNextDocumentNumber(propertyId, "RECEIPT");
+    const recSeq = await getNextDocumentNumber(propertyId, "RECEIPT", "PROPERTY", tx);
     const isBTC = depositMethod === "DIRECT_BILL";
     const isMultiRoomGroup = rooms.length > 1;
 
-    const payment = await prisma.payment.create({
+    const payment = await tx.payment.create({
       data: {
         organizationId: property.organizationId,
         propertyId,
         receiptNo: recSeq.formattedNumber,
         folioId: masterFolioId!,
+        reservationId: resId,
+        idempotencyKey: `CHECKIN_ADVANCE:${masterFolioId}`,
         amount: depositAmount,
         method: depositMethod || "CASH",
         reference: depositRef || (isBTC ? `BTC-${guestData.companyName || "CORP"}` : (isMultiRoomGroup ? `GROUP_ADVANCE_POOL:₹${depositAmount}` : undefined)),
         payerSnapshot: JSON.stringify({
+          reservationNo: existingReservation?.confirmationNo,
+          category: "ADVANCE_DEPOSIT",
+          collectionStage: "CHECK_IN_ADDITIONAL",
           name: guestData.name,
           phone: guestData.phone,
           companyName: guestData.companyName || "",
@@ -1111,7 +1081,7 @@ export async function checkInGuest({
       },
     });
 
-    await prisma.paymentAllocation.create({
+    await tx.paymentAllocation.create({
       data: {
         paymentId: payment.id,
         folioWindowId: guestWindowForDeposit.id,
@@ -1121,7 +1091,7 @@ export async function checkInGuest({
 
     // Record unallocated Group Advance Pool in Deposit table
     if (isMultiRoomGroup) {
-      await prisma.deposit.create({
+      await tx.deposit.create({
         data: {
           organizationId: property.organizationId,
           propertyId,
@@ -1138,7 +1108,7 @@ export async function checkInGuest({
     // Only decrement individual room folio balance if single room or consolidated group billing
     // For separate room billing (!groupBilling), the advance is held in the group pool, not deducted from Room 1
     if (!isMultiRoomGroup || groupBilling) {
-      await prisma.folio.update({
+      await tx.folio.update({
         where: { id: masterFolioId! },
         data: { balance: { decrement: depositAmount } },
       });
@@ -1146,7 +1116,7 @@ export async function checkInGuest({
   }
 
   // 9. Generate GRC Registration Record
-  const grcSeq = await getNextDocumentNumber(propertyId, "GRC");
+  const grcSeq = await getNextDocumentNumber(propertyId, "GRC", "PROPERTY", tx);
   const formattedArrival = (arrivalAt || new Date()).toISOString();
 
   // Normalize roomPax breakdown for all rooms
@@ -1166,7 +1136,7 @@ export async function checkInGuest({
     }
   }
 
-  const registration = await prisma.guestRegistration.create({
+  const registration = await tx.guestRegistration.create({
     data: {
       organizationId: property.organizationId,
       propertyId: property.id,
@@ -1189,7 +1159,7 @@ export async function checkInGuest({
       goingTo: guestData.goingTo || "",
       purposeOfVisit: guestData.purposeOfVisit || "Tourism / Holiday",
       referralChannel: guestData.referralChannel || (guestData.companyName ? `Corporate (${guestData.companyName})` : "Direct / Walk-In"),
-      mobilePhone: (guestData as any).mobilePhone || guestData.phone || guest.phone,
+      mobilePhone: (guestData as any).mobilePhone || guestData.phone || guest.phone || "0000000000",
       alternatePhone: (guestData as any).alternatePhone || guestData.phone || "",
       email: guestData.email || guest.email || "",
       driverName: guestData.driverName || "",
@@ -1202,7 +1172,7 @@ export async function checkInGuest({
       assignedRoomNumber: rooms.map((r) => r.number).join(", "),
       stayId: stayIdsForDeposit[0],
       guestId: guest.id,
-      depositAmount: depositAmount,
+      depositAmount: totalCheckinAdvance,
       processedByUserId: actorId,
       internalNotes: JSON.stringify({
         adults: adults || 2,
@@ -1214,7 +1184,10 @@ export async function checkInGuest({
         isRateInclusive,
         checkoutType,
         gracePeriodMinutes,
-        depositAmount,
+        depositAmount: totalCheckinAdvance,
+        reservationAdvanceApplied: carriedAdvance.amount,
+        additionalDepositCollected: depositAmount,
+        reservationAdvanceReceiptNos: carriedAdvance.receiptNos,
         advancePaymentMethod: depositMethod,
         kitchenDining: kitchenDining || "NO",
         diningFixedRate: diningFixedRate || 0,
@@ -1230,7 +1203,7 @@ export async function checkInGuest({
   });
 
   // 10. Write Audit Log
-  await prisma.auditLog.create({
+  await tx.auditLog.create({
     data: {
       organizationId: property.organizationId,
       propertyId,
@@ -1243,12 +1216,15 @@ export async function checkInGuest({
         roomNumbers: rooms.map((r) => r.number).join(", "),
         grcNo: grcSeq.formattedNumber,
         guestName: guest.name,
-        depositAmount,
+        depositAmount: totalCheckinAdvance,
+        reservationAdvanceApplied: carriedAdvance.amount,
+        additionalDepositCollected: depositAmount,
+        reservationAdvanceReceiptNos: carriedAdvance.receiptNos,
       }),
     },
   });
 
-  return { success: true, stayIds: stayIdsForDeposit, guest, masterFolioId, registration };
+  return { success: true, advance: { carried: carriedAdvance.amount, collectedNow: depositAmount, total: totalCheckinAdvance, originalReceiptNos: carriedAdvance.receiptNos }, stayIds: stayIdsForDeposit, guest, masterFolioId, registration };
 }
 
 export async function moveRoom({
@@ -1297,8 +1273,29 @@ export async function moveRoom({
     include: { roomState: true, roomType: true },
   });
 
+  if (targetRoom.propertyId !== targetStay.propertyId) {
+    throw new Error("Target room belongs to a different property.");
+  }
+  if (!targetRoom.active) {
+    throw new Error("Target room is inactive.");
+  }
   if (targetRoom.roomState?.occupancyStatus === "OCCUPIED") {
     throw new Error(`Target room ${targetRoom.number} is currently occupied.`);
+  }
+  if (targetRoom.roomState?.sellabilityStatus !== "SELLABLE" && !reason) {
+    throw new Error(`Target room ${targetRoom.number} is ${targetRoom.roomState?.sellabilityStatus}. Override reason required.`);
+  }
+  const moveNow = new Date();
+  const activeTargetBlock = await prisma.roomBlock.findFirst({
+    where: {
+      roomId: targetRoom.id,
+      status: "ACTIVE",
+      startsAt: { lte: moveNow },
+      OR: [{ endsAt: null }, { endsAt: { gt: moveNow } }],
+    },
+  });
+  if (activeTargetBlock) {
+    throw new Error(`Target room ${targetRoom.number} is currently blocked (${activeTargetBlock.type}: ${activeTargetBlock.reason}).`);
   }
 
   const effectiveFromRoomId = fromRoomId || sourceRoomId;
@@ -1394,17 +1391,33 @@ export async function moveRoom({
   }
 
   // 3. Determine new rate handling and moveReason for the new room assignment
-  let newRateHandling = "RETAIN_RATE";
+  const numCustomRate =
+    customRate !== undefined && customRate !== null && !isNaN(Number(customRate))
+      ? Number(customRate)
+      : undefined;
+
+  let effectiveNewRate = existingRate;
+  let effectiveIsInclusive = isExistingInclusive;
+
+  // Preserve existing checkout policy (24_HOURS vs FIXED_TIME) unless complimentary
+  const basePolicyHandling =
+    currentAssignment.rateHandling && currentAssignment.rateHandling !== "COMPLIMENTARY" && currentAssignment.rateHandling !== "RETAIN_RATE"
+      ? currentAssignment.rateHandling
+      : "FIXED_TIME:0";
+
+  let newRateHandling = basePolicyHandling;
   let newMoveReason = `AGREED_RATE:${existingRate}:${isExistingInclusive ? "INC" : "EXC"}`;
 
-  if (rateHandling === "COMPLIMENTARY" || customRate === 0) {
+  if (rateHandling === "COMPLIMENTARY" || numCustomRate === 0) {
     newRateHandling = "COMPLIMENTARY";
     newMoveReason = "AGREED_RATE:0";
-  } else if (customRate !== undefined && customRate > 0) {
-    newRateHandling = "RETAIN_RATE";
-    newMoveReason = `AGREED_RATE:${customRate}:${isExistingInclusive ? "INC" : "EXC"}`;
+    effectiveNewRate = 0;
+  } else if ((rateHandling === "CUSTOM" || numCustomRate !== undefined) && numCustomRate !== undefined && numCustomRate > 0) {
+    newRateHandling = basePolicyHandling;
+    newMoveReason = `AGREED_RATE:${numCustomRate}:${isExistingInclusive ? "INC" : "EXC"}`;
+    effectiveNewRate = numCustomRate;
   } else if (rateHandling === "USE_TARGET_BASE") {
-    let targetBase = 3200;
+    let targetBase = Number((targetRoom.roomType as any)?.basePrice) || 3200;
     if (targetRoom.roomTypeId) {
       const targetRv = await prisma.ratePlanVersion.findFirst({
         where: { roomTypeId: targetRoom.roomTypeId, active: true },
@@ -1417,12 +1430,15 @@ export async function moveRoom({
         } catch {}
       }
     }
-    newRateHandling = "RETAIN_RATE";
+    newRateHandling = basePolicyHandling;
     newMoveReason = `AGREED_RATE:${targetBase}:INC`;
+    effectiveNewRate = targetBase;
+    effectiveIsInclusive = true;
   } else {
     // RETAIN_RATE
-    newRateHandling = isExistingComp ? "COMPLIMENTARY" : (currentAssignment.rateHandling || "RETAIN_RATE");
+    newRateHandling = isExistingComp ? "COMPLIMENTARY" : basePolicyHandling;
     newMoveReason = isExistingComp ? "AGREED_RATE:0" : `AGREED_RATE:${existingRate}:${isExistingInclusive ? "INC" : "EXC"}`;
+    effectiveNewRate = isExistingComp ? 0 : existingRate;
   }
 
   // Tag predecessor room into moveReason for tracking lineage:
@@ -1549,10 +1565,11 @@ export async function moveRoom({
                 rid === oldRoomNumber || rid === oldRoomId ? targetRoom.number : rid
               );
             }
-            if (parsed.roomRates && oldRoomNumber && parsed.roomRates[oldRoomNumber] !== undefined) {
-              const oldVal = parsed.roomRates[oldRoomNumber];
-              delete parsed.roomRates[oldRoomNumber];
-              parsed.roomRates[targetRoom.number] = oldVal;
+            if (parsed.roomRates) {
+              if (oldRoomNumber) delete parsed.roomRates[oldRoomNumber];
+              if (oldRoomId) delete parsed.roomRates[oldRoomId];
+              parsed.roomRates[targetRoom.number] = effectiveNewRate === 0 ? "0" : String(effectiveNewRate);
+              parsed.roomRates[targetRoomId] = effectiveNewRate === 0 ? "0" : String(effectiveNewRate);
             }
             updatedNotes = JSON.stringify(parsed);
           } catch {}
@@ -1599,8 +1616,54 @@ export async function moveRoom({
       },
     });
 
-    // Note: In-stay room transfers preserve the existing folio balance and charges seamlessly.
-    // Negative credit adjustments are not posted to avoid distorting revenue and creating phantom surplus credits.
+    // Synchronize latest active cycle's room tariff to reflect the new room & override price:
+    const activeEntries = targetStay.folio.windows[0].entries || [];
+    const roomTariffEntries = activeEntries
+      .filter((e: any) =>
+        e.chargeCode === "ROOM_TARIFF" &&
+        e.status === "POSTED" &&
+        e.sourceType !== "MANUAL_CHARGE" &&
+        (oldRoomNumber ? (e.description?.includes(oldRoomNumber) || !e.description?.includes("Room ")) : true)
+      )
+      .sort((a: any, b: any) => new Date(b.createdAt || b.serviceDate).getTime() - new Date(a.createdAt || a.serviceDate).getTime());
+
+    if (roomTariffEntries.length > 0) {
+      const latestTariff = roomTariffEntries[0];
+      const isCompRate = effectiveNewRate === 0 || newRateHandling === "COMPLIMENTARY";
+      const gst = isCompRate
+        ? { taxableAmount: 0, taxAmount: 0, totalAmount: 0, components: [] }
+        : calculateGST({
+            grossOrBaseAmount: effectiveNewRate,
+            isInclusive: effectiveIsInclusive,
+            sacHsn: "996311",
+            supplierStateCode: targetStay.property?.stateCode || "18",
+            customTaxRate: 5,
+          });
+
+      let updatedDesc = latestTariff.description || "";
+      if (oldRoomNumber && updatedDesc.includes(oldRoomNumber)) {
+        updatedDesc = updatedDesc.replace(new RegExp(`\\b(?:Room|Rm)?\\s*#?\\s*${oldRoomNumber}\\b`, "i"), `Room ${targetRoom.number}`);
+      } else if (!updatedDesc.includes(targetRoom.number)) {
+        updatedDesc = `Room Tariff - Room ${targetRoom.number}`;
+      }
+
+      await prisma.folioEntry.update({
+        where: { id: latestTariff.id },
+        data: {
+          description: updatedDesc,
+          unitAmount: effectiveNewRate,
+          taxableAmount: gst.taxableAmount,
+          taxComponentsJson: JSON.stringify(gst.components),
+          totalAmount: gst.totalAmount,
+        },
+      });
+    }
+
+    try {
+      await sync24HourFolioCharges({ folioId: targetStay.folio.id });
+    } catch (syncErr) {
+      console.warn("Folio 24h sync warning during moveRoom:", syncErr);
+    }
   }
 
   // 10. Audit Log

@@ -1,3 +1,4 @@
+import { authorizeRequest, getApiAccess } from "@/lib/auth/api-access";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { sendMail } from "@/lib/email/mailer";
@@ -12,6 +13,10 @@ import { getComprehensiveHotelReport } from "@/lib/domain/comprehensive-report-s
 import { resolveSelectedProperty } from "@/lib/config/property-config";
 
 export async function POST(request: Request) {
+  const access = await authorizeRequest(request);
+  if (access instanceof Response) return access;
+  request = access.request;
+
   try {
     const body = await request.json();
     const {

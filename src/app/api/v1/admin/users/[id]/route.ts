@@ -1,3 +1,4 @@
+import { authorizeRequest, getApiAccess } from "@/lib/auth/api-access";
 import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
@@ -10,6 +11,10 @@ export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const access = await authorizeRequest(request);
+  if (access instanceof Response) return access;
+  request = access.request;
+
   try {
     const { id } = await params;
     if (!id) {
@@ -110,11 +115,15 @@ export async function PATCH(
       status: isOwner ? "ACTIVE" : (status || undefined),
     };
 
+    if ((password?.trim() && password.trim().length < 12) || (pin?.trim() && !/^\d{6,12}$/.test(pin.trim()))) {
+      return NextResponse.json({ error: "Use a password of at least 12 characters or a PIN of 6–12 digits." }, { status: 400 });
+    }
+
     if (clientSupportsPasswordHash && password?.trim()) {
       updateData.passwordHash = hashPassword(password.trim());
     }
     if (clientSupportsPin && pin?.trim() !== undefined) {
-      updateData.pin = pin?.trim() || null;
+      updateData.pin = pin?.trim() ? hashPassword(pin.trim()) : null;
     }
 
     await prisma.$transaction(async (tx) => {
@@ -144,9 +153,9 @@ export async function PATCH(
 
       // 2. If roleId or properties are provided, update grants
       if (finalRoleId || propertyIds.length > 0 || finalAllProperties) {
-        const membership = user.memberships[0];
+        const membership = user.memberships.find((m) => m.organizationId === getApiAccess(request).property.organizationId);
         if (membership) {
-          const allProps = await tx.property.findMany();
+          const allProps = await tx.property.findMany({ where: { organizationId: getApiAccess(request).property.organizationId } });
           const targetPropertyIds = finalAllProperties
             ? allProps.map((p) => p.id)
             : propertyIds.length > 0
@@ -178,7 +187,7 @@ export async function PATCH(
 
     // If running client did not support pin/passwordHash natively, attempt raw SQL update if table has the columns
     if (!clientSupportsPin && pin?.trim() !== undefined) {
-      const pinVal = pin.trim() || null;
+      const pinVal = pin.trim() ? hashPassword(pin.trim()) : null;
       try {
         await prisma.$executeRawUnsafe(`UPDATE "User" SET "pin" = $1 WHERE "id" = $2;`, pinVal, id);
       } catch {
@@ -198,6 +207,7 @@ export async function PATCH(
       }
     }
 
+    await prisma.userSession.updateMany({ where: { userId: id, revokedAt: null }, data: { revokedAt: new Date() } });
     return NextResponse.json({
       success: true,
       message: clientSupportsPin
@@ -213,6 +223,10 @@ export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const access = await authorizeRequest(request);
+  if (access instanceof Response) return access;
+  request = access.request;
+
   try {
     const { id } = await params;
     if (!id) {

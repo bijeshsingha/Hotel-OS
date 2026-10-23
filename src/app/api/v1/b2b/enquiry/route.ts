@@ -1,9 +1,14 @@
+import { authorizeRequest, getApiAccess } from "@/lib/auth/api-access";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { getNextDocumentNumber } from "@/lib/sequence/generator";
 import { addCompanyToMaster } from "@/lib/db/company-service";
 
 export async function POST(request: Request) {
+  const access = await authorizeRequest(request);
+  if (access instanceof Response) return access;
+  request = access.request;
+
   try {
     const body = await request.json();
     const {

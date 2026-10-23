@@ -166,22 +166,22 @@ export default function CompaniesMasterPage() {
     <div className="space-y-4 max-w-[1600px] mx-auto w-full text-zinc-900 dark:text-zinc-100">
       
       {/* 1. TOP HEADER & METRIC STATS */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-5 rounded-3xl bg-white dark:bg-[#111114] border border-zinc-200/90 dark:border-zinc-800 shadow-xs">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-5 rounded-3xl bg-white dark:bg-[#111114] border border-zinc-200/90 dark:border-zinc-800 shadow-xs ui-radius-panel ui-shadow-quiet ui-surface">
         <div className="flex items-center gap-3.5">
-          <div className="h-11 w-11 rounded-xl bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800/60 text-blue-600 dark:text-blue-400 flex items-center justify-center shadow-xs shrink-0">
+          <div className="h-11 w-11 rounded-xl bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800/60 text-blue-600 dark:text-blue-400 flex items-center justify-center shadow-xs shrink-0 ui-shadow-quiet">
             <Building2 className="h-5 w-5" />
           </div>
           <div>
             <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-lg sm:text-xl font-black text-zinc-900 dark:text-white tracking-tight">
+              <h1 className="text-lg sm:text-xl font-black text-zinc-900 dark:text-white tracking-tight ui-weight-medium ui-page-title">
                 Corporate & Travel Agent Master Directory
               </h1>
-              <span className="inline-flex items-center gap-1 text-[11px] font-bold font-mono px-2.5 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="inline-flex items-center gap-1 text-[11px] font-bold font-mono px-2.5 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60 ui-text-meta ui-weight-medium ui-font-body">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 " />
                 {totalCount} Active Master Records
               </span>
             </div>
-            <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5 font-medium">
+            <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5 font-medium ui-text-body">
               Central B2B Corporate Ledger • 15-Digit GSTIN ITC Profiles • Travel Agencies & OTA Channels
             </p>
           </div>
@@ -192,7 +192,7 @@ export default function CompaniesMasterPage() {
           <button
             type="button"
             onClick={() => setShowAddModal(true)}
-            className="h-10 px-4 rounded-xl bg-zinc-950 dark:bg-white text-white dark:text-zinc-950 font-black text-xs flex items-center gap-2 transition hover:bg-zinc-800 dark:hover:bg-zinc-200 shadow-md active:scale-95 cursor-pointer"
+            className="h-10 px-4 rounded-xl bg-zinc-950 dark:bg-white text-white dark:text-zinc-950 font-black text-xs flex items-center gap-2 transition hover:bg-zinc-800 dark:hover:bg-zinc-200 shadow-md  cursor-pointer ui-radius-control ui-weight-medium ui-text-body ui-shadow-quiet ui-control ui-control-sized"
           >
             <Plus className="h-4 w-4" />
             <span>Add Company / Agent</span>
@@ -201,7 +201,7 @@ export default function CompaniesMasterPage() {
       </div>
 
       {/* 2. FILTER RIBBON & STATS BAR */}
-      <div className="p-3.5 sm:p-4 rounded-xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 shadow-2xs">
+      <div className="p-3.5 sm:p-4 rounded-xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 shadow-2xs ui-shadow-quiet ui-surface">
         
         {/* Search Input */}
         <div className="relative flex-1 max-w-md">
@@ -211,12 +211,12 @@ export default function CompaniesMasterPage() {
             placeholder="Search by company, short code, GSTIN, phone, city, or address..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full h-9 pl-9 pr-8 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs sm:text-sm text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 focus:outline-none transition shadow-2xs font-normal"
+            className="w-full h-9 pl-9 pr-8 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs sm:text-sm text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 focus:outline-none transition shadow-2xs font-normal ui-text-body ui-shadow-quiet ui-field" aria-label="Search by company, short code, GSTIN, phone, city, or address"
           />
           {search && (
             <button
               onClick={() => setSearch("")}
-              className="absolute right-2.5 top-2.5 text-zinc-400 hover:text-zinc-700 dark:hover:text-white cursor-pointer"
+              className="absolute right-2.5 top-2.5 text-zinc-400 hover:text-zinc-700 dark:hover:text-white cursor-pointer ui-control"
             >
               <X className="h-4 w-4" />
             </button>
@@ -224,15 +224,15 @@ export default function CompaniesMasterPage() {
         </div>
 
         {/* Segmented Filter Pills */}
-        <div className="flex items-center gap-0.5 bg-zinc-100 dark:bg-zinc-900 p-0.5 rounded-lg border border-zinc-200 dark:border-zinc-800 text-xs font-medium overflow-x-auto">
+        <div className="flex items-center gap-0.5 bg-zinc-100 dark:bg-zinc-900 p-0.5 rounded-lg border border-zinc-200 dark:border-zinc-800 text-xs font-medium overflow-x-auto ui-text-body">
           <button
             type="button"
             onClick={() => setTypeFilter("ALL")}
             className={`px-3 py-1.5 rounded-md transition whitespace-nowrap cursor-pointer ${
               typeFilter === "ALL"
-                ? "bg-white dark:bg-zinc-800 text-zinc-950 dark:text-zinc-50 shadow-2xs font-semibold border border-zinc-200/80 dark:border-zinc-700/60"
+                ? "bg-white dark:bg-zinc-800 text-zinc-950 dark:text-zinc-50 shadow-2xs font-semibold border border-zinc-200/80 dark:border-zinc-700/60 ui-shadow-quiet"
                 : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200"
-            }`}
+            } ui-control`}
           >
             All ({totalCount})
           </button>
@@ -242,9 +242,9 @@ export default function CompaniesMasterPage() {
             onClick={() => setTypeFilter("COMPANY")}
             className={`px-3 py-1.5 rounded-md transition flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
               typeFilter === "COMPANY"
-                ? "bg-white dark:bg-zinc-800 text-emerald-700 dark:text-emerald-400 shadow-2xs font-semibold border border-zinc-200/80 dark:border-zinc-700/60"
+                ? "bg-white dark:bg-zinc-800 text-emerald-700 dark:text-emerald-400 shadow-2xs font-semibold border border-zinc-200/80 dark:border-zinc-700/60 ui-shadow-quiet"
                 : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200"
-            }`}
+            } ui-control`}
           >
             <Briefcase className="h-3.5 w-3.5" />
             <span>Corporates ({corporateCount})</span>
@@ -255,9 +255,9 @@ export default function CompaniesMasterPage() {
             onClick={() => setTypeFilter("TRAVEL_AGENT")}
             className={`px-3 py-1.5 rounded-md transition flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
               typeFilter === "TRAVEL_AGENT"
-                ? "bg-white dark:bg-zinc-800 text-purple-700 dark:text-purple-400 shadow-2xs font-semibold border border-zinc-200/80 dark:border-zinc-700/60"
+                ? "bg-white dark:bg-zinc-800 text-purple-700 dark:text-purple-400 shadow-2xs font-semibold border border-zinc-200/80 dark:border-zinc-700/60 ui-shadow-quiet"
                 : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200"
-            }`}
+            } ui-control`}
           >
             <Compass className="h-3.5 w-3.5" />
             <span>Agents ({agentCount})</span>
@@ -268,9 +268,9 @@ export default function CompaniesMasterPage() {
             onClick={() => setTypeFilter("OTA")}
             className={`px-3 py-1.5 rounded-md transition flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
               typeFilter === "OTA"
-                ? "bg-white dark:bg-zinc-800 text-blue-700 dark:text-blue-400 shadow-2xs font-semibold border border-zinc-200/80 dark:border-zinc-700/60"
+                ? "bg-white dark:bg-zinc-800 text-blue-700 dark:text-blue-400 shadow-2xs font-semibold border border-zinc-200/80 dark:border-zinc-700/60 ui-shadow-quiet"
                 : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200"
-            }`}
+            } ui-control`}
           >
             <Globe className="h-3.5 w-3.5" />
             <span>OTAs ({otaCount})</span>
@@ -279,11 +279,11 @@ export default function CompaniesMasterPage() {
       </div>
 
       {/* 3. MASTER DIRECTORY ENTERPRISE TABLE */}
-      <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#111114] overflow-hidden shadow-2xs">
+      <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#111114] overflow-hidden shadow-2xs ui-shadow-quiet ui-surface">
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse text-xs">
+          <table className="w-full text-left border-collapse text-xs ui-text-body ui-data-table">
             <thead>
-              <tr className="border-b border-zinc-200 dark:border-zinc-800 text-[11px] uppercase tracking-wider text-zinc-600 dark:text-zinc-400 bg-zinc-50/90 dark:bg-zinc-900/90 sticky top-0 z-10 backdrop-blur-xs font-semibold">
+              <tr className="border-b border-zinc-200 dark:border-zinc-800 text-[11px] uppercase tracking-wider text-zinc-600 dark:text-zinc-400 bg-zinc-50/90 dark:bg-zinc-900/90 sticky top-0 z-10 backdrop-blur-xs font-semibold ui-text-meta">
                 <th className="py-3 px-4 font-semibold">Company / Account Name</th>
                 <th className="py-3 px-4 font-semibold">Account Type</th>
                 <th className="py-3 px-4 font-semibold">GSTIN (B2B Tax Credit)</th>
@@ -296,7 +296,7 @@ export default function CompaniesMasterPage() {
             <tbody className="divide-y divide-zinc-200/70 dark:divide-zinc-800/60">
               {companies.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-16 text-center text-zinc-400 dark:text-zinc-500 font-mono text-xs">
+                  <td colSpan={7} className="py-16 text-center text-zinc-400 dark:text-zinc-500 font-mono text-xs ui-font-body ui-text-body">
                     <div className="flex flex-col items-center justify-center space-y-2">
                       <Search className="h-8 w-8 text-zinc-300 dark:text-zinc-600" />
                       <span className="font-semibold text-zinc-700 dark:text-zinc-300">
@@ -307,7 +307,7 @@ export default function CompaniesMasterPage() {
                           setSearch("");
                           setTypeFilter("ALL");
                         }}
-                        className="text-blue-600 dark:text-blue-400 text-xs font-medium hover:underline cursor-pointer"
+                        className="text-blue-600 dark:text-blue-400 text-xs font-medium hover:underline cursor-pointer ui-text-body ui-control"
                       >
                         Reset search filters
                       </button>
@@ -331,7 +331,7 @@ export default function CompaniesMasterPage() {
                       <td className="py-3 px-4">
                         <div className="flex items-center gap-3">
                           <div
-                            className={`h-8 w-8 rounded-lg flex items-center justify-center text-xs font-semibold text-white shrink-0 shadow-2xs ${
+                            className={`h-8 w-8 rounded-lg flex items-center justify-center text-xs font-semibold text-white shrink-0 shadow-2xs  ui-text-body ui-shadow-quiet ${
                               isCorporate
                                 ? "bg-emerald-600"
                                 : isOTA
@@ -348,18 +348,18 @@ export default function CompaniesMasterPage() {
                                 {c.accountName}
                               </span>
                               {c.shortName && (
-                                <span className="text-[10px] font-mono font-medium px-1.5 py-0.2 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700">
+                                <span className="text-[10px] font-mono font-medium px-1.5 py-0.2 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 ui-text-meta ui-font-body">
                                   {c.shortName}
                                 </span>
                               )}
                             </div>
 
                             {c.remarks ? (
-                              <p className="text-xs text-zinc-500 dark:text-zinc-400 truncate max-w-xs italic">
+                              <p className="text-xs text-zinc-500 dark:text-zinc-400 truncate max-w-xs italic ui-text-body">
                                 {c.remarks}
                               </p>
                             ) : (
-                              <p className="text-[11px] text-zinc-500 dark:text-zinc-400 font-mono">
+                              <p className="text-[11px] text-zinc-500 dark:text-zinc-400 font-mono ui-text-meta ui-font-body">
                                 Registered Master B2B Account
                               </p>
                             )}
@@ -370,21 +370,21 @@ export default function CompaniesMasterPage() {
                       {/* Account Type Pill */}
                       <td className="py-3 px-4 whitespace-nowrap">
                         {isCorporate && (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60 font-medium text-xs">
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60 font-medium text-xs ui-text-body">
                             <Briefcase className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
                             <span>Corporate B2B</span>
                           </span>
                         )}
 
                         {isOTA && (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800/60 font-medium text-xs">
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800/60 font-medium text-xs ui-text-body">
                             <Globe className="h-3 w-3 text-blue-600 dark:text-blue-400" />
                             <span>OTA Channel</span>
                           </span>
                         )}
 
                         {isAgent && (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800/60 font-medium text-xs">
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800/60 font-medium text-xs ui-text-body">
                             <Compass className="h-3 w-3 text-purple-600 dark:text-purple-400" />
                             <span>Travel Agent</span>
                           </span>
@@ -395,15 +395,15 @@ export default function CompaniesMasterPage() {
                       <td className="py-3 px-4">
                         {c.gstin ? (
                           <div className="space-y-1">
-                            <div className="flex items-center gap-1.5 font-mono">
-                              <span className="font-semibold text-zinc-900 dark:text-zinc-100 text-xs tracking-tight bg-zinc-100 dark:bg-zinc-800/80 px-2 py-0.5 rounded border border-zinc-200 dark:border-zinc-700">
+                            <div className="flex items-center gap-1.5 font-mono ui-font-body">
+                              <span className="font-semibold text-zinc-900 dark:text-zinc-100 text-xs tracking-tight bg-zinc-100 dark:bg-zinc-800/80 px-2 py-0.5 rounded border border-zinc-200 dark:border-zinc-700 ui-text-body">
                                 {c.gstin}
                               </span>
                               <button
                                 type="button"
                                 onClick={() => handleCopy(c.gstin!)}
                                 title="Copy GSTIN"
-                                className="p-1 rounded hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-400 hover:text-zinc-800 dark:hover:text-white transition cursor-pointer"
+                                className="p-1 rounded hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-400 hover:text-zinc-800 dark:hover:text-white transition cursor-pointer ui-control" aria-label="Copy GSTIN"
                               >
                                 {copiedGstin === c.gstin ? (
                                   <Check className="h-3.5 w-3.5 text-emerald-600" />
@@ -413,13 +413,13 @@ export default function CompaniesMasterPage() {
                               </button>
                             </div>
                             {stateBadge && (
-                              <div className="text-[10px] text-zinc-500 dark:text-zinc-400 font-mono font-medium">
+                              <div className="text-[10px] text-zinc-500 dark:text-zinc-400 font-mono font-medium ui-text-meta ui-font-body">
                                 {stateBadge}
                               </div>
                             )}
                           </div>
                         ) : (
-                          <span className="text-zinc-400 dark:text-zinc-500 font-mono text-xs italic">
+                          <span className="text-zinc-400 dark:text-zinc-500 font-mono text-xs italic ui-font-body ui-text-body">
                             — No GSTIN
                           </span>
                         )}
@@ -427,7 +427,7 @@ export default function CompaniesMasterPage() {
 
                       {/* Contact Phone & Email */}
                       <td className="py-3 px-4">
-                        <div className="space-y-1 font-mono text-xs">
+                        <div className="space-y-1 font-mono text-xs ui-font-body ui-text-body">
                           {(c.mobile || c.phone) ? (
                             <a
                               href={`tel:${c.mobile || c.phone}`}
@@ -437,13 +437,13 @@ export default function CompaniesMasterPage() {
                               <span>{c.mobile || c.phone}</span>
                             </a>
                           ) : (
-                            <span className="text-zinc-400 dark:text-zinc-500 italic text-xs">— No Phone</span>
+                            <span className="text-zinc-400 dark:text-zinc-500 italic text-xs ui-text-body">— No Phone</span>
                           )}
 
                           {c.email && (
                             <a
                               href={`mailto:${c.email}`}
-                              className="text-xs text-zinc-500 dark:text-zinc-400 hover:text-blue-600 dark:hover:text-blue-400 flex items-center gap-1.5 truncate max-w-[180px] transition-colors"
+                              className="text-xs text-zinc-500 dark:text-zinc-400 hover:text-blue-600 dark:hover:text-blue-400 flex items-center gap-1.5 truncate max-w-[180px] transition-colors ui-text-body"
                             >
                               <Mail className="h-3 w-3 text-zinc-400 shrink-0" />
                               <span className="truncate">{c.email}</span>
@@ -456,18 +456,18 @@ export default function CompaniesMasterPage() {
                       <td className="py-3 px-3">
                         <div className="space-y-0.5 max-w-xs">
                           {c.city ? (
-                            <div className="font-extrabold text-zinc-900 dark:text-zinc-100 text-xs flex items-center gap-1">
+                            <div className="font-extrabold text-zinc-900 dark:text-zinc-100 text-xs flex items-center gap-1 ui-weight-medium ui-text-body">
                               <MapPin className="h-3 w-3 text-rose-500 shrink-0" />
                               <span>{c.city}</span>
                             </div>
                           ) : null}
 
                           {c.address ? (
-                            <p className="text-[10.5px] text-zinc-500 dark:text-zinc-400 line-clamp-1" title={c.address}>
+                            <p className="text-[10.5px] text-zinc-500 dark:text-zinc-400 line-clamp-1 ui-text-meta" title={c.address}>
                               {c.address}
                             </p>
                           ) : (
-                            <span className="text-zinc-400 italic text-[11px]">Direct / Assam</span>
+                            <span className="text-zinc-400 italic text-[11px] ui-text-meta">Direct / Assam</span>
                           )}
                         </div>
                       </td>
@@ -475,15 +475,15 @@ export default function CompaniesMasterPage() {
                       {/* Terms & Food Plan */}
                       <td className="py-3 px-3 whitespace-nowrap">
                         <div className="space-y-1">
-                          <span className="inline-block px-2 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 font-mono font-bold text-[10.5px]">
+                          <span className="inline-block px-2 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 font-mono font-bold text-[10.5px] ui-font-body ui-weight-medium ui-text-meta">
                             {c.foodPlan || "EP"} (Plan)
                           </span>
                           {c.commissionPercent ? (
-                            <div className="text-[10.5px] font-bold text-amber-600 dark:text-amber-400 font-mono">
+                            <div className="text-[10.5px] font-bold text-amber-600 dark:text-amber-400 font-mono ui-text-meta ui-weight-medium ui-font-body">
                               {c.commissionPercent}% Comm.
                             </div>
                           ) : (
-                            <div className="text-[10px] text-zinc-400 font-mono">
+                            <div className="text-[10px] text-zinc-400 font-mono ui-text-meta ui-font-body">
                               Cr Limit: ₹{c.creditLimit || 0}
                             </div>
                           )}
@@ -495,7 +495,7 @@ export default function CompaniesMasterPage() {
                         <button
                           type="button"
                           onClick={() => handleBookStayForCompany(c)}
-                          className="h-8 px-3.5 rounded-xl bg-indigo-50 hover:bg-indigo-600 text-indigo-700 hover:text-white dark:bg-indigo-950/60 dark:hover:bg-indigo-600 dark:text-indigo-300 dark:hover:text-white border border-indigo-200/80 dark:border-indigo-800 font-extrabold text-xs transition flex items-center gap-1.5 shadow-xs cursor-pointer active:scale-95 inline-flex"
+                          className="h-8 px-3.5 rounded-xl bg-indigo-50 hover:bg-indigo-600 text-indigo-700 hover:text-white dark:bg-indigo-950/60 dark:hover:bg-indigo-600 dark:text-indigo-300 dark:hover:text-white border border-indigo-200/80 dark:border-indigo-800 font-extrabold text-xs transition flex items-center gap-1.5 shadow-xs cursor-pointer  inline-flex ui-radius-control ui-weight-medium ui-text-body ui-shadow-quiet ui-control ui-control-sized"
                         >
                           <CalendarPlus className="h-3.5 w-3.5" />
                           <span>Book Stay</span>
@@ -510,11 +510,11 @@ export default function CompaniesMasterPage() {
         </div>
 
         {/* Status Footer */}
-        <div className="p-4 border-t border-zinc-200 dark:border-zinc-800 bg-slate-50 dark:bg-zinc-900/60 flex items-center justify-between text-xs text-zinc-500 dark:text-zinc-400 font-medium">
+        <div className="p-4 border-t border-zinc-200 dark:border-zinc-800 bg-slate-50 dark:bg-zinc-900/60 flex items-center justify-between text-xs text-zinc-500 dark:text-zinc-400 font-medium ui-text-body">
           <div>
             Showing <strong>{companies.length}</strong> of <strong>{totalCount}</strong> Master Accounts
           </div>
-          <div className="font-mono text-[11px]">
+          <div className="font-mono text-[11px] ui-font-body ui-text-meta">
             Official GST Rule 46 Registered Entities
           </div>
         </div>

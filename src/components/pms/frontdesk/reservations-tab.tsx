@@ -145,14 +145,14 @@ export function ReservationsTab({
   };
 
   return (
-    <div className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-[#121215] overflow-hidden space-y-4">
+    <div className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-[#121215] overflow-hidden space-y-4 ui-radius-panel ui-surface">
       {/* 1. Header & Operational KPI Bar */}
       <div className="p-4 sm:p-5 border-b border-zinc-200/80 dark:border-zinc-800 space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <div className="flex items-center gap-2.5">
               <Calendar className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-              <h2 className="text-base font-bold text-zinc-950 dark:text-zinc-50">
+              <h2 className="text-base font-bold text-zinc-950 dark:text-zinc-50 ui-weight-medium ui-section-title">
                 Reservations & Advance Bookings
               </h2>
             </div>
@@ -161,7 +161,7 @@ export function ReservationsTab({
             </p>
           </div>
 
-          <div className="text-xs font-mono font-bold text-zinc-500 bg-zinc-100 dark:bg-zinc-800/80 px-3 py-1.5 rounded-xl shrink-0 self-start sm:self-auto">
+          <div className="text-xs font-mono font-bold text-zinc-500 bg-zinc-100 dark:bg-zinc-800/80 px-3 py-1.5 rounded-xl shrink-0 self-start sm:self-auto ui-text-body ui-font-body ui-weight-medium">
             {reservations.length} Bookings in System
           </div>
         </div>
@@ -169,47 +169,47 @@ export function ReservationsTab({
         {/* Operational Metrics Cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 pt-1">
           <div className="p-3.5 rounded-xl border border-blue-200/80 dark:border-blue-900/40 bg-blue-50/50 dark:bg-blue-950/20">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-blue-700 dark:text-blue-400 block">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-blue-700 dark:text-blue-400 block ui-text-meta ui-weight-medium">
               Expected Today
             </span>
             <div className="flex items-baseline gap-2 mt-1">
-              <span className="text-2xl font-bold font-mono text-blue-950 dark:text-blue-100">
+              <span className="text-2xl font-bold font-mono text-blue-950 dark:text-blue-100 ui-weight-medium ui-font-body">
                 {todayArrivalsCount}
               </span>
-              <span className="text-xs text-blue-600 dark:text-blue-400 font-medium">Guest Arrivals</span>
+              <span className="text-xs text-blue-600 dark:text-blue-400 font-medium ui-text-body">Guest Arrivals</span>
             </div>
           </div>
 
           <div className="p-3.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 block">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 block ui-text-meta ui-weight-medium">
               Upcoming Future
             </span>
             <div className="flex items-baseline gap-2 mt-1">
-              <span className="text-2xl font-bold font-mono text-zinc-900 dark:text-zinc-100">
+              <span className="text-2xl font-bold font-mono text-zinc-900 dark:text-zinc-100 ui-weight-medium ui-font-body">
                 {upcomingCount}
               </span>
-              <span className="text-xs text-zinc-500 font-medium">Confirmed</span>
+              <span className="text-xs text-zinc-500 font-medium ui-text-body">Confirmed</span>
             </div>
           </div>
 
           <div className="p-3.5 rounded-xl border border-emerald-200/80 dark:border-emerald-900/40 bg-emerald-50/50 dark:bg-emerald-950/20">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400 block">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400 block ui-text-meta ui-weight-medium">
               Checked In
             </span>
             <div className="flex items-baseline gap-2 mt-1">
-              <span className="text-2xl font-bold font-mono text-emerald-950 dark:text-emerald-100">
+              <span className="text-2xl font-bold font-mono text-emerald-950 dark:text-emerald-100 ui-weight-medium ui-font-body">
                 {checkedInCount}
               </span>
-              <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">In-House Stays</span>
+              <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium ui-text-body">In-House Stays</span>
             </div>
           </div>
 
           <div className="p-3.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 block">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 block ui-text-meta ui-weight-medium">
               Deposits Held
             </span>
             <div className="flex items-baseline gap-2 mt-1">
-              <span className="text-xl font-bold font-mono text-emerald-600 dark:text-emerald-400">
+              <span className="text-xl font-bold font-mono text-emerald-600 dark:text-emerald-400 ui-weight-medium ui-font-body">
                 {formatINR(totalDepositHeld)}
               </span>
             </div>
@@ -219,14 +219,14 @@ export function ReservationsTab({
 
       {/* 2. Operational Filter Tabs & Search */}
       <div className="px-4 sm:px-5 flex flex-col md:flex-row md:items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-1.5 text-xs font-semibold">
+        <div className="flex flex-wrap items-center gap-1.5 text-xs font-semibold ui-text-body">
           <button
             onClick={() => setActiveTab("ALL")}
             className={`px-3 py-1.5 rounded-xl transition cursor-pointer ${
               activeTab === "ALL"
-                ? "bg-zinc-950 text-white dark:bg-white dark:text-zinc-950 shadow-xs"
+                ? "bg-zinc-950 text-white dark:bg-white dark:text-zinc-950 shadow-xs ui-shadow-quiet"
                 : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700"
-            }`}
+            } ui-control`}
           >
             All ({reservations.length})
           </button>
@@ -234,20 +234,20 @@ export function ReservationsTab({
             onClick={() => setActiveTab("TODAY")}
             className={`px-3 py-1.5 rounded-xl transition cursor-pointer flex items-center gap-1.5 ${
               activeTab === "TODAY"
-                ? "bg-blue-600 text-white shadow-xs"
+                ? "bg-blue-600 text-white shadow-xs ui-shadow-quiet"
                 : "bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 border border-blue-200 dark:border-blue-800/40"
-            }`}
+            } ui-control`}
           >
-            <span className="h-1.5 w-1.5 rounded-full bg-blue-500 animate-pulse" />
+            <span className="h-1.5 w-1.5 rounded-full bg-blue-500 " />
             <span>Today's Arrivals ({todayArrivalsCount})</span>
           </button>
           <button
             onClick={() => setActiveTab("UPCOMING")}
             className={`px-3 py-1.5 rounded-xl transition cursor-pointer ${
               activeTab === "UPCOMING"
-                ? "bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 shadow-xs"
+                ? "bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 shadow-xs ui-shadow-quiet"
                 : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700"
-            }`}
+            } ui-control`}
           >
             Upcoming ({upcomingCount})
           </button>
@@ -255,9 +255,9 @@ export function ReservationsTab({
             onClick={() => setActiveTab("CHECKED_IN")}
             className={`px-3 py-1.5 rounded-xl transition cursor-pointer flex items-center gap-1.5 ${
               activeTab === "CHECKED_IN"
-                ? "bg-emerald-600 text-white shadow-xs"
+                ? "bg-emerald-600 text-white shadow-xs ui-shadow-quiet"
                 : "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/40"
-            }`}
+            } ui-control`}
           >
             <span>Checked In ({checkedInCount})</span>
           </button>
@@ -268,7 +268,7 @@ export function ReservationsTab({
                 activeTab === "CANCELLED"
                   ? "bg-zinc-800 text-white"
                   : "bg-zinc-100 text-zinc-500 dark:bg-zinc-800/80 dark:text-zinc-400"
-              }`}
+              } ui-control`}
             >
               Cancelled ({cancelledCount})
             </button>
@@ -284,12 +284,12 @@ export function ReservationsTab({
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search reservation #, guest, phone, channel..."
-              className="w-full h-9 pl-9 pr-8 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs sm:text-sm text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:border-blue-500"
+              className="w-full h-9 pl-9 pr-8 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs sm:text-sm text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:border-blue-500 ui-radius-control ui-text-body ui-field" aria-label="Search reservation #, guest, phone, channel"
             />
             {search && (
               <button
                 onClick={() => setSearch("")}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 cursor-pointer"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 cursor-pointer ui-control"
               >
                 <X className="h-3.5 w-3.5" />
               </button>
@@ -300,8 +300,8 @@ export function ReservationsTab({
             <button
               type="button"
               onClick={onNewBooking}
-              className="h-9 px-3.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold inline-flex items-center gap-1.5 transition shadow-xs cursor-pointer active:scale-95 shrink-0"
-              title="Create New Advance Reservation"
+              className="h-9 px-3.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold inline-flex items-center gap-1.5 transition shadow-xs cursor-pointer  shrink-0 ui-radius-control ui-text-body ui-weight-medium ui-shadow-quiet ui-control ui-control-sized"
+              title="Create New Advance Reservation" aria-label="Create New Advance Reservation"
             >
               <Plus className="h-4 w-4" />
               <span>New Booking</span>
@@ -312,8 +312,8 @@ export function ReservationsTab({
 
       {/* 3. Table */}
       <div className="overflow-x-auto">
-        <table className="w-full text-left text-sm whitespace-nowrap">
-          <thead className="bg-zinc-50/80 dark:bg-zinc-900/60 border-b border-zinc-200/80 dark:border-zinc-800 text-zinc-500 dark:text-zinc-400 font-semibold text-xs uppercase tracking-wider">
+        <table className="w-full text-left text-sm whitespace-nowrap ui-data-table">
+          <thead className="bg-zinc-50/80 dark:bg-zinc-900/60 border-b border-zinc-200/80 dark:border-zinc-800 text-zinc-500 dark:text-zinc-400 font-semibold text-xs uppercase tracking-wider ui-text-body">
             <tr>
               <th className="px-5 py-3.5">Status</th>
               <th className="px-5 py-3.5">Booking #</th>
@@ -332,7 +332,7 @@ export function ReservationsTab({
                   {/* Status Badge */}
                   <td className="px-5 py-4">
                     <span
-                      className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full ${
+                      className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full  ui-text-body ${
                         b.isTodayArrival
                           ? "bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-200 dark:border-blue-800/50"
                           : b.isCheckedIn
@@ -345,7 +345,7 @@ export function ReservationsTab({
                       <span
                         className={`h-1.5 w-1.5 rounded-full ${
                           b.isTodayArrival
-                            ? "bg-blue-500 animate-pulse"
+                            ? "bg-blue-500 "
                             : b.isCheckedIn
                             ? "bg-emerald-500"
                             : b.isCancelled
@@ -364,7 +364,7 @@ export function ReservationsTab({
                   </td>
 
                   {/* Confirmation Number */}
-                  <td className="px-5 py-4 font-mono font-bold text-zinc-950 dark:text-zinc-50 text-sm">
+                  <td className="px-5 py-4 font-mono font-bold text-zinc-950 dark:text-zinc-50 text-sm ui-font-body ui-weight-medium">
                     {b.code}
                   </td>
 
@@ -374,27 +374,27 @@ export function ReservationsTab({
                       {b.guestName}
                     </div>
                     {b.guestEmail && (
-                      <div className="text-xs text-zinc-400 font-normal">{b.guestEmail}</div>
+                      <div className="text-xs text-zinc-400 font-normal ui-text-body">{b.guestEmail}</div>
                     )}
                   </td>
 
                   {/* Contact Phone */}
-                  <td className="px-4 py-4 font-mono text-zinc-600 dark:text-zinc-400 text-sm">
+                  <td className="px-4 py-4 font-mono text-zinc-600 dark:text-zinc-400 text-sm ui-font-body">
                     {b.guestPhone ? (
                       <span className="tabular-nums">{b.guestPhone}</span>
                     ) : (
-                      <span className="text-zinc-400 text-xs">No phone</span>
+                      <span className="text-zinc-400 text-xs ui-text-body">No phone</span>
                     )}
                   </td>
 
                   {/* Dates with Nights count */}
-                  <td className="px-4 py-4 font-mono text-sm">
+                  <td className="px-4 py-4 font-mono text-sm ui-font-body">
                     <div className="flex items-center gap-1.5 text-zinc-900 dark:text-zinc-100 font-semibold">
                       <span>{formatDateDisplay(b.arrivalStr)}</span>
                       <ArrowRight className="h-3 w-3 text-zinc-400 inline" />
                       <span>{formatDateDisplay(b.departureStr)}</span>
                     </div>
-                    <div className="text-[11px] text-zinc-500 font-normal">
+                    <div className="text-[11px] text-zinc-500 font-normal ui-text-meta">
                       {b.nights} {b.nights === 1 ? "Night" : "Nights"} stay
                     </div>
                   </td>
@@ -404,18 +404,18 @@ export function ReservationsTab({
                     <div className="text-zinc-800 dark:text-zinc-200 text-sm font-semibold">
                       {b.roomCat}
                     </div>
-                    <div className="inline-block mt-0.5 text-[11px] font-medium px-2 py-0.2 rounded-md bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 capitalize">
+                    <div className="inline-block mt-0.5 text-[11px] font-medium px-2 py-0.2 rounded-md bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 capitalize ui-text-meta">
                       {b.source}
                     </div>
                   </td>
 
                   {/* Deposit Paid / Total Rate */}
-                  <td className="px-4 py-4 font-mono tabular-nums text-sm">
-                    <div className="text-emerald-600 dark:text-emerald-400 font-bold">
+                  <td className="px-4 py-4 font-mono tabular-nums text-sm ui-font-body">
+                    <div className="text-emerald-600 dark:text-emerald-400 font-bold ui-weight-medium">
                       {formatINR(b.depositPaid)}
                     </div>
                     {b.totalRate > 0 && (
-                      <div className="text-[11px] text-zinc-400 font-normal">
+                      <div className="text-[11px] text-zinc-400 font-normal ui-text-meta">
                         Total: {formatINR(b.totalRate)}
                       </div>
                     )}
@@ -427,14 +427,14 @@ export function ReservationsTab({
                     {!b.isCheckedIn && !b.isCancelled ? (
                       <button
                         onClick={() => onCheckIn(b.raw)}
-                        className="px-3.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs inline-flex items-center gap-1.5 transition cursor-pointer shadow-xs"
-                        title="Start Check-In for this guest"
+                        className="px-3.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs inline-flex items-center gap-1.5 transition cursor-pointer shadow-xs ui-text-body ui-shadow-quiet ui-control"
+                        title="Start Check-In for this guest" aria-label="Start Check-In for this guest"
                       >
                         <UserPlus className="h-3.5 w-3.5" />
                         <span>Check-In</span>
                       </button>
                     ) : (
-                      <span className="px-3 py-1.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-400 text-xs font-semibold inline-flex items-center gap-1">
+                      <span className="px-3 py-1.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-400 text-xs font-semibold inline-flex items-center gap-1 ui-text-body">
                         <CheckCircle2 className="h-3.5 w-3.5" />
                         <span>{b.isCheckedIn ? "Checked In" : "Cancelled"}</span>
                       </span>
@@ -443,8 +443,8 @@ export function ReservationsTab({
                     {/* Voucher Action */}
                     <button
                       onClick={() => onViewVoucher(b.raw)}
-                      className="px-3 py-1.5 rounded-lg bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 text-xs font-semibold inline-flex items-center gap-1.5 transition cursor-pointer"
-                      title="View Booking Confirmation Voucher"
+                      className="px-3 py-1.5 rounded-lg bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 text-xs font-semibold inline-flex items-center gap-1.5 transition cursor-pointer ui-text-body ui-control"
+                      title="View Booking Confirmation Voucher" aria-label="View Booking Confirmation Voucher"
                     >
                       <FileText className="h-3.5 w-3.5" />
                       <span>Voucher</span>

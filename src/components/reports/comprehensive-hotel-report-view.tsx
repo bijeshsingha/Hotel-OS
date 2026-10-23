@@ -26,7 +26,7 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { formatINR } from "@/lib/gst/calculator";
-import { ComprehensiveHotelReport, AdminModificationRecord } from "@/lib/domain/comprehensive-report-service";
+import type { ComprehensiveHotelReport, AdminModificationRecord } from "@/lib/domain/comprehensive-report-service";
 import { PrintableComprehensiveReport } from "./printable-comprehensive-report";
 import { EmailReportModal } from "./email-report-modal";
 
@@ -88,22 +88,22 @@ export function ComprehensiveHotelReportView({
     <div className="space-y-6">
       
       {/* EXECUTIVE CONTROL BAR */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-5 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-sm">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-5 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-sm ui-radius-panel ui-shadow-quiet ui-surface">
         <div className="flex items-center gap-3">
-          <div className="h-11 w-11 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-600 text-white flex items-center justify-center font-black shadow-md shadow-blue-500/20">
+          <div className="h-11 w-11 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-600 text-white flex items-center justify-center font-black shadow-md shadow-blue-500/20 ui-radius-panel ui-weight-medium ui-shadow-quiet">
             <Building2 className="h-6 w-6" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-base sm:text-lg font-black text-zinc-900 dark:text-white">
+              <h1 className="text-base sm:text-lg font-black text-zinc-900 dark:text-white ui-weight-medium ui-page-title">
                 {property.displayName}
               </h1>
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 ui-text-meta ui-font-body ui-weight-medium">
                 {property.code}
               </span>
             </div>
-            <p className="text-xs text-zinc-500 flex items-center gap-2 mt-0.5">
-              <span>GSTIN: <span className="font-mono font-semibold">{property.gstin || "N/A"}</span></span>
+            <p className="text-xs text-zinc-500 flex items-center gap-2 mt-0.5 ui-text-body">
+              <span>GSTIN: <span className="font-mono font-semibold ui-font-body">{property.gstin || "N/A"}</span></span>
             </p>
           </div>
         </div>
@@ -111,14 +111,14 @@ export function ComprehensiveHotelReportView({
         {/* Action Controls */}
         <div className="flex flex-wrap items-center gap-2">
           {/* Business Date Picker */}
-          <div className="flex items-center gap-1.5 h-8.5 px-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 text-xs">
+          <div className="flex items-center gap-1.5 h-8.5 px-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 text-xs ui-text-body">
             <Calendar className="h-3.5 w-3.5 text-zinc-400" />
             <span className="text-zinc-500 font-medium">Date:</span>
             <input
               type="date"
               value={selectedDate || report.reportDate}
               onChange={(e) => onDateChange(e.target.value)}
-              className="bg-transparent font-mono font-semibold text-zinc-900 dark:text-white focus:outline-none cursor-pointer"
+              className="bg-transparent font-mono font-semibold text-zinc-900 dark:text-white focus:outline-none cursor-pointer ui-font-body ui-field"
             />
           </div>
 
@@ -126,7 +126,7 @@ export function ComprehensiveHotelReportView({
             type="button"
             onClick={onRefresh}
             disabled={loading}
-            className="h-8.5 px-2.5 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700/60 text-xs font-medium text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5 transition cursor-pointer disabled:opacity-50 select-none"
+            className="h-8.5 px-2.5 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700/60 text-xs font-medium text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5 transition cursor-pointer disabled:opacity-50 select-none ui-text-body ui-control ui-control-sized"
           >
             <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin text-zinc-900 dark:text-zinc-100" : "text-zinc-500"}`} />
             <span className="hidden sm:inline">Refresh</span>
@@ -135,7 +135,7 @@ export function ComprehensiveHotelReportView({
           <button
             type="button"
             onClick={() => setShowEmailModal(true)}
-            className="h-8.5 px-3 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700/60 text-xs font-medium text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5 transition cursor-pointer select-none"
+            className="h-8.5 px-3 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700/60 text-xs font-medium text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5 transition cursor-pointer select-none ui-text-body ui-control ui-control-sized"
           >
             <Mail className="h-3.5 w-3.5 text-zinc-500" />
             <span>Email</span>
@@ -144,7 +144,7 @@ export function ComprehensiveHotelReportView({
           <button
             type="button"
             onClick={() => setShowPrintModal(true)}
-            className="h-8.5 px-3 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-zinc-100 dark:hover:bg-white dark:text-zinc-900 text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer shadow-2xs select-none"
+            className="h-8.5 px-3 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-zinc-100 dark:hover:bg-white dark:text-zinc-900 text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer shadow-2xs select-none ui-text-body ui-shadow-quiet ui-control ui-control-sized"
           >
             <Printer className="h-3.5 w-3.5" />
             <span>Print Sheet</span>
@@ -155,89 +155,89 @@ export function ComprehensiveHotelReportView({
       {/* TOP 5 METRIC CARDS */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3.5">
         {/* Gross Revenue */}
-        <div className="p-4 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-1">
-          <div className="flex items-center justify-between text-xs text-zinc-500 font-semibold uppercase">
+        <div className="p-4 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-1 ui-radius-panel ui-shadow-quiet ui-surface">
+          <div className="flex items-center justify-between text-xs text-zinc-500 font-semibold uppercase ui-text-body">
             <span>Gross Revenue</span>
             <DollarSign className="h-4 w-4 text-zinc-400" />
           </div>
-          <div className="text-xl sm:text-2xl font-black font-mono text-zinc-900 dark:text-white">
+          <div className="text-xl sm:text-2xl font-black font-mono text-zinc-900 dark:text-white ui-weight-medium ui-font-body">
             {formatINR(money.grossRevenue)}
           </div>
-          <div className="text-[11px] text-zinc-500">
+          <div className="text-[11px] text-zinc-500 ui-text-meta">
             Room: {formatINR(money.roomRevenue)} &bull; F&B: {formatINR(money.fbRevenue)}
           </div>
         </div>
 
         {/* Collections */}
-        <div className="p-4 rounded-2xl bg-white dark:bg-zinc-900 border border-emerald-200/80 dark:border-emerald-900/30 shadow-xs space-y-1">
-          <div className="flex items-center justify-between text-xs text-emerald-800 dark:text-emerald-400 font-semibold uppercase">
+        <div className="p-4 rounded-2xl bg-white dark:bg-zinc-900 border border-emerald-200/80 dark:border-emerald-900/30 shadow-xs space-y-1 ui-radius-panel ui-shadow-quiet ui-surface">
+          <div className="flex items-center justify-between text-xs text-emerald-800 dark:text-emerald-400 font-semibold uppercase ui-text-body">
             <span>Collections</span>
             <ArrowDownLeft className="h-4 w-4 text-emerald-600" />
           </div>
-          <div className="text-xl sm:text-2xl font-black font-mono text-emerald-700 dark:text-emerald-300">
+          <div className="text-xl sm:text-2xl font-black font-mono text-emerald-700 dark:text-emerald-300 ui-weight-medium ui-font-body">
             {formatINR(money.totalCollections)}
           </div>
-          <div className="text-[11px] text-emerald-600/80">
+          <div className="text-[11px] text-emerald-600/80 ui-text-meta">
             {money.collectionsCount} total payments received
           </div>
         </div>
 
         {/* Occupancy */}
-        <div className="p-4 rounded-2xl bg-white dark:bg-zinc-900 border border-blue-200/80 dark:border-blue-900/30 shadow-xs space-y-1">
-          <div className="flex items-center justify-between text-xs text-blue-800 dark:text-blue-400 font-semibold uppercase">
+        <div className="p-4 rounded-2xl bg-white dark:bg-zinc-900 border border-blue-200/80 dark:border-blue-900/30 shadow-xs space-y-1 ui-radius-panel ui-shadow-quiet ui-surface">
+          <div className="flex items-center justify-between text-xs text-blue-800 dark:text-blue-400 font-semibold uppercase ui-text-body">
             <span>Occupancy Rate</span>
             <BedDouble className="h-4 w-4 text-blue-600" />
           </div>
-          <div className="text-xl sm:text-2xl font-black font-mono text-blue-700 dark:text-blue-300">
+          <div className="text-xl sm:text-2xl font-black font-mono text-blue-700 dark:text-blue-300 ui-weight-medium ui-font-body">
             {rooms.occupancyPct}%
           </div>
-          <div className="text-[11px] text-blue-600/80">
+          <div className="text-[11px] text-blue-600/80 ui-text-meta">
             {rooms.occupiedRooms} occupied / {rooms.totalRooms} rooms
           </div>
         </div>
 
         {/* Drawer Float In Hand */}
-        <div className="p-4 rounded-2xl bg-gradient-to-br from-teal-50 to-emerald-50/50 dark:from-teal-950/20 dark:to-emerald-950/10 border border-teal-200/80 dark:border-teal-800/40 shadow-xs space-y-1">
-          <div className="flex items-center justify-between text-xs text-teal-800 dark:text-teal-300 font-semibold uppercase">
+        <div className="p-4 rounded-2xl bg-gradient-to-br from-teal-50 to-emerald-50/50 dark:from-teal-950/20 dark:to-emerald-950/10 border border-teal-200/80 dark:border-teal-800/40 shadow-xs space-y-1 ui-radius-panel ui-shadow-quiet">
+          <div className="flex items-center justify-between text-xs text-teal-800 dark:text-teal-300 font-semibold uppercase ui-text-body">
             <span>Till Cash In-Hand</span>
             <Wallet className="h-4 w-4 text-teal-600" />
           </div>
-          <div className="text-xl sm:text-2xl font-black font-mono text-teal-800 dark:text-teal-200">
+          <div className="text-xl sm:text-2xl font-black font-mono text-teal-800 dark:text-teal-200 ui-weight-medium ui-font-body">
             {formatINR(money.cashDrawer.netCashInHand)}
           </div>
-          <div className="text-[11px] text-teal-700/80 dark:text-teal-400">
+          <div className="text-[11px] text-teal-700/80 dark:text-teal-400 ui-text-meta">
             Physical desk drawer total
           </div>
         </div>
 
         {/* Admin Modifications */}
-        <div className="p-4 rounded-2xl bg-white dark:bg-zinc-900 border border-purple-200/80 dark:border-purple-900/30 shadow-xs space-y-1">
-          <div className="flex items-center justify-between text-xs text-purple-800 dark:text-purple-400 font-semibold uppercase">
+        <div className="p-4 rounded-2xl bg-white dark:bg-zinc-900 border border-purple-200/80 dark:border-purple-900/30 shadow-xs space-y-1 ui-radius-panel ui-shadow-quiet ui-surface">
+          <div className="flex items-center justify-between text-xs text-purple-800 dark:text-purple-400 font-semibold uppercase ui-text-body">
             <span>Admin Mods</span>
             <ShieldCheck className="h-4 w-4 text-purple-600" />
           </div>
-          <div className="text-xl sm:text-2xl font-black font-mono text-purple-700 dark:text-purple-300">
+          <div className="text-xl sm:text-2xl font-black font-mono text-purple-700 dark:text-purple-300 ui-weight-medium ui-font-body">
             {adminModifications.totalModificationsCount}
           </div>
-          <div className="text-[11px] text-purple-600/80">
+          <div className="text-[11px] text-purple-600/80 ui-text-meta">
             Modifications logged today
           </div>
         </div>
       </div>
 
       {/* SECTION 1: DAILY MONEY & FINANCIAL POSITION */}
-      <div className="p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-sm space-y-5">
+      <div className="p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-sm space-y-5 ui-radius-panel ui-shadow-quiet ui-surface">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-zinc-200 dark:border-zinc-800 pb-3">
           <div>
-            <h2 className="text-sm font-bold uppercase tracking-wider text-zinc-900 dark:text-white flex items-center gap-2">
+            <h2 className="text-sm font-bold uppercase tracking-wider text-zinc-900 dark:text-white flex items-center gap-2 ui-weight-medium ui-section-title">
               <Receipt className="h-4 w-4 text-emerald-600" />
               <span>1. Daily Money & Financial Position</span>
             </h2>
-            <p className="text-xs text-zinc-500">
+            <p className="text-xs text-zinc-500 ui-text-body">
               Inflows, disbursements, cash drawer reconciliation, and taxes for {report.reportDate}
             </p>
           </div>
-          <div className="text-xs font-mono font-bold px-3 py-1 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300">
+          <div className="text-xs font-mono font-bold px-3 py-1 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 ui-text-body ui-font-body ui-weight-medium">
             Net Day Cash Flow: <span className={money.netCashFlow >= 0 ? "text-emerald-600" : "text-rose-600"}>{formatINR(money.netCashFlow)}</span>
           </div>
         </div>
@@ -250,20 +250,20 @@ export function ComprehensiveHotelReportView({
             <div>
               <div className="bg-zinc-50 dark:bg-zinc-800/80 px-4 py-2.5 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
                 <div>
-                  <span className="text-xs font-bold uppercase tracking-wider text-zinc-800 dark:text-zinc-200 block">
+                  <span className="text-xs font-bold uppercase tracking-wider text-zinc-800 dark:text-zinc-200 block ui-text-body ui-weight-medium">
                     Mode of Payments
                   </span>
-                  <span className="text-[10px] text-zinc-500">Real customer tenders &amp; settled inflows</span>
+                  <span className="text-[10px] text-zinc-500 ui-text-meta">Real customer tenders &amp; settled inflows</span>
                 </div>
                 <div className="text-right">
-                  <span className="text-xs font-mono font-bold text-emerald-600 dark:text-emerald-400 block">
+                  <span className="text-xs font-mono font-bold text-emerald-600 dark:text-emerald-400 block ui-text-body ui-font-body ui-weight-medium">
                     {formatINR(money.totalCollections)}
                   </span>
-                  <span className="text-[10px] text-zinc-400 font-semibold">{money.collectionsCount} receipts</span>
+                  <span className="text-[10px] text-zinc-400 font-semibold ui-text-meta">{money.collectionsCount} receipts</span>
                 </div>
               </div>
 
-              <table className="w-full text-xs">
+              <div className="ui-table-scroll"><table className="w-full text-xs ui-text-body ui-data-table">
                 <tbody>
                   {[
                     { mode: "CASH", label: "CASH", desc: "Front desk & outlet cash inflow" },
@@ -280,16 +280,16 @@ export function ComprehensiveHotelReportView({
                       <tr key={mode} className="border-b border-zinc-100 dark:border-zinc-800/50 hover:bg-zinc-50 dark:hover:bg-zinc-800/30">
                         <td className="px-4 py-2.5">
                           <div className="flex items-center gap-1.5">
-                            <span className="font-bold text-zinc-900 dark:text-zinc-100">{label}</span>
+                            <span className="font-bold text-zinc-900 dark:text-zinc-100 ui-weight-medium">{label}</span>
                             {badge && (
-                              <span className="text-[9px] uppercase px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 font-semibold">
+                              <span className="text-[9px] uppercase px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 font-semibold ui-text-meta">
                                 {badge}
                               </span>
                             )}
                           </div>
-                          <div className="text-[10px] text-zinc-500">{desc}</div>
+                          <div className="text-[10px] text-zinc-500 ui-text-meta">{desc}</div>
                         </td>
-                        <td className="px-4 py-2.5 text-right font-mono font-bold text-zinc-900 dark:text-zinc-100 text-sm">
+                        <td className="px-4 py-2.5 text-right font-mono font-bold text-zinc-900 dark:text-zinc-100 text-sm ui-font-body ui-weight-medium">
                           {formatINR(amount)}
                         </td>
                       </tr>
@@ -301,10 +301,10 @@ export function ComprehensiveHotelReportView({
                     .filter(([m, amt]) => !["CASH", "UPI", "BTC", "CARD", "BANK_TRANSFER", "CHEQUE", "OUTSTANDING", "TRANSFER", "ADVANCE_ALLOCATION"].includes(m) && (amt || 0) > 0)
                     .map(([method, amount]) => (
                       <tr key={method} className="border-b border-zinc-100 dark:border-zinc-800/50 hover:bg-zinc-50 dark:hover:bg-zinc-800/30">
-                        <td className="px-4 py-2.5 font-bold text-zinc-900 dark:text-zinc-100">
+                        <td className="px-4 py-2.5 font-bold text-zinc-900 dark:text-zinc-100 ui-weight-medium">
                           {method.replace(/_/g, " ")}
                         </td>
-                        <td className="px-4 py-2.5 text-right font-mono font-bold text-zinc-900 dark:text-zinc-100 text-sm">
+                        <td className="px-4 py-2.5 text-right font-mono font-bold text-zinc-900 dark:text-zinc-100 text-sm ui-font-body ui-weight-medium">
                           {formatINR(amount || 0)}
                         </td>
                       </tr>
@@ -314,34 +314,34 @@ export function ComprehensiveHotelReportView({
                   <tr className="border-t-2 border-amber-200/70 dark:border-amber-900/60 bg-amber-50/40 dark:bg-amber-950/20">
                     <td className="px-4 py-2.5">
                       <div className="flex items-center gap-1.5">
-                        <span className="font-black text-amber-900 dark:text-amber-200">OUTSTANDING</span>
-                        <span className="text-[9px] uppercase px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-300 font-bold">
+                        <span className="font-black text-amber-900 dark:text-amber-200 ui-weight-medium">OUTSTANDING</span>
+                        <span className="text-[9px] uppercase px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-300 font-bold ui-text-meta ui-weight-medium">
                           Pending Dues
                         </span>
                       </div>
-                      <div className="text-[10px] text-amber-700/80 dark:text-amber-400/80">
+                      <div className="text-[10px] text-amber-700/80 dark:text-amber-400/80 ui-text-meta">
                         Unsettled folio receivables currently due across all stays
                       </div>
                     </td>
-                    <td className="px-4 py-2.5 text-right font-mono font-bold text-amber-700 dark:text-amber-400 text-sm">
+                    <td className="px-4 py-2.5 text-right font-mono font-bold text-amber-700 dark:text-amber-400 text-sm ui-font-body ui-weight-medium">
                       {formatINR(money.collectionsByMethod.OUTSTANDING || 0)}
                     </td>
                   </tr>
                 </tbody>
-              </table>
+              </table></div>
             </div>
 
             {/* Internal Transfers Reconciled Section */}
             {money.internalTransfers && (money.internalTransfers.transferredDueToMaster > 0 || money.internalTransfers.advanceAllocatedFromPool > 0) && (
-              <div className="px-4 py-2.5 bg-zinc-50/80 dark:bg-zinc-800/50 border-t border-zinc-200 dark:border-zinc-800 text-[11px] text-zinc-600 dark:text-zinc-400 space-y-1">
+              <div className="px-4 py-2.5 bg-zinc-50/80 dark:bg-zinc-800/50 border-t border-zinc-200 dark:border-zinc-800 text-[11px] text-zinc-600 dark:text-zinc-400 space-y-1 ui-text-meta">
                 <div className="font-semibold text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
                   <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
                   <span>Reconciled Internal Ledger Movements</span>
                 </div>
-                <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px]">
+                <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px] ui-text-meta">
                   {money.internalTransfers.transferredDueToMaster > 0 && (
                     <span>
-                      Transferred Due to Master: <strong className="font-mono text-zinc-800 dark:text-zinc-200">{formatINR(money.internalTransfers.transferredDueToMaster)}</strong>
+                      Transferred Due to Master: <strong className="font-mono text-zinc-800 dark:text-zinc-200 ui-font-body">{formatINR(money.internalTransfers.transferredDueToMaster)}</strong>
                     </span>
                   )}
                   {money.internalTransfers.transferredDueToMaster > 0 && money.internalTransfers.advanceAllocatedFromPool > 0 && (
@@ -349,11 +349,11 @@ export function ComprehensiveHotelReportView({
                   )}
                   {money.internalTransfers.advanceAllocatedFromPool > 0 && (
                     <span>
-                      Allocated from Advance Pool: <strong className="font-mono text-zinc-800 dark:text-zinc-200">{formatINR(money.internalTransfers.advanceAllocatedFromPool)}</strong>
+                      Allocated from Advance Pool: <strong className="font-mono text-zinc-800 dark:text-zinc-200 ui-font-body">{formatINR(money.internalTransfers.advanceAllocatedFromPool)}</strong>
                     </span>
                   )}
                 </div>
-                <div className="text-[10px] text-zinc-400 dark:text-zinc-500">
+                <div className="text-[10px] text-zinc-400 dark:text-zinc-500 ui-text-meta">
                   Internal room-to-master ledger reallocations are tracked separately to prevent double-counting.
                 </div>
               </div>
@@ -363,14 +363,14 @@ export function ComprehensiveHotelReportView({
           {/* Expenses by Category */}
           <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 overflow-hidden">
             <div className="bg-zinc-50 dark:bg-zinc-800/80 px-4 py-2.5 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
-              <span className="text-xs font-bold uppercase tracking-wider text-zinc-800 dark:text-zinc-200">
+              <span className="text-xs font-bold uppercase tracking-wider text-zinc-800 dark:text-zinc-200 ui-text-body ui-weight-medium">
                 Expenses & Payouts by Category
               </span>
-              <span className="text-xs font-mono font-bold text-rose-600 dark:text-rose-400">
+              <span className="text-xs font-mono font-bold text-rose-600 dark:text-rose-400 ui-text-body ui-font-body ui-weight-medium">
                 -{formatINR(money.totalExpenses)}
               </span>
             </div>
-            <table className="w-full text-xs">
+            <div className="ui-table-scroll"><table className="w-full text-xs ui-text-body ui-data-table">
               <tbody>
                 {Object.entries(money.expensesByCategory).filter(([_, amt]) => amt > 0).length === 0 ? (
                   <tr>
@@ -384,111 +384,111 @@ export function ComprehensiveHotelReportView({
                       <td className="px-4 py-2.5 font-semibold text-zinc-700 dark:text-zinc-300">
                         {cat.replace(/_/g, " ")}
                       </td>
-                      <td className="px-4 py-2.5 text-right font-mono font-bold text-rose-600 dark:text-rose-400">
+                      <td className="px-4 py-2.5 text-right font-mono font-bold text-rose-600 dark:text-rose-400 ui-font-body ui-weight-medium">
                         -{formatINR(amount)}
                       </td>
                     </tr>
                   ))
                 )}
               </tbody>
-            </table>
+            </table></div>
           </div>
         </div>
 
         {/* Physical Cash Drawer Reconciliation Box */}
         <div className="p-4 rounded-xl bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200 dark:border-zinc-800 space-y-3">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-black uppercase tracking-wider text-teal-800 dark:text-teal-300">
+            <span className="text-xs font-black uppercase tracking-wider text-teal-800 dark:text-teal-300 ui-text-body ui-weight-medium">
               Front Desk Physical Cash Drawer (Till) Position
             </span>
-            <span className="text-[11px] text-zinc-500">Opening Base Configured: {formatINR(property.openingCashBalance)}</span>
+            <span className="text-[11px] text-zinc-500 ui-text-meta">Opening Base Configured: {formatINR(property.openingCashBalance)}</span>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs ui-text-body">
             <div className="p-3 rounded-lg bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700">
-              <span className="text-zinc-500 text-[11px] block">1. Starting Drawer Float</span>
-              <span className="text-sm font-mono font-bold text-zinc-900 dark:text-white mt-0.5 block">{formatINR(money.cashDrawer.openingBalance)}</span>
+              <span className="text-zinc-500 text-[11px] block ui-text-meta">1. Starting Drawer Float</span>
+              <span className="text-sm font-mono font-bold text-zinc-900 dark:text-white mt-0.5 block ui-font-body ui-weight-medium">{formatINR(money.cashDrawer.openingBalance)}</span>
             </div>
 
             <div className="p-3 rounded-lg bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700">
-              <span className="text-emerald-700 dark:text-emerald-400 text-[11px] block">+ 2. Cash Inflow Today</span>
-              <span className="text-sm font-mono font-bold text-emerald-700 dark:text-emerald-300 mt-0.5 block">+{formatINR(money.cashDrawer.cashIn)}</span>
+              <span className="text-emerald-700 dark:text-emerald-400 text-[11px] block ui-text-meta">+ 2. Cash Inflow Today</span>
+              <span className="text-sm font-mono font-bold text-emerald-700 dark:text-emerald-300 mt-0.5 block ui-font-body ui-weight-medium">+{formatINR(money.cashDrawer.cashIn)}</span>
             </div>
 
             <div className="p-3 rounded-lg bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700">
-              <span className="text-rose-700 dark:text-rose-400 text-[11px] block">- 3. Cash Outflow Today</span>
-              <span className="text-sm font-mono font-bold text-rose-700 dark:text-rose-300 mt-0.5 block">-{formatINR(money.cashDrawer.cashOut)}</span>
+              <span className="text-rose-700 dark:text-rose-400 text-[11px] block ui-text-meta">- 3. Cash Outflow Today</span>
+              <span className="text-sm font-mono font-bold text-rose-700 dark:text-rose-300 mt-0.5 block ui-font-body ui-weight-medium">-{formatINR(money.cashDrawer.cashOut)}</span>
             </div>
 
             <div className="p-3 rounded-lg bg-teal-50 dark:bg-teal-950/30 border border-teal-200 dark:border-teal-800">
-              <span className="text-teal-800 dark:text-teal-300 text-[11px] font-bold block">= Physical Cash In Till</span>
-              <span className="text-base font-mono font-black text-teal-800 dark:text-teal-200 mt-0.5 block">{formatINR(money.cashDrawer.netCashInHand)}</span>
+              <span className="text-teal-800 dark:text-teal-300 text-[11px] font-bold block ui-text-meta ui-weight-medium">= Physical Cash In Till</span>
+              <span className="text-base font-mono font-black text-teal-800 dark:text-teal-200 mt-0.5 block ui-font-body ui-weight-medium">{formatINR(money.cashDrawer.netCashInHand)}</span>
             </div>
           </div>
         </div>
       </div>
 
       {/* SECTION 2: DAILY ROOMS & OPERATIONS */}
-      <div className="p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-sm space-y-5">
+      <div className="p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-sm space-y-5 ui-radius-panel ui-shadow-quiet ui-surface">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-zinc-200 dark:border-zinc-800 pb-3">
           <div>
-            <h2 className="text-sm font-bold uppercase tracking-wider text-zinc-900 dark:text-white flex items-center gap-2">
+            <h2 className="text-sm font-bold uppercase tracking-wider text-zinc-900 dark:text-white flex items-center gap-2 ui-weight-medium ui-section-title">
               <BedDouble className="h-4 w-4 text-blue-600" />
               <span>2. Daily Room Inventory & PMS Performance</span>
             </h2>
-            <p className="text-xs text-zinc-500">
-              Inventory breakdown, housekeeping status, rate realization, and in-house guest roster
+            <p className="text-xs text-zinc-500 ui-text-body">
+              Occupancy and guest roster are shown at the selected day close. Housekeeping and outstanding folio balances show current operational records.
             </p>
           </div>
-          <div className="flex items-center gap-2 text-xs">
-            <span className="px-2.5 py-1 rounded-md bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 font-bold border border-emerald-200 dark:border-emerald-800">
+          <div className="flex items-center gap-2 text-xs ui-text-body">
+            <span className="px-2.5 py-1 rounded-md bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 font-bold border border-emerald-200 dark:border-emerald-800 ui-weight-medium">
               {rooms.roomStates.inspected} Inspected
             </span>
-            <span className="px-2.5 py-1 rounded-md bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300 font-bold border border-blue-200 dark:border-blue-800">
+            <span className="px-2.5 py-1 rounded-md bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300 font-bold border border-blue-200 dark:border-blue-800 ui-weight-medium">
               {rooms.roomStates.clean} Clean
             </span>
-            <span className="px-2.5 py-1 rounded-md bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-300 font-bold border border-amber-200 dark:border-amber-800">
+            <span className="px-2.5 py-1 rounded-md bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-300 font-bold border border-amber-200 dark:border-amber-800 ui-weight-medium">
               {rooms.roomStates.dirty} Dirty
             </span>
-            <span className="px-2.5 py-1 rounded-md bg-rose-50 dark:bg-rose-950/30 text-rose-700 dark:text-rose-300 font-bold border border-rose-200 dark:border-rose-800">
+            <span className="px-2.5 py-1 rounded-md bg-rose-50 dark:bg-rose-950/30 text-rose-700 dark:text-rose-300 font-bold border border-rose-200 dark:border-rose-800 ui-weight-medium">
               {rooms.roomStates.maintenance} Out of Order
             </span>
           </div>
         </div>
 
         {/* Operational Flow Stats */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs ui-text-body">
           <div className="p-3.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/30">
-            <span className="text-zinc-500 text-[11px] block font-semibold">Average Daily Rate (ADR)</span>
-            <span className="text-lg font-mono font-bold text-zinc-900 dark:text-white mt-1 block">{formatINR(rooms.adr)}</span>
+            <span className="text-zinc-500 text-[11px] block font-semibold ui-text-meta">Average Daily Rate (ADR)</span>
+            <span className="text-lg font-mono font-bold text-zinc-900 dark:text-white mt-1 block ui-font-body ui-weight-medium">{formatINR(rooms.adr)}</span>
           </div>
 
           <div className="p-3.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/30">
-            <span className="text-zinc-500 text-[11px] block font-semibold">RevPAR</span>
-            <span className="text-lg font-mono font-bold text-zinc-900 dark:text-white mt-1 block">{formatINR(rooms.revpar)}</span>
+            <span className="text-zinc-500 text-[11px] block font-semibold ui-text-meta">RevPAR</span>
+            <span className="text-lg font-mono font-bold text-zinc-900 dark:text-white mt-1 block ui-font-body ui-weight-medium">{formatINR(rooms.revpar)}</span>
           </div>
 
           <div className="p-3.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/30">
-            <span className="text-zinc-500 text-[11px] block font-semibold">In-House Headcount</span>
-            <span className="text-lg font-bold text-zinc-900 dark:text-white mt-1 block">{rooms.inHouseGuestsCount} Guests</span>
+            <span className="text-zinc-500 text-[11px] block font-semibold ui-text-meta">In-House Headcount</span>
+            <span className="text-lg font-bold text-zinc-900 dark:text-white mt-1 block ui-weight-medium">{rooms.inHouseGuestsCount} Guests</span>
           </div>
 
           <div className="p-3.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/30">
-            <span className="text-zinc-500 text-[11px] block font-semibold">Desk Flow Today</span>
-            <span className="text-lg font-bold text-zinc-900 dark:text-white mt-1 block">{rooms.arrivalsToday} Arr &bull; {rooms.departuresToday} Dep</span>
+            <span className="text-zinc-500 text-[11px] block font-semibold ui-text-meta">Desk Flow Today</span>
+            <span className="text-lg font-bold text-zinc-900 dark:text-white mt-1 block ui-weight-medium">{rooms.arrivalsToday} Arr &bull; {rooms.departuresToday} Dep</span>
           </div>
         </div>
 
         {/* In-House Guest Roster */}
         <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 overflow-hidden">
-          <div className="bg-zinc-50 dark:bg-zinc-800/80 px-4 py-2.5 border-b border-zinc-200 dark:border-zinc-800 font-bold text-xs text-zinc-800 dark:text-zinc-200 flex items-center justify-between">
-            <span>Current In-House Guest Roster ({rooms.inHouseRoster.length} Stays)</span>
-            <span className="text-[11px] text-zinc-500 font-normal">Active Room Folios</span>
+          <div className="bg-zinc-50 dark:bg-zinc-800/80 px-4 py-2.5 border-b border-zinc-200 dark:border-zinc-800 font-bold text-xs text-zinc-800 dark:text-zinc-200 flex items-center justify-between ui-weight-medium ui-text-body">
+            <span>Guest Roster at Selected Day Close ({rooms.inHouseRoster.length} Stays)</span>
+            <span className="text-[11px] text-zinc-500 font-normal ui-text-meta">Active Room Folios</span>
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full text-xs">
+            <table className="w-full text-xs ui-text-body ui-data-table">
               <thead>
-                <tr className="bg-zinc-100/50 dark:bg-zinc-800/50 border-b border-zinc-200 dark:border-zinc-800 text-[10px] uppercase font-bold text-zinc-500">
+                <tr className="bg-zinc-100/50 dark:bg-zinc-800/50 border-b border-zinc-200 dark:border-zinc-800 text-[10px] uppercase font-bold text-zinc-500 ui-text-meta ui-weight-medium">
                   <th className="px-3.5 py-2 text-left">Room</th>
                   <th className="px-3.5 py-2 text-left">Primary Guest</th>
                   <th className="px-3.5 py-2 text-left">Check-In</th>
@@ -508,18 +508,18 @@ export function ComprehensiveHotelReportView({
                 ) : (
                   rooms.inHouseRoster.map((r) => (
                     <tr key={r.stayId} className="border-b border-zinc-100 dark:border-zinc-800/50 hover:bg-zinc-50 dark:hover:bg-zinc-800/30">
-                      <td className="px-3.5 py-2.5 font-mono font-bold text-blue-600 dark:text-blue-400">
+                      <td className="px-3.5 py-2.5 font-mono font-bold text-blue-600 dark:text-blue-400 ui-font-body ui-weight-medium">
                         {r.roomNumber}
                       </td>
                       <td className="px-3.5 py-2.5">
-                        <div className="font-bold text-zinc-900 dark:text-white">{r.guestName}</div>
-                        <div className="text-[10px] text-zinc-500">{r.phone}</div>
+                        <div className="font-bold text-zinc-900 dark:text-white ui-weight-medium">{r.guestName}</div>
+                        <div className="text-[10px] text-zinc-500 ui-text-meta">{r.phone}</div>
                       </td>
-                      <td className="px-3.5 py-2.5 font-mono text-zinc-600 dark:text-zinc-400">{r.checkInDate}</td>
-                      <td className="px-3.5 py-2.5 font-mono text-zinc-600 dark:text-zinc-400">{r.expectedDeparture}</td>
-                      <td className="px-3.5 py-2.5 text-right font-mono font-semibold">{formatINR(r.totalCharges)}</td>
-                      <td className="px-3.5 py-2.5 text-right font-mono text-emerald-600 dark:text-emerald-400 font-semibold">{formatINR(r.totalPaid)}</td>
-                      <td className="px-3.5 py-2.5 text-right font-mono font-bold">
+                      <td className="px-3.5 py-2.5 font-mono text-zinc-600 dark:text-zinc-400 ui-font-body">{r.checkInDate}</td>
+                      <td className="px-3.5 py-2.5 font-mono text-zinc-600 dark:text-zinc-400 ui-font-body">{r.expectedDeparture}</td>
+                      <td className="px-3.5 py-2.5 text-right font-mono font-semibold ui-font-body">{formatINR(r.totalCharges)}</td>
+                      <td className="px-3.5 py-2.5 text-right font-mono text-emerald-600 dark:text-emerald-400 font-semibold ui-font-body">{formatINR(r.totalPaid)}</td>
+                      <td className="px-3.5 py-2.5 text-right font-mono font-bold ui-font-body ui-weight-medium">
                         <span className={r.balanceDue > 0 ? "text-rose-600 dark:text-rose-400" : "text-emerald-600"}>
                           {formatINR(r.balanceDue)}
                         </span>
@@ -534,18 +534,18 @@ export function ComprehensiveHotelReportView({
       </div>
 
       {/* SECTION 3: MANAGEMENT & ADMIN MODIFICATIONS AUDIT TRAIL */}
-      <div className="p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-sm space-y-4">
+      <div className="p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-sm space-y-4 ui-radius-panel ui-shadow-quiet ui-surface">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-200 dark:border-zinc-800 pb-3">
           <div>
-            <h2 className="text-sm font-bold uppercase tracking-wider text-zinc-900 dark:text-white flex items-center gap-2">
+            <h2 className="text-sm font-bold uppercase tracking-wider text-zinc-900 dark:text-white flex items-center gap-2 ui-weight-medium ui-section-title">
               <ShieldCheck className="h-4 w-4 text-purple-600" />
               <span>3. Management & Admin Modifications Trail</span>
             </h2>
-            <p className="text-xs text-zinc-500">
+            <p className="text-xs text-zinc-500 ui-text-body">
               Audit log of changes made through admin portal (rate changes, opening cash balance, GRC edits, room moves)
             </p>
           </div>
-          <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+          <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 ui-text-body ui-weight-medium">
             {filteredAuditLogs.length} Events Logged
           </span>
         </div>
@@ -559,11 +559,11 @@ export function ComprehensiveHotelReportView({
                 key={cat}
                 type="button"
                 onClick={() => setAuditCategoryFilter(cat)}
-                className={`px-3 py-1 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                className={`px-3 py-1 rounded-lg text-xs font-semibold transition cursor-pointer  ui-text-body ${
                   auditCategoryFilter === cat
                     ? "bg-zinc-900 dark:bg-white text-white dark:text-zinc-900"
                     : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700"
-                }`}
+                } ui-control`}
               >
                 {cat === "ALL" ? "All Categories" : cat.replace(/_/g, " ")}
               </button>
@@ -578,17 +578,17 @@ export function ComprehensiveHotelReportView({
               value={auditSearch}
               onChange={(e) => setAuditSearch(e.target.value)}
               placeholder="Search modification, staff, or ID..."
-              className="w-full h-8 pl-8 pr-3 rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-xs text-zinc-900 dark:text-white focus:outline-none focus:border-blue-600"
+              className="w-full h-8 pl-8 pr-3 rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-xs text-zinc-900 dark:text-white focus:outline-none focus:border-blue-600 ui-text-body ui-field" aria-label="Search modification, staff, or ID"
             />
           </div>
         </div>
 
         {/* Audit Logs Table */}
-        <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 overflow-hidden text-xs">
+        <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 overflow-hidden text-xs ui-text-body">
           <div className="overflow-x-auto">
-            <table className="w-full">
+            <table className="w-full ui-data-table">
               <thead>
-                <tr className="bg-zinc-50 dark:bg-zinc-800 border-b border-zinc-200 dark:border-zinc-800 text-[10px] font-bold text-zinc-500 uppercase">
+                <tr className="bg-zinc-50 dark:bg-zinc-800 border-b border-zinc-200 dark:border-zinc-800 text-[10px] font-bold text-zinc-500 uppercase ui-text-meta ui-weight-medium">
                   <th className="px-4 py-2.5 text-left w-24">Time</th>
                   <th className="px-4 py-2.5 text-left">Action & Summary</th>
                   <th className="px-4 py-2.5 text-left w-36">Authorized Actor</th>
@@ -610,19 +610,19 @@ export function ComprehensiveHotelReportView({
                     return (
                       <React.Fragment key={rec.id}>
                         <tr className="border-b border-zinc-100 dark:border-zinc-800/60 hover:bg-zinc-50 dark:hover:bg-zinc-800/30">
-                          <td className="px-4 py-3 font-mono text-[11px] text-zinc-500 align-top">
+                          <td className="px-4 py-3 font-mono text-[11px] text-zinc-500 align-top ui-font-body ui-text-meta">
                             {rec.timeFormatted}
                           </td>
                           <td className="px-4 py-3 align-top space-y-1">
                             <div className="flex items-center gap-2">
-                              <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${getCategoryBadgeClass(rec.category)}`}>
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-bold border  ui-text-meta ui-weight-medium ${getCategoryBadgeClass(rec.category)}`}>
                                 {rec.actionLabel}
                               </span>
-                              <span className="text-[10px] font-mono text-zinc-400">
+                              <span className="text-[10px] font-mono text-zinc-400 ui-text-meta ui-font-body">
                                 {rec.targetType}: {rec.targetId}
                               </span>
                             </div>
-                            <div className="text-xs font-medium text-zinc-800 dark:text-zinc-200">
+                            <div className="text-xs font-medium text-zinc-800 dark:text-zinc-200 ui-text-body">
                               {rec.summary}
                             </div>
                           </td>
@@ -634,13 +634,13 @@ export function ComprehensiveHotelReportView({
                               <button
                                 type="button"
                                 onClick={() => setExpandedLogId(isExpanded ? null : rec.id)}
-                                className="px-2 py-1 rounded text-[10px] font-bold border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-300 inline-flex items-center gap-1 cursor-pointer"
+                                className="px-2 py-1 rounded text-[10px] font-bold border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-300 inline-flex items-center gap-1 cursor-pointer ui-text-meta ui-weight-medium ui-control"
                               >
                                 <span>{isExpanded ? "Hide" : "View"}</span>
                                 {isExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
                               </button>
                             ) : (
-                              <span className="text-zinc-400 text-[10px]">No diff</span>
+                              <span className="text-zinc-400 text-[10px] ui-text-meta">No diff</span>
                             )}
                           </td>
                         </tr>
@@ -649,15 +649,15 @@ export function ComprehensiveHotelReportView({
                         {isExpanded && hasDiff && (
                           <tr className="bg-zinc-50 dark:bg-zinc-950/50 border-b border-zinc-200 dark:border-zinc-800">
                             <td colSpan={4} className="p-4 space-y-2">
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-[11px] font-mono">
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-[11px] font-mono ui-text-meta ui-font-body">
                                 <div className="p-3 rounded-lg bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800">
-                                  <div className="font-bold text-zinc-500 uppercase text-[10px] mb-1">State Before</div>
+                                  <div className="font-bold text-zinc-500 uppercase text-[10px] mb-1 ui-weight-medium ui-text-meta">State Before</div>
                                   <pre className="overflow-x-auto whitespace-pre-wrap text-zinc-700 dark:text-zinc-300">
                                     {rec.before ? JSON.stringify(rec.before, null, 2) : "None"}
                                   </pre>
                                 </div>
                                 <div className="p-3 rounded-lg bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800">
-                                  <div className="font-bold text-zinc-500 uppercase text-[10px] mb-1">State After</div>
+                                  <div className="font-bold text-zinc-500 uppercase text-[10px] mb-1 ui-weight-medium ui-text-meta">State After</div>
                                   <pre className="overflow-x-auto whitespace-pre-wrap text-emerald-700 dark:text-emerald-400">
                                     {rec.after ? JSON.stringify(rec.after, null, 2) : "None"}
                                   </pre>

@@ -14,7 +14,8 @@ export type DocumentType =
 export async function getNextDocumentNumber(
   propertyId: string,
   documentType: DocumentType,
-  scopeKey = "PROPERTY"
+  scopeKey = "PROPERTY",
+  db: any = prisma
 ): Promise<{ formattedNumber: string; nextVal: number; prefix: string; financialYear: string }> {
   // Current financial year in India: Apr 1 to Mar 31
   const now = new Date();
@@ -37,14 +38,14 @@ export async function getNextDocumentNumber(
   else if (documentType === "MAINTENANCE") defaultPrefix = `MNT-`;
 
   // Fetch organizationId from property
-  const prop = await prisma.property.findUnique({
+  const prop = await db.property.findUnique({
     where: { id: propertyId },
     select: { organizationId: true },
   });
   const orgId = prop?.organizationId || "org_ambarish";
 
   // Upsert document sequence record atomically
-  const sequence = await prisma.documentSequence.upsert({
+  const sequence = await db.documentSequence.upsert({
     where: {
       propertyId_documentType_scopeKey_financialYear: {
         propertyId,

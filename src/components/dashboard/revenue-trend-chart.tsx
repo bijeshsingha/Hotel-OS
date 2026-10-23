@@ -17,17 +17,17 @@ interface RevenueTrendChartProps {
 
 export function RevenueTrendChart({ trendHistory }: RevenueTrendChartProps) {
   return (
-    <div className="p-4 sm:p-5 rounded-xl bg-white dark:bg-[#121215] border border-zinc-200/70 dark:border-zinc-800/70 space-y-3">
+    <div className="p-4 sm:p-5 rounded-xl bg-white dark:bg-[#121215] border border-zinc-200/70 dark:border-zinc-800/70 space-y-3 ui-surface">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
+          <h2 className="text-sm font-bold text-zinc-900 dark:text-zinc-100 ui-weight-medium ui-section-title">
             Revenue Progression (14 Days)
           </h2>
-          <p className="text-xs text-zinc-500">
+          <p className="text-xs text-zinc-500 ui-text-body">
             Daily room tariff and F&B intake
           </p>
         </div>
-        <div className="flex items-center gap-3 text-xs font-medium">
+        <div className="flex items-center gap-3 text-xs font-medium ui-text-body">
           <span className="flex items-center gap-1.5 text-blue-600 dark:text-blue-400">
             <span className="h-2 w-2 rounded-full bg-blue-500" /> Room
           </span>

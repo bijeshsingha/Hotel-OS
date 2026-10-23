@@ -1,11 +1,23 @@
+import { authorizeRequest, getApiAccess } from "@/lib/auth/api-access";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { getEffectiveStayDeparture } from "@/lib/domain/pms-service";
+import { mayPerform } from "@/lib/auth/session";
+import { PERMISSIONS as P } from "@/lib/auth/roles";
 
 export async function GET(request: Request) {
+  const access = await authorizeRequest(request);
+  if (access instanceof Response) return access;
+  request = access.request;
+
   try {
     const { searchParams } = new URL(request.url);
     const propertyId = searchParams.get("propertyId");
+    const { user, property } = getApiAccess(request);
+    const [canViewGuests, canViewFolios] = await Promise.all([
+      mayPerform(user, property.id, property.organizationId, P.GUEST_PII_VIEW),
+      mayPerform(user, property.id, property.organizationId, P.FOLIO_VIEW),
+    ]);
 
     if (!propertyId) {
       return NextResponse.json({ error: "propertyId is required" }, { status: 400 });
@@ -76,7 +88,12 @@ export async function GET(request: Request) {
             return {
               ...a,
               stay: {
-                ...a.stay,
+                ...(canViewGuests && canViewFolios ? a.stay : {
+                  id: a.stay.id,
+                  status: a.stay.status,
+                  ...(canViewGuests ? { primaryGuest: a.stay.primaryGuest } : {}),
+                  ...(canViewFolios ? { folio: a.stay.folio } : {}),
+                }),
                 expectedDepartureAt: dynamicDep.effectiveDepartureAt.toISOString(),
                 isExtendedDeparture: dynamicDep.isExtended,
                 extensionNights: dynamicDep.extensionNights,

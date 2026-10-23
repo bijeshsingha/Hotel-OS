@@ -28,12 +28,13 @@ export function getTransporter(): Transporter {
       host: SMTP_HOST,
       port: SMTP_PORT,
       secure: SMTP_SECURE, // true for 465, false for 587
+      requireTLS: !SMTP_SECURE,
       auth: {
         user: SMTP_USER,
         pass: SMTP_PASS,
       },
       tls: {
-        rejectUnauthorized: false, // Prevents local self-signed certificate handshake halts
+        rejectUnauthorized: true,
       },
     });
   }

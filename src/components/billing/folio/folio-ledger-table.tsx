@@ -56,28 +56,28 @@ export function FolioLedgerTable({
     .reduce((sum: number, e: any) => sum + (e.totalAmount || 0), 0);
 
   return (
-    <div className="rounded-xl border border-zinc-200/70 dark:border-zinc-800/70 bg-white dark:bg-[#121215] overflow-hidden space-y-3">
+    <div className="rounded-xl border border-zinc-200/70 dark:border-zinc-800/70 bg-white dark:bg-[#121215] overflow-hidden space-y-3 ui-surface">
       {/* Table Filter Toolbar */}
       <div className="p-3 sm:p-4 border-b border-zinc-200/70 dark:border-zinc-800/70 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
         <div className="flex items-center gap-2">
           <Receipt className="h-4 w-4 text-zinc-500" />
-          <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
+          <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100 ui-weight-medium">
             Folio Ledger Transactions
           </h3>
-          <span className="text-xs text-zinc-400 font-mono">
+          <span className="text-xs text-zinc-400 font-mono ui-text-body ui-font-body">
             ({filteredEntries.length} lines)
           </span>
         </div>
 
         <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1 text-xs">
+          <div className="flex items-center gap-1 text-xs ui-text-body">
             <button
               onClick={() => onTypeFilterChange("ALL")}
               className={`px-2 py-1 rounded-md transition cursor-pointer ${
                 typeFilter === "ALL"
-                  ? "bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-bold"
+                  ? "bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-bold ui-weight-medium"
                   : "text-zinc-500 hover:text-zinc-800"
-              }`}
+              } ui-control`}
             >
               All
             </button>
@@ -85,9 +85,9 @@ export function FolioLedgerTable({
               onClick={() => onTypeFilterChange("ROOM_TARIFF")}
               className={`px-2 py-1 rounded-md transition cursor-pointer ${
                 typeFilter === "ROOM_TARIFF"
-                  ? "bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-bold"
+                  ? "bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-bold ui-weight-medium"
                   : "text-zinc-500 hover:text-zinc-800"
-              }`}
+              } ui-control`}
             >
               Tariff
             </button>
@@ -95,9 +95,9 @@ export function FolioLedgerTable({
               onClick={() => onTypeFilterChange("RESTAURANT_FOOD")}
               className={`px-2 py-1 rounded-md transition cursor-pointer ${
                 typeFilter === "RESTAURANT_FOOD"
-                  ? "bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-bold"
+                  ? "bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-bold ui-weight-medium"
                   : "text-zinc-500 hover:text-zinc-800"
-              }`}
+              } ui-control`}
             >
               F&B
             </button>
@@ -110,7 +110,7 @@ export function FolioLedgerTable({
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}
               placeholder="Search ledger..."
-              className="w-40 sm:w-48 h-7.5 pl-8 pr-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none"
+              className="w-40 sm:w-48 h-7.5 pl-8 pr-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none ui-text-body ui-field" aria-label="Search ledger"
             />
           </div>
         </div>
@@ -118,7 +118,7 @@ export function FolioLedgerTable({
 
       {/* Ledger Table */}
       <div className="overflow-x-auto">
-        <table className="w-full text-left text-xs whitespace-nowrap">
+        <table className="w-full text-left text-xs whitespace-nowrap ui-text-body ui-data-table">
           <thead className="bg-zinc-50 dark:bg-zinc-900 border-b border-zinc-200/70 dark:border-zinc-800/70 text-zinc-500 dark:text-zinc-400 font-medium">
             <tr>
               <th className="px-3.5 py-2.5">Date / Time</th>
@@ -147,27 +147,27 @@ export function FolioLedgerTable({
                   key={entry.id || index}
                   className="hover:bg-zinc-50/80 dark:hover:bg-zinc-800/40 transition"
                 >
-                  <td className="px-3.5 py-2 font-mono text-zinc-500 text-[11px]">
+                  <td className="px-3.5 py-2 font-mono text-zinc-500 text-[11px] ui-font-body ui-text-meta">
                     {formattedDate}
                   </td>
                   <td className="px-3.5 py-2 text-zinc-900 dark:text-zinc-100">
                     <span className="font-medium">{entry.description || "Charge"}</span>
                     {entry.reference && (
-                      <span className="ml-1.5 font-mono text-[10.5px] text-zinc-400">
+                      <span className="ml-1.5 font-mono text-[10.5px] text-zinc-400 ui-font-body ui-text-meta">
                         ({entry.reference})
                       </span>
                     )}
                   </td>
-                  <td className="px-3 py-2 font-mono text-zinc-400 text-[11px]">
+                  <td className="px-3 py-2 font-mono text-zinc-400 text-[11px] ui-font-body ui-text-meta">
                     {entry.sacHsnCode || "996311"}
                   </td>
-                  <td className="px-3.5 py-2 text-right font-mono font-semibold tabular-nums text-zinc-900 dark:text-zinc-100">
+                  <td className="px-3.5 py-2 text-right font-mono font-semibold tabular-nums text-zinc-900 dark:text-zinc-100 ui-font-body">
                     {!isCredit ? formatINR(entry.totalAmount || 0) : ""}
                   </td>
-                  <td className="px-3.5 py-2 text-right font-mono font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">
+                  <td className="px-3.5 py-2 text-right font-mono font-semibold tabular-nums text-emerald-600 dark:text-emerald-400 ui-font-body">
                     {isCredit ? formatINR(entry.totalAmount || 0) : ""}
                   </td>
-                  <td className="px-3.5 py-2 text-right font-mono text-zinc-400 text-[11px]">
+                  <td className="px-3.5 py-2 text-right font-mono text-zinc-400 text-[11px] ui-font-body ui-text-meta">
                     {entry.gstRate ? `${entry.gstRate}%` : "12%"}
                   </td>
                 </tr>
@@ -175,25 +175,25 @@ export function FolioLedgerTable({
             })}
             {filteredEntries.length === 0 && (
               <tr>
-                <td colSpan={6} className="p-8 text-center text-zinc-400 text-xs">
+                <td colSpan={6} className="p-8 text-center text-zinc-400 text-xs ui-text-body">
                   No folio ledger entries recorded yet.
                 </td>
               </tr>
             )}
           </tbody>
           {filteredEntries.length > 0 && (
-            <tfoot className="bg-zinc-50/90 dark:bg-zinc-900/90 border-t border-zinc-200 dark:border-zinc-800 font-bold text-xs">
+            <tfoot className="bg-zinc-50/90 dark:bg-zinc-900/90 border-t border-zinc-200 dark:border-zinc-800 font-bold text-xs ui-weight-medium ui-text-body">
               <tr>
                 <td colSpan={3} className="px-3.5 py-2.5 text-zinc-600 dark:text-zinc-400">
                   Total Ledger Summary
                 </td>
-                <td className="px-3.5 py-2.5 text-right font-mono text-zinc-900 dark:text-zinc-100">
+                <td className="px-3.5 py-2.5 text-right font-mono text-zinc-900 dark:text-zinc-100 ui-font-body">
                   {formatINR(totalDebits)}
                 </td>
-                <td className="px-3.5 py-2.5 text-right font-mono text-emerald-600 dark:text-emerald-400">
+                <td className="px-3.5 py-2.5 text-right font-mono text-emerald-600 dark:text-emerald-400 ui-font-body">
                   {formatINR(totalCredits)}
                 </td>
-                <td className="px-3.5 py-2.5 text-right font-mono text-zinc-500">
+                <td className="px-3.5 py-2.5 text-right font-mono text-zinc-500 ui-font-body">
                   Net: {formatINR(totalDebits - totalCredits)}
                 </td>
               </tr>

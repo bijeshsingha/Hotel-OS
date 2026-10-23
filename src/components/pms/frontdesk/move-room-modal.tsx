@@ -51,7 +51,7 @@ export function MoveRoomModal({
     currentRate = 0;
   } else if (activeAssignment?.moveReason?.includes("AGREED_RATE:")) {
     const rateSection = activeAssignment.moveReason.slice(activeAssignment.moveReason.indexOf("AGREED_RATE:"));
-    const match = rateSection.match(/AGREED_RATE:(\d+)/);
+    const match = rateSection.match(/AGREED_RATE:([0-9]+(?:\.[0-9]+)?)/);
     if (match) currentRate = Number(match[1]);
   } else if (currentRoom?.roomType?.basePrice) {
     currentRate = Number(currentRoom.roomType.basePrice);
@@ -76,7 +76,7 @@ export function MoveRoomModal({
           targetRoomId,
           reason,
           rateHandling,
-          customRate: rateHandling === "CUSTOM" && customRate ? parseFloat(customRate) : undefined,
+          customRate: rateHandling === "CUSTOM" && customRate !== "" ? parseFloat(customRate) : undefined,
         }),
       });
 
@@ -94,38 +94,38 @@ export function MoveRoomModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in">
-      <div className="bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 max-w-md w-full space-y-4 shadow-xl text-zinc-900 dark:text-zinc-100">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs  ">
+      <div className="bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 max-w-md w-full space-y-4 shadow-xl text-zinc-900 dark:text-zinc-100 ui-radius-panel ui-surface">
         <div className="flex items-center justify-between border-b border-zinc-200/70 dark:border-zinc-800/70 pb-3">
           <div className="flex items-center gap-2">
             <ArrowRightLeft className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-            <h2 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
+            <h2 className="text-sm font-bold text-zinc-900 dark:text-zinc-100 ui-weight-medium ui-section-title">
               Move Room: {stay.primaryGuest?.name || "Guest"}
             </h2>
           </div>
-          <button onClick={onClose} className="p-1 rounded-md text-zinc-400 hover:text-zinc-600">
+          <button onClick={onClose} className="p-1 rounded-md text-zinc-400 hover:text-zinc-600 ui-control">
             <X className="h-4 w-4" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-3.5 text-xs">
+        <form onSubmit={handleSubmit} className="space-y-3.5 text-xs ui-text-body">
           <div>
             <span className="text-zinc-500 block mb-1">Current Room</span>
-            <div className="p-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200/60 dark:border-zinc-800/60 font-mono font-bold text-zinc-900 dark:text-zinc-100 flex items-center justify-between">
+            <div className="p-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200/60 dark:border-zinc-800/60 font-mono font-bold text-zinc-900 dark:text-zinc-100 flex items-center justify-between ui-font-body ui-weight-medium">
               <span>Room {currentRoom?.number || "Unassigned"} ({currentRoom?.roomType?.name || "Standard"})</span>
-              <span className="text-xs font-semibold text-blue-600 dark:text-blue-400">{formatINR(currentRate)}/night</span>
+              <span className="text-xs font-semibold text-blue-600 dark:text-blue-400 ui-text-body">{formatINR(currentRate)}/night</span>
             </div>
           </div>
 
           <div>
-            <label className="block text-zinc-700 dark:text-zinc-300 font-medium mb-1">
+            <label className="block text-zinc-700 dark:text-zinc-300 font-medium mb-1 ui-label">
               Select Destination Room *
             </label>
             <select
               required
               value={targetRoomId}
               onChange={(e) => setTargetRoomId(e.target.value)}
-              className="w-full h-9 px-2.5 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none"
+              className="w-full h-9 px-2.5 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none ui-text-body ui-field" aria-label="Select Destination Room"
             >
               <option value="">Select Vacant Clean Room</option>
               {vacantRooms.map((r) => (
@@ -137,32 +137,35 @@ export function MoveRoomModal({
           </div>
 
           <div>
-            <label className="block text-zinc-700 dark:text-zinc-300 font-medium mb-1">
+            <label className="block text-zinc-700 dark:text-zinc-300 font-medium mb-1 ui-label">
               Rate Handling
             </label>
             <div className="grid grid-cols-2 gap-1.5">
-              <label className={`p-2 rounded-lg border text-[11px] cursor-pointer ${rateHandling === "RETAIN_RATE" ? "border-blue-500 bg-blue-50/20 text-blue-600 dark:text-blue-400 font-semibold" : "border-zinc-200 dark:border-zinc-800"}`}>
-                <input type="radio" name="pmsRate" value="RETAIN_RATE" checked={rateHandling === "RETAIN_RATE"} onChange={() => setRateHandling("RETAIN_RATE")} className="sr-only" />
+              <label className={`p-2 rounded-lg border text-[11px] cursor-pointer  ui-text-meta ${rateHandling === "RETAIN_RATE" ? "border-blue-500 bg-blue-50/20 text-blue-600 dark:text-blue-400 font-semibold" : "border-zinc-200 dark:border-zinc-800"} ui-label`}>
+                <input type="radio" name="pmsRate" value="RETAIN_RATE" checked={rateHandling === "RETAIN_RATE"} onChange={() => setRateHandling("RETAIN_RATE")} className="sr-only ui-field" aria-label="Rate Handling" />
                 <div>Retain Current</div>
-                <div className="text-[10px] text-zinc-400 font-normal">{formatINR(currentRate)}/night</div>
+                <div className="text-[10px] text-zinc-400 font-normal ui-text-meta">{formatINR(currentRate)}/night</div>
               </label>
 
-              <label className={`p-2 rounded-lg border text-[11px] cursor-pointer ${rateHandling === "USE_TARGET_BASE" ? "border-blue-500 bg-blue-50/20 text-blue-600 dark:text-blue-400 font-semibold" : "border-zinc-200 dark:border-zinc-800"}`}>
-                <input type="radio" name="pmsRate" value="USE_TARGET_BASE" checked={rateHandling === "USE_TARGET_BASE"} onChange={() => setRateHandling("USE_TARGET_BASE")} className="sr-only" />
+              <label className={`p-2 rounded-lg border text-[11px] cursor-pointer  ui-text-meta ${rateHandling === "USE_TARGET_BASE" ? "border-blue-500 bg-blue-50/20 text-blue-600 dark:text-blue-400 font-semibold" : "border-zinc-200 dark:border-zinc-800"} ui-label`}>
+                <input type="radio" name="pmsRate" value="USE_TARGET_BASE" checked={rateHandling === "USE_TARGET_BASE"} onChange={() => setRateHandling("USE_TARGET_BASE")} className="sr-only ui-field" aria-label="Rate Handling" />
                 <div>Destination Base</div>
-                <div className="text-[10px] text-zinc-400 font-normal">{formatINR(targetRoomBaseRate)}/night</div>
+                <div className="text-[10px] text-zinc-400 font-normal ui-text-meta">{formatINR(targetRoomBaseRate)}/night</div>
               </label>
 
-              <label className={`p-2 rounded-lg border text-[11px] cursor-pointer ${rateHandling === "CUSTOM" ? "border-blue-500 bg-blue-50/20 text-blue-600 dark:text-blue-400 font-semibold" : "border-zinc-200 dark:border-zinc-800"}`}>
-                <input type="radio" name="pmsRate" value="CUSTOM" checked={rateHandling === "CUSTOM"} onChange={() => setRateHandling("CUSTOM")} className="sr-only" />
+              <label className={`p-2 rounded-lg border text-[11px] cursor-pointer  ui-text-meta ${rateHandling === "CUSTOM" ? "border-blue-500 bg-blue-50/20 text-blue-600 dark:text-blue-400 font-semibold" : "border-zinc-200 dark:border-zinc-800"} ui-label`}>
+                <input type="radio" name="pmsRate" value="CUSTOM" checked={rateHandling === "CUSTOM"} onChange={() => {
+                  setRateHandling("CUSTOM");
+                  if (!customRate) setCustomRate(String(targetRoomBaseRate || currentRate));
+                }} className="sr-only ui-field" aria-label="Rate Handling" />
                 <div>Custom Override</div>
-                <div className="text-[10px] text-zinc-400 font-normal">Negotiated rate</div>
+                <div className="text-[10px] text-zinc-400 font-normal ui-text-meta">Negotiated rate</div>
               </label>
 
-              <label className={`p-2 rounded-lg border text-[11px] cursor-pointer ${rateHandling === "COMPLIMENTARY" ? "border-blue-500 bg-blue-50/20 text-blue-600 dark:text-blue-400 font-semibold" : "border-zinc-200 dark:border-zinc-800"}`}>
-                <input type="radio" name="pmsRate" value="COMPLIMENTARY" checked={rateHandling === "COMPLIMENTARY"} onChange={() => setRateHandling("COMPLIMENTARY")} className="sr-only" />
+              <label className={`p-2 rounded-lg border text-[11px] cursor-pointer  ui-text-meta ${rateHandling === "COMPLIMENTARY" ? "border-blue-500 bg-blue-50/20 text-blue-600 dark:text-blue-400 font-semibold" : "border-zinc-200 dark:border-zinc-800"} ui-label`}>
+                <input type="radio" name="pmsRate" value="COMPLIMENTARY" checked={rateHandling === "COMPLIMENTARY"} onChange={() => setRateHandling("COMPLIMENTARY")} className="sr-only ui-field" aria-label="Rate Handling" />
                 <div>Complimentary</div>
-                <div className="text-[10px] text-zinc-400 font-normal">₹0 / night</div>
+                <div className="text-[10px] text-zinc-400 font-normal ui-text-meta">₹0 / night</div>
               </label>
             </div>
 
@@ -173,15 +176,15 @@ export function MoveRoomModal({
                   placeholder="Custom Rate in INR"
                   value={customRate}
                   onChange={(e) => setCustomRate(e.target.value)}
-                  className="w-full h-8 px-2.5 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none"
-                  required
+                  className="w-full h-8 px-2.5 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none ui-text-body ui-field"
+                  required aria-label="Custom Rate in INR"
                 />
               </div>
             )}
           </div>
 
           <div>
-            <label className="block text-zinc-700 dark:text-zinc-300 font-medium mb-1">
+            <label className="block text-zinc-700 dark:text-zinc-300 font-medium mb-1 ui-label">
               Reason for Room Change
             </label>
             <input
@@ -189,7 +192,7 @@ export function MoveRoomModal({
               value={reason}
               onChange={(e) => setReason(e.target.value)}
               placeholder="e.g. Guest preference, AC malfunction"
-              className="w-full h-9 px-2.5 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none"
+              className="w-full h-9 px-2.5 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none ui-text-body ui-field" aria-label="Reason for Room Change"
             />
           </div>
 
@@ -197,14 +200,14 @@ export function MoveRoomModal({
             <button
               type="button"
               onClick={onClose}
-              className="px-3 py-1.5 rounded-lg text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 text-xs font-semibold"
+              className="px-3 py-1.5 rounded-lg text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 text-xs font-semibold ui-text-body ui-control"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="px-4 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold disabled:opacity-50 cursor-pointer"
+              className="px-4 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold disabled:opacity-50 cursor-pointer ui-text-body ui-control"
             >
               {loading ? "Moving..." : "Confirm Move"}
             </button>

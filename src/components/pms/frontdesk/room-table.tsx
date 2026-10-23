@@ -24,10 +24,10 @@ export function RoomTable({
   onQuickCheckIn,
 }: RoomTableProps) {
   return (
-    <div className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-[#121215] overflow-hidden">
+    <div className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-[#121215] overflow-hidden ui-radius-panel ui-surface">
       <div className="overflow-x-auto">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-zinc-50/80 dark:bg-zinc-900/60 border-b border-zinc-200/80 dark:border-zinc-800 text-zinc-500 dark:text-zinc-400 font-semibold text-xs uppercase tracking-wider">
+        <table className="w-full text-left text-sm ui-data-table">
+          <thead className="bg-zinc-50/80 dark:bg-zinc-900/60 border-b border-zinc-200/80 dark:border-zinc-800 text-zinc-500 dark:text-zinc-400 font-semibold text-xs uppercase tracking-wider ui-text-body">
             <tr>
               <th className="px-5 py-3.5">Room</th>
               <th className="px-4 py-3.5">Category</th>
@@ -63,9 +63,9 @@ export function RoomTable({
                   onClick={() => onSelectInspect(room)}
                   className="hover:bg-zinc-50 dark:hover:bg-zinc-800/50 cursor-pointer transition-colors"
                 >
-                  <td className="px-5 py-4 font-bold font-mono text-base sm:text-lg text-zinc-950 dark:text-zinc-50">
+                  <td className="px-5 py-4 font-bold font-mono text-base sm:text-lg text-zinc-950 dark:text-zinc-50 ui-weight-medium ui-font-body">
                     {room.number}
-                    <span className="text-xs text-zinc-400 font-normal ml-1.5 font-sans">
+                    <span className="text-xs text-zinc-400 font-normal ml-1.5 font-sans ui-text-body">
                       (Fl {room.floor})
                     </span>
                   </td>
@@ -74,17 +74,17 @@ export function RoomTable({
                   </td>
                   <td className="px-4 py-4">
                     {isOOO ? (
-                      <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300">
+                      <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 ui-text-body">
                         <span className="h-2 w-2 rounded-full bg-rose-500" />
                         Out of Order
                       </span>
                     ) : isOccupied ? (
-                      <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300">
+                      <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 ui-text-body">
                         <span className="h-2 w-2 rounded-full bg-blue-600 dark:bg-blue-400" />
                         Occupied
                       </span>
                     ) : (
-                      <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300">
+                      <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 ui-text-body">
                         <span className="h-2 w-2 rounded-full bg-emerald-500" />
                         Vacant
                       </span>
@@ -93,11 +93,11 @@ export function RoomTable({
                   <td className="px-4 py-4">
                     <button
                       onClick={(e) => onToggleHK(room.id, hkStatus, e)}
-                      className={`px-3 py-1 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                      className={`px-3 py-1 rounded-lg text-xs font-semibold transition cursor-pointer  ui-text-body ${
                         hkStatus === "CLEAN"
                           ? "text-zinc-600 dark:text-zinc-400 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700"
                           : "text-amber-700 dark:text-amber-300 bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/60"
-                      }`}
+                      } ui-control`}
                     >
                       {hkStatus}
                     </button>
@@ -109,15 +109,15 @@ export function RoomTable({
                         <span className="truncate max-w-[200px]">{guest.name}</span>
                       </div>
                     ) : (
-                      <span className="text-zinc-400 text-xs">Vacant</span>
+                      <span className="text-zinc-400 text-xs ui-text-body">Vacant</span>
                     )}
                   </td>
-                  <td className="px-4 py-4 font-mono text-sm tabular-nums">
+                  <td className="px-4 py-4 font-mono text-sm tabular-nums ui-font-body">
                     {isOccupied ? (
                       <span
                         className={
                           balance > 0.5
-                            ? "font-bold text-rose-600 dark:text-rose-400"
+                            ? "font-bold text-rose-600 dark:text-rose-400 ui-weight-medium"
                             : "text-emerald-600 dark:text-emerald-400 font-semibold"
                         }
                       >
@@ -132,16 +132,16 @@ export function RoomTable({
                       <>
                         <button
                           onClick={(e) => onOpenFolio(activeStay, room, e)}
-                          className="px-3.5 py-1.5 rounded-lg bg-zinc-950 hover:bg-zinc-800 dark:bg-white dark:hover:bg-zinc-100 text-white dark:text-zinc-950 font-semibold text-xs transition cursor-pointer inline-flex items-center gap-1.5 shadow-xs"
-                          title="Open Folio"
+                          className="px-3.5 py-1.5 rounded-lg bg-zinc-950 hover:bg-zinc-800 dark:bg-white dark:hover:bg-zinc-100 text-white dark:text-zinc-950 font-semibold text-xs transition cursor-pointer inline-flex items-center gap-1.5 shadow-xs ui-text-body ui-shadow-quiet ui-control"
+                          title="Open Folio" aria-label="Open Folio"
                         >
                           <Receipt className="h-3.5 w-3.5" />
                           <span>Folio</span>
                         </button>
                         <button
                           onClick={(e) => onOpenMoveModal(activeStay, room, e)}
-                          className="px-2.5 py-1.5 rounded-lg bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 text-xs font-semibold transition cursor-pointer"
-                          title="Move Room"
+                          className="px-2.5 py-1.5 rounded-lg bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 text-xs font-semibold transition cursor-pointer ui-text-body ui-control"
+                          title="Move Room" aria-label="Move Room"
                         >
                           <ArrowRightLeft className="h-3.5 w-3.5" />
                         </button>
@@ -149,7 +149,7 @@ export function RoomTable({
                     ) : (
                       <button
                         onClick={(e) => onQuickCheckIn(room, e)}
-                        className="px-3.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs transition cursor-pointer shadow-xs"
+                        className="px-3.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs transition cursor-pointer shadow-xs ui-text-body ui-shadow-quiet ui-control"
                       >
                         Check-In
                       </button>

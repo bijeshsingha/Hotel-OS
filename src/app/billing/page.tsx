@@ -6,6 +6,8 @@ import { useHotel } from "@/lib/context/hotel-context";
 import { formatINR, ACTIVE_TAX_RATES, getTaxRateForSac } from "@/lib/gst/calculator";
 import { formatGuestDisplayName } from "@/lib/domain/name-utils";
 import { numberToWordsINR } from "@/lib/gst/number-to-words";
+import { authRequest } from "@/lib/auth/client-request";
+import { ManualKotInput } from "@/lib/billing/manual-kot";
 import {
   Receipt,
   Plus,
@@ -66,7 +68,7 @@ import { FolioHero } from "@/components/billing/folio/folio-hero";
 import { FolioChargesTable } from "@/components/billing/folio/folio-charges-table";
 import { FolioPaymentsTable } from "@/components/billing/folio/folio-payments-table";
 import { apiCache } from "@/lib/cache/api-cache";
-import { calculate24HrBillableDays, calculateDynamicDepartureDate } from "@/lib/domain/pms-service";
+import { calculate24HrBillableDays, calculateDynamicDepartureDate } from "@/lib/domain/stay-calculator";
 
 export type { DirectoryRoomItem, MainFolioTab };
 
@@ -187,12 +189,16 @@ function BillingContent() {
   const initialAction = searchParams.get("action") || "";
 
   const { activeProperty, user, refreshKey, refreshData } = useHotel();
+  const canEditPaymentReceipts = user?.activeRole === "ORG_OWNER";
   const [stays, setStays] = useState<any[]>([]);
   const [selectedStayId, setSelectedStayId] = useState<string>(initialStayId);
   const [selectedRoomNumber, setSelectedRoomNumber] = useState<string>("");
   const [groupBillingMode, setGroupBillingMode] = useState<"NO" | "YES">("NO");
   const [folioData, setFolioData] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // Mobile View Switcher: Folio view vs Rooms Directory (<lg screens)
+  const [mobileActiveView, setMobileActiveView] = useState<"FOLIO" | "ROOMS">("FOLIO");
 
   // Main Folio View Tabs: In-House Active Rooms vs. Outstanding Dues vs. Settled & Departed Folios Archive
   const [activeMainTab, setActiveMainTab] = useState<"IN_HOUSE" | "OUTSTANDING_DUES" | "SETTLED_ARCHIVE">(
@@ -620,7 +626,7 @@ function BillingContent() {
         const rawEntriesList = (s.folio?.windows?.flatMap((w: any) => w.entries || w.lineItems || []) || []).filter(
           (e: any) => e.chargeCode !== "ROOM_TRANSFER_CREDIT"
         );
-        const paymentsList = s.folio?.payments || [];
+        const paymentsList = (s.folio?.payments || []).filter((p: any) => p.status === "SUCCEEDED");
 
         // Determine charges for this room (including predecessor rooms)
         const originalPrimaryRoom = assignments[0]?.room?.number || allRoomNumbers[0];
@@ -1046,7 +1052,7 @@ function BillingContent() {
       rate = 0;
       isComp = true;
     } else if (assignment?.moveReason?.includes("AGREED_RATE:")) {
-      const match = assignment.moveReason.match(/AGREED_RATE:(\d+)(?::([A-Z]+))?/);
+      const match = assignment.moveReason.match(/AGREED_RATE:([0-9]+(?:\.[0-9]+)?)(?::([A-Z]+))?/);
       if (match) {
         rate = Number(match[1]) || 3200;
         if (match[2] === "EXC") isRateInclusive = false;
@@ -1187,7 +1193,7 @@ function BillingContent() {
     });
   }, [modeFilteredEntries, ledgerTypeFilter, ledgerSearchQuery]);
 
-  const payments = folioData?.payments || [];
+  const payments = useMemo(() => (folioData?.payments || []).filter((p: any) => p.status === "SUCCEEDED"), [folioData?.payments]);
   const invoices = useMemo(() => {
     if (!folioData) return [];
     if (Array.isArray(folioData.invoices) && folioData.invoices.length > 0) return folioData.invoices;
@@ -1278,6 +1284,38 @@ function BillingContent() {
       });
     } catch (err: any) {
       alert(`Error posting charge: ${err.message}`);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Post all KOT rows together; keep the dialog open for another batch.
+  const handlePostKots = async (kots: ManualKotInput[], requestId: string) => {
+    if (!folioData?.id || !folioData.windows?.[0]?.id) throw new Error("Select an open folio before posting KOTs.");
+    const folioId = folioData.id;
+    const attributed = kots.map(kot => {
+      let description = kot.description;
+      if (isMultiRoomGroup && activeRoomNumber && activeRoomNumber !== "Unassigned") {
+        description = `${description} (Room ${activeRoomNumber})`;
+      }
+      return { ...kot, description };
+    });
+    setActionLoading(true);
+    try {
+      const { response, data } = await authRequest(`/api/v1/folios/${folioId}/charges`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ folioWindowId: folioData.windows[0].id, requestId, kots: attributed }),
+      });
+      if (!response.ok) {
+        const problem = new Error(data?.error || "Could not post the KOTs.") as Error & { status?: number };
+        problem.status = response.status;
+        throw problem;
+      }
+      apiCache.invalidate("/api/v1/folios");
+      apiCache.invalidate("/api/v1/stays");
+      // A refresh failure must not turn an acknowledged charge into a failed posting.
+      void Promise.allSettled([loadFolio(folioId), loadStays(true)]);
     } finally {
       setActionLoading(false);
     }
@@ -1456,7 +1494,7 @@ function BillingContent() {
   // Update Collected Payment
   const handleUpdatePayment = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editingPayment || !folioData?.id) return;
+    if (!canEditPaymentReceipts || !editingPayment || !folioData?.id) return;
     setEditPaymentLoading(true);
 
     try {
@@ -1493,6 +1531,7 @@ function BillingContent() {
 
   // Delete / Void Payment
   const handleDeletePayment = async (paymentId: string) => {
+    if (!canEditPaymentReceipts) return;
     if (!confirm("Are you sure you want to delete this payment record? The folio balance will be recalculated.")) return;
     if (!folioData?.id) return;
     setEditPaymentLoading(true);
@@ -1828,103 +1867,143 @@ function BillingContent() {
 
   return (
     <>
-      <div className="billing-dashboard-view no-print print:hidden max-w-[1700px] mx-auto w-full text-zinc-900 dark:text-zinc-100 space-y-6 transition-colors duration-150">
+      <div className="billing-dashboard-view no-print print:hidden max-w-[1440px] mx-auto w-full text-zinc-900 dark:text-zinc-100 space-y-6 transition-colors duration-150">
         
         {/* 1. MASTER TOP HEADER (SLEEK & INTEGRATED) */}
-        <div className="pb-4 border-b border-zinc-200/80 dark:border-zinc-800 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="pb-4 border-b border-zinc-200/80 dark:border-zinc-800 flex flex-col md:flex-row md:items-center justify-between gap-3.5 sm:gap-4 ui-page-header">
           <div className="space-y-1">
-            <div className="flex items-center gap-3">
-              <h1 className="text-2xl sm:text-3xl font-extrabold text-zinc-950 dark:text-zinc-50 tracking-tight">
+            <div className="flex items-center gap-2.5 sm:gap-3 flex-wrap">
+              <h1 className="text-2xl sm:text-3xl font-extrabold text-zinc-950 dark:text-zinc-50 tracking-tight ui-weight-medium ui-page-title">
                 Billing & Folio
               </h1>
-              <span className="rounded-full px-2.5 py-0.5 text-xs font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800/40 uppercase tracking-wide">
+              <span className="ui-status ui-status-grey">
                 GST Rule 46
               </span>
             </div>
-            <div className="flex items-center gap-2 text-xs sm:text-sm text-zinc-500 dark:text-zinc-400 flex-wrap">
-              <span className="text-emerald-600 dark:text-emerald-400 font-semibold">
+            <div className="flex items-center gap-2 text-xs sm:text-sm text-zinc-500 dark:text-zinc-400 flex-wrap ui-text-body">
+              <span className="ui-billing-context">
                 {activeProperty?.displayName || "Hotel Folio & Billing"}
               </span>
               <span>•</span>
-              <span className="font-mono">GSTIN: {activeProperty?.gstin || "N/A"}</span>
+              <span className="font-mono ui-font-body">GSTIN: {activeProperty?.gstin || "N/A"}</span>
               <span>•</span>
-              <span>Date: <strong className="font-mono text-zinc-800 dark:text-zinc-200">{activeProperty?.businessDate || (typeof window !== "undefined" ? new Date().toLocaleDateString("en-CA") : "")}</strong></span>
+              <span>Date: <strong className="font-mono text-zinc-800 dark:text-zinc-200 ui-font-body">{activeProperty?.businessDate || (typeof window !== "undefined" ? new Date().toLocaleDateString("en-CA") : "")}</strong></span>
             </div>
           </div>
 
           {/* Top Main Tab Navigation: In-House vs Outstanding Dues vs Settled Archive */}
-          <div className="flex items-center gap-1.5 bg-zinc-100 dark:bg-zinc-800/80 p-1 rounded-xl text-xs sm:text-sm font-semibold self-start md:self-auto border border-zinc-200/60 dark:border-zinc-700/60">
+          <div className="ui-segments">
             <button
               type="button"
               onClick={() => handleSwitchMainTab("IN_HOUSE")}
-              className={`flex items-center gap-2 h-9 px-3.5 rounded-lg transition cursor-pointer ${
-                activeMainTab === "IN_HOUSE"
-                  ? "bg-white dark:bg-zinc-900 text-zinc-950 dark:text-white font-bold shadow-xs"
-                  : "text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200"
-              }`}
+              className="ui-segment" aria-pressed={activeMainTab === "IN_HOUSE"}
             >
-              <BedDouble className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+              <BedDouble className="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
               <span>In-House</span>
-              <span className="font-mono text-xs opacity-80">({inHouseCount})</span>
+              <span className="font-mono text-xs opacity-80 hidden xs:inline ui-font-body ui-text-body">({inHouseCount})</span>
             </button>
 
             <button
               type="button"
               onClick={() => handleSwitchMainTab("OUTSTANDING_DUES")}
-              className={`flex items-center gap-2 h-9 px-3.5 rounded-lg transition cursor-pointer ${
-                activeMainTab === "OUTSTANDING_DUES"
-                  ? "bg-rose-600 text-white font-bold shadow-xs"
-                  : "text-rose-700 dark:text-rose-400 hover:text-rose-900"
-              }`}
+              className="ui-segment" aria-pressed={activeMainTab === "OUTSTANDING_DUES"}
             >
-              <AlertCircle className="h-4 w-4" />
+              <AlertCircle className="h-4 w-4 shrink-0" />
               <span>Debtors</span>
-              <span className="font-mono text-xs opacity-80">({outstandingCount})</span>
+              <span className="font-mono text-xs opacity-80 hidden xs:inline ui-font-body ui-text-body">({outstandingCount})</span>
             </button>
 
             <button
               type="button"
               onClick={() => handleSwitchMainTab("SETTLED_ARCHIVE")}
-              className={`flex items-center gap-2 h-9 px-3.5 rounded-lg transition cursor-pointer ${
-                activeMainTab === "SETTLED_ARCHIVE"
-                  ? "bg-white dark:bg-zinc-900 text-zinc-950 dark:text-white font-bold shadow-xs"
-                  : "text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200"
-              }`}
+              className="ui-segment" aria-pressed={activeMainTab === "SETTLED_ARCHIVE"}
             >
-              <Archive className="h-4 w-4 text-zinc-400" />
+              <Archive className="h-4 w-4 text-zinc-400 shrink-0" />
               <span>Settled</span>
-              <span className="font-mono text-xs opacity-80">({settledArchiveCount})</span>
+              <span className="font-mono text-xs opacity-80 hidden xs:inline ui-font-body ui-text-body">({settledArchiveCount})</span>
             </button>
           </div>
         </div>
 
-      {/* 2. MAIN 2-COLUMN OPERATIONAL VIEW: Optimal proportions and fluid workspace */}
-      <div className="flex flex-col lg:flex-row gap-6 items-start w-full">
-        
-        {/* LEFT COLUMN: ROOMS DIRECTORY */}
-        <BillingSidebar
-          activeMainTab={activeMainTab}
-          directoryItems={directoryItems}
-          filteredDirectoryItems={filteredDirectoryItems}
-          selectedStayId={selectedStayId}
-          selectedRoomNumber={selectedRoomNumber}
-          staySearchQuery={staySearchQuery}
-          setStaySearchQuery={setStaySearchQuery}
-          stayStatusFilter={stayStatusFilter}
-          setStayStatusFilter={setStayStatusFilter}
-          onSelectRoom={(stayId, roomNumber) => {
-            setSelectedStayId(stayId);
-            setSelectedRoomNumber(roomNumber);
-            setGroupBillingMode("NO");
-          }}
-          inHouseCount={inHouseCount}
-          outstandingCount={outstandingCount}
-          settledArchiveCount={settledArchiveCount}
-          formatShortDate={formatShortDate}
-        />
+        {/* MOBILE ROOM SELECTOR & QUICK VIEW BAR (<lg only) */}
+        <div className="lg:hidden bg-white dark:bg-[#121215] border border-zinc-200/80 dark:border-zinc-800 rounded-2xl p-3 shadow-xs flex items-center justify-between gap-3 ui-radius-panel ui-shadow-quiet ui-surface">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800/60 flex items-center justify-center text-blue-600 dark:text-blue-400 shrink-0 font-mono font-black text-sm ui-font-body ui-weight-medium">
+              {activeRoomNumber !== "Unassigned" ? activeRoomNumber : "-"}
+            </div>
+            <div className="min-w-0">
+              <div className="text-xs font-bold text-zinc-950 dark:text-zinc-50 truncate flex items-center gap-1.5 ui-text-body ui-weight-medium">
+                <span>Room {activeRoomNumber}</span>
+                {activeDirectoryItem && (
+                  <span
+                    className={`text-[10px] font-mono px-1.5 py-0.2 rounded font-semibold  ui-text-meta ui-font-body ${
+                      activeDirectoryItem.roomBalance > 0.5
+                        ? "bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300"
+                        : "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300"
+                    }`}
+                  >
+                    {activeDirectoryItem.roomBalance > 0.5 ? formatINR(activeDirectoryItem.roomBalance) : "Settled"}
+                  </span>
+                )}
+              </div>
+              <p className="text-[11px] text-zinc-400 truncate ui-text-meta">
+                {formatGuestDisplayName(activeStay?.primaryGuest?.name) || "Select a Room"}
+              </p>
+            </div>
+          </div>
 
-        {/* RIGHT COLUMN: FOLIO HERO, KPI CARDS & LEDGER */}
-        <div className="flex-1 min-w-0 space-y-6 w-full">
+          <div className="flex items-center gap-1.5 shrink-0">
+            <button
+              type="button"
+              onClick={() => setMobileActiveView(mobileActiveView === "ROOMS" ? "FOLIO" : "ROOMS")}
+              className="min-h-[42px] px-3.5 rounded-xl bg-blue-50 dark:bg-blue-950/50 hover:bg-blue-100 dark:hover:bg-blue-900/50 text-blue-700 dark:text-blue-300 text-xs font-bold flex items-center gap-1.5 border border-blue-200/80 dark:border-blue-800/60  transition cursor-pointer ui-radius-control ui-text-body ui-weight-medium ui-control ui-control-sized"
+            >
+              {mobileActiveView === "ROOMS" ? (
+                <>
+                  <Receipt className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                  <span>View Folio</span>
+                </>
+              ) : (
+                <>
+                  <BedDouble className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                  <span>Rooms ({filteredDirectoryItems.length})</span>
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+
+        {/* 2. MAIN 2-COLUMN OPERATIONAL VIEW: Optimal proportions and fluid workspace */}
+        <div className="flex flex-col lg:flex-row gap-6 items-start w-full">
+          
+          {/* LEFT COLUMN: ROOMS DIRECTORY */}
+          <div className={`w-full lg:w-auto ${mobileActiveView === "ROOMS" ? "block" : "hidden lg:block"}`}>
+            <BillingSidebar
+              activeMainTab={activeMainTab}
+              directoryItems={directoryItems}
+              filteredDirectoryItems={filteredDirectoryItems}
+              selectedStayId={selectedStayId}
+              selectedRoomNumber={selectedRoomNumber}
+              staySearchQuery={staySearchQuery}
+              setStaySearchQuery={setStaySearchQuery}
+              stayStatusFilter={stayStatusFilter}
+              setStayStatusFilter={setStayStatusFilter}
+              onSelectRoom={(stayId, roomNumber) => {
+                setSelectedStayId(stayId);
+                setSelectedRoomNumber(roomNumber);
+                setGroupBillingMode("NO");
+                setMobileActiveView("FOLIO");
+              }}
+              onCloseMobileDrawer={() => setMobileActiveView("FOLIO")}
+              inHouseCount={inHouseCount}
+              outstandingCount={outstandingCount}
+              settledArchiveCount={settledArchiveCount}
+              formatShortDate={formatShortDate}
+            />
+          </div>
+
+          {/* RIGHT COLUMN: FOLIO HERO, KPI CARDS & LEDGER */}
+          <div className={`flex-1 min-w-0 space-y-4 sm:space-y-6 w-full ${mobileActiveView === "FOLIO" ? "block" : "hidden lg:block"}`}>
           {folioData && activeStay ? (
             <>
               <FolioHero
@@ -2021,7 +2100,7 @@ function BillingContent() {
               <FolioPaymentsTable
                 payments={payments}
                 totalPayments={totalPayments}
-                onEditPayment={(p) => {
+                onEditPayment={canEditPaymentReceipts ? (p) => {
                   let parsedSnap: any = {};
                   try {
                     if (p.payerSnapshot) parsedSnap = typeof p.payerSnapshot === "string" ? JSON.parse(p.payerSnapshot) : p.payerSnapshot;
@@ -2046,16 +2125,16 @@ function BillingContent() {
                     gstin: parsedSnap.gstin || "",
                   });
                   setShowEditPaymentModal(true);
-                }}
+                } : undefined}
               />
 
 
               {/* 5. GENERATED TAX INVOICES CARD */}
               {invoices.length > 0 && (
-                <div className="rounded-xl border border-zinc-200/70 dark:border-zinc-800/70 bg-white dark:bg-[#121215] p-4 space-y-2.5">
+                <div className="rounded-xl border border-zinc-200/70 dark:border-zinc-800/70 bg-white dark:bg-[#121215] p-4 space-y-2.5 ui-surface">
                   <div className="flex items-center gap-2">
                     <Printer className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300 ui-text-body ui-weight-medium">
                       Generated Tax Invoices
                     </h3>
                   </div>
@@ -2063,19 +2142,19 @@ function BillingContent() {
                     {invoices.map((inv: any) => (
                       <div
                         key={inv.id}
-                        className="flex items-center justify-between p-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200/70 dark:border-zinc-800 text-xs"
+                        className="flex items-center justify-between p-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200/70 dark:border-zinc-800 text-xs ui-text-body"
                       >
                         <div>
-                          <div className="font-mono font-bold text-blue-600 dark:text-blue-400">
+                          <div className="font-mono font-bold text-blue-600 dark:text-blue-400 ui-font-body ui-weight-medium">
                             {inv.invoiceNo}
                           </div>
-                          <div className="text-[11px] text-zinc-400 font-mono mt-0.5">
+                          <div className="text-[11px] text-zinc-400 font-mono mt-0.5 ui-text-meta ui-font-body">
                             FY: {inv.financialYear} • Issued: {inv.issuedAt?.slice(0, 10)}
                           </div>
                         </div>
 
                         <div className="flex items-center gap-3">
-                          <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">
+                          <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400 tabular-nums ui-font-body ui-weight-medium">
                             {formatINR(inv.totalAmount || 0)}
                           </span>
                           <button
@@ -2084,7 +2163,7 @@ function BillingContent() {
                               setIsLiveTaxBillView(false);
                               setShowInvoiceModal(true);
                             }}
-                            className="h-7.5 px-3 rounded-md bg-zinc-900 text-white hover:bg-zinc-800 dark:bg-white dark:text-zinc-950 text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition"
+                            className="h-7.5 px-3 rounded-md bg-zinc-900 text-white hover:bg-zinc-800 dark:bg-white dark:text-zinc-950 text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition ui-text-body ui-control"
                           >
                             <Printer className="h-3 w-3" />
                             <span>Print</span>
@@ -2097,12 +2176,12 @@ function BillingContent() {
               )}
             </>
           ) : (
-            <div className="rounded-xl border border-zinc-200/70 dark:border-zinc-800/70 bg-white dark:bg-[#121215] p-12 text-center text-zinc-500 space-y-2">
+            <div className="rounded-xl border border-zinc-200/70 dark:border-zinc-800/70 bg-white dark:bg-[#121215] p-12 text-center text-zinc-500 space-y-2 ui-surface">
               <Receipt className="h-8 w-8 text-zinc-400 mx-auto" />
               <p className="font-semibold text-sm text-zinc-800 dark:text-zinc-200">
                 {stays.length === 0 ? "No active folios found for this property" : "Select a room from the directory to manage billing"}
               </p>
-              <p className="text-xs text-zinc-400 max-w-sm mx-auto">
+              <p className="text-xs text-zinc-400 max-w-sm mx-auto ui-text-body">
                 {stays.length === 0 ? "Currently there are no in-house guests or pending folios for this property." : "Use the directory on the left or select multiple rooms for group payment settlements."}
               </p>
             </div>
@@ -2118,6 +2197,9 @@ function BillingContent() {
         isOpen={showManualChargeModal}
         onClose={() => setShowManualChargeModal(false)}
         activeStay={activeStay}
+        folioId={folioData?.id}
+        roomNumber={activeRoomNumber}
+        onPostKots={handlePostKots}
         chargeForm={chargeForm}
         setChargeForm={setChargeForm}
         onSubmit={handlePostCharge}
@@ -2148,7 +2230,7 @@ function BillingContent() {
       />
 
       <EditPaymentModal
-        isOpen={showEditPaymentModal}
+        isOpen={canEditPaymentReceipts && showEditPaymentModal}
         onClose={() => {
           setShowEditPaymentModal(false);
           setEditingPayment(null);
@@ -2298,7 +2380,7 @@ export default function BillingPage() {
   return (
     <Suspense
       fallback={
-        <div className="p-16 text-center text-xs font-mono text-zinc-500">
+        <div className="p-16 text-center text-xs font-mono text-zinc-500 ui-text-body ui-font-body">
           Loading Billing & Invoicing Engine...
         </div>
       }

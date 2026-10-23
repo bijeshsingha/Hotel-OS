@@ -2,6 +2,7 @@
 
 import React from "react";
 import { Calendar } from "lucide-react";
+import { StatusBadge } from "./status-badge";
 
 interface PageHeaderProps {
   title: string;
@@ -14,74 +15,21 @@ interface PageHeaderProps {
   actions?: React.ReactNode;
 }
 
-export function PageHeader({
-  title,
-  description,
-  icon: Icon,
-  badge,
-  badgeVariant = "live",
-  businessDate,
-  metadata,
-  actions,
-}: PageHeaderProps) {
-  const badgeStyles: Record<string, string> = {
-    live: "text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 border-emerald-200 dark:border-emerald-500/20",
-    success: "text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 border-emerald-200 dark:border-emerald-500/20",
-    warning: "text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-500/10 border-amber-200 dark:border-amber-500/20",
-    danger: "text-rose-700 dark:text-rose-400 bg-rose-50 dark:bg-rose-500/10 border-rose-200 dark:border-rose-500/20",
-    info: "text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-500/10 border-blue-200 dark:border-blue-500/20",
-    neutral: "text-zinc-600 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700",
-  };
-
-  return (
-    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 pb-4 border-b border-zinc-200/80 dark:border-zinc-800">
-      <div className="space-y-0.5">
-        <div className="flex items-center gap-2.5 flex-wrap">
-          {Icon && (
-            <div className="h-8 w-8 rounded-lg bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-zinc-700 dark:text-zinc-300 shrink-0">
-              <Icon className="h-4.5 w-4.5" />
-            </div>
-          )}
-          <h1 className="text-xl sm:text-2xl font-bold text-zinc-950 dark:text-zinc-50 tracking-tight">
-            {title}
-          </h1>
-          {badge && (
-            <span
-              className={`rounded-full px-2.5 py-0.5 text-xs font-semibold border flex items-center gap-1.5 shrink-0 ${
-                badgeStyles[badgeVariant] || badgeStyles.neutral
-              }`}
-            >
-              {badgeVariant === "live" && (
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              )}
-              {badge}
-            </span>
-          )}
-        </div>
-        {description && (
-          <p className="text-xs sm:text-sm text-zinc-500 dark:text-zinc-400 max-w-3xl">
-            {description}
-          </p>
-        )}
+export function PageHeader({ title, description, icon: Icon, badge, badgeVariant = "live", businessDate, metadata, actions }: PageHeaderProps) {
+  const variants = { live: "green", neutral: "grey", success: "green", warning: "amber", danger: "red", info: "blue" } as const;
+  return <div className="ui-page-header">
+    <div>
+      <div className="ui-page-heading">
+        {Icon && <Icon className="h-5 w-5 text-zinc-500 dark:text-zinc-400" />}
+        <h1 className="ui-page-title">{title}</h1>
+        {badge && <StatusBadge label={badge} variant={variants[badgeVariant]} dot={badgeVariant === "live"} />}
       </div>
-
-      <div className="flex items-center gap-2 flex-wrap md:self-center">
-        {metadata}
-        {businessDate && (
-          <div className="flex items-center gap-2 h-8.5 px-2.5 rounded-lg bg-zinc-100/80 dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 text-xs shrink-0 select-none">
-            <span className="flex items-center gap-1.5 text-xs font-medium text-zinc-500 dark:text-zinc-400">
-              <Calendar className="h-3.5 w-3.5 text-zinc-400 dark:text-zinc-500 shrink-0" />
-              <span>Date</span>
-            </span>
-            <span className="h-3 w-px bg-zinc-200 dark:bg-zinc-700" />
-            <span className="font-mono font-semibold text-xs text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-              {businessDate}
-            </span>
-          </div>
-        )}
-        {actions}
-      </div>
+      {description && <p className="ui-page-description">{description}</p>}
     </div>
-  );
+    <div className="ui-page-actions">
+      {metadata}
+      {businessDate && <span className="ui-date"><Calendar className="h-4 w-4" aria-hidden="true" />Business date <strong>{businessDate}</strong></span>}
+      {actions}
+    </div>
+  </div>;
 }

@@ -1,5 +1,6 @@
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400;1,600&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
 @import "tailwindcss";
+@import "./ui-system.css";
 
 @custom-variant dark (&:where(.dark, .dark *));
 
@@ -140,9 +141,7 @@ nextjs-portal {
    VERCEL GEIST FORM CONTROLS & TYPOGRAPHY ELEVATION
    ================================================================ */
 
-input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not(.bg-transparent):not(.border-0):not(.border-none),
-select:not(.bg-transparent):not(.border-0):not(.border-none),
-textarea:not(.bg-transparent):not(.border-0):not(.border-none) {
+:where(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not(.bg-transparent):not(.border-0):not(.border-none), select:not(.bg-transparent):not(.border-0):not(.border-none), textarea:not(.bg-transparent):not(.border-0):not(.border-none)) {
   min-height: 40px;
   font-size: 14px;
   border-radius: 0.625rem;
@@ -208,7 +207,7 @@ textarea:disabled {
 }
 
 label {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 500;
   color: var(--foreground);
   letter-spacing: -0.01em;
@@ -443,9 +442,6 @@ input[type="number"] {
   animation: modalFadeIn 0.15s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-button:active:not(:disabled) {
-  transform: scale(0.985);
-  transition: transform 0.05s ease-out;
-}
+/* Controls keep a stable position while pressed. */
 
 

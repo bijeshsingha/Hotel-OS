@@ -22,25 +22,119 @@ export function FolioPaymentsTable({
   return (
     <div className="space-y-6">
       {/* Payments Table */}
-      <div className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-[#121215] overflow-hidden">
+      <div className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-[#121215] overflow-hidden ui-radius-panel ui-surface">
         <div className="p-4 sm:p-5 flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800/80">
           <div className="flex items-center gap-2.5">
             <CreditCard className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
-            <h2 className="text-base font-bold text-zinc-950 dark:text-zinc-50">
+            <h2 className="text-base font-bold text-zinc-950 dark:text-zinc-50 ui-weight-medium ui-section-title">
               Payment Receipts
             </h2>
-            <span className="text-sm text-zinc-400 font-mono">
+            <span className="text-sm text-zinc-400 font-mono ui-font-body">
               ({payments.length} {payments.length === 1 ? "receipt" : "receipts"})
             </span>
           </div>
-          <div className="text-sm font-mono font-bold text-emerald-600 dark:text-emerald-400">
+          <div className="text-sm font-mono font-bold text-emerald-600 dark:text-emerald-400 ui-font-body ui-weight-medium">
             Total Settled: {formatINR(totalPayments)}
           </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm border-collapse min-w-[700px]">
-            <thead className="bg-zinc-50/80 dark:bg-zinc-900/60 border-b border-zinc-200/70 dark:border-zinc-800/80 text-zinc-500 dark:text-zinc-400 font-bold text-[11px] uppercase tracking-wider">
+        {/* 1. Mobile Touch-Friendly Receipt Cards View (<md screens) */}
+        <div className="block md:hidden divide-y divide-zinc-100 dark:divide-zinc-800/70">
+          {payments.map((p) => {
+            const isGroup = p.reference?.includes("GRP") || p.receiptNo?.includes("GRP");
+            const isRefund =
+              Number(p.amount) < 0 ||
+              p.method?.includes("REFUND") ||
+              p.method?.includes("PAYOUT");
+
+            const formatPaymentDate = (d?: string | null) => {
+              if (!d) return "-";
+              try {
+                const dt = new Date(d);
+                const day = dt.getDate().toString().padStart(2, "0");
+                const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+                const month = months[dt.getMonth()];
+                const hours = dt.getHours().toString().padStart(2, "0");
+                const mins = dt.getMinutes().toString().padStart(2, "0");
+                return `${day} ${month} • ${hours}:${mins}`;
+              } catch {
+                return d;
+              }
+            };
+
+            return (
+              <div key={p.id} className="p-3.5 sm:p-4 space-y-2.5 hover:bg-zinc-50/50 dark:hover:bg-zinc-900/30 transition">
+                {/* Header: Receipt #, Badges & Amount */}
+                <div className="flex items-start justify-between gap-2">
+                  <div className="space-y-1 min-w-0">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="font-mono font-bold text-blue-600 dark:text-blue-400 text-sm ui-font-body ui-weight-medium">
+                        {p.receiptNo}
+                      </span>
+                      <span className="inline-block px-2 py-0.5 rounded-md bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 font-mono text-[11px] font-bold border border-zinc-200/60 dark:border-zinc-700/60 ui-font-body ui-text-meta ui-weight-medium">
+                        {p.method}
+                      </span>
+                      {isGroup && (
+                        <span className="text-[10px] font-mono bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 px-1.5 py-0.2 rounded border border-purple-200 dark:border-purple-900 font-bold uppercase ui-text-meta ui-font-body ui-weight-medium">
+                          Group
+                        </span>
+                      )}
+                      {isRefund && (
+                        <span className="text-[10px] font-mono bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 px-1.5 py-0.2 rounded border border-rose-200 dark:border-rose-900 font-bold uppercase ui-text-meta ui-font-body ui-weight-medium">
+                          Refund
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-xs text-zinc-500 dark:text-zinc-400 font-mono ui-text-body ui-font-body">
+                      {formatPaymentDate(p.receivedAt)}
+                    </div>
+                  </div>
+
+                  <div
+                    className={`font-mono font-bold text-base text-right shrink-0  ui-font-body ui-weight-medium ${
+                      isRefund ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400"
+                    }`}
+                  >
+                    {isRefund ? `- ${formatINR(Math.abs(p.amount))}` : formatINR(p.amount || 0)}
+                  </div>
+                </div>
+
+                {/* Reference notes & Edit Action */}
+                <div className="flex items-center justify-between gap-2 pt-1 text-xs ui-text-body">
+                  <div className="text-zinc-500 dark:text-zinc-400 truncate">
+                    {p.reference && !p.reference.startsWith("GRC-DEPOSIT-") ? (
+                      <span className="font-medium">Ref: {p.reference}</span>
+                    ) : (
+                      <span className="text-zinc-400">Direct Settlement</span>
+                    )}
+                  </div>
+
+                  {onEditPayment && (
+                    <button
+                      type="button"
+                      onClick={() => onEditPayment(p)}
+                      className="min-h-[40px] px-3 py-1.5 rounded-lg text-xs font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition inline-flex items-center gap-1.5 cursor-pointer border border-zinc-200/80 dark:border-zinc-800  shrink-0 ui-text-body ui-control ui-control-sized"
+                    >
+                      <Pencil className="h-3.5 w-3.5 text-zinc-500" />
+                      <span>Edit</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+
+          {payments.length === 0 && (
+            <div className="py-10 px-4 text-center text-zinc-400 text-sm">
+              No payment receipts recorded for this folio yet
+            </div>
+          )}
+        </div>
+
+        {/* 2. Desktop Payments Table (>=md screens) */}
+        <div className="hidden md:block overflow-x-auto">
+          <table className="w-full text-left text-sm border-collapse min-w-[700px] ui-data-table">
+            <thead className="bg-zinc-50/80 dark:bg-zinc-900/60 border-b border-zinc-200/70 dark:border-zinc-800/80 text-zinc-500 dark:text-zinc-400 font-bold text-[11px] uppercase tracking-wider ui-weight-medium ui-text-meta">
               <tr>
                 <th scope="col" className="py-3 px-4 w-[130px]">Receipt #</th>
                 <th scope="col" className="py-3 px-4 w-[150px]">Date & Time</th>
@@ -75,34 +169,34 @@ export function FolioPaymentsTable({
 
                 return (
                   <tr key={p.id} className="hover:bg-zinc-50/70 dark:hover:bg-zinc-900/40 transition-colors">
-                    <td className="py-3 px-4 font-mono font-semibold text-blue-600 dark:text-blue-400 text-xs sm:text-sm whitespace-nowrap align-middle">
+                    <td className="py-3 px-4 font-mono font-semibold text-blue-600 dark:text-blue-400 text-xs sm:text-sm whitespace-nowrap align-middle ui-font-body ui-text-body">
                       <div className="inline-flex items-center gap-1.5 flex-wrap">
                         <span>{p.receiptNo}</span>
                         {isGroup && (
-                          <span className="text-[10px] font-mono bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 px-1.5 py-0.2 rounded border border-purple-200 dark:border-purple-900 font-bold uppercase">
+                          <span className="text-[10px] font-mono bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 px-1.5 py-0.2 rounded border border-purple-200 dark:border-purple-900 font-bold uppercase ui-text-meta ui-font-body ui-weight-medium">
                             Group
                           </span>
                         )}
                         {isRefund && (
-                          <span className="text-[10px] font-mono bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 px-1.5 py-0.2 rounded border border-rose-200 dark:border-rose-900 font-bold uppercase">
+                          <span className="text-[10px] font-mono bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 px-1.5 py-0.2 rounded border border-rose-200 dark:border-rose-900 font-bold uppercase ui-text-meta ui-font-body ui-weight-medium">
                             Refund
                           </span>
                         )}
                       </div>
                     </td>
-                    <td className="py-3 px-4 text-zinc-500 dark:text-zinc-400 font-mono text-xs whitespace-nowrap align-middle">
+                    <td className="py-3 px-4 text-zinc-500 dark:text-zinc-400 font-mono text-xs whitespace-nowrap align-middle ui-font-body ui-text-body">
                       {formatPaymentDate(p.receivedAt)}
                     </td>
-                    <td className="py-3 px-4 font-semibold text-zinc-900 dark:text-zinc-100 text-xs sm:text-sm align-middle whitespace-nowrap">
-                      <span className="inline-block px-2 py-0.5 rounded-md bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 font-mono text-[11px] font-bold border border-zinc-200/60 dark:border-zinc-700/60">
+                    <td className="py-3 px-4 font-semibold text-zinc-900 dark:text-zinc-100 text-xs sm:text-sm align-middle whitespace-nowrap ui-text-body">
+                      <span className="inline-block px-2 py-0.5 rounded-md bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 font-mono text-[11px] font-bold border border-zinc-200/60 dark:border-zinc-700/60 ui-font-body ui-text-meta ui-weight-medium">
                         {p.method}
                       </span>
                     </td>
-                    <td className="py-3 px-4 text-zinc-500 dark:text-zinc-400 text-xs sm:text-sm align-middle">
+                    <td className="py-3 px-4 text-zinc-500 dark:text-zinc-400 text-xs sm:text-sm align-middle ui-text-body">
                       {p.reference && !p.reference.startsWith("GRC-DEPOSIT-") ? p.reference : "-"}
                     </td>
                     <td
-                      className={`py-3 px-4 font-mono font-bold text-right tabular-nums text-sm sm:text-base whitespace-nowrap align-middle ${
+                      className={`py-3 px-4 font-mono font-bold text-right tabular-nums text-sm sm:text-base whitespace-nowrap align-middle  ui-font-body ui-weight-medium ${
                         isRefund
                           ? "text-rose-600 dark:text-rose-400"
                           : "text-emerald-600 dark:text-emerald-400"
@@ -115,8 +209,8 @@ export function FolioPaymentsTable({
                         <button
                           type="button"
                           onClick={() => onEditPayment(p)}
-                          className="px-2.5 py-1 rounded-lg text-xs font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition inline-flex items-center gap-1 cursor-pointer border border-zinc-200/80 dark:border-zinc-800"
-                          title="Edit payment details"
+                          className="px-2.5 py-1 rounded-lg text-xs font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition inline-flex items-center gap-1 cursor-pointer border border-zinc-200/80 dark:border-zinc-800 ui-text-body ui-control"
+                          title="Edit payment details" aria-label="Edit payment details"
                         >
                           <Pencil className="h-3 w-3" />
                           <span>Edit</span>
@@ -140,10 +234,10 @@ export function FolioPaymentsTable({
 
       {/* Generated Invoices List if any */}
       {invoices.length > 0 && (
-        <div className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-[#121215] p-5 space-y-3">
+        <div className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-[#121215] p-5 space-y-3 ui-radius-panel ui-surface">
           <div className="flex items-center gap-2.5">
             <FileCheck className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-            <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300 ui-text-body ui-weight-medium">
               Tax Invoices
             </h3>
           </div>
@@ -154,22 +248,22 @@ export function FolioPaymentsTable({
                 className="flex items-center justify-between p-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200/70 dark:border-zinc-800 text-sm"
               >
                 <div>
-                  <div className="font-mono font-bold text-blue-600 dark:text-blue-400 text-sm">
+                  <div className="font-mono font-bold text-blue-600 dark:text-blue-400 text-sm ui-font-body ui-weight-medium">
                     {inv.invoiceNo}
                   </div>
-                  <div className="text-xs text-zinc-400 font-mono mt-0.5">
+                  <div className="text-xs text-zinc-400 font-mono mt-0.5 ui-text-body ui-font-body">
                     FY: {inv.financialYear} • Issued: {inv.issuedAt?.slice(0, 10)}
                   </div>
                 </div>
                 <div className="flex items-center gap-4">
-                  <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400 text-base">
+                  <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400 text-base ui-font-body ui-weight-medium">
                     {formatINR(inv.totalAmount || 0)}
                   </span>
                   {onPrintInvoice && (
                     <button
                       type="button"
                       onClick={() => onPrintInvoice(inv)}
-                      className="px-3 py-1.5 rounded-lg bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition"
+                      className="px-3 py-1.5 rounded-lg bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition ui-text-body ui-control"
                     >
                       <Printer className="h-4 w-4" />
                       <span>Print</span>

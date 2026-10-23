@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { X, Mail, Send, CheckCircle2, AlertCircle, FileSpreadsheet } from "lucide-react";
-import { ExecutiveReportResult } from "@/lib/domain/executive-report-service";
+import type { ExecutiveReportResult } from "@/lib/domain/executive-report-service";
 import { formatINR } from "@/lib/gst/calculator";
 
 interface ExecutiveEmailModalProps {
@@ -110,11 +110,11 @@ export const ExecutiveEmailModal: React.FC<ExecutiveEmailModalProps> = ({
       role="dialog"
       aria-modal="true"
       aria-labelledby="email-modal-title"
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-950/60 backdrop-blur-xs animate-in fade-in duration-150"
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-950/60 backdrop-blur-xs   duration-150"
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl w-full max-w-lg overflow-hidden"
+        className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl w-full max-w-lg overflow-hidden ui-surface"
       >
         {/* Header */}
         <div className="flex items-start justify-between p-4 sm:p-5 border-b border-slate-200 dark:border-slate-800">
@@ -125,11 +125,11 @@ export const ExecutiveEmailModal: React.FC<ExecutiveEmailModalProps> = ({
             <div>
               <h2
                 id="email-modal-title"
-                className="text-base font-bold text-slate-900 dark:text-slate-100"
+                className="text-base font-bold text-slate-900 dark:text-slate-100 ui-weight-medium ui-section-title"
               >
                 Email Executive Report
               </h2>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
+              <p className="text-xs text-slate-500 dark:text-slate-400 ui-text-body">
                 Send report summary and attached Excel workbook to management
               </p>
             </div>
@@ -138,7 +138,7 @@ export const ExecutiveEmailModal: React.FC<ExecutiveEmailModalProps> = ({
             type="button"
             onClick={onClose}
             disabled={isSending}
-            className="p-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors focus:outline-none focus:ring-2 focus:ring-slate-400"
+            className="p-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors focus:outline-none focus:ring-2 focus:ring-slate-400 ui-control"
             aria-label="Close dialog"
           >
             <X className="w-5 h-5" />
@@ -146,7 +146,7 @@ export const ExecutiveEmailModal: React.FC<ExecutiveEmailModalProps> = ({
         </div>
 
         {/* Form Body */}
-        <form onSubmit={handleSubmit} className="p-4 sm:p-5 space-y-4 text-xs">
+        <form onSubmit={handleSubmit} className="p-4 sm:p-5 space-y-4 text-xs ui-text-body">
           {status.type === "SUCCESS" && (
             <div className="p-3 bg-emerald-50 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 rounded-lg flex items-center gap-2">
               <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
@@ -162,7 +162,7 @@ export const ExecutiveEmailModal: React.FC<ExecutiveEmailModalProps> = ({
           )}
 
           <div>
-            <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+            <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1 ui-label">
               Recipient Email Address *
             </label>
             <input
@@ -171,12 +171,12 @@ export const ExecutiveEmailModal: React.FC<ExecutiveEmailModalProps> = ({
               value={recipientEmail}
               onChange={(e) => setRecipientEmail(e.target.value)}
               placeholder="e.g. generalmanager@hotel.com"
-              className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-400"
+              className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-400 ui-text-body ui-field" aria-label="Recipient Email Address"
             />
           </div>
 
           <div>
-            <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+            <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1 ui-label">
               Subject Line *
             </label>
             <input
@@ -184,12 +184,12 @@ export const ExecutiveEmailModal: React.FC<ExecutiveEmailModalProps> = ({
               required
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
-              className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-400"
+              className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-400 ui-text-body ui-field" aria-label="Subject Line"
             />
           </div>
 
           <div>
-            <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+            <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1 ui-label">
               Management Memo (Optional Note)
             </label>
             <textarea
@@ -197,7 +197,7 @@ export const ExecutiveEmailModal: React.FC<ExecutiveEmailModalProps> = ({
               value={memo}
               onChange={(e) => setMemo(e.target.value)}
               placeholder="Add executive remarks, shift notes, or audit highlights..."
-              className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-400 resize-none"
+              className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-400 resize-none ui-text-body ui-field" aria-label="Management Memo (Optional Note)"
             />
           </div>
 
@@ -207,11 +207,11 @@ export const ExecutiveEmailModal: React.FC<ExecutiveEmailModalProps> = ({
               id="attach-excel-toggle"
               checked={attachExcel}
               onChange={(e) => setAttachExcel(e.target.checked)}
-              className="rounded text-blue-600 focus:ring-blue-500 h-4 w-4"
+              className="rounded text-blue-600 focus:ring-blue-500 h-4 w-4 ui-field"
             />
             <label
               htmlFor="attach-excel-toggle"
-              className="flex items-center gap-1.5 font-medium text-slate-700 dark:text-slate-300 cursor-pointer"
+              className="flex items-center gap-1.5 font-medium text-slate-700 dark:text-slate-300 cursor-pointer ui-label"
             >
               <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
               <span>Attach complete 7-sheet Excel workbook (.xlsx)</span>
@@ -219,7 +219,7 @@ export const ExecutiveEmailModal: React.FC<ExecutiveEmailModalProps> = ({
           </div>
 
           {/* Quick Metrics Preview */}
-          <div className="p-3 bg-slate-50 dark:bg-slate-800/20 rounded border border-slate-100 dark:border-slate-800 text-[11px] text-slate-500 space-y-1">
+          <div className="p-3 bg-slate-50 dark:bg-slate-800/20 rounded border border-slate-100 dark:border-slate-800 text-[11px] text-slate-500 space-y-1 ui-text-meta">
             <div className="font-semibold text-slate-700 dark:text-slate-300">
               Email Snapshot Summary:
             </div>
@@ -256,14 +256,14 @@ export const ExecutiveEmailModal: React.FC<ExecutiveEmailModalProps> = ({
               type="button"
               onClick={onClose}
               disabled={isSending}
-              className="px-3 py-1.5 text-xs font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded transition-colors"
+              className="px-3 py-1.5 text-xs font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded transition-colors ui-text-body ui-control"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isSending}
-              className="inline-flex items-center gap-1.5 px-4 py-1.5 text-xs font-semibold text-white bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white rounded transition-colors disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 px-4 py-1.5 text-xs font-semibold text-white bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white rounded transition-colors disabled:opacity-50 ui-text-body ui-control"
             >
               {isSending ? (
                 <>

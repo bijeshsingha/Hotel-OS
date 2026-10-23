@@ -25,7 +25,7 @@ import {
   BedDouble,
   CheckCircle2,
 } from "lucide-react";
-import {
+import type {
   ExecutiveReportResult,
   OutstandingRoomAccount,
   FutureBookingAdvance,
@@ -230,13 +230,13 @@ export default function ExecutiveReportPage() {
             <h4 className="text-sm font-semibold text-rose-900 dark:text-rose-200">
               Report Generation Error
             </h4>
-            <p className="text-xs text-rose-700 dark:text-rose-300 mt-0.5">
+            <p className="text-xs text-rose-700 dark:text-rose-300 mt-0.5 ui-text-body">
               {errorMessage}
             </p>
             <button
               type="button"
               onClick={fetchReport}
-              className="mt-2 text-xs font-semibold text-rose-800 dark:text-rose-200 underline hover:no-underline inline-flex items-center gap-1"
+              className="mt-2 text-xs font-semibold text-rose-800 dark:text-rose-200 underline hover:no-underline inline-flex items-center gap-1 ui-text-body ui-control"
             >
               <RefreshCw className="w-3.5 h-3.5" /> Try again
             </button>
@@ -246,7 +246,7 @@ export default function ExecutiveReportPage() {
 
       {/* Loading Skeleton */}
       {isLoading && !report && (
-        <div className="space-y-6 animate-pulse">
+        <div className="space-y-6 ">
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
             {[...Array(5)].map((_, i) => (
               <div
@@ -269,11 +269,11 @@ export default function ExecutiveReportPage() {
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
             {/* Operational Surplus */}
             <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-3 sm:p-4">
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 block">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 block ui-text-meta">
                 Net Operational Surplus
               </span>
               <div
-                className={`text-lg sm:text-xl font-bold mt-1 ${
+                className={`text-lg sm:text-xl font-bold mt-1  ui-weight-medium ${
                   report.insights.netOperationalSurplus >= 0
                     ? "text-emerald-600 dark:text-emerald-400"
                     : "text-rose-600 dark:text-rose-400"
@@ -281,59 +281,59 @@ export default function ExecutiveReportPage() {
               >
                 {formatINR(report.insights.netOperationalSurplus)}
               </div>
-              <span className="text-[11px] text-slate-400 mt-0.5 block">
+              <span className="text-[11px] text-slate-400 mt-0.5 block ui-text-meta">
                 Earned Revenue minus Expenses
               </span>
             </div>
 
             {/* Upcoming Arrivals */}
             <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-3 sm:p-4">
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 block">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 block ui-text-meta">
                 Expected Arrivals (48h)
               </span>
-              <div className="text-lg sm:text-xl font-bold text-slate-900 dark:text-slate-100 mt-1">
+              <div className="text-lg sm:text-xl font-bold text-slate-900 dark:text-slate-100 mt-1 ui-weight-medium">
                 {report.insights.upcomingArrivalsNext48h} Bookings
               </div>
-              <span className="text-[11px] text-slate-400 mt-0.5 block">
+              <span className="text-[11px] text-slate-400 mt-0.5 block ui-text-meta">
                 Incoming check-in pipeline
               </span>
             </div>
 
             {/* Upcoming Departures */}
             <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-3 sm:p-4">
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 block">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 block ui-text-meta">
                 Expected Departures (48h)
               </span>
-              <div className="text-lg sm:text-xl font-bold text-slate-900 dark:text-slate-100 mt-1">
+              <div className="text-lg sm:text-xl font-bold text-slate-900 dark:text-slate-100 mt-1 ui-weight-medium">
                 {report.insights.upcomingDeparturesNext48h} Stays
               </div>
-              <span className="text-[11px] text-slate-400 mt-0.5 block">
+              <span className="text-[11px] text-slate-400 mt-0.5 block ui-text-meta">
                 Upcoming front desk checkouts
               </span>
             </div>
 
             {/* Cancellations */}
             <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-3 sm:p-4">
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 block">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 block ui-text-meta">
                 Cancellations
               </span>
-              <div className="text-lg sm:text-xl font-bold text-slate-900 dark:text-slate-100 mt-1">
+              <div className="text-lg sm:text-xl font-bold text-slate-900 dark:text-slate-100 mt-1 ui-weight-medium">
                 {report.insights.cancellationsCount}
               </div>
-              <span className="text-[11px] text-slate-400 mt-0.5 block">
+              <span className="text-[11px] text-slate-400 mt-0.5 block ui-text-meta">
                 Cancelled in period
               </span>
             </div>
 
             {/* Overdue Checked-Out Folios */}
             <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-3 sm:p-4">
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 block">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 block ui-text-meta">
                 Overdue Checked-Out
               </span>
-              <div className="text-lg sm:text-xl font-bold text-rose-600 dark:text-rose-400 mt-1">
+              <div className="text-lg sm:text-xl font-bold text-rose-600 dark:text-rose-400 mt-1 ui-weight-medium">
                 {report.insights.overdueCheckedOutCount} Folios
               </div>
-              <span className="text-[11px] text-slate-400 mt-0.5 block">
+              <span className="text-[11px] text-slate-400 mt-0.5 block ui-text-meta">
                 Unsettled post-departure
               </span>
             </div>
@@ -516,66 +516,66 @@ export default function ExecutiveReportPage() {
             <button
               type="button"
               onClick={() => setActiveTab("OVERVIEW")}
-              className={`px-3 py-2 text-xs sm:text-sm font-semibold border-b-2 whitespace-nowrap transition-colors ${
+              className={`px-3 py-2 text-xs sm:text-sm font-semibold border-b-2 whitespace-nowrap transition-colors  ui-text-body ${
                 activeTab === "OVERVIEW"
                   ? "border-slate-900 text-slate-900 dark:border-white dark:text-white"
                   : "border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
-              }`}
+              } ui-control`}
             >
               Overview & Analytics
             </button>
             <button
               type="button"
               onClick={() => setActiveTab("REVENUE")}
-              className={`px-3 py-2 text-xs sm:text-sm font-semibold border-b-2 whitespace-nowrap transition-colors ${
+              className={`px-3 py-2 text-xs sm:text-sm font-semibold border-b-2 whitespace-nowrap transition-colors  ui-text-body ${
                 activeTab === "REVENUE"
                   ? "border-slate-900 text-slate-900 dark:border-white dark:text-white"
                   : "border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
-              }`}
+              } ui-control`}
             >
               Revenue & Collections
             </button>
             <button
               type="button"
               onClick={() => setActiveTab("RECEIVABLES")}
-              className={`px-3 py-2 text-xs sm:text-sm font-semibold border-b-2 whitespace-nowrap transition-colors ${
+              className={`px-3 py-2 text-xs sm:text-sm font-semibold border-b-2 whitespace-nowrap transition-colors  ui-text-body ${
                 activeTab === "RECEIVABLES"
                   ? "border-slate-900 text-slate-900 dark:border-white dark:text-white"
                   : "border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
-              }`}
+              } ui-control`}
             >
               Receivables (&gt; ₹5,000) ({report.highReceivables.totalOverThresholdCount})
             </button>
             <button
               type="button"
               onClick={() => setActiveTab("ADVANCES")}
-              className={`px-3 py-2 text-xs sm:text-sm font-semibold border-b-2 whitespace-nowrap transition-colors ${
+              className={`px-3 py-2 text-xs sm:text-sm font-semibold border-b-2 whitespace-nowrap transition-colors  ui-text-body ${
                 activeTab === "ADVANCES"
                   ? "border-slate-900 text-slate-900 dark:border-white dark:text-white"
                   : "border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
-              }`}
+              } ui-control`}
             >
               Future Advances ({report.futureAdvances.items.length})
             </button>
             <button
               type="button"
               onClick={() => setActiveTab("EXPENSES")}
-              className={`px-3 py-2 text-xs sm:text-sm font-semibold border-b-2 whitespace-nowrap transition-colors ${
+              className={`px-3 py-2 text-xs sm:text-sm font-semibold border-b-2 whitespace-nowrap transition-colors  ui-text-body ${
                 activeTab === "EXPENSES"
                   ? "border-slate-900 text-slate-900 dark:border-white dark:text-white"
                   : "border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
-              }`}
+              } ui-control`}
             >
               Operating Expenses
             </button>
             <button
               type="button"
               onClick={() => setActiveTab("CASH")}
-              className={`px-3 py-2 text-xs sm:text-sm font-semibold border-b-2 whitespace-nowrap transition-colors ${
+              className={`px-3 py-2 text-xs sm:text-sm font-semibold border-b-2 whitespace-nowrap transition-colors  ui-text-body ${
                 activeTab === "CASH"
                   ? "border-slate-900 text-slate-900 dark:border-white dark:text-white"
                   : "border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
-              }`}
+              } ui-control`}
             >
               Cash Drawer Reconciliation
             </button>

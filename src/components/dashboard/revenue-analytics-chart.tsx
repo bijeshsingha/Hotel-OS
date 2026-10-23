@@ -53,18 +53,18 @@ export function RevenueAnalyticsChart({
   const totalModeCollections = paymentModeData.reduce((sum, item) => sum + item.value, 0);
 
   return (
-    <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-[#121215] border border-zinc-200/80 dark:border-zinc-800/80 shadow-xs space-y-4">
+    <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-[#121215] border border-zinc-200/80 dark:border-zinc-800/80 shadow-xs space-y-4 ui-radius-panel ui-shadow-quiet ui-surface">
       
       {/* HEADER & VIEW SELECTOR */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-zinc-100 dark:border-zinc-800/60 pb-3.5">
         <div>
           <div className="flex items-center gap-2">
-            <span className="h-2 w-2 rounded-full bg-blue-600 animate-pulse" />
-            <h2 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
-              Financial Intelligence & Velocity
+            <span className="h-2 w-2 rounded-full bg-blue-600 " />
+            <h2 className="text-sm font-bold text-zinc-900 dark:text-zinc-100 ui-weight-medium ui-section-title">
+              Revenue and collections
             </h2>
           </div>
-          <p className="text-xs text-zinc-500 mt-0.5">
+          <p className="text-xs text-zinc-500 mt-0.5 ui-text-body">
             {activeView === "TREND" && "14-day chronological room tariff and F&B intake progression"}
             {activeView === "PAYMENT_MODES" && "Channel breakdown of today's collections"}
             {activeView === "HOURLY" && "Hourly transaction velocity throughout the 24-hour cycle"}
@@ -72,15 +72,15 @@ export function RevenueAnalyticsChart({
         </div>
 
         {/* View Switcher Pills */}
-        <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-800/80 p-1 rounded-xl text-xs font-semibold">
+        <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-800/80 p-1 rounded-xl text-xs font-semibold ui-text-body">
           <button
             type="button"
             onClick={() => setActiveView("TREND")}
             className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition cursor-pointer ${
               activeView === "TREND"
-                ? "bg-white dark:bg-zinc-900 text-blue-600 dark:text-blue-400 shadow-2xs font-bold"
+                ? "bg-white dark:bg-zinc-900 text-blue-600 dark:text-blue-400 shadow-2xs font-bold ui-shadow-quiet ui-weight-medium"
                 : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
-            }`}
+            } ui-control`}
           >
             <TrendingUp className="h-3.5 w-3.5" />
             <span>14-Day Trend</span>
@@ -91,9 +91,9 @@ export function RevenueAnalyticsChart({
             onClick={() => setActiveView("PAYMENT_MODES")}
             className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition cursor-pointer ${
               activeView === "PAYMENT_MODES"
-                ? "bg-white dark:bg-zinc-900 text-blue-600 dark:text-blue-400 shadow-2xs font-bold"
+                ? "bg-white dark:bg-zinc-900 text-blue-600 dark:text-blue-400 shadow-2xs font-bold ui-shadow-quiet ui-weight-medium"
                 : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
-            }`}
+            } ui-control`}
           >
             <PieIcon className="h-3.5 w-3.5" />
             <span>Payment Modes</span>
@@ -104,9 +104,9 @@ export function RevenueAnalyticsChart({
             onClick={() => setActiveView("HOURLY")}
             className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition cursor-pointer ${
               activeView === "HOURLY"
-                ? "bg-white dark:bg-zinc-900 text-blue-600 dark:text-blue-400 shadow-2xs font-bold"
+                ? "bg-white dark:bg-zinc-900 text-blue-600 dark:text-blue-400 shadow-2xs font-bold ui-shadow-quiet ui-weight-medium"
                 : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
-            }`}
+            } ui-control`}
           >
             <Clock className="h-3.5 w-3.5" />
             <span>Hourly Flow</span>
@@ -117,7 +117,7 @@ export function RevenueAnalyticsChart({
       {/* VIEW 1: 14-DAY AREA REVENUE TREND */}
       {activeView === "TREND" && (
         <div className="space-y-2">
-          <div className="flex items-center justify-end gap-4 text-xs font-semibold">
+          <div className="flex items-center justify-end gap-4 text-xs font-semibold ui-text-body">
             <span className="flex items-center gap-1.5 text-blue-600 dark:text-blue-400">
               <span className="h-2 w-2 rounded-full bg-blue-500" /> Room Tariff
             </span>
@@ -187,7 +187,7 @@ export function RevenueAnalyticsChart({
         <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center min-h-[256px]">
           <div className="md:col-span-6 h-60 w-full relative flex items-center justify-center">
             {paymentModeData.length === 0 ? (
-              <div className="text-center text-xs text-zinc-400">No collections recorded today</div>
+              <div className="text-center text-xs text-zinc-400 ui-text-body">No collections recorded today</div>
             ) : (
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
@@ -221,8 +221,8 @@ export function RevenueAnalyticsChart({
             {/* Center Metric */}
             {paymentModeData.length > 0 && (
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                <span className="text-[10px] font-bold uppercase text-zinc-400 tracking-wider">Total</span>
-                <span className="text-sm font-extrabold font-mono text-zinc-900 dark:text-white">
+                <span className="text-[10px] font-bold uppercase text-zinc-400 tracking-wider ui-text-meta ui-weight-medium">Total</span>
+                <span className="text-sm font-extrabold font-mono text-zinc-900 dark:text-white ui-weight-medium ui-font-body">
                   {formatINR(totalModeCollections)}
                 </span>
               </div>
@@ -231,12 +231,12 @@ export function RevenueAnalyticsChart({
 
           {/* Legend and Percentages */}
           <div className="md:col-span-6 space-y-2">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-500 mb-2">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-500 mb-2 ui-text-body ui-weight-medium">
               Settlement Channels Share
             </h3>
             <div className="space-y-1.5 max-h-52 overflow-y-auto pr-1">
               {paymentModeData.length === 0 ? (
-                <p className="text-xs text-zinc-400">Waiting for today&apos;s settlements...</p>
+                <p className="text-xs text-zinc-400 ui-text-body">Waiting for today&apos;s settlements...</p>
               ) : (
                 paymentModeData.map((item, idx) => {
                   const pct = totalModeCollections > 0 ? Math.round((item.value / totalModeCollections) * 100) : 0;
@@ -244,15 +244,15 @@ export function RevenueAnalyticsChart({
                   return (
                     <div
                       key={idx}
-                      className="p-2 rounded-xl bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200/60 dark:border-zinc-800 flex items-center justify-between text-xs"
+                      className="p-2 rounded-xl bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200/60 dark:border-zinc-800 flex items-center justify-between text-xs ui-text-body"
                     >
                       <div className="flex items-center gap-2">
                         <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: color }} />
                         <span className="font-semibold text-zinc-800 dark:text-zinc-200">{item.name}</span>
                       </div>
-                      <div className="flex items-center gap-2 font-mono">
-                        <span className="font-bold text-zinc-900 dark:text-white">{formatINR(item.value)}</span>
-                        <span className="text-[10px] text-zinc-400 bg-zinc-200/60 dark:bg-zinc-700/60 px-1.5 py-0.5 rounded font-bold">
+                      <div className="flex items-center gap-2 font-mono ui-font-body">
+                        <span className="font-bold text-zinc-900 dark:text-white ui-weight-medium">{formatINR(item.value)}</span>
+                        <span className="text-[10px] text-zinc-400 bg-zinc-200/60 dark:bg-zinc-700/60 px-1.5 py-0.5 rounded font-bold ui-text-meta ui-weight-medium">
                           {pct}%
                         </span>
                       </div>
@@ -268,7 +268,7 @@ export function RevenueAnalyticsChart({
       {/* VIEW 3: HOURLY TRANSACTION VELOCITY */}
       {activeView === "HOURLY" && (
         <div className="space-y-2">
-          <div className="flex items-center justify-between text-xs font-semibold">
+          <div className="flex items-center justify-between text-xs font-semibold ui-text-body">
             <span className="text-zinc-500">24-Hour Intake Intensity</span>
             <span className="text-blue-600 dark:text-blue-400">Peak Front Desk Transaction Periods</span>
           </div>

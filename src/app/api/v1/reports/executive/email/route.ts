@@ -1,3 +1,4 @@
+import { authorizeRequest, getApiAccess } from "@/lib/auth/api-access";
 import { NextResponse } from "next/server";
 import { getExecutiveReport } from "@/lib/domain/executive-report-service";
 import { generateExecutiveReportExcel } from "@/lib/domain/executive-report-excel";
@@ -7,6 +8,10 @@ import { formatINR } from "@/lib/gst/calculator";
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
+  const access = await authorizeRequest(request);
+  if (access instanceof Response) return access;
+  request = access.request;
+
   try {
     const body = await request.json();
     const {

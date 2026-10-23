@@ -177,20 +177,20 @@ export default function DailyManagerAuditPage() {
   return (
     <div className="space-y-5 max-w-[1600px] mx-auto w-full text-zinc-900 dark:text-zinc-100 pb-16">
       {/* Top Header Banner */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 p-5 rounded-3xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-sm">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 p-5 rounded-3xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-sm ui-radius-panel ui-shadow-quiet ui-surface">
         <div>
           <div className="flex items-center gap-2.5 flex-wrap">
-            <div className="h-9 w-9 rounded-2xl bg-indigo-600/10 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold">
+            <div className="h-9 w-9 rounded-2xl bg-indigo-600/10 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold ui-radius-panel ui-weight-medium">
               <Moon className="h-5 w-5" />
             </div>
-            <h1 className="text-lg sm:text-xl font-black tracking-tight text-zinc-900 dark:text-white">
+            <h1 className="text-lg sm:text-xl font-black tracking-tight text-zinc-900 dark:text-white ui-weight-medium ui-page-title">
               Daily Manager Audit
             </h1>
-            <span className="rounded-lg px-2.5 py-0.5 text-[11px] font-bold text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800 font-mono uppercase tracking-wider">
+            <span className="rounded-lg px-2.5 py-0.5 text-[11px] font-bold text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800 font-mono uppercase tracking-wider ui-text-meta ui-weight-medium ui-font-body">
               12 AM – 12 AM Midnight Cycle
             </span>
           </div>
-          <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400 mt-1">
+          <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400 mt-1 ui-text-body">
             Comprehensive financial close, cashier drawer reconciliation, PMS KPI flash & tax ledgers
           </p>
         </div>
@@ -198,18 +198,18 @@ export default function DailyManagerAuditPage() {
         {/* Action Controls & Navigation */}
         <div className="flex items-center gap-2.5 flex-wrap">
           {/* Next Midnight Countdown */}
-          <div className="rounded-2xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-3.5 py-2 text-xs text-zinc-700 dark:text-zinc-300 flex items-center gap-2 shadow-xs">
+          <div className="rounded-2xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-3.5 py-2 text-xs text-zinc-700 dark:text-zinc-300 flex items-center gap-2 shadow-xs ui-radius-panel ui-text-body ui-shadow-quiet">
             <Clock className="h-4 w-4 text-amber-500" />
             <span className="font-medium text-zinc-500">Rolls in:</span>
-            <strong className="text-emerald-600 dark:text-emerald-400 font-mono font-bold">{timeUntilMidnight}</strong>
+            <strong className="text-emerald-600 dark:text-emerald-400 font-mono font-bold ui-font-body ui-weight-medium">{timeUntilMidnight}</strong>
           </div>
 
           {/* Quick Date Selector */}
-          <div className="inline-flex items-center h-10 p-1 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 rounded-xl shadow-2xs">
+          <div className="inline-flex items-center h-10 p-1 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 rounded-xl shadow-2xs ui-shadow-quiet">
             <button
               onClick={() => handleDateShift(-1)}
-              className="h-8 w-8 rounded-lg flex items-center justify-center hover:bg-white dark:hover:bg-zinc-800 text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white transition cursor-pointer"
-              title="Previous Day"
+              className="h-8 w-8 rounded-lg flex items-center justify-center hover:bg-white dark:hover:bg-zinc-800 text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white transition cursor-pointer ui-control ui-control-sized"
+              title="Previous Day" aria-label="Previous Day"
             >
               <ChevronLeft className="h-4 w-4" />
             </button>
@@ -218,13 +218,13 @@ export default function DailyManagerAuditPage() {
                 type="date"
                 value={selectedDate}
                 onChange={(e) => setSelectedDate(e.target.value)}
-                className="h-8 bg-transparent border-0 border-none outline-none ring-0 text-xs sm:text-sm font-mono font-bold px-1.5 text-zinc-900 dark:text-white focus:outline-none focus:ring-0 cursor-pointer"
+                className="h-8 bg-transparent border-0 border-none outline-none ring-0 text-xs sm:text-sm font-mono font-bold px-1.5 text-zinc-900 dark:text-white focus:outline-none focus:ring-0 cursor-pointer ui-text-body ui-font-body ui-weight-medium ui-field"
               />
             </div>
             <button
               onClick={() => handleDateShift(1)}
-              className="h-8 w-8 rounded-lg flex items-center justify-center hover:bg-white dark:hover:bg-zinc-800 text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white transition cursor-pointer"
-              title="Next Day"
+              className="h-8 w-8 rounded-lg flex items-center justify-center hover:bg-white dark:hover:bg-zinc-800 text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white transition cursor-pointer ui-control ui-control-sized"
+              title="Next Day" aria-label="Next Day"
             >
               <ChevronRight className="h-4 w-4" />
             </button>
@@ -233,7 +233,7 @@ export default function DailyManagerAuditPage() {
           {/* Email Report Button */}
           <button
             onClick={() => setShowEmailModal(true)}
-            className="h-10 px-4 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center gap-2 transition shadow-xs cursor-pointer active:scale-98"
+            className="h-10 px-4 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center gap-2 transition shadow-xs cursor-pointer  ui-radius-control ui-weight-medium ui-text-body ui-shadow-quiet ui-control ui-control-sized"
           >
             <Mail className="h-4 w-4" />
             <span>Email Report</span>
@@ -242,7 +242,7 @@ export default function DailyManagerAuditPage() {
           {/* Print Official Report Button */}
           <button
             onClick={() => setShowPrintModal(true)}
-            className="h-10 px-4 rounded-2xl bg-zinc-900 hover:bg-zinc-800 dark:bg-white dark:hover:bg-zinc-200 text-white dark:text-zinc-950 font-bold text-xs flex items-center gap-2 transition shadow-xs cursor-pointer"
+            className="h-10 px-4 rounded-2xl bg-zinc-900 hover:bg-zinc-800 dark:bg-white dark:hover:bg-zinc-200 text-white dark:text-zinc-950 font-bold text-xs flex items-center gap-2 transition shadow-xs cursor-pointer ui-radius-control ui-weight-medium ui-text-body ui-shadow-quiet ui-control ui-control-sized"
           >
             <Printer className="h-4 w-4" />
             <span>Print Official 12 AM Audit</span>
@@ -252,8 +252,8 @@ export default function DailyManagerAuditPage() {
           <button
             onClick={handleArchiveSnapshot}
             disabled={isArchiving}
-            className="h-10 px-3.5 rounded-2xl bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/50 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 font-bold text-xs flex items-center gap-1.5 border border-indigo-200 dark:border-indigo-800 transition shadow-xs cursor-pointer disabled:opacity-50"
-            title="Archive and lock 12 AM snapshot"
+            className="h-10 px-3.5 rounded-2xl bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/50 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 font-bold text-xs flex items-center gap-1.5 border border-indigo-200 dark:border-indigo-800 transition shadow-xs cursor-pointer disabled:opacity-50 ui-radius-control ui-weight-medium ui-text-body ui-shadow-quiet ui-control ui-control-sized"
+            title="Archive and lock 12 AM snapshot" aria-label="Archive and lock 12 AM snapshot"
           >
             <Lock className="h-3.5 w-3.5" />
             <span>{isArchiving ? "Archiving..." : "Archive Snapshot"}</span>
@@ -262,8 +262,8 @@ export default function DailyManagerAuditPage() {
           {/* Export CSV */}
           <button
             onClick={handleExportCSV}
-            className="h-10 px-3.5 rounded-2xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-900 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 font-bold text-xs flex items-center gap-1.5 border border-zinc-200 dark:border-zinc-800 transition shadow-xs cursor-pointer"
-            title="Export CSV"
+            className="h-10 px-3.5 rounded-2xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-900 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 font-bold text-xs flex items-center gap-1.5 border border-zinc-200 dark:border-zinc-800 transition shadow-xs cursor-pointer ui-radius-control ui-weight-medium ui-text-body ui-shadow-quiet ui-control ui-control-sized"
+            title="Export CSV" aria-label="Export CSV"
           >
             <FileSpreadsheet className="h-3.5 w-3.5" />
             <span className="hidden sm:inline">CSV</span>
@@ -275,12 +275,12 @@ export default function DailyManagerAuditPage() {
       <div className="flex items-center gap-2 border-b border-zinc-200 dark:border-zinc-800 pb-3">
         <Link
           href="/night-audit"
-          className="flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800/60 transition"
+          className="flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800/60 transition ui-radius-panel ui-text-body ui-weight-medium"
         >
           <ShieldCheck className="h-4 w-4 text-zinc-400" />
           <span>Night Audit & Day Close</span>
         </Link>
-        <div className="flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold bg-indigo-600 text-white shadow-sm shadow-indigo-600/20">
+        <div className="flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold bg-indigo-600 text-white shadow-sm shadow-indigo-600/20 ui-radius-panel ui-text-body ui-weight-medium ui-shadow-quiet">
           <Moon className="h-4 w-4" />
           <span>Daily Manager Audit (12 AM – 12 AM)</span>
         </div>
@@ -288,25 +288,25 @@ export default function DailyManagerAuditPage() {
 
       {/* Main Content Area */}
       {loading ? (
-        <div className="p-16 text-center text-xs font-semibold text-zinc-400 animate-pulse bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 rounded-3xl">
+        <div className="p-16 text-center text-xs font-semibold text-zinc-400  bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 rounded-3xl ui-text-body ui-radius-panel ui-surface">
           Calculating 12 AM – 12 AM financial reconciliation & PMS metrics for {selectedDate}...
         </div>
       ) : data ? (
-        <div className="space-y-5 animate-in fade-in duration-200">
+        <div className="space-y-5   duration-200">
           {/* 1. TOP 4 FINANCIAL & CASH HANDOVER KPI CARDS */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3.5">
             {/* Card 1: Gross Billed Revenue */}
-            <div className="p-5 rounded-3xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-3">
+            <div className="p-5 rounded-3xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-3 ui-radius-panel ui-shadow-quiet ui-surface">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">Gross Billed Revenue</span>
+                <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider ui-text-meta ui-weight-medium">Gross Billed Revenue</span>
                 <div className="h-8 w-8 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
                   <DollarSign className="h-4.5 w-4.5" />
                 </div>
               </div>
-              <div className="text-2xl font-black text-zinc-900 dark:text-zinc-100 tracking-tight">
+              <div className="text-2xl font-black text-zinc-900 dark:text-zinc-100 tracking-tight ui-weight-medium">
                 {formatINR(data.financialSummary?.grossRevenue || 0)}
               </div>
-              <div className="text-xs text-zinc-500 space-y-1 pt-2 border-t border-zinc-100 dark:border-zinc-800/80 font-mono">
+              <div className="text-xs text-zinc-500 space-y-1 pt-2 border-t border-zinc-100 dark:border-zinc-800/80 font-mono ui-text-body ui-font-body">
                 <div className="flex justify-between">
                   <span>Room Tariff:</span>
                   <strong className="text-zinc-800 dark:text-zinc-200">{formatINR(data.financialSummary?.roomRevenue || 0)}</strong>
@@ -323,17 +323,17 @@ export default function DailyManagerAuditPage() {
             </div>
 
             {/* Card 2: Total Collections (Inflows) */}
-            <div className="p-5 rounded-3xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-3">
+            <div className="p-5 rounded-3xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-3 ui-radius-panel ui-shadow-quiet ui-surface">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">Total Collections (Inflow)</span>
+                <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider ui-text-meta ui-weight-medium">Total Collections (Inflow)</span>
                 <div className="h-8 w-8 rounded-xl bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 flex items-center justify-center">
                   <ArrowDownLeft className="h-4.5 w-4.5" />
                 </div>
               </div>
-              <div className="text-2xl font-black text-blue-600 dark:text-blue-400 tracking-tight">
+              <div className="text-2xl font-black text-blue-600 dark:text-blue-400 tracking-tight ui-weight-medium">
                 {formatINR(data.financialSummary?.totalCollections || 0)}
               </div>
-              <div className="text-xs text-zinc-500 space-y-1 pt-2 border-t border-zinc-100 dark:border-zinc-800/80 font-mono">
+              <div className="text-xs text-zinc-500 space-y-1 pt-2 border-t border-zinc-100 dark:border-zinc-800/80 font-mono ui-text-body ui-font-body">
                 <div className="flex justify-between">
                   <span>UPI & QR:</span>
                   <strong className="text-zinc-800 dark:text-zinc-200">{formatINR(data.collectionsByMethod?.UPI || 0)}</strong>
@@ -352,17 +352,17 @@ export default function DailyManagerAuditPage() {
             </div>
 
             {/* Card 3: Total Expenses (Outflows) */}
-            <div className="p-5 rounded-3xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-3">
+            <div className="p-5 rounded-3xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-3 ui-radius-panel ui-shadow-quiet ui-surface">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">Total Expenses (Outflow)</span>
+                <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider ui-text-meta ui-weight-medium">Total Expenses (Outflow)</span>
                 <div className="h-8 w-8 rounded-xl bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 flex items-center justify-center">
                   <ArrowUpRight className="h-4.5 w-4.5" />
                 </div>
               </div>
-              <div className="text-2xl font-black text-rose-600 dark:text-rose-400 tracking-tight">
+              <div className="text-2xl font-black text-rose-600 dark:text-rose-400 tracking-tight ui-weight-medium">
                 {formatINR(data.financialSummary?.totalExpenses || 0)}
               </div>
-              <div className="text-xs text-zinc-500 space-y-1 pt-2 border-t border-zinc-100 dark:border-zinc-800/80 font-mono">
+              <div className="text-xs text-zinc-500 space-y-1 pt-2 border-t border-zinc-100 dark:border-zinc-800/80 font-mono ui-text-body ui-font-body">
                 <div className="flex justify-between">
                   <span>Cash Paid Out:</span>
                   <strong className="text-rose-600 dark:text-rose-400">
@@ -388,19 +388,19 @@ export default function DailyManagerAuditPage() {
             </div>
 
             {/* Card 4: Cash Drawer Handover */}
-            <div className="p-5 rounded-3xl bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-300 dark:border-emerald-800/50 shadow-xs space-y-3">
+            <div className="p-5 rounded-3xl bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-300 dark:border-emerald-800/50 shadow-xs space-y-3 ui-radius-panel ui-shadow-quiet">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-emerald-800 dark:text-emerald-300 uppercase tracking-wider">
+                <span className="text-[11px] font-bold text-emerald-800 dark:text-emerald-300 uppercase tracking-wider ui-text-meta ui-weight-medium">
                   Physical Cash in Hand
                 </span>
                 <div className="h-8 w-8 rounded-xl bg-emerald-100 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 flex items-center justify-center">
                   <Banknote className="h-4.5 w-4.5" />
                 </div>
               </div>
-              <div className="text-2xl font-black text-emerald-800 dark:text-emerald-300 tracking-tight">
+              <div className="text-2xl font-black text-emerald-800 dark:text-emerald-300 tracking-tight ui-weight-medium">
                 {formatINR(data.financialSummary?.cashDrawerPosition?.netCashInHand || 0)}
               </div>
-              <div className="text-xs text-emerald-700 dark:text-emerald-400 space-y-1 pt-2 border-t border-emerald-200 dark:border-emerald-800/60 font-mono">
+              <div className="text-xs text-emerald-700 dark:text-emerald-400 space-y-1 pt-2 border-t border-emerald-200 dark:border-emerald-800/60 font-mono ui-text-body ui-font-body">
                 <div className="flex justify-between">
                   <span>Cash In (Receipts):</span>
                   <strong>+{formatINR(data.financialSummary?.cashDrawerPosition?.cashIn || 0)}</strong>
@@ -409,7 +409,7 @@ export default function DailyManagerAuditPage() {
                   <span>Cash Out (Expenses):</span>
                   <strong className="text-rose-600">-{formatINR(data.financialSummary?.cashDrawerPosition?.cashOut || 0)}</strong>
                 </div>
-                <div className="text-[10px] text-emerald-700 dark:text-emerald-400 font-sans italic pt-0.5">
+                <div className="text-[10px] text-emerald-700 dark:text-emerald-400 font-sans italic pt-0.5 ui-text-meta">
                   Reconciled for 12 AM cashier shift handover
                 </div>
               </div>
@@ -417,54 +417,54 @@ export default function DailyManagerAuditPage() {
           </div>
 
           {/* 2. PMS OPERATIONAL PERFORMANCE METRICS */}
-          <div className="p-5 rounded-3xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-4">
+          <div className="p-5 rounded-3xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-4 ui-radius-panel ui-shadow-quiet ui-surface">
             <div className="flex items-center justify-between flex-wrap gap-2">
-              <h3 className="text-xs font-bold text-zinc-900 dark:text-zinc-100 uppercase tracking-wider flex items-center gap-2">
+              <h3 className="text-xs font-bold text-zinc-900 dark:text-zinc-100 uppercase tracking-wider flex items-center gap-2 ui-text-body ui-weight-medium">
                 <BedDouble className="h-4 w-4 text-indigo-500" />
                 PMS Operational Performance Metrics (12 AM – 12 AM)
               </h3>
-              <div className="text-xs font-mono text-zinc-500">
+              <div className="text-xs font-mono text-zinc-500 ui-text-body ui-font-body">
                 Total Rooms: <strong className="text-zinc-800 dark:text-zinc-200">{data.pmsMetrics?.totalRooms}</strong> | Available: <strong className="text-zinc-800 dark:text-zinc-200">{data.pmsMetrics?.availableRooms}</strong>
               </div>
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
-              <div className="p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 space-y-1">
-                <div className="text-[10.5px] font-bold text-zinc-500 uppercase tracking-wider">Occupancy %</div>
-                <div className="text-xl font-black text-indigo-600 dark:text-indigo-400">
+              <div className="p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 space-y-1 ui-radius-panel">
+                <div className="text-[10.5px] font-bold text-zinc-500 uppercase tracking-wider ui-text-meta ui-weight-medium">Occupancy %</div>
+                <div className="text-xl font-black text-indigo-600 dark:text-indigo-400 ui-weight-medium">
                   {data.pmsMetrics?.occupancyPct}%
                 </div>
-                <div className="text-[11px] text-zinc-500 font-mono">
+                <div className="text-[11px] text-zinc-500 font-mono ui-text-meta ui-font-body">
                   {data.pmsMetrics?.roomsSold} / {data.pmsMetrics?.totalRooms} Rooms Sold
                 </div>
               </div>
 
-              <div className="p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 space-y-1">
-                <div className="text-[10.5px] font-bold text-zinc-500 uppercase tracking-wider">ADR (Avg Daily Rate)</div>
-                <div className="text-xl font-black text-zinc-900 dark:text-zinc-100">
+              <div className="p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 space-y-1 ui-radius-panel">
+                <div className="text-[10.5px] font-bold text-zinc-500 uppercase tracking-wider ui-text-meta ui-weight-medium">ADR (Avg Daily Rate)</div>
+                <div className="text-xl font-black text-zinc-900 dark:text-zinc-100 ui-weight-medium">
                   {formatINR(data.pmsMetrics?.adr || 0)}
                 </div>
-                <div className="text-[11px] text-zinc-500 font-mono">
+                <div className="text-[11px] text-zinc-500 font-mono ui-text-meta ui-font-body">
                   Room Rev / Rooms Sold
                 </div>
               </div>
 
-              <div className="p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 space-y-1">
-                <div className="text-[10.5px] font-bold text-zinc-500 uppercase tracking-wider">RevPAR</div>
-                <div className="text-xl font-black text-zinc-900 dark:text-zinc-100">
+              <div className="p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 space-y-1 ui-radius-panel">
+                <div className="text-[10.5px] font-bold text-zinc-500 uppercase tracking-wider ui-text-meta ui-weight-medium">RevPAR</div>
+                <div className="text-xl font-black text-zinc-900 dark:text-zinc-100 ui-weight-medium">
                   {formatINR(data.pmsMetrics?.revpar || 0)}
                 </div>
-                <div className="text-[11px] text-zinc-500 font-mono">
+                <div className="text-[11px] text-zinc-500 font-mono ui-text-meta ui-font-body">
                   Room Rev / Total Rooms
                 </div>
               </div>
 
-              <div className="p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 space-y-1">
-                <div className="text-[10.5px] font-bold text-zinc-500 uppercase tracking-wider">Guest Flow</div>
-                <div className="text-xl font-black text-zinc-900 dark:text-zinc-100">
+              <div className="p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 space-y-1 ui-radius-panel">
+                <div className="text-[10.5px] font-bold text-zinc-500 uppercase tracking-wider ui-text-meta ui-weight-medium">Guest Flow</div>
+                <div className="text-xl font-black text-zinc-900 dark:text-zinc-100 ui-weight-medium">
                   {data.pmsMetrics?.inHouseGuestsCount} In-House
                 </div>
-                <div className="text-[11px] text-zinc-500 font-mono">
+                <div className="text-[11px] text-zinc-500 font-mono ui-text-meta ui-font-body">
                   +{data.pmsMetrics?.checkInsCount} In / -{data.pmsMetrics?.checkOutsCount} Out
                 </div>
               </div>
@@ -472,13 +472,13 @@ export default function DailyManagerAuditPage() {
           </div>
 
           {/* 3. 24-HOUR (12 AM TO 12 AM) ACTIVITY TIMELINE CHART */}
-          <div className="p-5 rounded-3xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-3">
+          <div className="p-5 rounded-3xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-3 ui-radius-panel ui-shadow-quiet ui-surface">
             <div className="flex items-center justify-between flex-wrap gap-2">
-              <h3 className="text-xs font-bold text-zinc-900 dark:text-zinc-100 uppercase tracking-wider flex items-center gap-2">
+              <h3 className="text-xs font-bold text-zinc-900 dark:text-zinc-100 uppercase tracking-wider flex items-center gap-2 ui-text-body ui-weight-medium">
                 <Activity className="h-4 w-4 text-emerald-500" />
                 24-Hour (12 AM – 12 AM) Activity Timeline
               </h3>
-              <div className="flex items-center gap-4 text-xs font-mono text-zinc-500">
+              <div className="flex items-center gap-4 text-xs font-mono text-zinc-500 ui-text-body ui-font-body">
                 <div className="flex items-center gap-1.5">
                   <div className="h-3 w-3 rounded-md bg-blue-500" />
                   <span>Collections</span>
@@ -510,8 +510,8 @@ export default function DailyManagerAuditPage() {
                   return (
                     <div key={idx} className="flex flex-col items-center justify-end h-full group relative">
                       {/* Tooltip on hover */}
-                      <div className="absolute bottom-full mb-1 hidden group-hover:flex flex-col z-20 bg-zinc-950 text-white rounded-xl p-2.5 text-[10px] whitespace-nowrap shadow-2xl font-mono border border-zinc-800">
-                        <span className="font-bold text-zinc-200">{b.hourLabel}</span>
+                      <div className="absolute bottom-full mb-1 hidden group-hover:flex flex-col z-20 bg-zinc-950 text-white rounded-xl p-2.5 text-[10px] whitespace-nowrap shadow-2xl font-mono border border-zinc-800 ui-text-meta ui-dialog-surface ui-font-body">
+                        <span className="font-bold text-zinc-200 ui-weight-medium">{b.hourLabel}</span>
                         <span className="text-blue-400">Collections: {formatINR(b.collections)}</span>
                         <span className="text-emerald-400">Revenue: {formatINR(b.revenue)}</span>
                         <span className="text-rose-400">Expenses: {formatINR(b.expenses)}</span>
@@ -521,19 +521,19 @@ export default function DailyManagerAuditPage() {
                         {b.collections > 0 && (
                           <div
                             style={{ height: `${colHeight}%` }}
-                            className="w-1.5 sm:w-2 bg-blue-500 rounded-t-xs transition-all"
+                            className="w-1.5 sm:w-2 bg-blue-500 rounded-t-xs transition-colors"
                           />
                         )}
                         {b.revenue > 0 && (
                           <div
                             style={{ height: `${revHeight}%` }}
-                            className="w-1.5 sm:w-2 bg-emerald-500 rounded-t-xs transition-all"
+                            className="w-1.5 sm:w-2 bg-emerald-500 rounded-t-xs transition-colors"
                           />
                         )}
                         {b.expenses > 0 && (
                           <div
                             style={{ height: `${expHeight}%` }}
-                            className="w-1.5 sm:w-2 bg-rose-500 rounded-t-xs transition-all"
+                            className="w-1.5 sm:w-2 bg-rose-500 rounded-t-xs transition-colors"
                           />
                         )}
                         {!hasActivity && (
@@ -544,9 +544,9 @@ export default function DailyManagerAuditPage() {
                   );
                 })}
               </div>
-              <div className="min-w-[650px] grid grid-cols-24 gap-1.5 text-[9px] font-mono text-zinc-400 text-center pt-2">
+              <div className="min-w-[650px] grid grid-cols-24 gap-1.5 text-[9px] font-mono text-zinc-400 text-center pt-2 ui-text-meta ui-font-body">
                 {data.hourlyActivity?.map((b: any, idx: number) => (
-                  <div key={idx} className={idx % 3 === 0 ? "font-bold text-zinc-700 dark:text-zinc-300" : "hidden sm:block"}>
+                  <div key={idx} className={idx % 3 === 0 ? "font-bold text-zinc-700 dark:text-zinc-300 ui-weight-medium" : "hidden sm:block"}>
                     {idx % 3 === 0 ? b.hourLabel.replace(" ", "") : ""}
                   </div>
                 ))}
@@ -557,37 +557,37 @@ export default function DailyManagerAuditPage() {
           {/* 4. INFLOW CHANNELS & OUTFLOW CATEGORIES MATRIX */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Collections Breakdown */}
-            <div className="p-5 rounded-3xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-3.5">
+            <div className="p-5 rounded-3xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-3.5 ui-radius-panel ui-shadow-quiet ui-surface">
               <div className="flex items-center justify-between">
-                <h3 className="text-xs font-bold text-zinc-900 dark:text-zinc-100 uppercase tracking-wider flex items-center gap-2">
+                <h3 className="text-xs font-bold text-zinc-900 dark:text-zinc-100 uppercase tracking-wider flex items-center gap-2 ui-text-body ui-weight-medium">
                   <Wallet className="h-4 w-4 text-blue-500" />
                   Collections Inflow Channels
                 </h3>
-                <span className="font-mono text-xs font-bold text-blue-600 dark:text-blue-400">
+                <span className="font-mono text-xs font-bold text-blue-600 dark:text-blue-400 ui-font-body ui-text-body ui-weight-medium">
                   {formatINR(data.financialSummary?.totalCollections || 0)}
                 </span>
               </div>
 
-              <div className="space-y-2 text-xs font-mono">
-                <div className="flex items-center justify-between p-3 rounded-2xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200/60 dark:border-zinc-800/60">
+              <div className="space-y-2 text-xs font-mono ui-text-body ui-font-body">
+                <div className="flex items-center justify-between p-3 rounded-2xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200/60 dark:border-zinc-800/60 ui-radius-panel">
                   <span className="text-zinc-600 dark:text-zinc-400">Advance Deposits & Pre-bookings</span>
                   <strong className="text-zinc-900 dark:text-zinc-100">
                     {formatINR(data.collectionsBySource?.ADVANCE_DEPOSIT || 0)}
                   </strong>
                 </div>
-                <div className="flex items-center justify-between p-3 rounded-2xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200/60 dark:border-zinc-800/60">
+                <div className="flex items-center justify-between p-3 rounded-2xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200/60 dark:border-zinc-800/60 ui-radius-panel">
                   <span className="text-zinc-600 dark:text-zinc-400">Room Folio Settlements</span>
                   <strong className="text-zinc-900 dark:text-zinc-100">
                     {formatINR(data.collectionsBySource?.FOLIO_SETTLEMENT || 0)}
                   </strong>
                 </div>
-                <div className="flex items-center justify-between p-3 rounded-2xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200/60 dark:border-zinc-800/60">
+                <div className="flex items-center justify-between p-3 rounded-2xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200/60 dark:border-zinc-800/60 ui-radius-panel">
                   <span className="text-zinc-600 dark:text-zinc-400">POS Restaurant Direct</span>
                   <strong className="text-zinc-900 dark:text-zinc-100">
                     {formatINR(data.collectionsBySource?.POS_RESTAURANT || 0)}
                   </strong>
                 </div>
-                <div className="flex items-center justify-between p-3 rounded-2xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200/60 dark:border-zinc-800/60">
+                <div className="flex items-center justify-between p-3 rounded-2xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200/60 dark:border-zinc-800/60 ui-radius-panel">
                   <span className="text-zinc-600 dark:text-zinc-400">OTA Channels & VCC</span>
                   <strong className="text-zinc-900 dark:text-zinc-100">
                     {formatINR(data.collectionsBySource?.OTA_COLLECTION || 0)}
@@ -597,37 +597,37 @@ export default function DailyManagerAuditPage() {
             </div>
 
             {/* Expenses Breakdown */}
-            <div className="p-5 rounded-3xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-3.5">
+            <div className="p-5 rounded-3xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-3.5 ui-radius-panel ui-shadow-quiet ui-surface">
               <div className="flex items-center justify-between">
-                <h3 className="text-xs font-bold text-zinc-900 dark:text-zinc-100 uppercase tracking-wider flex items-center gap-2">
+                <h3 className="text-xs font-bold text-zinc-900 dark:text-zinc-100 uppercase tracking-wider flex items-center gap-2 ui-text-body ui-weight-medium">
                   <Tag className="h-4 w-4 text-rose-500" />
                   Expenses Outflow Categories
                 </h3>
-                <span className="font-mono text-xs font-bold text-rose-600 dark:text-rose-400">
+                <span className="font-mono text-xs font-bold text-rose-600 dark:text-rose-400 ui-font-body ui-text-body ui-weight-medium">
                   {formatINR(data.financialSummary?.totalExpenses || 0)}
                 </span>
               </div>
 
-              <div className="space-y-2 text-xs font-mono">
-                <div className="flex items-center justify-between p-3 rounded-2xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200/60 dark:border-zinc-800/60">
+              <div className="space-y-2 text-xs font-mono ui-text-body ui-font-body">
+                <div className="flex items-center justify-between p-3 rounded-2xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200/60 dark:border-zinc-800/60 ui-radius-panel">
                   <span className="text-zinc-600 dark:text-zinc-400">Driver Commissions</span>
                   <strong className="text-zinc-900 dark:text-zinc-100">
                     {formatINR(data.expensesByCategory?.DRIVER_COMMISSION || 0)}
                   </strong>
                 </div>
-                <div className="flex items-center justify-between p-3 rounded-2xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200/60 dark:border-zinc-800/60">
+                <div className="flex items-center justify-between p-3 rounded-2xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200/60 dark:border-zinc-800/60 ui-radius-panel">
                   <span className="text-zinc-600 dark:text-zinc-400">Vendor Payments & Purchases</span>
                   <strong className="text-zinc-900 dark:text-zinc-100">
                     {formatINR(data.expensesByCategory?.VENDOR_PAYMENT || 0)}
                   </strong>
                 </div>
-                <div className="flex items-center justify-between p-3 rounded-2xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200/60 dark:border-zinc-800/60">
+                <div className="flex items-center justify-between p-3 rounded-2xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200/60 dark:border-zinc-800/60 ui-radius-panel">
                   <span className="text-zinc-600 dark:text-zinc-400">F&B Raw Materials</span>
                   <strong className="text-zinc-900 dark:text-zinc-100">
                     {formatINR(data.expensesByCategory?.FB_PURCHASE || 0)}
                   </strong>
                 </div>
-                <div className="flex items-center justify-between p-3 rounded-2xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200/60 dark:border-zinc-800/60">
+                <div className="flex items-center justify-between p-3 rounded-2xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200/60 dark:border-zinc-800/60 ui-radius-panel">
                   <span className="text-zinc-600 dark:text-zinc-400">Maintenance & Petty Cash</span>
                   <strong className="text-zinc-900 dark:text-zinc-100">
                     {formatINR(
@@ -641,19 +641,19 @@ export default function DailyManagerAuditPage() {
           </div>
 
           {/* 5. FULL DAY TRANSACTION AUDIT LEDGER */}
-          <div className="p-5 rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-3.5">
+          <div className="p-5 rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-3.5 ui-radius-panel ui-shadow-quiet ui-surface">
             <div className="flex items-center justify-between">
-              <h3 className="text-[11px] font-semibold text-zinc-900 dark:text-zinc-100 uppercase tracking-wider">
+              <h3 className="text-[11px] font-semibold text-zinc-900 dark:text-zinc-100 uppercase tracking-wider ui-text-meta">
                 Full Audit Trail for {data.reportDate} (00:00 – 23:59)
               </h3>
-              <span className="text-xs font-mono text-zinc-500">
+              <span className="text-xs font-mono text-zinc-500 ui-text-body ui-font-body">
                 {data.recentTransactions?.length || 0} total records
               </span>
             </div>
 
             <div className="overflow-x-auto rounded-xl border border-zinc-200 dark:border-zinc-800">
-              <table className="w-full text-left text-xs whitespace-nowrap border-collapse">
-                <thead className="bg-zinc-50/90 dark:bg-zinc-900/90 text-zinc-500 dark:text-zinc-400 text-[11px] uppercase tracking-wider font-semibold border-b border-zinc-200 dark:border-zinc-800 sticky top-0 z-10 backdrop-blur-xs">
+              <table className="w-full text-left text-xs whitespace-nowrap border-collapse ui-text-body ui-data-table">
+                <thead className="bg-zinc-50/90 dark:bg-zinc-900/90 text-zinc-500 dark:text-zinc-400 text-[11px] uppercase tracking-wider font-semibold border-b border-zinc-200 dark:border-zinc-800 sticky top-0 z-10 backdrop-blur-xs ui-text-meta">
                   <tr>
                     <th className="px-4 py-3 font-semibold">Time</th>
                     <th className="px-4 py-3 font-semibold">Type</th>
@@ -674,10 +674,10 @@ export default function DailyManagerAuditPage() {
                       const isExpense = t.type === "EXPENSE";
                       return (
                         <tr key={idx} className="hover:bg-zinc-50/80 dark:hover:bg-zinc-900/40 transition-colors">
-                          <td className="px-4 py-3 text-zinc-500 dark:text-zinc-400 font-mono text-[11px]">{t.time}</td>
+                          <td className="px-4 py-3 text-zinc-500 dark:text-zinc-400 font-mono text-[11px] ui-font-body ui-text-meta">{t.time}</td>
                           <td className="px-4 py-3">
                             <span
-                              className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium border ${
+                              className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium border  ui-text-meta ${
                                 isExpense
                                   ? "bg-rose-50/80 text-rose-700 border-rose-200/80 dark:bg-rose-950/40 dark:text-rose-400 dark:border-rose-900/50"
                                   : "bg-blue-50/80 text-blue-700 border-blue-200/80 dark:bg-blue-950/40 dark:text-blue-400 dark:border-blue-900/50"
@@ -694,9 +694,9 @@ export default function DailyManagerAuditPage() {
                           <td className="px-4 py-3 text-zinc-900 dark:text-zinc-100 font-medium">
                             {t.description}
                           </td>
-                          <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400 font-mono text-[11px]">{t.method}</td>
+                          <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400 font-mono text-[11px] ui-font-body ui-text-meta">{t.method}</td>
                           <td
-                            className={`px-4 py-3 text-right font-mono tabular-nums font-semibold ${
+                            className={`px-4 py-3 text-right font-mono tabular-nums font-semibold  ui-font-body ${
                               isExpense ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400"
                             }`}
                           >
@@ -718,28 +718,28 @@ export default function DailyManagerAuditPage() {
       {/* ========================================================================= */}
       {showPrintModal && data && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 overflow-y-auto">
-          <div className="w-full max-w-2xl rounded-3xl border border-zinc-700 bg-white text-zinc-950 p-6 shadow-2xl space-y-4 print:p-0 print:border-none font-sans text-xs">
+          <div className="w-full max-w-2xl rounded-3xl border border-zinc-700 bg-white text-zinc-950 p-6 shadow-2xl space-y-4 print:p-0 print:border-none font-sans text-xs ui-radius-panel ui-dialog-surface ui-text-body ui-surface">
             <div className="flex items-center justify-between pb-3 border-b border-zinc-200 print:hidden">
-              <span className="text-xs font-bold uppercase font-mono text-zinc-600 flex items-center gap-2">
+              <span className="text-xs font-bold uppercase font-mono text-zinc-600 flex items-center gap-2 ui-text-body ui-weight-medium ui-font-body">
                 <Moon className="h-4 w-4 text-indigo-600" />
                 Official 12 AM Midnight Daily Manager Audit Report
               </span>
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => setShowEmailModal(true)}
-                  className="flex items-center gap-1.5 rounded-xl bg-blue-600 px-3.5 py-1.5 text-xs font-bold text-white hover:bg-blue-700 transition shadow-xs cursor-pointer"
+                  className="flex items-center gap-1.5 rounded-xl bg-blue-600 px-3.5 py-1.5 text-xs font-bold text-white hover:bg-blue-700 transition shadow-xs cursor-pointer ui-radius-control ui-text-body ui-weight-medium ui-shadow-quiet ui-control"
                 >
                   <Mail className="h-3.5 w-3.5" /> Email Copy
                 </button>
                 <button
                   onClick={() => window.print()}
-                  className="flex items-center gap-1.5 rounded-xl bg-zinc-950 px-3.5 py-1.5 text-xs font-bold text-white hover:bg-zinc-800 transition shadow-xs cursor-pointer"
+                  className="flex items-center gap-1.5 rounded-xl bg-zinc-950 px-3.5 py-1.5 text-xs font-bold text-white hover:bg-zinc-800 transition shadow-xs cursor-pointer ui-radius-control ui-text-body ui-weight-medium ui-shadow-quiet ui-control"
                 >
                   <Printer className="h-3.5 w-3.5" /> Print Report
                 </button>
                 <button
                   onClick={() => setShowPrintModal(false)}
-                  className="text-zinc-500 hover:text-zinc-900 cursor-pointer"
+                  className="text-zinc-500 hover:text-zinc-900 cursor-pointer ui-control"
                 >
                   <X className="h-4 w-4" />
                 </button>
@@ -750,26 +750,26 @@ export default function DailyManagerAuditPage() {
             <div className="space-y-4">
               <div className="flex justify-between items-start border-b border-zinc-300 pb-3">
                 <div>
-                  <h1 className="text-base font-black uppercase text-zinc-950">{activeProperty?.displayName}</h1>
-                  <p className="text-[11px] text-zinc-600">{activeProperty?.legalName}</p>
-                  <p className="font-mono text-[11px] text-zinc-700">
+                  <h1 className="text-base font-black uppercase text-zinc-950 ui-weight-medium ui-page-title">{activeProperty?.displayName}</h1>
+                  <p className="text-[11px] text-zinc-600 ui-text-meta">{activeProperty?.legalName}</p>
+                  <p className="font-mono text-[11px] text-zinc-700 ui-font-body ui-text-meta">
                     GSTIN: {activeProperty?.gstin || "N/A"} | State Code: {activeProperty?.stateCode || "18"}
                   </p>
                 </div>
-                <div className="text-right font-mono">
-                  <div className="font-bold text-zinc-950">DAILY MANAGER AUDIT</div>
-                  <div className="text-zinc-600 text-[11px]">Audit Date: {data.reportDate}</div>
-                  <div className="text-zinc-600 text-[11px]">Cycle: 00:00:00 – 23:59:59 (12 AM - 12 AM)</div>
-                  <div className="text-zinc-600 text-[11px]">Printed: {new Date().toLocaleString()}</div>
+                <div className="text-right font-mono ui-font-body">
+                  <div className="font-bold text-zinc-950 ui-weight-medium">DAILY MANAGER AUDIT</div>
+                  <div className="text-zinc-600 text-[11px] ui-text-meta">Audit Date: {data.reportDate}</div>
+                  <div className="text-zinc-600 text-[11px] ui-text-meta">Cycle: 00:00:00 – 23:59:59 (12 AM - 12 AM)</div>
+                  <div className="text-zinc-600 text-[11px] ui-text-meta">Printed: {new Date().toLocaleString()}</div>
                 </div>
               </div>
 
               {/* Financial Revenue & Tax Breakdown */}
               <div className="space-y-1.5">
-                <h3 className="font-bold uppercase text-[11px] text-zinc-800 border-b pb-1">
+                <h3 className="font-bold uppercase text-[11px] text-zinc-800 border-b pb-1 ui-weight-medium ui-text-meta">
                   1. Revenue & GST Breakdown (Taxable vs Taxes)
                 </h3>
-                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px] font-mono">
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px] font-mono ui-text-meta ui-font-body">
                   <div>Room Tariff Revenue: <strong>{formatINR(data.financialSummary?.roomRevenue || 0)}</strong></div>
                   <div>F&B Restaurant Revenue: <strong>{formatINR(data.financialSummary?.fbRevenue || 0)}</strong></div>
                   <div>Other Service Revenue: <strong>{formatINR(data.financialSummary?.otherRevenue || 0)}</strong></div>
@@ -777,17 +777,17 @@ export default function DailyManagerAuditPage() {
                   <div>CGST Collected: <strong>{formatINR(data.financialSummary?.cgstAmount || 0)}</strong></div>
                   <div>SGST Collected: <strong>{formatINR(data.financialSummary?.sgstAmount || 0)}</strong></div>
                 </div>
-                <div className="text-right font-mono font-bold text-xs pt-1 border-t">
+                <div className="text-right font-mono font-bold text-xs pt-1 border-t ui-font-body ui-weight-medium ui-text-body">
                   Gross Billed Revenue: {formatINR(data.financialSummary?.grossRevenue || 0)}
                 </div>
               </div>
 
               {/* Collections & Cashier Handover */}
               <div className="space-y-1.5 pt-2">
-                <h3 className="font-bold uppercase text-[11px] text-zinc-800 border-b pb-1">
+                <h3 className="font-bold uppercase text-[11px] text-zinc-800 border-b pb-1 ui-weight-medium ui-text-meta">
                   2. Collections & Cash Drawer Position
                 </h3>
-                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px] font-mono">
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px] font-mono ui-text-meta ui-font-body">
                   <div>Cash Collected (Inflow): <strong>{formatINR(data.financialSummary?.cashDrawerPosition?.cashIn || 0)}</strong></div>
                   <div>UPI / QR Collections: <strong>{formatINR(data.collectionsByMethod?.UPI || 0)}</strong></div>
                   <div>Card & POS Collections: <strong>{formatINR(data.collectionsByMethod?.CARD || 0)}</strong></div>
@@ -798,22 +798,22 @@ export default function DailyManagerAuditPage() {
               </div>
 
               {/* Cash in Hand Callout */}
-              <div className="bg-zinc-100 p-3 rounded-xl border border-zinc-300 font-mono text-xs space-y-1">
-                <div className="flex justify-between font-black text-sm">
+              <div className="bg-zinc-100 p-3 rounded-xl border border-zinc-300 font-mono text-xs space-y-1 ui-font-body ui-text-body">
+                <div className="flex justify-between font-black text-sm ui-weight-medium">
                   <span>Net Physical Cash in Hand to Handover:</span>
-                  <span className="text-zinc-950 font-black">{formatINR(data.financialSummary?.cashDrawerPosition?.netCashInHand || 0)}</span>
+                  <span className="text-zinc-950 font-black ui-weight-medium">{formatINR(data.financialSummary?.cashDrawerPosition?.netCashInHand || 0)}</span>
                 </div>
-                <p className="text-[10px] text-zinc-600 font-sans">
+                <p className="text-[10px] text-zinc-600 font-sans ui-text-meta">
                   Total physical cash collected minus cash paid out during 12 AM – 12 AM operational window.
                 </p>
               </div>
 
               {/* PMS Summary */}
               <div className="space-y-1.5 pt-2">
-                <h3 className="font-bold uppercase text-[11px] text-zinc-800 border-b pb-1">
+                <h3 className="font-bold uppercase text-[11px] text-zinc-800 border-b pb-1 ui-weight-medium ui-text-meta">
                   3. PMS Operations & Occupancy Summary
                 </h3>
-                <div className="grid grid-cols-3 gap-2 text-[11px] font-mono">
+                <div className="grid grid-cols-3 gap-2 text-[11px] font-mono ui-text-meta ui-font-body">
                   <div>Occupancy: <strong>{data.pmsMetrics?.occupancyPct}%</strong></div>
                   <div>Rooms Sold: <strong>{data.pmsMetrics?.roomsSold} / {data.pmsMetrics?.totalRooms}</strong></div>
                   <div>ADR: <strong>{formatINR(data.pmsMetrics?.adr || 0)}</strong></div>
@@ -824,14 +824,14 @@ export default function DailyManagerAuditPage() {
               </div>
 
               {/* Signature Blocks */}
-              <div className="pt-8 grid grid-cols-2 gap-8 text-center text-xs border-t border-zinc-300 font-mono">
+              <div className="pt-8 grid grid-cols-2 gap-8 text-center text-xs border-t border-zinc-300 font-mono ui-text-body ui-font-body">
                 <div>
                   <div className="w-44 mx-auto border-b border-zinc-400 pb-8 text-zinc-400 italic">Night Auditor / Cashier</div>
-                  <div className="font-bold mt-1">Prepared By</div>
+                  <div className="font-bold mt-1 ui-weight-medium">Prepared By</div>
                 </div>
                 <div>
                   <div className="w-44 mx-auto border-b border-zinc-400 pb-8 text-zinc-400 italic">General Manager / Owner</div>
-                  <div className="font-bold mt-1">Verified & Approved By</div>
+                  <div className="font-bold mt-1 ui-weight-medium">Verified & Approved By</div>
                 </div>
               </div>
             </div>

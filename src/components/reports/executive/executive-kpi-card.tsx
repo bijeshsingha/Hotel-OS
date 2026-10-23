@@ -2,7 +2,7 @@
 
 import React from "react";
 import { TrendingUp, TrendingDown, Minus, ArrowUpRight } from "lucide-react";
-import { MetricComparison } from "@/lib/domain/executive-report-service";
+import type { MetricComparison } from "@/lib/domain/executive-report-service";
 import { formatINR } from "@/lib/gst/calculator";
 
 interface ExecutiveKpiCardProps {
@@ -68,14 +68,14 @@ export const ExecutiveKpiCard: React.FC<ExecutiveKpiCardProps> = ({
           onClick();
         }
       }}
-      className={`relative bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-4 transition-all ${
+      className={`relative bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-4 transition-colors  ${
         onClick
-          ? "cursor-pointer hover:border-slate-300 dark:hover:border-slate-700 hover:shadow-sm group focus:outline-none focus:ring-2 focus:ring-slate-400"
+          ? "cursor-pointer hover:border-slate-300 dark:hover:border-slate-700 hover:shadow-sm group focus:outline-none focus:ring-2 focus:ring-slate-400 ui-shadow-quiet"
           : ""
       }`}
     >
       <div className="flex items-start justify-between gap-2 mb-2">
-        <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+        <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 ui-text-body">
           {title}
         </span>
         {onClick && (
@@ -86,16 +86,16 @@ export const ExecutiveKpiCard: React.FC<ExecutiveKpiCardProps> = ({
       </div>
 
       <div className="flex items-baseline gap-2 mb-1.5">
-        <div className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-50">
+        <div className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-50 ui-weight-medium">
           {formattedValue}
         </div>
       </div>
 
       {/* Comparison badge & subtitle */}
-      <div className="flex flex-wrap items-center gap-2 pt-1 text-xs">
+      <div className="flex flex-wrap items-center gap-2 pt-1 text-xs ui-text-body">
         {comparison && (
           <div
-            className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-medium border ${badgeColor}`}
+            className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-medium border  ui-text-meta ${badgeColor}`}
           >
             {comparison.trend === "UP" && <TrendingUp className="w-3 h-3" />}
             {comparison.trend === "DOWN" && <TrendingDown className="w-3 h-3" />}
@@ -108,14 +108,14 @@ export const ExecutiveKpiCard: React.FC<ExecutiveKpiCardProps> = ({
         )}
 
         {subtitle && (
-          <span className="text-slate-500 dark:text-slate-400 text-xs">
+          <span className="text-slate-500 dark:text-slate-400 text-xs ui-text-body">
             {subtitle}
           </span>
         )}
       </div>
 
       {onClick && drillDownLabel && (
-        <div className="mt-2 pt-2 border-t border-slate-100 dark:border-slate-800/80 text-[11px] text-slate-400 dark:text-slate-500 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+        <div className="mt-2 pt-2 border-t border-slate-100 dark:border-slate-800/80 text-[11px] text-slate-400 dark:text-slate-500 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors ui-text-meta">
           {drillDownLabel}
         </div>
       )}

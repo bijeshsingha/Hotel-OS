@@ -1,9 +1,14 @@
+import { authorizeRequest, getApiAccess } from "@/lib/auth/api-access";
 import { NextResponse } from "next/server";
 import { getExecutiveReport } from "@/lib/domain/executive-report-service";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
+  const access = await authorizeRequest(request);
+  if (access instanceof Response) return access;
+  request = access.request;
+
   try {
     const { searchParams } = new URL(request.url);
     const propertyId = searchParams.get("propertyId") || undefined;
@@ -27,7 +32,7 @@ export async function GET(request: Request) {
         success: false,
         error: error?.message || "Failed to generate executive report",
       },
-      { status: 500 }
+      { status: error instanceof RangeError ? 400 : 500 }
     );
   }
 }

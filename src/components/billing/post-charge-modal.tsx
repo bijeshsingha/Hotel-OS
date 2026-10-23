@@ -1,219 +1,165 @@
-import React from "react";
-import { Plus, X } from "lucide-react";
-import { formatINR, getTaxRateForSac } from "@/lib/gst/calculator";
+import React, { useEffect, useRef, useState } from "react";
+import { AlertCircle, CheckCircle2, ChevronDown, Plus, Trash2, X } from "lucide-react";
+import { formatINR, round2 } from "@/lib/gst/calculator";
+import { MANUAL_CHARGE_GST_RATE, MAX_MANUAL_KOTS, ManualKotInput, normalizeManualKots, quoteManualCharge } from "@/lib/billing/manual-kot";
 import { ChargeFormState } from "./billing-types";
+import styles from "./post-charge-modal.module.css";
 
 interface PostChargeModalProps {
   isOpen: boolean;
   onClose: () => void;
   activeStay: any;
+  folioId?: string;
+  roomNumber?: string;
   chargeForm: ChargeFormState;
   setChargeForm: React.Dispatch<React.SetStateAction<ChargeFormState>>;
-  onSubmit: (e: React.FormEvent) => Promise<void>;
+  onSubmit: (event: React.FormEvent) => Promise<void>;
+  onPostKots: (kots: ManualKotInput[], requestId: string) => Promise<void>;
   loading: boolean;
 }
 
-export function PostChargeModal({
-  isOpen,
-  onClose,
-  activeStay,
-  chargeForm,
-  setChargeForm,
-  onSubmit,
-  loading,
-}: PostChargeModalProps) {
+interface KotDraft { id: string; kotNumber: string; description: string; amount: string; }
+const categories = [
+  { code: "RESTAURANT_FOOD", label: "Food & beverage / KOT", description: "Kitchen Order (KOT)", sac: "996331" },
+  { code: "STAY_EXTENSION", label: "Stay extension", description: "Stay Extension Charge", sac: "996311" },
+  { code: "ROOM_TARIFF", label: "Room tariff / extra bed", description: "Room Tariff / Extra Bed Adjustment", sac: "996311" },
+  { code: "LAUNDRY", label: "Laundry & pressing", description: "Laundry & Pressing Service", sac: "9997" },
+  { code: "TRANSPORT", label: "Travel / cab / transfer", description: "Cab / Airport Pick & Drop", sac: "9964" },
+  { code: "MISC", label: "Other guest service", description: "Guest Service Charge", sac: "9999" },
+];
+
+export function PostChargeModal({ isOpen, onClose, activeStay, folioId, roomNumber, chargeForm, setChargeForm, onSubmit, onPostKots, loading }: PostChargeModalProps) {
+  const [rows, setRows] = useState<KotDraft[]>([{ id: "kot-first", kotNumber: "", description: "", amount: "" }]);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+  const [uncertain, setUncertain] = useState(false);
+  const dialog = useRef<HTMLDivElement>(null);
+  const categoryInput = useRef<HTMLSelectElement>(null);
+  const slipInputs = useRef<Record<string, HTMLInputElement | null>>({});
+  const rowCounter = useRef(0);
+  const nextFocus = useRef<string | null>(null);
+  const posting = useRef(false);
+  const closeAction = useRef(onClose);
+  const busy = useRef(loading);
+  closeAction.current = onClose;
+  busy.current = loading;
+  const pending = useRef<{ id: string; folioId?: string; signature: string } | null>(null);
+  const isKot = chargeForm.chargeCode === "RESTAURANT_FOOD";
+  const locked = loading || uncertain;
+  const blankRow = (): KotDraft => ({ id: `kot-${++rowCounter.current}`, kotNumber: "", description: "", amount: "" });
+
+  useEffect(() => {
+    if (!isOpen) return;
+    if (pending.current && pending.current.folioId === folioId) {
+      setChargeForm(previous => ({ ...previous, chargeCode: "RESTAURANT_FOOD", sacHsn: "996331" }));
+      return;
+    }
+    pending.current = null;
+    setUncertain(false);
+    setError(null);
+    setSuccess(null);
+    setRows([{ ...blankRow(), kotNumber: chargeForm.kotNumber || "", description: chargeForm.chargeCode === "RESTAURANT_FOOD" && chargeForm.description !== "Kitchen Order (KOT)" ? chargeForm.description : "", amount: chargeForm.chargeCode === "RESTAURANT_FOOD" && Number(chargeForm.amount) > 0 ? chargeForm.amount : "" }]);
+    // Seed only on opening/context change, never while a staff member edits a row.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, folioId]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const previousFocus = document.activeElement as HTMLElement | null;
+    if (!categoryInput.current?.disabled) categoryInput.current?.focus();
+    else dialog.current?.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus();
+    const keyboard = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !busy.current && !posting.current) { event.preventDefault(); closeAction.current(); }
+      if (event.key !== "Tab") return;
+      const controls = Array.from(dialog.current?.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), select:not(:disabled), [tabindex="0"]') || []).filter(element => element.getClientRects().length > 0);
+      if (!controls.length) { event.preventDefault(); dialog.current?.focus(); return; }
+      const first = controls[0]; const last = controls[controls.length - 1];
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+    };
+    document.addEventListener("keydown", keyboard);
+    return () => { document.removeEventListener("keydown", keyboard); if (previousFocus?.isConnected) previousFocus.focus(); };
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (nextFocus.current) { slipInputs.current[nextFocus.current]?.focus(); nextFocus.current = null; }
+  }, [rows]);
+
   if (!isOpen) return null;
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in">
-      <div className="w-full max-w-md rounded-3xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-[#121215] p-5 sm:p-6 shadow-2xl space-y-4 text-zinc-900 dark:text-white">
-        <div className="flex items-center justify-between pb-3 border-b border-zinc-200 dark:border-zinc-800">
-          <div>
-            <h2 className="text-base font-bold text-zinc-900 dark:text-white flex items-center gap-2">
-              <Plus className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
-              Post Charge to Room {activeStay?.roomAssignments?.[0]?.room?.number || "—"}
-            </h2>
-            <p className="text-xs text-zinc-500 font-mono mt-0.5">
-              Guest: {activeStay?.primaryGuest?.name || "In-House Guest"}
-            </p>
-          </div>
-          <button
-            onClick={onClose}
-            className="text-zinc-400 hover:text-zinc-700 dark:hover:text-white cursor-pointer"
-          >
-            <X className="h-5 w-5" />
-          </button>
+  const quotes = isKot ? rows.map(row => quoteManualCharge(Number(row.amount) || 0)) : [quoteManualCharge(Number(chargeForm.amount) || 0, chargeForm.sacHsn)];
+  const totals = quotes.reduce((sum, quote) => ({ taxable: round2(sum.taxable + quote.taxableAmount), cgst: round2(sum.cgst + quote.components.cgstAmount), sgst: round2(sum.sgst + quote.components.sgstAmount), total: round2(sum.total + quote.totalAmount) }), { taxable: 0, cgst: 0, sgst: 0, total: 0 });
+  const updateRow = (id: string, field: keyof Omit<KotDraft, "id">, value: string) => { setRows(previous => previous.map(row => row.id === id ? { ...row, [field]: value } : row)); setError(null); setSuccess(null); };
+
+  const submit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (loading || posting.current) return;
+    setError(null);
+    if (!isKot) {
+      if (!chargeForm.description.trim() || !Number.isFinite(Number(chargeForm.amount)) || Number(chargeForm.amount) <= 0) { setError("Enter a description and an amount greater than ₹0."); return; }
+      posting.current = true;
+      try { await onSubmit(event); } finally { posting.current = false; }
+      return;
+    }
+    let entries: ManualKotInput[];
+    try { entries = normalizeManualKots(rows); } catch (validation) { setError(validation instanceof Error ? validation.message : "Check the KOT entries."); return; }
+    const signature = JSON.stringify(entries);
+    if (pending.current && pending.current.signature !== signature) { setError("Retry the original entries first. This batch may already have been posted; check the folio before starting a different batch."); return; }
+    if (!pending.current) pending.current = { id: crypto.randomUUID(), folioId, signature };
+    posting.current = true;
+    try {
+      await onPostKots(entries, pending.current.id);
+      pending.current = null;
+      setUncertain(false);
+      setSuccess(`${entries.length} KOT${entries.length === 1 ? "" : "s"} posted · ${formatINR(round2(entries.reduce((sum, entry) => sum + entry.amount, 0)))}. You can add more here.`);
+      const row = blankRow(); nextFocus.current = row.id; setRows([row]);
+    } catch (problem) {
+      const status = (problem as { status?: number })?.status;
+      const unknownOutcome = !status || status >= 500;
+      setUncertain(unknownOutcome);
+      if (!unknownOutcome) pending.current = null;
+      const message = problem instanceof Error ? problem.message : "Could not post the KOTs.";
+      setError(unknownOutcome ? `${message} Retry posting to confirm the same batch without adding duplicates. Check the folio before starting another batch.` : message);
+    } finally { posting.current = false; }
+  };
+
+  return <div className={styles.overlay}>
+    <div ref={dialog} role="dialog" aria-modal="true" aria-labelledby="post-charge-heading" tabIndex={-1} className={styles.dialog}>
+      <header className={styles.header}><div><h2 id="post-charge-heading">Post charge to Room {roomNumber || activeStay?.roomAssignments?.[0]?.room?.number || "N/A"}</h2><p>Guest: {activeStay?.primaryGuest?.name || "In-house guest"}</p></div><button type="button" className={styles.iconButton} onClick={onClose} disabled={loading} aria-label="Close charge form"><X size={19} aria-hidden="true" /></button></header>
+      <form onSubmit={submit} noValidate className={styles.form} aria-busy={loading}>
+        {success && <div role="status" className={`${styles.message} ${styles.success}`}><CheckCircle2 size={18} aria-hidden="true" /><span>{success}</span></div>}
+        {error && <div role="alert" className={`${styles.message} ${styles.error}`}><AlertCircle size={18} aria-hidden="true" /><span>{error}</span></div>}
+        <div className={styles.field}>
+          <label htmlFor="charge-category">Service or category</label>
+          <div className={styles.selectWrap}><select ref={categoryInput} id="charge-category" className={styles.categorySelect} value={chargeForm.chargeCode} disabled={locked} aria-describedby="charge-category-help" onKeyDown={event => { if (event.key === "Escape") event.stopPropagation(); }} onChange={event => { const category = categories.find(item => item.code === event.target.value) || categories[0]; setChargeForm(previous => ({ ...previous, chargeCode: category.code, sacHsn: category.sac, description: category.description })); setError(null); setSuccess(null); }}>{categories.map(category => <option key={category.code} value={category.code}>{category.label}</option>)}</select><ChevronDown size={18} aria-hidden="true" /></div>
+          <p id="charge-category-help" className={styles.hint}>{isKot ? "Enter one row per KOT slip. Each amount includes GST." : "Post a charge for this service. The entered amount includes GST."}</p>
         </div>
 
-        <form onSubmit={onSubmit} className="space-y-4 text-xs sm:text-sm">
-          {/* 1. Single Clean Dropdown for Charge Category */}
-          <div>
-            <label className="text-xs uppercase font-bold font-mono text-zinc-500 tracking-wider block mb-1.5">
-              Select Service / Category *
-            </label>
-            <select
-              value={chargeForm.chargeCode}
-              onChange={(e) => {
-                const val = e.target.value;
-                const presets: Record<string, { desc: string; sac: string }> = {
-                  RESTAURANT_FOOD: { desc: "Kitchen Order (KOT)", sac: "996331" },
-                  STAY_EXTENSION: { desc: "Stay Extension Charge", sac: "996311" },
-                  ROOM_TARIFF: { desc: "Room Tariff / Extra Bed Adjustment", sac: "996311" },
-                  LAUNDRY: { desc: "Laundry & Pressing Service", sac: "9997" },
-                  TRANSPORT: { desc: "Cab / Airport Pick & Drop", sac: "9964" },
-                  MISC: { desc: "Guest Service Charge", sac: "9999" },
-                };
-                const selected = presets[val] || { desc: "Guest Service Charge", sac: "996331" };
-                setChargeForm((prev) => ({
-                  ...prev,
-                  chargeCode: val,
-                  sacHsn: selected.sac,
-                  description: prev.kotNumber?.trim()
-                    ? `KOT #${prev.kotNumber.trim().toUpperCase()} — ${selected.desc}`
-                    : selected.desc,
-                }));
-              }}
-              className="w-full h-11 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 px-3.5 text-xs sm:text-sm text-zinc-900 dark:text-white font-semibold focus:outline-none focus:border-blue-500 transition cursor-pointer"
-            >
-              <option value="RESTAURANT_FOOD">🍽️ Food & Beverage / Kitchen Order (KOT) (5% GST)</option>
-              <option value="STAY_EXTENSION">⏱️ Stay Extension Charge (5% GST)</option>
-              <option value="ROOM_TARIFF">🛏️ Room Tariff / Extra Bed Adjustment (5% GST)</option>
-              <option value="LAUNDRY">🧺 Laundry & Valet Service (5% GST)</option>
-              <option value="TRANSPORT">🚗 Travel / Cab / Transfer (5% GST)</option>
-              <option value="MISC">📦 Miscellaneous Guest Service (5% GST)</option>
-            </select>
-          </div>
+        {isKot ? <>
+          <div className={styles.sectionHeading}><h3>KOT slips ({rows.length})</h3><span className={styles.taxBadge}>{MANUAL_CHARGE_GST_RATE}% GST included</span></div>
+          <div className={styles.rows}>{rows.map((row, index) => <div className={styles.row} key={row.id}>
+            <p className={styles.rowTitle}>KOT {index + 1}</p>
+            <div className={styles.field}><label htmlFor={`${row.id}-number`}>Slip number <span className="text-zinc-500">(optional)</span></label><input ref={element => { slipInputs.current[row.id] = element; }} id={`${row.id}-number`} value={row.kotNumber} disabled={locked} placeholder="e.g. KOT-1042" maxLength={80} onChange={event => updateRow(row.id, "kotNumber", event.target.value)} /></div>
+            <div className={styles.field}><label htmlFor={`${row.id}-amount`}>Amount</label><div className={styles.money}><span aria-hidden="true">₹</span><input id={`${row.id}-amount`} type="number" inputMode="decimal" min="0.01" step="0.01" required value={row.amount} disabled={locked} placeholder="0.00" onChange={event => updateRow(row.id, "amount", event.target.value)} /></div></div>
+            <button type="button" className={`${styles.iconButton} ${styles.remove}`} disabled={locked || rows.length === 1} aria-label={`Remove KOT ${index + 1}`} onClick={() => { setRows(previous => previous.filter(item => item.id !== row.id)); setError(null); setSuccess(null); }}><Trash2 size={17} aria-hidden="true" /></button>
+            <div className={`${styles.field} ${styles.rowDetails}`}><label htmlFor={`${row.id}-description`}>Details <span className="text-zinc-500">(optional)</span></label><input id={`${row.id}-description`} value={row.description} disabled={locked} placeholder="e.g. Dinner / room service" maxLength={450} onChange={event => updateRow(row.id, "description", event.target.value)} /></div>
+          </div>)}</div>
+          <button type="button" className={styles.add} disabled={locked || rows.length >= MAX_MANUAL_KOTS} onClick={() => { const row = blankRow(); nextFocus.current = row.id; setRows(previous => [...previous, row]); setError(null); }}><Plus size={17} aria-hidden="true" />Add another KOT</button>
+        </> : <>
+          <div className={styles.field}><label htmlFor="charge-reference">Slip number <span className="text-zinc-500">(optional)</span></label><input id="charge-reference" value={chargeForm.kotNumber || ""} disabled={loading} placeholder="e.g. KOT-1042" onChange={event => setChargeForm(previous => ({ ...previous, kotNumber: event.target.value }))} /></div>
+          <div className={styles.field}><label htmlFor="charge-description">Description</label><input id="charge-description" required value={chargeForm.description} disabled={loading} onChange={event => setChargeForm(previous => ({ ...previous, description: event.target.value }))} /></div>
+          <div className={styles.field}><label htmlFor="charge-amount">Amount · {MANUAL_CHARGE_GST_RATE}% GST included</label><div className={styles.money}><span aria-hidden="true">₹</span><input id="charge-amount" type="number" inputMode="decimal" min="0.01" step="0.01" required value={chargeForm.amount} disabled={loading} placeholder="0.00" onChange={event => setChargeForm(previous => ({ ...previous, amount: event.target.value }))} /></div></div>
+        </>}
 
-          {/* 2. Optional KOT Slip Number */}
-          <div>
-            <label className="text-xs uppercase font-bold font-mono text-zinc-500 tracking-wider block mb-1.5 flex items-center justify-between">
-              <span>KOT Slip Number (Optional / Deliveries)</span>
-              <span className="text-[10px] text-zinc-400 font-sans">e.g. KOT-1042 / KOT-55</span>
-            </label>
-            <input
-              type="text"
-              placeholder="e.g. KOT-1042"
-              value={chargeForm.kotNumber || ""}
-              onChange={(e) => {
-                const kotVal = e.target.value;
-                setChargeForm((prev) => {
-                  const baseName = prev.description.replace(/^KOT\s*#?\w+\s*[—–-]\s*/i, "");
-                  return {
-                    ...prev,
-                    kotNumber: kotVal,
-                    description: kotVal.trim()
-                      ? `KOT #${kotVal.trim().toUpperCase()} — ${baseName || "Kitchen Order"}`
-                      : baseName || "Kitchen Order (KOT)",
-                  };
-                });
-              }}
-              className="w-full h-11 rounded-xl bg-orange-50/50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-800/60 px-3.5 text-xs sm:text-sm text-zinc-900 dark:text-white placeholder-zinc-400 font-mono font-bold focus:outline-none focus:border-orange-500 transition"
-            />
-          </div>
-
-          {/* 3. Editable Description */}
-          <div>
-            <label className="text-xs uppercase font-bold font-mono text-zinc-500 tracking-wider block mb-1.5">
-              Description / Item Details *
-            </label>
-            <input
-              type="text"
-              required
-              placeholder="e.g. Dinner Service / Breakfast / Delivery"
-              value={chargeForm.description}
-              onChange={(e) => setChargeForm({ ...chargeForm, description: e.target.value })}
-              className="w-full h-11 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 px-3.5 text-xs sm:text-sm text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:border-blue-500 font-medium transition"
-            />
-          </div>
-
-          {/* 4. Total Amount (Inclusive of 5% GST) */}
-          <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <label className="text-xs uppercase font-bold font-mono text-zinc-500 tracking-wider">
-                Total Amount (₹) *
-              </label>
-              <span className="text-[10.5px] font-mono font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-300 dark:border-emerald-800">
-                ✓ 5% GST Inclusive
-              </span>
-            </div>
-            <div className="relative">
-              <span className="absolute left-3.5 top-2.5 font-bold text-zinc-400 font-mono text-base">₹</span>
-              <input
-                type="number"
-                required
-                step="0.01"
-                min="0.01"
-                placeholder="0"
-                value={chargeForm.amount}
-                onChange={(e) => setChargeForm({ ...chargeForm, amount: e.target.value })}
-                className="w-full h-11 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 pl-8 pr-3.5 text-base text-zinc-900 dark:text-white focus:outline-none focus:border-blue-500 font-mono font-black transition"
-              />
-            </div>
-          </div>
-
-          {/* 5. Live 5% GST Inclusive Math Breakdown */}
-          {(() => {
-            const gross = Number(chargeForm.amount) || 0;
-            const taxRatePercent = getTaxRateForSac(chargeForm.sacHsn, gross);
-            const baseTaxable = Math.round((gross / (1 + taxRatePercent / 100)) * 100) / 100;
-            const totalGst = Math.round((gross - baseTaxable) * 100) / 100;
-            const halfRate = (taxRatePercent / 2).toFixed(1);
-            const cgst = Math.round((totalGst / 2) * 100) / 100;
-            const sgst = Math.round((totalGst - cgst) * 100) / 100;
-
-            return (
-              <div className="p-3.5 rounded-2xl bg-zinc-50 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 space-y-2.5">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="font-mono text-zinc-500 font-medium">Tax Calculation ({taxRatePercent}% Inclusive):</span>
-                  <span className="font-mono text-[11px] text-zinc-600 dark:text-zinc-400">
-                    CGST {halfRate}% + SGST {halfRate}%
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-3 gap-2 text-center text-xs font-mono">
-                  <div className="bg-white dark:bg-zinc-800/80 p-2 rounded-xl border border-zinc-200 dark:border-zinc-700/60 shadow-xs">
-                    <span className="text-[10px] text-zinc-400 block uppercase">Base Taxable</span>
-                    <span className="font-bold text-zinc-900 dark:text-white">{formatINR(baseTaxable)}</span>
-                  </div>
-                  <div className="bg-white dark:bg-zinc-800/80 p-2 rounded-xl border border-zinc-200 dark:border-zinc-700/60 shadow-xs">
-                    <span className="text-[10px] text-zinc-400 block uppercase">CGST ({halfRate}%)</span>
-                    <span className="font-bold text-zinc-900 dark:text-white">{formatINR(cgst)}</span>
-                  </div>
-                  <div className="bg-white dark:bg-zinc-800/80 p-2 rounded-xl border border-zinc-200 dark:border-zinc-700/60 shadow-xs">
-                    <span className="text-[10px] text-zinc-400 block uppercase">SGST ({halfRate}%)</span>
-                    <span className="font-bold text-zinc-900 dark:text-white">{formatINR(sgst)}</span>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between pt-2 border-t border-zinc-200 dark:border-zinc-800">
-                  <span className="text-xs font-bold text-zinc-700 dark:text-zinc-300">Total Posted to Room:</span>
-                  <span className="text-base sm:text-lg font-black font-mono text-emerald-600 dark:text-emerald-400">
-                    {formatINR(gross)}
-                  </span>
-                </div>
-              </div>
-            );
-          })()}
-
-          <div className="pt-2 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-end gap-2.5">
-            <button
-              type="button"
-              onClick={onClose}
-              className="h-10 px-4 rounded-xl text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white font-bold cursor-pointer"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={loading}
-              className="h-10 px-5 rounded-xl bg-zinc-900 text-white hover:bg-zinc-800 dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-200 font-black transition disabled:opacity-50 shadow-md flex items-center gap-1.5 cursor-pointer"
-            >
-              <Plus className="h-4 w-4" />
-              <span>{loading ? "Posting..." : "Post Charge (5% GST)"}</span>
-            </button>
-          </div>
-        </form>
-      </div>
+        <div className={styles.totals} aria-label="Charge totals">
+          <div className={styles.totalRow}><span>Taxable amount</span><span>{formatINR(totals.taxable)}</span></div>
+          <div className={styles.totalRow}><span>CGST ({MANUAL_CHARGE_GST_RATE / 2}%)</span><span>{formatINR(totals.cgst)}</span></div>
+          <div className={styles.totalRow}><span>SGST ({MANUAL_CHARGE_GST_RATE / 2}%)</span><span>{formatINR(totals.sgst)}</span></div>
+          <div className={`${styles.totalRow} ${styles.grandTotal}`}><span>{isKot ? `${rows.length} KOT${rows.length === 1 ? "" : "s"} · total to post` : "Total to post"}</span><span>{formatINR(totals.total)}</span></div>
+        </div>
+        {isKot && <p className={styles.hint}>Each KOT appears as a separate charge in the room folio. You can post up to {MAX_MANUAL_KOTS} slips together.</p>}
+        <footer className={styles.footer}><button type="button" className="ui-button ui-button-secondary" onClick={onClose} disabled={loading}>{success ? "Done" : "Cancel"}</button><button type="submit" className="ui-button ui-button-primary" disabled={loading}>{loading ? "Posting…" : uncertain ? "Retry posting" : isKot ? `Post ${rows.length === 1 ? "KOT" : `${rows.length} KOTs`}` : "Post charge"}</button></footer>
+      </form>
     </div>
-  );
+  </div>;
 }

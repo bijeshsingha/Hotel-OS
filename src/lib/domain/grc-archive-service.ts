@@ -295,7 +295,7 @@ export async function syncGrcEditsEverywhere(updatedGrc: any) {
           } else if (customRoomRates[assignment.room.number] !== undefined) {
             specificRate = Number(customRoomRates[assignment.room.number]);
           } else if (assignment.moveReason?.includes("AGREED_RATE:")) {
-            const match = assignment.moveReason.match(/AGREED_RATE:(\d+)/);
+            const match = assignment.moveReason.match(/AGREED_RATE:([0-9]+(?:\.[0-9]+)?)/);
             if (match) {
               const parsedMoveRate = Number(match[1]);
               if (!isNaN(parsedMoveRate)) specificRate = parsedMoveRate;
@@ -348,7 +348,7 @@ export async function syncGrcEditsEverywhere(updatedGrc: any) {
           } else if (customRoomRates[a.room.number] !== undefined) {
             specificRate = Number(customRoomRates[a.room.number]);
           } else if (a.moveReason?.includes("AGREED_RATE:")) {
-            const match = a.moveReason.match(/AGREED_RATE:(\d+)/);
+            const match = a.moveReason.match(/AGREED_RATE:([0-9]+(?:\.[0-9]+)?)/);
             if (match) {
               const parsedMoveRate = Number(match[1]);
               if (!isNaN(parsedMoveRate)) specificRate = parsedMoveRate;
@@ -392,7 +392,7 @@ export async function syncGrcEditsEverywhere(updatedGrc: any) {
               } else {
                 let specificRate = (matchedAssignment?.room?.roomType as any)?.basePrice || numTariff;
                 if (matchedAssignment?.moveReason?.includes("AGREED_RATE:")) {
-                  const m = matchedAssignment.moveReason.match(/AGREED_RATE:(\d+)/);
+                  const m = matchedAssignment.moveReason.match(/AGREED_RATE:([0-9]+(?:\.[0-9]+)?)/);
                   if (m) {
                     const parsed = Number(m[1]);
                     if (!isNaN(parsed)) specificRate = parsed;

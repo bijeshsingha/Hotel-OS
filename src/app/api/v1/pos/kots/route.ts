@@ -1,3 +1,4 @@
+import { authorizeRequest, getApiAccess } from "@/lib/auth/api-access";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { fireKOT, postOrderToRoomFolio } from "@/lib/domain/pos-service";
@@ -6,6 +7,10 @@ import { calculateGST } from "@/lib/gst/calculator";
 
 // GET /api/v1/pos/kots - Fetch recent KOTs
 export async function GET(request: Request) {
+  const access = await authorizeRequest(request);
+  if (access instanceof Response) return access;
+  request = access.request;
+
   try {
     const { searchParams } = new URL(request.url);
     const propertyId = searchParams.get("propertyId");
@@ -84,6 +89,10 @@ export async function GET(request: Request) {
 
 // POST /api/v1/pos/kots - Place Order & Fire KOT
 export async function POST(request: Request) {
+  const access = await authorizeRequest(request);
+  if (access instanceof Response) return access;
+  request = access.request;
+
   try {
     const body = await request.json();
     const {

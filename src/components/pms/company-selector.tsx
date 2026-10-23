@@ -157,7 +157,7 @@ export function CompanySelector({
         <button
           type="button"
           onClick={() => setIsOpen(!isOpen)}
-          className="w-full h-9 px-3 pr-16 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-white flex items-center justify-between gap-2 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all shadow-xs cursor-pointer text-left"
+          className="w-full h-9 px-3 pr-16 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-white flex items-center justify-between gap-2 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors shadow-xs cursor-pointer text-left ui-text-body ui-shadow-quiet ui-control ui-control-sized"
         >
           <div className="flex items-center gap-2 truncate">
             {selectedCompany?.accountType === "TRAVEL_AGENT" ? (
@@ -169,7 +169,7 @@ export function CompanySelector({
               {currentSelectionName || placeholder}
             </span>
             {selectedCompany?.gstin && (
-              <span className="hidden sm:inline-block text-[10px] font-mono font-medium bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 px-1.5 py-0.5 rounded border border-zinc-200 dark:border-zinc-700 shrink-0">
+              <span className="hidden sm:inline-block text-[10px] font-mono font-medium bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 px-1.5 py-0.5 rounded border border-zinc-200 dark:border-zinc-700 shrink-0 ui-text-meta ui-font-body">
                 GST: {selectedCompany.gstin}
               </span>
             )}
@@ -187,7 +187,7 @@ export function CompanySelector({
                 setIsOpen(false);
               }}
               title="Unselect / Clear Company"
-              className="p-1 rounded-md text-zinc-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition cursor-pointer"
+              className="p-1 rounded-md text-zinc-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition cursor-pointer ui-control" aria-label="Unselect / Clear Company"
             >
               <X className="h-3.5 w-3.5" />
             </button>
@@ -196,7 +196,7 @@ export function CompanySelector({
           <button
             type="button"
             onClick={() => setIsOpen(!isOpen)}
-            className="p-1 text-zinc-400 hover:text-zinc-700 dark:hover:text-white transition cursor-pointer"
+            className="p-1 text-zinc-400 hover:text-zinc-700 dark:hover:text-white transition cursor-pointer ui-control"
           >
             <ChevronDown className={`h-4 w-4 transition-transform ${isOpen ? "rotate-180" : ""}`} />
           </button>
@@ -205,7 +205,7 @@ export function CompanySelector({
 
       {/* Dropdown Menu */}
       {isOpen && (
-        <div className="absolute left-0 right-0 top-full mt-1 z-50 bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-xl overflow-hidden animate-in fade-in slide-in-from-top-1 max-h-72 flex flex-col">
+        <div className="absolute left-0 right-0 top-full mt-1 z-50 bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-xl overflow-hidden   slide-in-from-top-1 max-h-72 flex flex-col ui-surface">
           
           {/* Search Header */}
           <div className="p-2 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/50 flex items-center gap-2">
@@ -216,13 +216,13 @@ export function CompanySelector({
               placeholder="Search company, agent, GSTIN or city..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full bg-transparent border-none text-xs text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none"
+              className="w-full bg-transparent border-none text-xs text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none ui-text-body ui-field" aria-label="Search company, agent, GSTIN or city"
             />
             {search && (
               <button
                 type="button"
                 onClick={() => setSearch("")}
-                className="text-[10px] text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 px-1"
+                className="text-[10px] text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 px-1 ui-text-meta ui-control"
               >
                 Clear
               </button>
@@ -240,7 +240,7 @@ export function CompanySelector({
                   onSelect(null);
                   setIsOpen(false);
                 }}
-                className="w-full p-2 rounded-xl text-left transition flex items-center gap-2 bg-rose-50/60 hover:bg-rose-100/80 dark:bg-rose-950/20 dark:hover:bg-rose-950/40 text-rose-600 dark:text-rose-400 font-bold text-xs cursor-pointer border border-dashed border-rose-200 dark:border-rose-900/40"
+                className="w-full p-2 rounded-xl text-left transition flex items-center gap-2 bg-rose-50/60 hover:bg-rose-100/80 dark:bg-rose-950/20 dark:hover:bg-rose-950/40 text-rose-600 dark:text-rose-400 font-bold text-xs cursor-pointer border border-dashed border-rose-200 dark:border-rose-900/40 ui-radius-control ui-weight-medium ui-text-body ui-control"
               >
                 <X className="h-3.5 w-3.5 shrink-0" />
                 <span>✕ None / Clear Company (Individual / Direct Guest)</span>
@@ -248,7 +248,7 @@ export function CompanySelector({
             )}
 
             {companies.length === 0 ? (
-              <div className="p-4 text-center text-xs text-zinc-500">
+              <div className="p-4 text-center text-xs text-zinc-500 ui-text-body">
                 {loading ? "Searching master list..." : `No matching companies found for "${search}"`}
               </div>
             ) : (
@@ -266,17 +266,17 @@ export function CompanySelector({
                       isSelected
                         ? "bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800/60 text-indigo-950 dark:text-indigo-200"
                         : "hover:bg-zinc-100 dark:hover:bg-zinc-800/70 text-zinc-800 dark:text-zinc-200"
-                    }`}
+                    } ui-control`}
                   >
                     <div className="space-y-0.5 min-w-0">
                       <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="font-bold text-xs truncate">{c.accountName}</span>
+                        <span className="font-bold text-xs truncate ui-weight-medium ui-text-body">{c.accountName}</span>
                         {c.shortName && (
-                          <span className="text-[10px] font-mono bg-zinc-200 dark:bg-zinc-800 px-1 rounded text-zinc-700 dark:text-zinc-300 font-semibold">
+                          <span className="text-[10px] font-mono bg-zinc-200 dark:bg-zinc-800 px-1 rounded text-zinc-700 dark:text-zinc-300 font-semibold ui-text-meta ui-font-body">
                             {c.shortName}
                           </span>
                         )}
-                        <span className={`text-[9px] px-1.5 py-0.2 rounded font-bold uppercase ${
+                        <span className={`text-[9px] px-1.5 py-0.2 rounded font-bold uppercase  ui-text-meta ui-weight-medium ${
                           c.accountType === "TRAVEL_AGENT"
                             ? "bg-blue-100 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800"
                             : "bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800"
@@ -285,7 +285,7 @@ export function CompanySelector({
                         </span>
                       </div>
 
-                      <div className="flex items-center gap-3 text-[10px] text-zinc-500 dark:text-zinc-400 font-mono">
+                      <div className="flex items-center gap-3 text-[10px] text-zinc-500 dark:text-zinc-400 font-mono ui-text-meta ui-font-body">
                         {c.gstin ? (
                           <span>GST: <strong>{c.gstin}</strong></span>
                         ) : (
@@ -311,7 +311,7 @@ export function CompanySelector({
                 setShowAddModal(true);
                 setIsOpen(false);
               }}
-              className="w-full py-1.5 px-3 rounded-xl bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/40 dark:hover:bg-indigo-900/50 border border-indigo-200 dark:border-indigo-800/60 text-indigo-700 dark:text-indigo-300 font-bold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer"
+              className="w-full py-1.5 px-3 rounded-xl bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/40 dark:hover:bg-indigo-900/50 border border-indigo-200 dark:border-indigo-800/60 text-indigo-700 dark:text-indigo-300 font-bold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer ui-radius-control ui-weight-medium ui-text-body ui-control"
             >
               <Plus className="h-3.5 w-3.5" />
               <span>Add New Company / Travel Agent</span>

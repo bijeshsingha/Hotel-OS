@@ -17,9 +17,9 @@ export function OperationalStatusStrip({
   openKots,
 }: OperationalStatusStripProps) {
   return (
-    <div className="p-5 sm:p-6 rounded-2xl bg-white dark:bg-[#121215] border border-zinc-200/80 dark:border-zinc-800 space-y-4">
+    <div className="p-5 sm:p-6 rounded-2xl bg-white dark:bg-[#121215] border border-zinc-200/80 dark:border-zinc-800 space-y-4 ui-radius-panel ui-surface">
       <div>
-        <h2 className="text-base font-bold text-zinc-950 dark:text-zinc-50">
+        <h2 className="text-base font-bold text-zinc-950 dark:text-zinc-50 ui-weight-medium ui-section-title">
           Live Operational Status
         </h2>
         <p className="text-sm text-zinc-500 mt-0.5">
@@ -35,7 +35,7 @@ export function OperationalStatusStrip({
               Clean and Inspected
             </span>
           </div>
-          <span className="font-mono font-bold text-xl text-emerald-600 dark:text-emerald-400">
+          <span className="font-mono font-bold text-xl text-emerald-600 dark:text-emerald-400 ui-font-body ui-weight-medium">
             {inspectedRooms}
           </span>
         </div>
@@ -47,7 +47,7 @@ export function OperationalStatusStrip({
               Dirty / In Turnover
             </span>
           </div>
-          <span className="font-mono font-bold text-xl text-amber-600 dark:text-amber-400">
+          <span className="font-mono font-bold text-xl text-amber-600 dark:text-amber-400 ui-font-body ui-weight-medium">
             {dirtyRooms}
           </span>
         </div>
@@ -59,7 +59,7 @@ export function OperationalStatusStrip({
               Out of Order (Maintenance)
             </span>
           </div>
-          <span className="font-mono font-bold text-xl text-rose-600 dark:text-rose-400">
+          <span className="font-mono font-bold text-xl text-rose-600 dark:text-rose-400 ui-font-body ui-weight-medium">
             {outOfOrderRooms}
           </span>
         </div>
@@ -71,7 +71,7 @@ export function OperationalStatusStrip({
               Active Dining KOTs
             </span>
           </div>
-          <span className="font-mono font-bold text-xl text-blue-600 dark:text-blue-400">
+          <span className="font-mono font-bold text-xl text-blue-600 dark:text-blue-400 ui-font-body ui-weight-medium">
             {openKots}
           </span>
         </div>

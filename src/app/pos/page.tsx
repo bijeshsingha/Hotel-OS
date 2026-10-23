@@ -463,21 +463,21 @@ export default function POSPage() {
       {/* ========================================================================= */}
       {/* 1. TOP HEADER & LIVE STATUS BAR                                          */}
       {/* ========================================================================= */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white dark:bg-[#121215] border border-zinc-200/80 dark:border-zinc-800/80 p-4 sm:p-5 rounded-3xl shadow-xs">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white dark:bg-[#121215] border border-zinc-200/80 dark:border-zinc-800/80 p-4 sm:p-5 rounded-3xl shadow-xs ui-radius-panel ui-shadow-quiet ui-surface">
         <div className="flex items-center gap-3">
-          <div className="h-11 w-11 rounded-2xl bg-orange-500/10 border border-orange-500/30 flex items-center justify-center text-orange-600 dark:text-orange-400 shrink-0">
+          <div className="h-11 w-11 rounded-2xl bg-orange-500/10 border border-orange-500/30 flex items-center justify-center text-orange-600 dark:text-orange-400 shrink-0 ui-radius-panel">
             <UtensilsCrossed className="h-6 w-6" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-base sm:text-lg font-black tracking-tight text-zinc-900 dark:text-white flex items-center gap-2">
+              <h1 className="text-base sm:text-lg font-black tracking-tight text-zinc-900 dark:text-white flex items-center gap-2 ui-weight-medium ui-page-title">
                 <span>Restaurant POS & Kitchen Terminal</span>
               </h1>
-              <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 text-[10px] font-mono font-black uppercase">
+              <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 text-[10px] font-mono font-black uppercase ui-text-meta ui-font-body ui-weight-medium">
                 Live POS
               </span>
             </div>
-            <p className="text-xs text-zinc-500 dark:text-zinc-400">
+            <p className="text-xs text-zinc-500 dark:text-zinc-400 ui-text-body">
               {posData?.property?.displayName || "Hotel Ambarish Grand Residency"} • High-Speed KOT Dispatch & Folio Posting
             </p>
           </div>
@@ -485,14 +485,14 @@ export default function POSPage() {
 
         {/* Header Right Actions & Tabs */}
         <div className="flex items-center gap-2 flex-wrap">
-          <div className="flex items-center bg-zinc-100 dark:bg-zinc-900 p-1 rounded-2xl border border-zinc-200 dark:border-zinc-800 text-xs font-bold">
+          <div className="flex items-center bg-zinc-100 dark:bg-zinc-900 p-1 rounded-2xl border border-zinc-200 dark:border-zinc-800 text-xs font-bold ui-radius-panel ui-text-body ui-weight-medium">
             <button
               onClick={() => setActiveTab("TERMINAL")}
               className={`px-3 py-1.5 rounded-xl transition flex items-center gap-1.5 cursor-pointer ${
                 activeTab === "TERMINAL"
-                  ? "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-xs font-black"
+                  ? "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-xs font-black ui-shadow-quiet ui-weight-medium"
                   : "text-zinc-500 hover:text-zinc-900 dark:hover:text-white"
-              }`}
+              } ui-control`}
             >
               <Send className="h-3.5 w-3.5 text-orange-500" />
               <span>KOT Terminal</span>
@@ -501,9 +501,9 @@ export default function POSPage() {
               onClick={() => setActiveTab("HISTORY")}
               className={`px-3 py-1.5 rounded-xl transition flex items-center gap-1.5 cursor-pointer ${
                 activeTab === "HISTORY"
-                  ? "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-xs font-black"
+                  ? "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-xs font-black ui-shadow-quiet ui-weight-medium"
                   : "text-zinc-500 hover:text-zinc-900 dark:hover:text-white"
-              }`}
+              } ui-control`}
             >
               <FileText className="h-3.5 w-3.5 text-zinc-500" />
               <span>Recent KOTs</span>
@@ -516,15 +516,15 @@ export default function POSPage() {
                 setActivePrintKot(lastFiredKot);
                 setShowPrintModal(true);
               }}
-              className="h-9 px-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shadow-xs"
-              title="Reprint last fired KOT slip"
+              className="h-9 px-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shadow-xs ui-radius-control ui-text-body ui-weight-medium ui-shadow-quiet ui-surface ui-control ui-control-sized"
+              title="Reprint last fired KOT slip" aria-label="Reprint last fired KOT slip"
             >
               <Printer className="h-3.5 w-3.5 text-zinc-500" />
               <span>Reprint {lastFiredKot.kotNo}</span>
             </button>
           )}
 
-          <div className="h-9 px-3 rounded-xl bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs font-mono font-bold flex items-center gap-1.5 text-zinc-700 dark:text-zinc-300">
+          <div className="h-9 px-3 rounded-xl bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs font-mono font-bold flex items-center gap-1.5 text-zinc-700 dark:text-zinc-300 ui-text-body ui-font-body ui-weight-medium">
             <Clock className="h-3.5 w-3.5 text-blue-500" />
             <span>{currentTime || "IST"}</span>
           </div>
@@ -541,13 +541,13 @@ export default function POSPage() {
           <div className="lg:col-span-8 space-y-4">
             
             {/* DESTINATION SELECTOR CARD (ROOM, BAR, TABLE, OTHER) */}
-            <div className="rounded-3xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-[#121215] p-4 sm:p-5 shadow-xs space-y-3.5">
+            <div className="rounded-3xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-[#121215] p-4 sm:p-5 shadow-xs space-y-3.5 ui-radius-panel ui-shadow-quiet ui-surface">
               <div className="flex items-center justify-between pb-2 border-b border-zinc-100 dark:border-zinc-800/80">
-                <span className="text-xs font-black uppercase tracking-wider text-zinc-600 dark:text-zinc-400 flex items-center gap-1.5">
+                <span className="text-xs font-black uppercase tracking-wider text-zinc-600 dark:text-zinc-400 flex items-center gap-1.5 ui-text-body ui-weight-medium">
                   <Store className="h-3.5 w-3.5 text-orange-500" />
                   <span>Select Order Destination *</span>
                 </span>
-                <span className="text-[11px] font-bold text-orange-600 dark:text-orange-400 font-mono bg-orange-50 dark:bg-orange-950/40 px-2 py-0.5 rounded-md border border-orange-200 dark:border-orange-900">
+                <span className="text-[11px] font-bold text-orange-600 dark:text-orange-400 font-mono bg-orange-50 dark:bg-orange-950/40 px-2 py-0.5 rounded-md border border-orange-200 dark:border-orange-900 ui-text-meta ui-weight-medium ui-font-body">
                   {currentDestinationLabel}
                 </span>
               </div>
@@ -557,11 +557,11 @@ export default function POSPage() {
                 <button
                   type="button"
                   onClick={() => setDestinationType("ROOM")}
-                  className={`p-2.5 rounded-2xl border text-xs font-bold flex items-center justify-center gap-2 transition cursor-pointer ${
+                  className={`p-2.5 rounded-2xl border text-xs font-bold flex items-center justify-center gap-2 transition cursor-pointer  ui-radius-panel ui-text-body ui-weight-medium ${
                     destinationType === "ROOM"
-                      ? "bg-blue-600 text-white border-blue-600 shadow-md font-black"
+                      ? "bg-blue-600 text-white border-blue-600 shadow-md font-black ui-shadow-quiet ui-weight-medium"
                       : "bg-zinc-50 dark:bg-zinc-900/60 text-zinc-700 dark:text-zinc-300 border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-800"
-                  }`}
+                  } ui-control`}
                 >
                   <BedDouble className="h-4 w-4 shrink-0" />
                   <span>Room Service</span>
@@ -570,11 +570,11 @@ export default function POSPage() {
                 <button
                   type="button"
                   onClick={() => setDestinationType("BAR")}
-                  className={`p-2.5 rounded-2xl border text-xs font-bold flex items-center justify-center gap-2 transition cursor-pointer ${
+                  className={`p-2.5 rounded-2xl border text-xs font-bold flex items-center justify-center gap-2 transition cursor-pointer  ui-radius-panel ui-text-body ui-weight-medium ${
                     destinationType === "BAR"
-                      ? "bg-purple-600 text-white border-purple-600 shadow-md font-black"
+                      ? "bg-purple-600 text-white border-purple-600 shadow-md font-black ui-shadow-quiet ui-weight-medium"
                       : "bg-zinc-50 dark:bg-zinc-900/60 text-zinc-700 dark:text-zinc-300 border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-800"
-                  }`}
+                  } ui-control`}
                 >
                   <Wine className="h-4 w-4 shrink-0" />
                   <span>Bar Lounge</span>
@@ -583,11 +583,11 @@ export default function POSPage() {
                 <button
                   type="button"
                   onClick={() => setDestinationType("TABLE")}
-                  className={`p-2.5 rounded-2xl border text-xs font-bold flex items-center justify-center gap-2 transition cursor-pointer ${
+                  className={`p-2.5 rounded-2xl border text-xs font-bold flex items-center justify-center gap-2 transition cursor-pointer  ui-radius-panel ui-text-body ui-weight-medium ${
                     destinationType === "TABLE"
-                      ? "bg-emerald-600 text-white border-emerald-600 shadow-md font-black"
+                      ? "bg-emerald-600 text-white border-emerald-600 shadow-md font-black ui-shadow-quiet ui-weight-medium"
                       : "bg-zinc-50 dark:bg-zinc-900/60 text-zinc-700 dark:text-zinc-300 border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-800"
-                  }`}
+                  } ui-control`}
                 >
                   <UtensilsCrossed className="h-4 w-4 shrink-0" />
                   <span>Dine-In Table</span>
@@ -596,11 +596,11 @@ export default function POSPage() {
                 <button
                   type="button"
                   onClick={() => setDestinationType("OTHER")}
-                  className={`p-2.5 rounded-2xl border text-xs font-bold flex items-center justify-center gap-2 transition cursor-pointer ${
+                  className={`p-2.5 rounded-2xl border text-xs font-bold flex items-center justify-center gap-2 transition cursor-pointer  ui-radius-panel ui-text-body ui-weight-medium ${
                     destinationType === "OTHER"
-                      ? "bg-amber-600 text-white border-amber-600 shadow-md font-black"
+                      ? "bg-amber-600 text-white border-amber-600 shadow-md font-black ui-shadow-quiet ui-weight-medium"
                       : "bg-zinc-50 dark:bg-zinc-900/60 text-zinc-700 dark:text-zinc-300 border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-800"
-                  }`}
+                  } ui-control`}
                 >
                   <Store className="h-4 w-4 shrink-0" />
                   <span>Other / Takeaway</span>
@@ -611,15 +611,15 @@ export default function POSPage() {
               <div className="pt-1">
                 {/* 1. ROOM DESTINATION FORM */}
                 {destinationType === "ROOM" && (
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3.5 rounded-2xl bg-blue-50/50 dark:bg-blue-950/20 border border-blue-200/80 dark:border-blue-900/40 animate-in fade-in">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3.5 rounded-2xl bg-blue-50/50 dark:bg-blue-950/20 border border-blue-200/80 dark:border-blue-900/40   ui-radius-panel">
                     <div>
-                      <label className="text-[11px] font-bold text-zinc-700 dark:text-zinc-300 block mb-1">
+                      <label className="text-[11px] font-bold text-zinc-700 dark:text-zinc-300 block mb-1 ui-text-meta ui-weight-medium ui-label">
                         Select Guest Room *
                       </label>
                       <select
                         value={selectedRoomNumber}
                         onChange={(e) => setSelectedRoomNumber(e.target.value)}
-                        className="w-full h-10 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs font-bold text-zinc-900 dark:text-white focus:outline-none focus:border-blue-500 cursor-pointer shadow-2xs"
+                        className="w-full h-10 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs font-bold text-zinc-900 dark:text-white focus:outline-none focus:border-blue-500 cursor-pointer shadow-2xs ui-radius-control ui-text-body ui-weight-medium ui-shadow-quiet ui-surface ui-field" aria-label="Select Guest Room"
                       >
                         <optgroup label="🏨 Occupied In-House Rooms">
                           {posData?.rooms
@@ -643,7 +643,7 @@ export default function POSPage() {
                     </div>
 
                     <div>
-                      <label className="text-[11px] font-bold text-zinc-700 dark:text-zinc-300 block mb-1">
+                      <label className="text-[11px] font-bold text-zinc-700 dark:text-zinc-300 block mb-1 ui-text-meta ui-weight-medium ui-label">
                         Guest Name
                       </label>
                       <input
@@ -651,12 +651,12 @@ export default function POSPage() {
                         placeholder="In-House Guest"
                         value={guestName}
                         onChange={(e) => setGuestName(e.target.value)}
-                        className="w-full h-10 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs font-semibold text-zinc-900 dark:text-white focus:outline-none focus:border-blue-500 shadow-2xs"
+                        className="w-full h-10 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs font-semibold text-zinc-900 dark:text-white focus:outline-none focus:border-blue-500 shadow-2xs ui-radius-control ui-text-body ui-shadow-quiet ui-surface ui-field" aria-label="Guest Name"
                       />
                     </div>
 
                     <div>
-                      <label className="text-[11px] font-bold text-zinc-700 dark:text-zinc-300 block mb-1">
+                      <label className="text-[11px] font-bold text-zinc-700 dark:text-zinc-300 block mb-1 ui-text-meta ui-weight-medium ui-label">
                         Steward / Waiter
                       </label>
                       <input
@@ -664,7 +664,7 @@ export default function POSPage() {
                         placeholder="e.g. Rahul / Room Service"
                         value={waiterName}
                         onChange={(e) => setWaiterName(e.target.value)}
-                        className="w-full h-10 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs font-semibold text-zinc-900 dark:text-white focus:outline-none focus:border-blue-500 shadow-2xs"
+                        className="w-full h-10 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs font-semibold text-zinc-900 dark:text-white focus:outline-none focus:border-blue-500 shadow-2xs ui-radius-control ui-text-body ui-shadow-quiet ui-surface ui-field" aria-label="Steward / Waiter"
                       />
                     </div>
                   </div>
@@ -672,15 +672,15 @@ export default function POSPage() {
 
                 {/* 2. BAR DESTINATION FORM */}
                 {destinationType === "BAR" && (
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3.5 rounded-2xl bg-purple-50/50 dark:bg-purple-950/20 border border-purple-200/80 dark:border-purple-900/40 animate-in fade-in">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3.5 rounded-2xl bg-purple-50/50 dark:bg-purple-950/20 border border-purple-200/80 dark:border-purple-900/40   ui-radius-panel">
                     <div>
-                      <label className="text-[11px] font-bold text-zinc-700 dark:text-zinc-300 block mb-1">
+                      <label className="text-[11px] font-bold text-zinc-700 dark:text-zinc-300 block mb-1 ui-text-meta ui-weight-medium ui-label">
                         Bar Location / Station *
                       </label>
                       <select
                         value={selectedBarId}
                         onChange={(e) => setSelectedBarId(e.target.value)}
-                        className="w-full h-10 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs font-bold text-zinc-900 dark:text-white focus:outline-none focus:border-purple-500 cursor-pointer shadow-2xs"
+                        className="w-full h-10 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs font-bold text-zinc-900 dark:text-white focus:outline-none focus:border-purple-500 cursor-pointer shadow-2xs ui-radius-control ui-text-body ui-weight-medium ui-shadow-quiet ui-surface ui-field" aria-label="Bar Location / Station"
                       >
                         {posData?.barLocations?.map((b) => (
                           <option key={b.id} value={b.id}>
@@ -691,7 +691,7 @@ export default function POSPage() {
                     </div>
 
                     <div>
-                      <label className="text-[11px] font-bold text-zinc-700 dark:text-zinc-300 block mb-1">
+                      <label className="text-[11px] font-bold text-zinc-700 dark:text-zinc-300 block mb-1 ui-text-meta ui-weight-medium ui-label">
                         Guest / Tab Name (Optional)
                       </label>
                       <input
@@ -699,12 +699,12 @@ export default function POSPage() {
                         placeholder="e.g. Mr. Kapoor / Tab #4"
                         value={guestName}
                         onChange={(e) => setGuestName(e.target.value)}
-                        className="w-full h-10 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs font-semibold text-zinc-900 dark:text-white focus:outline-none focus:border-purple-500 shadow-2xs"
+                        className="w-full h-10 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs font-semibold text-zinc-900 dark:text-white focus:outline-none focus:border-purple-500 shadow-2xs ui-radius-control ui-text-body ui-shadow-quiet ui-surface ui-field" aria-label="Guest / Tab Name (Optional)"
                       />
                     </div>
 
                     <div>
-                      <label className="text-[11px] font-bold text-zinc-700 dark:text-zinc-300 block mb-1">
+                      <label className="text-[11px] font-bold text-zinc-700 dark:text-zinc-300 block mb-1 ui-text-meta ui-weight-medium ui-label">
                         Bartender / Steward
                       </label>
                       <input
@@ -712,7 +712,7 @@ export default function POSPage() {
                         placeholder="e.g. Alex / Barman"
                         value={waiterName}
                         onChange={(e) => setWaiterName(e.target.value)}
-                        className="w-full h-10 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs font-semibold text-zinc-900 dark:text-white focus:outline-none focus:border-purple-500 shadow-2xs"
+                        className="w-full h-10 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs font-semibold text-zinc-900 dark:text-white focus:outline-none focus:border-purple-500 shadow-2xs ui-radius-control ui-text-body ui-shadow-quiet ui-surface ui-field" aria-label="Bartender / Steward"
                       />
                     </div>
                   </div>
@@ -720,15 +720,15 @@ export default function POSPage() {
 
                 {/* 3. TABLE DESTINATION FORM */}
                 {destinationType === "TABLE" && (
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3.5 rounded-2xl bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-200/80 dark:border-emerald-900/40 animate-in fade-in">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3.5 rounded-2xl bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-200/80 dark:border-emerald-900/40   ui-radius-panel">
                     <div>
-                      <label className="text-[11px] font-bold text-zinc-700 dark:text-zinc-300 block mb-1">
+                      <label className="text-[11px] font-bold text-zinc-700 dark:text-zinc-300 block mb-1 ui-text-meta ui-weight-medium ui-label">
                         Select Dining Table *
                       </label>
                       <select
                         value={selectedTableId}
                         onChange={(e) => setSelectedTableId(e.target.value)}
-                        className="w-full h-10 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs font-bold text-zinc-900 dark:text-white focus:outline-none focus:border-emerald-500 cursor-pointer shadow-2xs"
+                        className="w-full h-10 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs font-bold text-zinc-900 dark:text-white focus:outline-none focus:border-emerald-500 cursor-pointer shadow-2xs ui-radius-control ui-text-body ui-weight-medium ui-shadow-quiet ui-surface ui-field" aria-label="Select Dining Table"
                       >
                         {posData?.tables?.map((t) => (
                           <option key={t.id} value={t.name}>
@@ -739,7 +739,7 @@ export default function POSPage() {
                     </div>
 
                     <div>
-                      <label className="text-[11px] font-bold text-zinc-700 dark:text-zinc-300 block mb-1">
+                      <label className="text-[11px] font-bold text-zinc-700 dark:text-zinc-300 block mb-1 ui-text-meta ui-weight-medium ui-label">
                         Covers (Guest Count)
                       </label>
                       <div className="flex items-center gap-1.5">
@@ -748,11 +748,11 @@ export default function POSPage() {
                             key={c}
                             type="button"
                             onClick={() => setCovers(c)}
-                            className={`h-10 flex-1 rounded-xl text-xs font-mono font-bold transition cursor-pointer border ${
+                            className={`h-10 flex-1 rounded-xl text-xs font-mono font-bold transition cursor-pointer border  ui-text-body ui-font-body ui-weight-medium ${
                               covers === c
                                 ? "bg-emerald-600 text-white border-emerald-600"
                                 : "bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300"
-                            }`}
+                            } ui-control`}
                           >
                             {c}
                           </button>
@@ -761,7 +761,7 @@ export default function POSPage() {
                     </div>
 
                     <div>
-                      <label className="text-[11px] font-bold text-zinc-700 dark:text-zinc-300 block mb-1">
+                      <label className="text-[11px] font-bold text-zinc-700 dark:text-zinc-300 block mb-1 ui-text-meta ui-weight-medium ui-label">
                         Server / Steward
                       </label>
                       <input
@@ -769,7 +769,7 @@ export default function POSPage() {
                         placeholder="e.g. Amit / Server"
                         value={waiterName}
                         onChange={(e) => setWaiterName(e.target.value)}
-                        className="w-full h-10 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs font-semibold text-zinc-900 dark:text-white focus:outline-none focus:border-emerald-500 shadow-2xs"
+                        className="w-full h-10 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs font-semibold text-zinc-900 dark:text-white focus:outline-none focus:border-emerald-500 shadow-2xs ui-radius-control ui-text-body ui-shadow-quiet ui-surface ui-field" aria-label="Server / Steward"
                       />
                     </div>
                   </div>
@@ -777,9 +777,9 @@ export default function POSPage() {
 
                 {/* 4. OTHER / TAKEAWAY DESTINATION FORM */}
                 {destinationType === "OTHER" && (
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3.5 rounded-2xl bg-amber-50/50 dark:bg-amber-950/20 border border-amber-200/80 dark:border-amber-900/40 animate-in fade-in">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3.5 rounded-2xl bg-amber-50/50 dark:bg-amber-950/20 border border-amber-200/80 dark:border-amber-900/40   ui-radius-panel">
                     <div>
-                      <label className="text-[11px] font-bold text-zinc-700 dark:text-zinc-300 block mb-1">
+                      <label className="text-[11px] font-bold text-zinc-700 dark:text-zinc-300 block mb-1 ui-text-meta ui-weight-medium ui-label">
                         Location Preset
                       </label>
                       <select
@@ -788,7 +788,7 @@ export default function POSPage() {
                           setSelectedOtherId(e.target.value);
                           setCustomOtherText("");
                         }}
-                        className="w-full h-10 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs font-bold text-zinc-900 dark:text-white focus:outline-none focus:border-amber-500 cursor-pointer shadow-2xs"
+                        className="w-full h-10 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs font-bold text-zinc-900 dark:text-white focus:outline-none focus:border-amber-500 cursor-pointer shadow-2xs ui-radius-control ui-text-body ui-weight-medium ui-shadow-quiet ui-surface ui-field" aria-label="Location Preset"
                       >
                         {posData?.otherLocations?.map((o) => (
                           <option key={o.id} value={o.id}>
@@ -799,7 +799,7 @@ export default function POSPage() {
                     </div>
 
                     <div>
-                      <label className="text-[11px] font-bold text-zinc-700 dark:text-zinc-300 block mb-1">
+                      <label className="text-[11px] font-bold text-zinc-700 dark:text-zinc-300 block mb-1 ui-text-meta ui-weight-medium ui-label">
                         Custom Destination / Note
                       </label>
                       <input
@@ -807,12 +807,12 @@ export default function POSPage() {
                         placeholder="e.g. Takeaway for Mr. Das"
                         value={customOtherText}
                         onChange={(e) => setCustomOtherText(e.target.value)}
-                        className="w-full h-10 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs font-semibold text-zinc-900 dark:text-white focus:outline-none focus:border-amber-500 shadow-2xs"
+                        className="w-full h-10 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs font-semibold text-zinc-900 dark:text-white focus:outline-none focus:border-amber-500 shadow-2xs ui-radius-control ui-text-body ui-shadow-quiet ui-surface ui-field" aria-label="Custom Destination / Note"
                       />
                     </div>
 
                     <div>
-                      <label className="text-[11px] font-bold text-zinc-700 dark:text-zinc-300 block mb-1">
+                      <label className="text-[11px] font-bold text-zinc-700 dark:text-zinc-300 block mb-1 ui-text-meta ui-weight-medium ui-label">
                         Guest / Receiver Name
                       </label>
                       <input
@@ -820,7 +820,7 @@ export default function POSPage() {
                         placeholder="e.g. Walk-in Guest"
                         value={guestName}
                         onChange={(e) => setGuestName(e.target.value)}
-                        className="w-full h-10 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs font-semibold text-zinc-900 dark:text-white focus:outline-none focus:border-amber-500 shadow-2xs"
+                        className="w-full h-10 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs font-semibold text-zinc-900 dark:text-white focus:outline-none focus:border-amber-500 shadow-2xs ui-radius-control ui-text-body ui-shadow-quiet ui-surface ui-field" aria-label="Guest / Receiver Name"
                       />
                     </div>
                   </div>
@@ -829,17 +829,17 @@ export default function POSPage() {
             </div>
 
             {/* MENU BROWSER & FILTER BAR */}
-            <div className="rounded-3xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-[#121215] p-4 sm:p-5 shadow-xs space-y-4">
+            <div className="rounded-3xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-[#121215] p-4 sm:p-5 shadow-xs space-y-4 ui-radius-panel ui-shadow-quiet ui-surface">
               
               {/* Category Pills Slider */}
               <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
                 <button
                   onClick={() => setSelectedCategory("ALL")}
-                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition cursor-pointer ${
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition cursor-pointer  ui-text-body ui-weight-medium ${
                     selectedCategory === "ALL"
-                      ? "bg-zinc-900 text-white dark:bg-white dark:text-zinc-950 font-black shadow-xs"
+                      ? "bg-zinc-900 text-white dark:bg-white dark:text-zinc-950 font-black shadow-xs ui-weight-medium ui-shadow-quiet"
                       : "bg-zinc-100 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-800"
-                  }`}
+                  } ui-control`}
                 >
                   All Items ({posData?.items?.length || 0})
                 </button>
@@ -847,11 +847,11 @@ export default function POSPage() {
                   <button
                     key={cat.id}
                     onClick={() => setSelectedCategory(cat.id)}
-                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition cursor-pointer ${
+                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition cursor-pointer  ui-text-body ui-weight-medium ${
                       selectedCategory === cat.id
-                        ? "bg-zinc-900 text-white dark:bg-white dark:text-zinc-950 font-black shadow-xs"
+                        ? "bg-zinc-900 text-white dark:bg-white dark:text-zinc-950 font-black shadow-xs ui-weight-medium ui-shadow-quiet"
                         : "bg-zinc-100 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-800"
-                    }`}
+                    } ui-control`}
                   >
                     {cat.name} ({cat.itemsCount})
                   </button>
@@ -867,12 +867,12 @@ export default function POSPage() {
                     placeholder="Search dishes by name, ingredients, or code..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full h-10 pl-10 pr-4 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:border-blue-500 font-medium"
+                    className="w-full h-10 pl-10 pr-4 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:border-blue-500 font-medium ui-radius-control ui-text-body ui-field" aria-label="Search dishes by name, ingredients, or code"
                   />
                   {searchQuery && (
                     <button
                       onClick={() => setSearchQuery("")}
-                      className="absolute right-3 top-3 text-zinc-400 hover:text-zinc-600"
+                      className="absolute right-3 top-3 text-zinc-400 hover:text-zinc-600 ui-control"
                     >
                       <X className="h-3.5 w-3.5" />
                     </button>
@@ -880,20 +880,20 @@ export default function POSPage() {
                 </div>
 
                 {/* Veg / Non-veg Segmented Control */}
-                <div className="flex items-center bg-zinc-100 dark:bg-zinc-900 p-1 rounded-xl border border-zinc-200 dark:border-zinc-800 text-xs font-bold shrink-0">
+                <div className="flex items-center bg-zinc-100 dark:bg-zinc-900 p-1 rounded-xl border border-zinc-200 dark:border-zinc-800 text-xs font-bold shrink-0 ui-text-body ui-weight-medium">
                   <button
                     onClick={() => setVegFilter("ALL")}
                     className={`px-2.5 py-1 rounded-lg transition ${
-                      vegFilter === "ALL" ? "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-2xs font-bold" : "text-zinc-500"
-                    }`}
+                      vegFilter === "ALL" ? "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-2xs font-bold ui-shadow-quiet ui-weight-medium" : "text-zinc-500"
+                    } ui-control`}
                   >
                     All
                   </button>
                   <button
                     onClick={() => setVegFilter("VEG")}
                     className={`px-2.5 py-1 rounded-lg transition flex items-center gap-1 ${
-                      vegFilter === "VEG" ? "bg-white dark:bg-zinc-800 text-emerald-600 dark:text-emerald-400 shadow-2xs font-bold" : "text-zinc-500"
-                    }`}
+                      vegFilter === "VEG" ? "bg-white dark:bg-zinc-800 text-emerald-600 dark:text-emerald-400 shadow-2xs font-bold ui-shadow-quiet ui-weight-medium" : "text-zinc-500"
+                    } ui-control`}
                   >
                     <span className="h-2 w-2 rounded-full bg-emerald-500"></span>
                     <span>Veg</span>
@@ -901,8 +901,8 @@ export default function POSPage() {
                   <button
                     onClick={() => setVegFilter("NON_VEG")}
                     className={`px-2.5 py-1 rounded-lg transition flex items-center gap-1 ${
-                      vegFilter === "NON_VEG" ? "bg-white dark:bg-zinc-800 text-rose-600 dark:text-rose-400 shadow-2xs font-bold" : "text-zinc-500"
-                    }`}
+                      vegFilter === "NON_VEG" ? "bg-white dark:bg-zinc-800 text-rose-600 dark:text-rose-400 shadow-2xs font-bold ui-shadow-quiet ui-weight-medium" : "text-zinc-500"
+                    } ui-control`}
                   >
                     <span className="h-2 w-2 rounded-full bg-rose-500"></span>
                     <span>Non-Veg</span>
@@ -913,7 +913,7 @@ export default function POSPage() {
                 <button
                   type="button"
                   onClick={() => setShowCustomItemModal(true)}
-                  className="h-10 px-3.5 rounded-xl bg-orange-50 hover:bg-orange-100 dark:bg-orange-950/40 dark:hover:bg-orange-900/50 text-orange-700 dark:text-orange-300 font-bold text-xs flex items-center gap-1.5 transition cursor-pointer shrink-0 border border-orange-200 dark:border-orange-800/80"
+                  className="h-10 px-3.5 rounded-xl bg-orange-50 hover:bg-orange-100 dark:bg-orange-950/40 dark:hover:bg-orange-900/50 text-orange-700 dark:text-orange-300 font-bold text-xs flex items-center gap-1.5 transition cursor-pointer shrink-0 border border-orange-200 dark:border-orange-800/80 ui-radius-control ui-weight-medium ui-text-body ui-control ui-control-sized"
                 >
                   <Plus className="h-3.5 w-3.5" />
                   <span>Custom Item</span>
@@ -930,10 +930,10 @@ export default function POSPage() {
                     <div
                       key={item.id}
                       onClick={() => addToCart(item)}
-                      className={`p-3 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between gap-2.5 select-none ${
+                      className={`p-3 rounded-2xl border transition-colors cursor-pointer flex flex-col justify-between gap-2.5 select-none  ui-radius-panel ${
                         inCartQty > 0
-                          ? "bg-orange-50/80 dark:bg-orange-950/40 border-orange-400 dark:border-orange-600 shadow-sm"
-                          : "bg-white dark:bg-zinc-900/70 hover:bg-zinc-50 dark:hover:bg-zinc-800/80 border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 shadow-2xs"
+                          ? "bg-orange-50/80 dark:bg-orange-950/40 border-orange-400 dark:border-orange-600 shadow-sm ui-shadow-quiet"
+                          : "bg-white dark:bg-zinc-900/70 hover:bg-zinc-50 dark:hover:bg-zinc-800/80 border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 shadow-2xs ui-shadow-quiet"
                       }`}
                     >
                       {/* Top Row: Indicator, Name & Price */}
@@ -946,18 +946,18 @@ export default function POSPage() {
                               }`}
                               title={item.isVeg ? "Veg" : "Non-Veg"}
                             />
-                            <h4 className="text-xs font-bold text-zinc-900 dark:text-white line-clamp-2 leading-tight">
+                            <h4 className="text-xs font-bold text-zinc-900 dark:text-white line-clamp-2 leading-tight ui-text-body ui-weight-medium">
                               {item.name}
                             </h4>
                           </div>
                         </div>
 
                         <div className="flex items-center justify-between pt-0.5">
-                          <span className="font-mono font-bold text-xs text-zinc-900 dark:text-white">
+                          <span className="font-mono font-bold text-xs text-zinc-900 dark:text-white ui-font-body ui-weight-medium ui-text-body">
                             {formatINR(item.price)}
                           </span>
                           {item.portionSize && item.portionSize !== "Standard" && (
-                            <span className="text-[10px] font-mono text-zinc-400">
+                            <span className="text-[10px] font-mono text-zinc-400 ui-text-meta ui-font-body">
                               {item.portionSize}
                             </span>
                           )}
@@ -977,27 +977,27 @@ export default function POSPage() {
                                 notes: cartItem?.notes || "",
                               });
                             }}
-                            className={`text-[10px] px-2 py-0.5 rounded-md font-bold transition ${
+                            className={`text-[10px] px-2 py-0.5 rounded-md font-bold transition  ui-text-meta ui-weight-medium ${
                               cartItem?.notes
                                 ? "bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-200 border border-amber-300 dark:border-amber-700"
                                 : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200"
-                            }`}
+                            } ui-control`}
                           >
                             {cartItem?.notes ? "📝 Note" : "+ Note"}
                           </button>
 
-                          <div className="flex items-center gap-1 bg-white dark:bg-zinc-900 p-0.5 rounded-lg border border-orange-300 dark:border-orange-700 shadow-2xs">
+                          <div className="flex items-center gap-1 bg-white dark:bg-zinc-900 p-0.5 rounded-lg border border-orange-300 dark:border-orange-700 shadow-2xs ui-shadow-quiet">
                             <button
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 updateQty(item.id, -1);
                               }}
-                              className="h-5 w-5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 flex items-center justify-center font-bold hover:bg-zinc-200 text-xs"
+                              className="h-5 w-5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 flex items-center justify-center font-bold hover:bg-zinc-200 text-xs ui-weight-medium ui-text-body ui-control"
                             >
                               <Minus className="h-2.5 w-2.5" />
                             </button>
-                            <span className="font-mono font-black text-xs px-1 text-orange-600 dark:text-orange-400">
+                            <span className="font-mono font-black text-xs px-1 text-orange-600 dark:text-orange-400 ui-font-body ui-weight-medium ui-text-body">
                               {inCartQty}
                             </span>
                             <button
@@ -1006,7 +1006,7 @@ export default function POSPage() {
                                 e.stopPropagation();
                                 updateQty(item.id, 1);
                               }}
-                              className="h-5 w-5 rounded bg-orange-600 text-white flex items-center justify-center font-bold hover:bg-orange-700 text-xs"
+                              className="h-5 w-5 rounded bg-orange-600 text-white flex items-center justify-center font-bold hover:bg-orange-700 text-xs ui-weight-medium ui-text-body ui-control"
                             >
                               <Plus className="h-2.5 w-2.5" />
                             </button>
@@ -1014,7 +1014,7 @@ export default function POSPage() {
                         </div>
                       ) : (
                         <div className="flex items-center justify-end pt-1">
-                          <span className="h-5 px-2 rounded-md bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 text-[10.5px] font-bold inline-flex items-center gap-1">
+                          <span className="h-5 px-2 rounded-md bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 text-[10.5px] font-bold inline-flex items-center gap-1 ui-text-meta ui-weight-medium">
                             <Plus className="h-2.5 w-2.5 text-zinc-400" />
                             <span>Add</span>
                           </span>
@@ -1027,7 +1027,7 @@ export default function POSPage() {
                 {filteredMenuItems.length === 0 && (
                   <div className="col-span-full p-8 text-center text-zinc-400 space-y-2">
                     <UtensilsCrossed className="h-8 w-8 mx-auto opacity-40" />
-                    <p className="text-xs">No dishes match your active filter.</p>
+                    <p className="text-xs ui-text-body">No dishes match your active filter.</p>
                   </div>
                 )}
               </div>
@@ -1037,7 +1037,7 @@ export default function POSPage() {
 
           {/* RIGHT 4 COLS: ACTIVE KOT TICKET & DISPATCH */}
           <div className="lg:col-span-4 space-y-4">
-            <div className="rounded-3xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-[#121215] p-4 sm:p-5 shadow-xs space-y-4 sticky top-4">
+            <div className="rounded-3xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-[#121215] p-4 sm:p-5 shadow-xs space-y-4 sticky top-4 ui-radius-panel ui-shadow-quiet ui-surface">
               
               {/* KOT Ticket Header */}
               <div className="flex items-center justify-between pb-3 border-b border-zinc-200 dark:border-zinc-800">
@@ -1046,8 +1046,8 @@ export default function POSPage() {
                     <ChefHat className="h-4 w-4" />
                   </div>
                   <div>
-                    <h3 className="text-sm font-black text-zinc-900 dark:text-white">Active KOT Order</h3>
-                    <p className="text-[10.5px] text-zinc-500">{currentDestinationLabel}</p>
+                    <h3 className="text-sm font-black text-zinc-900 dark:text-white ui-weight-medium">Active KOT Order</h3>
+                    <p className="text-[10.5px] text-zinc-500 ui-text-meta">{currentDestinationLabel}</p>
                   </div>
                 </div>
 
@@ -1055,7 +1055,7 @@ export default function POSPage() {
                   <button
                     type="button"
                     onClick={clearCart}
-                    className="text-[11px] font-bold text-rose-600 hover:text-rose-700 flex items-center gap-1"
+                    className="text-[11px] font-bold text-rose-600 hover:text-rose-700 flex items-center gap-1 ui-text-meta ui-weight-medium ui-control"
                   >
                     <Trash2 className="h-3 w-3" />
                     <span>Clear</span>
@@ -1068,7 +1068,7 @@ export default function POSPage() {
                 {cartEntries.map(({ item, qty, notes }) => (
                   <div
                     key={item.id}
-                    className="p-2.5 rounded-2xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 space-y-1.5 text-xs"
+                    className="p-2.5 rounded-2xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 space-y-1.5 text-xs ui-radius-panel ui-text-body"
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex items-center gap-1.5">
@@ -1077,17 +1077,17 @@ export default function POSPage() {
                             item.isVeg ? "bg-emerald-500" : "bg-rose-500"
                           }`}
                         />
-                        <span className="font-bold text-zinc-900 dark:text-white line-clamp-1">
+                        <span className="font-bold text-zinc-900 dark:text-white line-clamp-1 ui-weight-medium">
                           {item.name}
                         </span>
                       </div>
-                      <span className="font-mono font-bold text-zinc-900 dark:text-white">
+                      <span className="font-mono font-bold text-zinc-900 dark:text-white ui-font-body ui-weight-medium">
                         {formatINR(item.price * qty)}
                       </span>
                     </div>
 
                     {notes && (
-                      <div className="text-[10.5px] text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 px-2 py-0.5 rounded-md border border-amber-200 dark:border-amber-800/60 italic">
+                      <div className="text-[10.5px] text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 px-2 py-0.5 rounded-md border border-amber-200 dark:border-amber-800/60 italic ui-text-meta">
                         * Note: {notes}
                       </div>
                     )}
@@ -1102,7 +1102,7 @@ export default function POSPage() {
                             notes: notes || "",
                           })
                         }
-                        className="text-[10px] text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 font-semibold"
+                        className="text-[10px] text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 font-semibold ui-text-meta ui-control"
                       >
                         {notes ? "Edit note" : "+ Add note"}
                       </button>
@@ -1111,15 +1111,15 @@ export default function POSPage() {
                         <button
                           type="button"
                           onClick={() => updateQty(item.id, -1)}
-                          className="h-5 w-5 rounded bg-zinc-100 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300 flex items-center justify-center text-xs font-bold"
+                          className="h-5 w-5 rounded bg-zinc-100 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300 flex items-center justify-center text-xs font-bold ui-text-body ui-weight-medium ui-control"
                         >
                           <Minus className="h-2.5 w-2.5" />
                         </button>
-                        <span className="font-mono font-bold px-1 text-xs">{qty}</span>
+                        <span className="font-mono font-bold px-1 text-xs ui-font-body ui-weight-medium ui-text-body">{qty}</span>
                         <button
                           type="button"
                           onClick={() => updateQty(item.id, 1)}
-                          className="h-5 w-5 rounded bg-orange-600 text-white flex items-center justify-center text-xs font-bold"
+                          className="h-5 w-5 rounded bg-orange-600 text-white flex items-center justify-center text-xs font-bold ui-text-body ui-weight-medium ui-control"
                         >
                           <Plus className="h-2.5 w-2.5" />
                         </button>
@@ -1129,17 +1129,17 @@ export default function POSPage() {
                 ))}
 
                 {cartEntries.length === 0 && (
-                  <div className="p-8 text-center text-zinc-400 space-y-2 border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-2xl">
+                  <div className="p-8 text-center text-zinc-400 space-y-2 border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-2xl ui-radius-panel">
                     <UtensilsCrossed className="h-6 w-6 mx-auto opacity-30" />
-                    <p className="text-xs">No items in KOT ticket.</p>
-                    <p className="text-[10.5px] text-zinc-400">Click on dishes from the menu to add.</p>
+                    <p className="text-xs ui-text-body">No items in KOT ticket.</p>
+                    <p className="text-[10.5px] text-zinc-400 ui-text-meta">Click on dishes from the menu to add.</p>
                   </div>
                 )}
               </div>
 
               {/* Kitchen Instructions */}
               <div className="space-y-1">
-                <label className="text-[11px] font-bold text-zinc-700 dark:text-zinc-300 block">
+                <label className="text-[11px] font-bold text-zinc-700 dark:text-zinc-300 block ui-text-meta ui-weight-medium ui-label">
                   Kitchen / Chef Instructions
                 </label>
                 <input
@@ -1147,35 +1147,35 @@ export default function POSPage() {
                   placeholder="e.g. Serve hot, send extra cutlery & water"
                   value={kitchenInstructions}
                   onChange={(e) => setKitchenInstructions(e.target.value)}
-                  className="w-full h-9 px-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:border-orange-500 font-medium"
+                  className="w-full h-9 px-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:border-orange-500 font-medium ui-radius-control ui-text-body ui-field" aria-label="Kitchen / Chef Instructions"
                 />
               </div>
 
               {/* Bill Summary & GST */}
-              <div className="p-3.5 rounded-2xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 space-y-2 text-xs">
+              <div className="p-3.5 rounded-2xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 space-y-2 text-xs ui-radius-panel ui-text-body">
                 <div className="flex justify-between text-zinc-500 dark:text-zinc-400">
                   <span>Subtotal ({cartTotalItems} items):</span>
-                  <span className="font-mono font-bold text-zinc-900 dark:text-white">{formatINR(cartSubtotal)}</span>
+                  <span className="font-mono font-bold text-zinc-900 dark:text-white ui-font-body ui-weight-medium">{formatINR(cartSubtotal)}</span>
                 </div>
                 <div className="flex justify-between text-zinc-500 dark:text-zinc-400">
                   <span>Restaurant GST (5% SAC 996331):</span>
-                  <span className="font-mono font-bold text-zinc-900 dark:text-white">{formatINR(gstCalculation.taxAmount)}</span>
+                  <span className="font-mono font-bold text-zinc-900 dark:text-white ui-font-body ui-weight-medium">{formatINR(gstCalculation.taxAmount)}</span>
                 </div>
-                <div className="flex justify-between font-black text-sm pt-1.5 border-t border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white">
+                <div className="flex justify-between font-black text-sm pt-1.5 border-t border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white ui-weight-medium">
                   <span>Total Payable:</span>
-                  <span className="font-mono text-emerald-600 dark:text-emerald-400">{formatINR(gstCalculation.totalAmount)}</span>
+                  <span className="font-mono text-emerald-600 dark:text-emerald-400 ui-font-body">{formatINR(gstCalculation.totalAmount)}</span>
                 </div>
               </div>
 
               {/* Settlement Preference */}
               <div className="space-y-1">
-                <label className="text-[11px] font-bold text-zinc-700 dark:text-zinc-300 block">
+                <label className="text-[11px] font-bold text-zinc-700 dark:text-zinc-300 block ui-text-meta ui-weight-medium ui-label">
                   Settlement & Folio Preference
                 </label>
                 <select
                   value={paymentPreference}
                   onChange={(e: any) => setPaymentPreference(e.target.value)}
-                  className="w-full h-10 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs font-bold text-zinc-900 dark:text-white focus:outline-none focus:border-orange-500 cursor-pointer"
+                  className="w-full h-10 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-xs font-bold text-zinc-900 dark:text-white focus:outline-none focus:border-orange-500 cursor-pointer ui-radius-control ui-text-body ui-weight-medium ui-surface ui-field" aria-label="Settlement & Folio Preference"
                 >
                   {destinationType === "ROOM" && currentRoomObj?.isOccupied && (
                     <option value="POST_TO_ROOM">🏨 Post to Guest Room Folio (Room {selectedRoomNumber})</option>
@@ -1192,7 +1192,7 @@ export default function POSPage() {
                 type="button"
                 disabled={cartTotalItems === 0 || submitting}
                 onClick={handleFireKOT}
-                className="w-full h-12 rounded-2xl bg-orange-600 hover:bg-orange-700 text-white font-black text-sm transition shadow-lg disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
+                className="w-full h-12 rounded-2xl bg-orange-600 hover:bg-orange-700 text-white font-black text-sm transition shadow-lg disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer ui-radius-control ui-weight-medium ui-control"
               >
                 <Flame className="h-5 w-5" />
                 <span>{submitting ? "Firing KOT..." : "Fire KOT & Print Slip"}</span>
@@ -1210,15 +1210,15 @@ export default function POSPage() {
       {/* 4. TAB 3: RECENT KOTS & REPRINT HISTORY                                   */}
       {/* ========================================================================= */}
       {activeTab === "HISTORY" && (
-        <div className="rounded-3xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-[#121215] p-4 sm:p-5 shadow-xs space-y-4">
+        <div className="rounded-3xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-[#121215] p-4 sm:p-5 shadow-xs space-y-4 ui-radius-panel ui-shadow-quiet ui-surface">
           <div className="flex items-center justify-between pb-3 border-b border-zinc-200 dark:border-zinc-800">
             <div>
-              <h2 className="text-sm font-black text-zinc-900 dark:text-white">Recent Kitchen Order Tickets (KOT)</h2>
-              <p className="text-xs text-zinc-500">View and reprint all recently fired KOT slips</p>
+              <h2 className="text-sm font-black text-zinc-900 dark:text-white ui-weight-medium ui-section-title">Recent Kitchen Order Tickets (KOT)</h2>
+              <p className="text-xs text-zinc-500 ui-text-body">View and reprint all recently fired KOT slips</p>
             </div>
             <button
               onClick={loadPOSData}
-              className="h-8 px-3 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
+              className="h-8 px-3 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer ui-radius-control ui-text-body ui-weight-medium ui-control ui-control-sized"
             >
               <RefreshCw className="h-3.5 w-3.5" />
               <span>Refresh</span>
@@ -1226,8 +1226,8 @@ export default function POSPage() {
           </div>
 
           <div className="overflow-x-auto rounded-xl border border-zinc-200 dark:border-zinc-800">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-zinc-50/90 dark:bg-zinc-900/90 text-zinc-500 dark:text-zinc-400 text-[11px] uppercase font-semibold tracking-wider border-b border-zinc-200 dark:border-zinc-800">
+            <table className="w-full text-left text-xs ui-text-body ui-data-table">
+              <thead className="bg-zinc-50/90 dark:bg-zinc-900/90 text-zinc-500 dark:text-zinc-400 text-[11px] uppercase font-semibold tracking-wider border-b border-zinc-200 dark:border-zinc-800 ui-text-meta">
                 <tr>
                   <th className="px-4 py-3">KOT #</th>
                   <th className="px-4 py-3">Time</th>
@@ -1241,10 +1241,10 @@ export default function POSPage() {
               <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800/80">
                 {kotsList.map((kot) => (
                   <tr key={kot.id} className="hover:bg-zinc-50/80 dark:hover:bg-zinc-900/40 transition">
-                    <td className="px-4 py-3 font-mono font-medium text-orange-600 dark:text-orange-400">
+                    <td className="px-4 py-3 font-mono font-medium text-orange-600 dark:text-orange-400 ui-font-body">
                       {kot.kotNo}
                     </td>
-                    <td className="px-4 py-3 text-zinc-500 font-mono text-[11px]">
+                    <td className="px-4 py-3 text-zinc-500 font-mono text-[11px] ui-font-body ui-text-meta">
                       {new Date(kot.firedAt).toLocaleTimeString("en-GB")}
                     </td>
                     <td className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">
@@ -1252,12 +1252,12 @@ export default function POSPage() {
                     </td>
                     <td className="px-4 py-3 text-zinc-700 dark:text-zinc-300">
                       <span className="font-medium">{kot.totalItemsCount} Items</span>
-                      <span className="text-[11px] text-zinc-400 ml-1.5 font-mono">
+                      <span className="text-[11px] text-zinc-400 ml-1.5 font-mono ui-text-meta ui-font-body">
                         ({kot.lines.map((l: any) => `${l.name} ×${l.qty}`).join(", ")})
                       </span>
                     </td>
                     <td className="px-4 py-3">
-                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium border ${
+                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium border  ui-text-meta ${
                         kot.status === "QUEUED"
                           ? "bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800/50"
                           : kot.status === "PREPARING"
@@ -1270,13 +1270,13 @@ export default function POSPage() {
                         <span>{kot.status}</span>
                       </span>
                     </td>
-                    <td className="px-4 py-3 font-mono tabular-nums font-semibold text-right text-zinc-900 dark:text-zinc-100">
+                    <td className="px-4 py-3 font-mono tabular-nums font-semibold text-right text-zinc-900 dark:text-zinc-100 ui-font-body">
                       {formatINR(kot.totalAmount)}
                     </td>
                     <td className="px-4 py-3 text-right">
                       <button
                         onClick={() => handleReprintKot(kot)}
-                        className="h-8 px-2.5 rounded-md bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 font-medium text-xs transition inline-flex items-center gap-1.5 cursor-pointer shadow-xs border border-zinc-200 dark:border-zinc-700"
+                        className="h-8 px-2.5 rounded-md bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 font-medium text-xs transition inline-flex items-center gap-1.5 cursor-pointer shadow-xs border border-zinc-200 dark:border-zinc-700 ui-text-body ui-shadow-quiet ui-control ui-control-sized"
                       >
                         <Printer className="h-3 w-3 text-zinc-500" />
                         <span>Print KOT</span>
@@ -1302,8 +1302,8 @@ export default function POSPage() {
       {/* 5. CUSTOM OFF-MENU DISH MODAL                                             */}
       {/* ========================================================================= */}
       {showCustomItemModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in">
-          <div className="w-full max-w-md rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121215] p-5 shadow-2xl space-y-4 text-zinc-900 dark:text-white">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4  ">
+          <div className="w-full max-w-md rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121215] p-5 shadow-2xl space-y-4 text-zinc-900 dark:text-white ui-dialog-surface ui-surface">
             <div className="flex items-center justify-between pb-3 border-b border-zinc-200 dark:border-zinc-800">
               <div className="flex items-center gap-2">
                 <Plus className="h-4.5 w-4.5 text-orange-500" />
@@ -1311,60 +1311,60 @@ export default function POSPage() {
               </div>
               <button
                 onClick={() => setShowCustomItemModal(false)}
-                className="p-1 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400"
+                className="p-1 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 ui-control"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
 
-            <form onSubmit={handleAddCustomItem} className="space-y-3.5 text-xs">
+            <form onSubmit={handleAddCustomItem} className="space-y-3.5 text-xs ui-text-body">
               <div className="space-y-1">
-                <label className="text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider block">Dish / Item Name *</label>
+                <label className="text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider block ui-text-meta ui-label">Dish / Item Name *</label>
                 <input
                   type="text"
                   required
                   placeholder="e.g. Special Assam Black Tea / Chef Custom Fish"
                   value={customItemForm.name}
                   onChange={(e) => setCustomItemForm({ ...customItemForm, name: e.target.value })}
-                  className="w-full h-9 px-3 rounded-lg bg-white dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-zinc-100 font-medium placeholder:text-zinc-400 focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 focus:outline-none transition shadow-xs"
+                  className="w-full h-9 px-3 rounded-lg bg-white dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-zinc-100 font-medium placeholder:text-zinc-400 focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 focus:outline-none transition shadow-xs ui-text-body ui-shadow-quiet ui-field" aria-label="Dish / Item Name"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className="text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider block">Price (₹) *</label>
+                  <label className="text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider block ui-text-meta ui-label">Price (₹) *</label>
                   <input
                     type="number"
                     required
                     placeholder="250"
                     value={customItemForm.price}
                     onChange={(e) => setCustomItemForm({ ...customItemForm, price: e.target.value })}
-                    className="w-full h-9 px-3 rounded-lg bg-white dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 text-xs font-mono font-medium text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 focus:outline-none transition shadow-xs"
+                    className="w-full h-9 px-3 rounded-lg bg-white dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 text-xs font-mono font-medium text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 focus:outline-none transition shadow-xs ui-text-body ui-font-body ui-shadow-quiet ui-field" aria-label="Price (₹)"
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider block">Quantity</label>
+                  <label className="text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider block ui-text-meta ui-label">Quantity</label>
                   <input
                     type="number"
                     min="1"
                     value={customItemForm.qty}
                     onChange={(e) => setCustomItemForm({ ...customItemForm, qty: e.target.value })}
-                    className="w-full h-9 px-3 rounded-lg bg-white dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 text-xs font-mono font-medium text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 focus:outline-none transition shadow-xs"
+                    className="w-full h-9 px-3 rounded-lg bg-white dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 text-xs font-mono font-medium text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 focus:outline-none transition shadow-xs ui-text-body ui-font-body ui-shadow-quiet ui-field" aria-label="Quantity"
                   />
                 </div>
               </div>
 
               <div className="space-y-1">
-                <label className="text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider block">Dietary Type</label>
+                <label className="text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider block ui-text-meta ui-label">Dietary Type</label>
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
                     onClick={() => setCustomItemForm({ ...customItemForm, isVeg: true })}
-                    className={`flex-1 h-9 rounded-lg border text-xs font-medium flex items-center justify-center gap-1.5 cursor-pointer transition ${
+                    className={`flex-1 h-9 rounded-lg border text-xs font-medium flex items-center justify-center gap-1.5 cursor-pointer transition  ui-text-body ${
                       customItemForm.isVeg
                         ? "bg-emerald-50 dark:bg-emerald-950/40 border-emerald-500 text-emerald-700 dark:text-emerald-300"
                         : "bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-500 hover:bg-zinc-50"
-                    }`}
+                    } ui-control`}
                   >
                     <span className="h-2 w-2 rounded-full bg-emerald-500"></span>
                     <span>Pure Veg</span>
@@ -1372,11 +1372,11 @@ export default function POSPage() {
                   <button
                     type="button"
                     onClick={() => setCustomItemForm({ ...customItemForm, isVeg: false })}
-                    className={`flex-1 h-9 rounded-lg border text-xs font-medium flex items-center justify-center gap-1.5 cursor-pointer transition ${
+                    className={`flex-1 h-9 rounded-lg border text-xs font-medium flex items-center justify-center gap-1.5 cursor-pointer transition  ui-text-body ${
                       !customItemForm.isVeg
                         ? "bg-rose-50 dark:bg-rose-950/40 border-rose-500 text-rose-700 dark:text-rose-300"
                         : "bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-500 hover:bg-zinc-50"
-                    }`}
+                    } ui-control`}
                   >
                     <span className="h-2 w-2 rounded-full bg-rose-500"></span>
                     <span>Non-Veg</span>
@@ -1385,13 +1385,13 @@ export default function POSPage() {
               </div>
 
               <div className="space-y-1">
-                <label className="text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider block">Kitchen Prep Notes (Optional)</label>
+                <label className="text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider block ui-text-meta ui-label">Kitchen Prep Notes (Optional)</label>
                 <input
                   type="text"
                   placeholder="e.g. Mild spice, no garlic"
                   value={customItemForm.notes}
                   onChange={(e) => setCustomItemForm({ ...customItemForm, notes: e.target.value })}
-                  className="w-full h-9 px-3 rounded-lg bg-white dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 focus:outline-none transition shadow-xs"
+                  className="w-full h-9 px-3 rounded-lg bg-white dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 focus:outline-none transition shadow-xs ui-text-body ui-shadow-quiet ui-field" aria-label="Kitchen Prep Notes (Optional)"
                 />
               </div>
 
@@ -1399,13 +1399,13 @@ export default function POSPage() {
                 <button
                   type="button"
                   onClick={() => setShowCustomItemModal(false)}
-                  className="h-9 px-3.5 rounded-lg border border-zinc-200 dark:border-zinc-700 text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition cursor-pointer"
+                  className="h-9 px-3.5 rounded-lg border border-zinc-200 dark:border-zinc-700 text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition cursor-pointer ui-text-body ui-control ui-control-sized"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="h-9 px-4 rounded-lg bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-100 dark:hover:bg-zinc-200 text-white dark:text-zinc-900 font-medium text-xs shadow-xs transition cursor-pointer"
+                  className="h-9 px-4 rounded-lg bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-100 dark:hover:bg-zinc-200 text-white dark:text-zinc-900 font-medium text-xs shadow-xs transition cursor-pointer ui-text-body ui-shadow-quiet ui-control ui-control-sized"
                 >
                   Add to KOT
                 </button>
@@ -1419,16 +1419,16 @@ export default function POSPage() {
       {/* 6. PER-ITEM KITCHEN NOTE MODAL                                            */}
       {/* ========================================================================= */}
       {noteModalItem && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in">
-          <div className="w-full max-w-md rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121215] p-5 shadow-2xl space-y-4 text-zinc-900 dark:text-white">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4  ">
+          <div className="w-full max-w-md rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121215] p-5 shadow-2xl space-y-4 text-zinc-900 dark:text-white ui-dialog-surface ui-surface">
             <div className="flex items-center justify-between pb-3 border-b border-zinc-200 dark:border-zinc-800">
               <div>
                 <h3 className="text-sm font-semibold">Kitchen Instructions</h3>
-                <p className="text-xs text-zinc-500">{noteModalItem.name}</p>
+                <p className="text-xs text-zinc-500 ui-text-body">{noteModalItem.name}</p>
               </div>
               <button
                 onClick={() => setNoteModalItem(null)}
-                className="p-1 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400"
+                className="p-1 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 ui-control"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -1446,7 +1446,7 @@ export default function POSPage() {
                       const next = current ? `${current}, ${preset}` : preset;
                       setNoteModalItem({ ...noteModalItem, notes: next });
                     }}
-                    className="px-2.5 py-1 rounded-md bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 font-medium text-[11px] transition cursor-pointer border border-zinc-200/80 dark:border-zinc-700"
+                    className="px-2.5 py-1 rounded-md bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 font-medium text-[11px] transition cursor-pointer border border-zinc-200/80 dark:border-zinc-700 ui-text-meta ui-control"
                   >
                     + {preset}
                   </button>
@@ -1458,7 +1458,7 @@ export default function POSPage() {
                 placeholder="Type custom note for the chef..."
                 value={noteModalItem.notes}
                 onChange={(e) => setNoteModalItem({ ...noteModalItem, notes: e.target.value })}
-                className="w-full p-3 rounded-lg bg-white dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 text-xs focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 focus:outline-none font-medium transition shadow-xs"
+                className="w-full p-3 rounded-lg bg-white dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 text-xs focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 focus:outline-none font-medium transition shadow-xs ui-text-body ui-shadow-quiet ui-field" aria-label="Type custom note for the chef"
               />
             </div>
 
@@ -1466,7 +1466,7 @@ export default function POSPage() {
               <button
                 type="button"
                 onClick={() => setNoteModalItem(null)}
-                className="h-9 px-3.5 rounded-lg border border-zinc-200 dark:border-zinc-700 text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition cursor-pointer"
+                className="h-9 px-3.5 rounded-lg border border-zinc-200 dark:border-zinc-700 text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition cursor-pointer ui-text-body ui-control ui-control-sized"
               >
                 Cancel
               </button>
@@ -1476,7 +1476,7 @@ export default function POSPage() {
                   setItemNotes(noteModalItem.id, noteModalItem.notes);
                   setNoteModalItem(null);
                 }}
-                className="h-9 px-4 rounded-lg bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-100 dark:hover:bg-zinc-200 text-white dark:text-zinc-900 font-medium text-xs shadow-xs transition cursor-pointer"
+                className="h-9 px-4 rounded-lg bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-100 dark:hover:bg-zinc-200 text-white dark:text-zinc-900 font-medium text-xs shadow-xs transition cursor-pointer ui-text-body ui-shadow-quiet ui-control ui-control-sized"
               >
                 Save Note
               </button>

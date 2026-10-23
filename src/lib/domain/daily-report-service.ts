@@ -1,3 +1,8 @@
+import { reservationReceiptContext } from "./reservation-receipt-context";
+import { reportCashPosition } from "./report-cash";
+import { getStandalonePosReportEntries } from "./report-pos-revenue";
+import { summarizeReportLedger } from "../reports/report-ledger";
+import { reportDayBounds, reportDateOf } from "../reports/report-dates";
 import { prisma } from "../db/prisma";
 
 export interface DailyReportFilter {
@@ -76,24 +81,7 @@ export interface DailyReportResult {
 /**
  * Returns Date boundaries for 12 AM to 12 AM (00:00:00.000 to 23:59:59.999)
  */
-export function getMidnightDayBoundaries(dateStr: string) {
-  const [year, month, day] = dateStr.split("-").map(Number);
-  // Construct UTC/local range
-  const start = new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0));
-  const end = new Date(Date.UTC(year, month - 1, day, 23, 59, 59, 999));
-
-  // Local dates as well for flexible comparison
-  const localStart = new Date(year, month - 1, day, 0, 0, 0, 0);
-  const localEnd = new Date(year, month - 1, day, 23, 59, 59, 999);
-
-  return {
-    startUtc: start,
-    endUtc: end,
-    localStart,
-    localEnd,
-    dateStr,
-  };
-}
+export const getMidnightDayBoundaries = reportDayBounds;
 
 /**
  * Formats hour index (0..23) to 12-hour format string (e.g., "12 AM", "1 AM", "12 PM")
@@ -120,7 +108,7 @@ export async function getDailyMidnightReport(
   });
 
   const reportDate = targetDate || property.businessDate;
-  const { localStart, localEnd, startUtc, endUtc } = getMidnightDayBoundaries(reportDate);
+  const { localStart, localEnd, startUtc, endUtc } = getMidnightDayBoundaries(reportDate, property.timezone);
 
   // 1. Fetch Collections within the 12 AM - 12 AM Window
   const payments = await prisma.payment.findMany({
@@ -155,6 +143,7 @@ export async function getDailyMidnightReport(
       OR: [
         { businessDate: reportDate },
         {
+          businessDate: "",
           paidAt: {
             gte: localStart < startUtc ? localStart : startUtc,
             lte: localEnd > endUtc ? localEnd : endUtc,
@@ -171,9 +160,11 @@ export async function getDailyMidnightReport(
     where: {
       propertyId,
       status: "POSTED",
+      type: { in: ["CHARGE", "ADJUSTMENT"] },
       OR: [
         { serviceDate: reportDate },
         {
+          serviceDate: "",
           postedAt: {
             gte: localStart < startUtc ? localStart : startUtc,
             lte: localEnd > endUtc ? localEnd : endUtc,
@@ -196,20 +187,17 @@ export async function getDailyMidnightReport(
   });
 
   // Filter in-house on this date
-  const inHouseStays = stays.filter((s) => {
-    if (s.status === "IN_HOUSE") return true;
-    const arr = s.arrivalAt.toISOString().split("T")[0];
-    const dep = s.expectedDepartureAt.toISOString().split("T")[0];
-    return reportDate >= arr && reportDate <= dep;
-  });
+  const inHouseStays = stays.filter(s =>
+    ["IN_HOUSE", "CHECKED_OUT"].includes(s.status) && s.arrivalAt <= endUtc &&
+    (!s.actualDepartureAt || s.actualDepartureAt > endUtc));
 
   const checkInsCount = stays.filter((s) => {
-    const arr = s.arrivalAt.toISOString().split("T")[0];
+    const arr = reportDateOf(s.arrivalAt, property.timezone);
     return arr === reportDate;
   }).length;
 
   const checkOutsCount = stays.filter((s) => {
-    const dep = s.expectedDepartureAt.toISOString().split("T")[0];
+    const dep = reportDateOf(s.actualDepartureAt || s.expectedDepartureAt, property.timezone);
     return dep === reportDate && (s.status === "CHECKED_OUT" || s.status === "IN_HOUSE");
   }).length;
 
@@ -240,9 +228,11 @@ export async function getDailyMidnightReport(
 
   let totalCollections = 0;
   let validCollectionsCount = 0;
+  const reservationContext = await reservationReceiptContext(payments);
   const formattedCollections = payments.map((p) => {
-    let payerName = "Guest";
-    let roomNumber = "-";
+    const booking = reservationContext.get(p.id);
+    let payerName = booking?.guestName || "Guest";
+    let roomNumber = booking?.roomNumbers || "-";
 
     if (p.payerSnapshot) {
       try {
@@ -325,6 +315,7 @@ export async function getDailyMidnightReport(
       flow: "INFLOW",
       party: payerName,
       roomNumber,
+      reservationNo: booking?.reservationNo,
       amount: p.amount,
       method: p.method,
       sourceCategory,
@@ -380,35 +371,13 @@ export async function getDailyMidnightReport(
   });
 
   // 7. Cash Drawer Position & Opening Balance Carry-Forward
-  const priorCutoff = localStart < startUtc ? localStart : startUtc;
-  const priorCashPayments = await prisma.payment.findMany({
-    where: {
-      propertyId,
-      method: "CASH",
-      status: "SUCCEEDED",
-      receivedAt: { lt: priorCutoff },
-    },
-    select: { amount: true },
-  });
+  const cash = await reportCashPosition(propertyId, startUtc, endUtc, property.openingCashBalance || 0);
+  const baseOpening = property.openingCashBalance || 0;
+  const openingBalance = cash.opening;
+  const cashIn = cash.received;
+  const cashOut = cash.paid;
+  const netCashInHand = cash.closing;
 
-  const priorCashExpenses = await prisma.expense.findMany({
-    where: {
-      propertyId,
-      status: "PAID",
-      paymentMethod: "CASH",
-      paidAt: { lt: priorCutoff },
-    },
-    select: { totalAmount: true },
-  });
-
-  const priorCashIn = priorCashPayments.reduce((sum, p) => sum + p.amount, 0);
-  const priorCashOut = priorCashExpenses.reduce((sum, e) => sum + e.totalAmount, 0);
-  const baseOpening = (property as any).openingCashBalance || 0;
-  const openingBalance = Math.max(0, Math.round((baseOpening + priorCashIn - priorCashOut) * 100) / 100);
-
-  const cashIn = collectionsByMethod["CASH"] || 0;
-  const cashOut = expensesByMethod["CASH"] || 0;
-  const netCashInHand = Math.round((openingBalance + cashIn - cashOut) * 100) / 100;
   const netCashFlow = totalCollections - totalExpenses;
 
   // 8. Revenue & Tax Calculations
@@ -421,40 +390,22 @@ export async function getDailyMidnightReport(
   let sgstAmount = 0;
   let igstAmount = 0;
 
-  folioEntries.forEach((entry) => {
-    taxableAmount += entry.taxableAmount;
-    const entryTax = entry.totalAmount - entry.taxableAmount;
-    totalTax += entryTax;
-
-    if (entry.chargeCode === "ROOM_TARIFF") {
-      roomRevenue += entry.taxableAmount;
-    } else if (entry.chargeCode === "RESTAURANT_FOOD" || entry.chargeCode.includes("FB")) {
-      fbRevenue += entry.taxableAmount;
-    } else {
-      otherRevenue += entry.taxableAmount;
-    }
-
-    if (entry.taxComponentsJson) {
-      try {
-        const comps = JSON.parse(entry.taxComponentsJson);
-        cgstAmount += comps.cgstAmount || 0;
-        sgstAmount += comps.sgstAmount || 0;
-        igstAmount += comps.igstAmount || 0;
-      } catch (e) {
-        cgstAmount += entryTax / 2;
-        sgstAmount += entryTax / 2;
-      }
-    } else {
-      cgstAmount += entryTax / 2;
-      sgstAmount += entryTax / 2;
-    }
-  });
+  const standalonePos = await getStandalonePosReportEntries(propertyId, property.timezone, reportDate);
+  const ledger = summarizeReportLedger([...folioEntries, ...standalonePos]);
+  taxableAmount = ledger.total.base;
+  totalTax = ledger.total.tax;
+  roomRevenue = ledger.roomBase;
+  fbRevenue = ledger.streams.food.base;
+  otherRevenue = ledger.total.base - roomRevenue - fbRevenue;
+  cgstAmount = ledger.total.cgst;
+  sgstAmount = ledger.total.sgst;
+  igstAmount = ledger.total.igst;
 
   const grossRevenue = taxableAmount + totalTax;
 
   // 9. PMS Key Performance Indicators
   const totalRooms = property.rooms.length;
-  const roomsSold = inHouseStays.length;
+  const roomsSold = new Set(inHouseStays.flatMap(s => s.roomAssignments.filter(a => a.startsAt <= endUtc && (!a.endsAt || a.endsAt > endUtc)).map(a => a.roomId))).size;
   const availableRooms = Math.max(0, totalRooms - roomsSold);
   const occupancyPct = totalRooms > 0 ? Math.round((roomsSold / totalRooms) * 1000) / 10 : 0;
   const adr = roomsSold > 0 ? Math.round((roomRevenue / roomsSold) * 100) / 100 : 0;
@@ -504,7 +455,7 @@ export async function getDailyMidnightReport(
       type: "COLLECTION",
       flow: "INFLOW",
       party: c.party,
-      particulars: `Room ${c.roomNumber} (${c.sourceLabel})`,
+      particulars: c.reservationNo ? `Reservation ${c.reservationNo} advance · Room ${c.roomNumber}` : `Room ${c.roomNumber} (${c.sourceLabel})`,
       method: c.method,
       amount: c.amount,
       time: c.time,

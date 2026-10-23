@@ -1,3 +1,4 @@
+import { authorizeRequest, getApiAccess } from "@/lib/auth/api-access";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { verifyPassword } from "@/lib/auth/password";
@@ -7,6 +8,10 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export async function POST(request: Request) {
+  const access = await authorizeRequest(request);
+  if (access instanceof Response) return access;
+  request = access.request;
+
   try {
     const body = await request.json().catch(() => ({}));
     const { filename, passwordOrPin, userId } = body;
@@ -25,45 +30,8 @@ export async function POST(request: Request) {
       );
     }
 
-    const cleanInput = passwordOrPin.trim();
-
-    // 1. Verify against Master Admin or Owner credentials
-    let isAuthorized = false;
-
-    // Direct check against master passwords
-    if (verifyPassword(cleanInput)) {
-      isAuthorized = true;
-    } else {
-      // Find Org Owner or target user in database
-      const ownerUser = await prisma.user.findFirst({
-        where: userId
-          ? { id: userId }
-          : {
-              OR: [
-                { id: "usr_bijesh" },
-                { email: "bijesh.singha@hotelos.in" },
-                {
-                  memberships: {
-                    some: {
-                      propertyGrants: {
-                        some: { role: { code: "ORG_OWNER" } },
-                      },
-                    },
-                  },
-                },
-              ],
-            },
-      });
-
-      if (ownerUser) {
-        isAuthorized = verifyPassword(
-          cleanInput,
-          (ownerUser as any).passwordHash,
-          (ownerUser as any).pin
-        );
-      }
-    }
-
+    const user = getApiAccess(request).user;
+    const isAuthorized = verifyPassword(passwordOrPin, user.passwordHash, user.pin);
     if (!isAuthorized) {
       return NextResponse.json(
         { error: "Incorrect Super Admin password or security PIN. Database restore aborted." },

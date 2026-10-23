@@ -1,3 +1,7 @@
+import { reportCashPosition } from "./report-cash";
+import { getStandalonePosReportEntries } from "./report-pos-revenue";
+import { summarizeReportLedger } from "../reports/report-ledger";
+import { reportDateOf } from "../reports/report-dates";
 import { prisma } from "../db/prisma";
 import { getMidnightDayBoundaries } from "./daily-report-service";
 import { resolveSelectedProperty } from "../config/property-config";
@@ -174,7 +178,7 @@ export async function getComprehensiveHotelReport(
 
   const propertyId = property.id;
   const reportDate = params.date || property.businessDate || new Date().toISOString().split("T")[0];
-  const { localStart, localEnd, startUtc, endUtc } = getMidnightDayBoundaries(reportDate);
+  const { localStart, localEnd, startUtc, endUtc } = getMidnightDayBoundaries(reportDate, property.timezone);
 
   const filterWindow = {
     gte: localStart < startUtc ? localStart : startUtc,
@@ -210,7 +214,7 @@ export async function getComprehensiveHotelReport(
       status: "PAID",
       OR: [
         { businessDate: reportDate },
-        { paidAt: filterWindow },
+        { businessDate: "", paidAt: filterWindow },
       ],
     },
     orderBy: { paidAt: "desc" },
@@ -221,10 +225,10 @@ export async function getComprehensiveHotelReport(
     where: {
       propertyId,
       status: "POSTED",
-      type: "CHARGE",
+      type: { in: ["CHARGE", "ADJUSTMENT"] },
       OR: [
         { serviceDate: reportDate },
-        { postedAt: filterWindow },
+        { serviceDate: "", postedAt: filterWindow },
       ],
     },
   });
@@ -242,8 +246,8 @@ export async function getComprehensiveHotelReport(
         roomAssignments: { include: { room: { include: { roomType: true } } } },
         folio: {
           include: {
-            entries: { where: { status: "POSTED" } },
-            payments: { where: { status: "SUCCEEDED" } },
+            entries: { where: { status: "POSTED", type: { in: ["CHARGE", "ADJUSTMENT"] }, serviceDate: { lte: reportDate } } },
+            payments: { where: { status: "SUCCEEDED", receivedAt: { lte: endUtc } } },
           },
         },
       },
@@ -392,36 +396,13 @@ export async function getComprehensiveHotelReport(
   });
 
   // 9. Process Financials: Cash Drawer Reconciliation
-  const priorCutoff = filterWindow.gte;
-  const [priorCashPayments, priorCashExpenses] = await Promise.all([
-    prisma.payment.findMany({
-      where: {
-        propertyId,
-        method: "CASH",
-        status: "SUCCEEDED",
-        receivedAt: { lt: priorCutoff },
-      },
-      select: { amount: true },
-    }),
-    prisma.expense.findMany({
-      where: {
-        propertyId,
-        status: "PAID",
-        paymentMethod: "CASH",
-        paidAt: { lt: priorCutoff },
-      },
-      select: { totalAmount: true },
-    }),
-  ]);
-
-  const priorCashIn = priorCashPayments.reduce((s, p) => s + p.amount, 0);
-  const priorCashOut = priorCashExpenses.reduce((s, e) => s + e.totalAmount, 0);
+  const cash = await reportCashPosition(propertyId, startUtc, endUtc, property.openingCashBalance || 0);
   const baseOpening = property.openingCashBalance || 0;
-  const openingBalance = Math.round((baseOpening + priorCashIn - priorCashOut) * 100) / 100;
+  const openingBalance = cash.opening;
+  const cashIn = cash.received;
+  const cashOut = cash.paid;
+  const netCashInHand = cash.closing;
 
-  const cashIn = collectionsByMethod["CASH"] || 0;
-  const cashOut = expensesByMethod["CASH"] || 0;
-  const netCashInHand = Math.round((openingBalance + cashIn - cashOut) * 100) / 100;
   const netCashFlow = totalCollections - totalExpenses;
 
   // 10. Process Financials: Revenue & GST Journal
@@ -434,48 +415,26 @@ export async function getComprehensiveHotelReport(
   let sgstAmount = 0;
   let igstAmount = 0;
 
-  folioEntries.forEach((entry) => {
-    taxableTurnover += entry.taxableAmount || 0;
-    const tax = entry.totalAmount - (entry.taxableAmount || 0);
-    totalTaxes += tax;
-
-    const code = (entry.chargeCode || "").toUpperCase();
-    if (code === "ROOM_TARIFF" || code === "STAY_EXTENSION") {
-      roomRevenue += entry.taxableAmount || 0;
-    } else if (code.includes("FOOD") || code.includes("RESTAURANT") || code.includes("DINING")) {
-      fbRevenue += entry.taxableAmount || 0;
-    } else {
-      ancillaryRevenue += entry.taxableAmount || 0;
-    }
-
-    if (entry.taxComponentsJson) {
-      try {
-        const comp = JSON.parse(entry.taxComponentsJson);
-        cgstAmount += Number(comp.cgstAmount || 0);
-        sgstAmount += Number(comp.sgstAmount || 0);
-        igstAmount += Number(comp.igstAmount || 0);
-      } catch (e) {
-        cgstAmount += tax / 2;
-        sgstAmount += tax / 2;
-      }
-    } else {
-      cgstAmount += tax / 2;
-      sgstAmount += tax / 2;
-    }
-  });
+  const standalonePos = await getStandalonePosReportEntries(propertyId, property.timezone, reportDate);
+  const ledger = summarizeReportLedger([...folioEntries, ...standalonePos]);
+  taxableTurnover = ledger.total.base;
+  totalTaxes = ledger.total.tax;
+  roomRevenue = ledger.roomBase;
+  fbRevenue = ledger.streams.food.base;
+  ancillaryRevenue = ledger.total.base - roomRevenue - fbRevenue;
+  cgstAmount = ledger.total.cgst;
+  sgstAmount = ledger.total.sgst;
+  igstAmount = ledger.total.igst;
 
   const grossRevenue = taxableTurnover + totalTaxes;
 
   // 11. Process Rooms & Occupancy KPIs
-  const inHouseStays = stays.filter((s) => {
-    if (s.status === "IN_HOUSE") return true;
-    const arr = s.arrivalAt.toISOString().split("T")[0];
-    const dep = s.expectedDepartureAt.toISOString().split("T")[0];
-    return reportDate >= arr && reportDate <= dep;
-  });
+  const inHouseStays = stays.filter(s =>
+    ["IN_HOUSE", "CHECKED_OUT"].includes(s.status) && s.arrivalAt <= endUtc &&
+    (!s.actualDepartureAt || s.actualDepartureAt > endUtc));
 
   const totalRooms = allRooms.length;
-  const occupiedRooms = inHouseStays.length;
+  const occupiedRooms = new Set(inHouseStays.flatMap(s => s.roomAssignments.filter(a => a.startsAt <= endUtc && (!a.endsAt || a.endsAt > endUtc)).map(a => a.roomId))).size;
   const vacantRooms = Math.max(0, totalRooms - occupiedRooms);
   const occupancyPct = totalRooms > 0 ? Math.round((occupiedRooms / totalRooms) * 1000) / 10 : 0;
   const adr = occupiedRooms > 0 ? Math.round(roomRevenue / occupiedRooms) : 0;
@@ -488,11 +447,11 @@ export async function getComprehensiveHotelReport(
   });
 
   const arrivalsToday = stays.filter(
-    (s) => s.arrivalAt.toISOString().split("T")[0] === reportDate
+    (s) => reportDateOf(s.arrivalAt, property.timezone) === reportDate
   ).length + reservationsToday.length;
 
   const departuresToday = stays.filter(
-    (s) => (s.actualDepartureAt || s.expectedDepartureAt).toISOString().split("T")[0] === reportDate
+    (s) => reportDateOf(s.actualDepartureAt || s.expectedDepartureAt, property.timezone) === reportDate
   ).length;
 
   // Room status distribution
@@ -529,7 +488,7 @@ export async function getComprehensiveHotelReport(
       roomType,
       guestName: s.primaryGuest.name,
       phone: s.primaryGuest.phone || "-",
-      checkInDate: s.arrivalAt.toISOString().split("T")[0],
+      checkInDate: reportDateOf(s.arrivalAt, property.timezone),
       expectedDeparture: s.expectedDepartureAt.toISOString().split("T")[0],
       totalCharges: Math.round(totalCharges * 100) / 100,
       totalPaid: Math.round(totalPaid * 100) / 100,

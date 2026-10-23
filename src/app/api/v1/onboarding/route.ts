@@ -1,11 +1,17 @@
+import { authorizeRequest, getApiAccess } from "@/lib/auth/api-access";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { OnboardingService } from "@/lib/onboarding/onboarding-service";
 import { OnboardingPropertyData } from "@/lib/onboarding/types";
 
-export async function GET() {
+export async function GET(request: Request) {
+  const access = await authorizeRequest(request);
+  if (access instanceof Response) return access;
+  request = access.request;
+
   try {
     const existingProperties = await prisma.property.findMany({
+      where: { organizationId: getApiAccess(request).property.organizationId },
       select: {
         id: true,
         code: true,
@@ -74,6 +80,10 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const access = await authorizeRequest(request);
+  if (access instanceof Response) return access;
+  request = access.request;
+
   try {
     const body: OnboardingPropertyData = await request.json();
     const result = await OnboardingService.onboardProperty(body);

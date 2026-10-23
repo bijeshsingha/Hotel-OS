@@ -110,23 +110,23 @@ export function AddRoomModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in">
-      <div className="bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-xl p-5 max-w-lg w-full space-y-4 shadow-xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs  ">
+      <div className="bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-xl p-5 max-w-lg w-full space-y-4 shadow-xl ui-surface">
         <div className="flex items-center justify-between border-b border-zinc-200/70 dark:border-zinc-800/70 pb-3">
           <div className="flex items-center gap-2">
             <Plus className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-            <h2 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
+            <h2 className="text-sm font-bold text-zinc-900 dark:text-zinc-100 ui-weight-medium ui-section-title">
               Attach Room to In-House Guest
             </h2>
           </div>
-          <button onClick={onClose} className="p-1 rounded-md text-zinc-400 hover:text-zinc-600">
+          <button onClick={onClose} className="p-1 rounded-md text-zinc-400 hover:text-zinc-600 ui-control">
             <X className="h-4 w-4" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-3.5 text-xs">
+        <form onSubmit={handleSubmit} className="space-y-3.5 text-xs ui-text-body">
           <div>
-            <label className="block text-zinc-700 dark:text-zinc-300 font-medium mb-1">
+            <label className="block text-zinc-700 dark:text-zinc-300 font-medium mb-1 ui-label">
               Select In-House Guest *
             </label>
             <select
@@ -140,7 +140,7 @@ export function AddRoomModal({
                   setExtraBedRate(String(stayExtra));
                 }
               }}
-              className="w-full h-9 px-2.5 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none"
+              className="w-full h-9 px-2.5 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none ui-text-body ui-field" aria-label="Select In-House Guest"
             >
               <option value="">-- Choose In-House Guest --</option>
               {stays
@@ -163,7 +163,7 @@ export function AddRoomModal({
           </div>
 
           <div>
-            <label className="block text-zinc-700 dark:text-zinc-300 font-medium mb-1">
+            <label className="block text-zinc-700 dark:text-zinc-300 font-medium mb-1 ui-label">
               Select Vacant Room to Attach *
             </label>
             <select
@@ -178,7 +178,7 @@ export function AddRoomModal({
                 const defaultExtra = stayExtra !== null ? stayExtra : getRoomDefaultExtraRate(r);
                 setExtraBedRate(String(defaultExtra));
               }}
-              className="w-full h-9 px-2.5 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none"
+              className="w-full h-9 px-2.5 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none ui-text-body ui-field" aria-label="Select Vacant Room to Attach"
             >
               <option value="">Select Vacant Room</option>
               {vacantRooms.map((r) => (
@@ -191,7 +191,7 @@ export function AddRoomModal({
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
             <div>
-              <label className="block text-zinc-700 dark:text-zinc-300 font-medium mb-1">
+              <label className="block text-zinc-700 dark:text-zinc-300 font-medium mb-1 ui-label">
                 Agreed Rate / Night (₹)
               </label>
               <input
@@ -200,29 +200,29 @@ export function AddRoomModal({
                 value={isComplimentary ? "0" : agreedTariff}
                 onChange={(e) => setAgreedTariff(e.target.value)}
                 placeholder="0"
-                className="w-full h-9 px-2.5 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 font-mono text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none disabled:opacity-50 font-bold"
+                className="w-full h-9 px-2.5 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 font-mono text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none disabled:opacity-50 font-bold ui-font-body ui-text-body ui-weight-medium ui-field" aria-label="Agreed Rate / Night (₹)"
               />
             </div>
 
             <div>
-              <label className="block text-zinc-700 dark:text-zinc-300 font-medium mb-1">
+              <label className="block text-zinc-700 dark:text-zinc-300 font-medium mb-1 ui-label">
                 Extra Pax (Count)
               </label>
               <div className="h-9 flex items-center justify-between px-2 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800">
                 <button
                   type="button"
                   onClick={() => setExtraBeds((b) => Math.max(0, b - 1))}
-                  className="p-1 text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 cursor-pointer"
-                  title="Decrease Extra Pax"
+                  className="p-1 text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 cursor-pointer ui-control"
+                  title="Decrease Extra Pax" aria-label="Decrease Extra Pax"
                 >
                   <Minus className="h-3 w-3" />
                 </button>
-                <span className="font-mono font-bold text-xs">{extraBeds} Pax</span>
+                <span className="font-mono font-bold text-xs ui-font-body ui-weight-medium ui-text-body">{extraBeds} Pax</span>
                 <button
                   type="button"
                   onClick={() => setExtraBeds((b) => b + 1)}
-                  className="p-1 text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 cursor-pointer"
-                  title="Increase Extra Pax"
+                  className="p-1 text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 cursor-pointer ui-control"
+                  title="Increase Extra Pax" aria-label="Increase Extra Pax"
                 >
                   <Plus className="h-3 w-3" />
                 </button>
@@ -230,7 +230,7 @@ export function AddRoomModal({
             </div>
 
             <div>
-              <label className="block text-zinc-700 dark:text-zinc-300 font-medium mb-1">
+              <label className="block text-zinc-700 dark:text-zinc-300 font-medium mb-1 ui-label">
                 Extra Pax Rate (₹/Nt)
               </label>
               <input
@@ -239,23 +239,23 @@ export function AddRoomModal({
                 value={isComplimentary ? "0" : extraBedRate}
                 onChange={(e) => setExtraBedRate(e.target.value)}
                 placeholder="300"
-                className="w-full h-9 px-2.5 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 font-mono text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none disabled:opacity-50 font-bold"
+                className="w-full h-9 px-2.5 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 font-mono text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none disabled:opacity-50 font-bold ui-font-body ui-text-body ui-weight-medium ui-field" aria-label="Extra Pax Rate (₹/Nt)"
               />
             </div>
           </div>
 
           {extraBeds > 0 && (
-            <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200/80 dark:border-amber-800/60 text-xs">
+            <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200/80 dark:border-amber-800/60 text-xs ui-text-body">
               <span className="text-amber-800 dark:text-amber-300 font-medium">
                 Extra Pax Surcharge:
               </span>
-              <span className="font-mono font-bold text-amber-900 dark:text-amber-200">
+              <span className="font-mono font-bold text-amber-900 dark:text-amber-200 ui-font-body ui-weight-medium">
                 {extraBeds} Pax x ₹{isComplimentary ? 0 : Number(extraBedRate) || 0} = +₹{extraBeds * (isComplimentary ? 0 : Number(extraBedRate) || 0)} / night
               </span>
             </div>
           )}
 
-          <label className="flex items-center gap-2 cursor-pointer pt-1">
+          <label className="flex items-center gap-2 cursor-pointer pt-1 ui-label">
             <input
               type="checkbox"
               checked={isComplimentary}
@@ -263,7 +263,7 @@ export function AddRoomModal({
                 setIsComplimentary(e.target.checked);
                 if (e.target.checked) setAgreedTariff("0");
               }}
-              className="rounded border-zinc-300 text-blue-600"
+              className="rounded border-zinc-300 text-blue-600 ui-field"
             />
             <span className="text-zinc-700 dark:text-zinc-300">
               Complimentary Room (₹0 Free Stay)
@@ -274,14 +274,14 @@ export function AddRoomModal({
             <button
               type="button"
               onClick={onClose}
-              className="px-3 py-1.5 rounded-lg text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 text-xs font-semibold"
+              className="px-3 py-1.5 rounded-lg text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 text-xs font-semibold ui-text-body ui-control"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="px-4 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold disabled:opacity-50 cursor-pointer"
+              className="px-4 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold disabled:opacity-50 cursor-pointer ui-text-body ui-control"
             >
               {loading ? "Adding..." : "Add Room to Stay"}
             </button>

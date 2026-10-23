@@ -1,8 +1,13 @@
+import { authorizeRequest, getApiAccess } from "@/lib/auth/api-access";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { calculateGST } from "@/lib/gst/calculator";
 
 export async function POST(request: Request) {
+  const access = await authorizeRequest(request);
+  if (access instanceof Response) return access;
+  request = access.request;
+
   try {
     const body = await request.json();
     const {
@@ -58,9 +63,50 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Room not found." }, { status: 404 });
     }
 
+    if (room.propertyId !== stay.propertyId) {
+      return NextResponse.json(
+        { error: `Room ${room.number} belongs to a different property.` },
+        { status: 400 }
+      );
+    }
+
+    if (!room.active) {
+      return NextResponse.json(
+        { error: `Room ${room.number} is inactive.` },
+        { status: 400 }
+      );
+    }
+
     if (room.roomState?.occupancyStatus === "OCCUPIED") {
       return NextResponse.json(
         { error: `Room ${room.number} is already occupied.` },
+        { status: 400 }
+      );
+    }
+
+    if (room.roomState?.sellabilityStatus !== "SELLABLE") {
+      return NextResponse.json(
+        { error: `Room ${room.number} is ${room.roomState?.sellabilityStatus}. Cannot add to stay.` },
+        { status: 400 }
+      );
+    }
+
+    if (!["CLEAN", "INSPECTED"].includes(room.roomState.housekeepingStatus)) {
+      return NextResponse.json({ error: `Room ${room.number} must be cleaned before assigning it to a guest.` }, { status: 409 });
+    }
+
+    const now = new Date();
+    const activeBlock = await prisma.roomBlock.findFirst({
+      where: {
+        roomId: room.id,
+        status: "ACTIVE",
+        startsAt: { lte: now },
+        OR: [{ endsAt: null }, { endsAt: { gt: now } }],
+      },
+    });
+    if (activeBlock) {
+      return NextResponse.json(
+        { error: `Room ${room.number} is currently blocked (${activeBlock.type}: ${activeBlock.reason}).` },
         { status: 400 }
       );
     }

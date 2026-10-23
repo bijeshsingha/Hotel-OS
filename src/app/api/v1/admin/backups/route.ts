@@ -1,3 +1,4 @@
+import { authorizeRequest, getApiAccess } from "@/lib/auth/api-access";
 import { NextResponse } from "next/server";
 import {
   listBackups,
@@ -9,7 +10,11 @@ import {
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-export async function GET() {
+export async function GET(request: Request) {
+  const access = await authorizeRequest(request);
+  if (access instanceof Response) return access;
+  request = access.request;
+
   try {
     const stats = getActiveDbStats();
     const backups = listBackups();
@@ -28,6 +33,10 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const access = await authorizeRequest(request);
+  if (access instanceof Response) return access;
+  request = access.request;
+
   try {
     const body = await request.json().catch(() => ({}));
     const note = body?.note;
@@ -49,6 +58,10 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE(request: Request) {
+  const access = await authorizeRequest(request);
+  if (access instanceof Response) return access;
+  request = access.request;
+
   try {
     const { searchParams } = new URL(request.url);
     let filename = searchParams.get("filename");

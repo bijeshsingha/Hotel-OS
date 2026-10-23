@@ -126,9 +126,9 @@ export function RoomGrid({
 
   if (rooms.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center p-14 text-center rounded-2xl bg-white dark:bg-[#121215] border border-zinc-200/80 dark:border-zinc-800">
+      <div className="flex flex-col items-center justify-center p-14 text-center rounded-2xl bg-white dark:bg-[#121215] border border-zinc-200/80 dark:border-zinc-800 ui-radius-panel ui-surface">
         <AlertCircle className="h-10 w-10 text-zinc-400 dark:text-zinc-600 mb-3" />
-        <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100">
+        <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100 ui-weight-medium">
           No rooms match your filter criteria
         </h3>
         <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1 max-w-sm">
@@ -142,7 +142,7 @@ export function RoomGrid({
     <div className="space-y-6">
       {/* Global Grouping Header with Expand/Collapse All */}
       <div className="flex items-center justify-between gap-3 px-1">
-        <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+        <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 ui-text-body">
           <LayoutGrid className="h-3.5 w-3.5 text-zinc-400" />
           <span>
             {sortBy === "CATEGORY"
@@ -159,8 +159,8 @@ export function RoomGrid({
           <button
             type="button"
             onClick={toggleAll}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-zinc-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white bg-zinc-100 hover:bg-zinc-200/80 dark:bg-zinc-800 dark:hover:bg-zinc-700/80 transition cursor-pointer"
-            title={allCollapsed ? "Expand all categories" : "Collapse all categories"}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-zinc-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white bg-zinc-100 hover:bg-zinc-200/80 dark:bg-zinc-800 dark:hover:bg-zinc-700/80 transition cursor-pointer ui-text-body ui-control"
+            title={allCollapsed ? "Expand all categories" : "Collapse all categories"} aria-label={allCollapsed ? "Expand all categories" : "Collapse all categories"}
           >
             {allCollapsed ? (
               <>
@@ -202,7 +202,7 @@ export function RoomGrid({
         return (
           <div
             key={group.key}
-            className="space-y-4 rounded-2xl border border-zinc-200/80 dark:border-zinc-800/80 bg-zinc-50/40 dark:bg-zinc-900/20 p-3 sm:p-4.5 transition-all"
+            className="space-y-4 rounded-2xl border border-zinc-200/80 dark:border-zinc-800/80 bg-zinc-50/40 dark:bg-zinc-900/20 p-3 sm:p-4.5 transition-colors ui-radius-panel"
           >
             {/* Clickable Header Bar */}
             <div
@@ -218,24 +218,24 @@ export function RoomGrid({
               }}
             >
               <div className="flex items-center gap-2.5 min-w-0">
-                <span className="p-1 rounded-lg bg-white dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 shadow-xs border border-zinc-200/80 dark:border-zinc-700/80 group-hover:scale-105 transition">
+                <span className="p-1 rounded-lg bg-white dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 shadow-xs border border-zinc-200/80 dark:border-zinc-700/80 group-hover:scale-105 transition ui-shadow-quiet">
                   {isCollapsed ? (
                     <ChevronRight className="h-4 w-4 text-zinc-600 dark:text-zinc-300" />
                   ) : (
                     <ChevronDown className="h-4 w-4 text-zinc-600 dark:text-zinc-300" />
                   )}
                 </span>
-                <span className="text-sm sm:text-base font-bold uppercase tracking-wider text-zinc-900 dark:text-zinc-100 truncate">
+                <span className="text-sm sm:text-base font-bold uppercase tracking-wider text-zinc-900 dark:text-zinc-100 truncate ui-weight-medium">
                   {group.title}
                 </span>
-                <span className="text-xs font-mono font-semibold px-2 py-0.5 rounded-full bg-zinc-200/80 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 shrink-0">
+                <span className="text-xs font-mono font-semibold px-2 py-0.5 rounded-full bg-zinc-200/80 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 shrink-0 ui-text-body ui-font-body">
                   {group.rooms.length} {group.rooms.length === 1 ? "room" : "rooms"}
                 </span>
               </div>
 
               {/* Status summary preview & Expand/Minimize action badge */}
               <div className="flex items-center gap-2.5 sm:gap-4 shrink-0">
-                <div className="hidden md:flex items-center gap-2.5 text-xs font-semibold">
+                <div className="hidden md:flex items-center gap-2.5 text-xs font-semibold ui-text-body">
                   {readyCount > 0 && (
                     <span className="inline-flex items-center gap-1 text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded-md border border-emerald-200/60 dark:border-emerald-900/60">
                       <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
@@ -262,7 +262,7 @@ export function RoomGrid({
                   )}
                 </div>
 
-                <span className="inline-flex items-center text-xs font-semibold px-2.5 py-1 rounded-lg bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 shadow-xs group-hover:bg-zinc-50 dark:group-hover:bg-zinc-700 transition">
+                <span className="inline-flex items-center text-xs font-semibold px-2.5 py-1 rounded-lg bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 shadow-xs group-hover:bg-zinc-50 dark:group-hover:bg-zinc-700 transition ui-text-body ui-shadow-quiet">
                   {isCollapsed ? "Expand" : "Minimize"}
                 </span>
               </div>
@@ -270,7 +270,7 @@ export function RoomGrid({
 
             {/* Room Cards Grid (Visible when not minimized) */}
             {!isCollapsed && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6 pt-1 animate-in fade-in duration-150">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6 pt-1   duration-150">
                 {group.rooms.map((room) => (
                   <RoomCard
                     key={room.id}

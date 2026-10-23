@@ -3,7 +3,7 @@
 import React, { useRef } from "react";
 import { Printer, Download, X, Building2, Calendar, ShieldCheck, Mail } from "lucide-react";
 import { formatINR } from "@/lib/gst/calculator";
-import { ComprehensiveHotelReport } from "@/lib/domain/comprehensive-report-service";
+import type { ComprehensiveHotelReport } from "@/lib/domain/comprehensive-report-service";
 
 interface PrintableComprehensiveReportProps {
   isOpen: boolean;

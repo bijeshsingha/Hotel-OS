@@ -16,7 +16,7 @@ import {
   CartesianGrid,
   Legend,
 } from "recharts";
-import { ExecutiveChartPoint } from "@/lib/domain/executive-report-service";
+import type { ExecutiveChartPoint } from "@/lib/domain/executive-report-service";
 import { formatINR } from "@/lib/gst/calculator";
 
 interface ExecutiveChartsSectionProps {
@@ -40,14 +40,14 @@ export const ExecutiveChartsSection: React.FC<ExecutiveChartsSectionProps> = ({
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-4 sm:p-5">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
           <div>
-            <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
+            <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 ui-weight-medium">
               Daily Financial Velocity: Revenue vs. Collections vs. Expenses
             </h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400">
+            <p className="text-xs text-slate-500 dark:text-slate-400 ui-text-body">
               Comparing earned billings, cash/online inflows, and operational outflows
             </p>
           </div>
-          <div className="flex flex-wrap items-center gap-3 text-xs">
+          <div className="flex flex-wrap items-center gap-3 text-xs ui-text-body">
             <span className="flex items-center gap-1.5 text-slate-700 dark:text-slate-300">
               <span className="h-2.5 w-2.5 rounded-full bg-slate-900 dark:bg-slate-100" />
               Revenue
@@ -65,7 +65,7 @@ export const ExecutiveChartsSection: React.FC<ExecutiveChartsSectionProps> = ({
 
         <div className="h-64 sm:h-72 w-full pt-2">
           {dailyTrend.length === 0 ? (
-            <div className="h-full flex items-center justify-center text-xs text-slate-400">
+            <div className="h-full flex items-center justify-center text-xs text-slate-400 ui-text-body">
               No trend data available for selected dates.
             </div>
           ) : (
@@ -151,12 +151,12 @@ export const ExecutiveChartsSection: React.FC<ExecutiveChartsSectionProps> = ({
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Revenue Mix Donut */}
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-4">
-          <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">
+          <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2 ui-text-body ui-weight-medium">
             Earned Revenue Mix
           </h4>
           <div className="h-48 w-full">
             {revenueSplit.every((r) => r.value === 0) ? (
-              <div className="h-full flex items-center justify-center text-xs text-slate-400">
+              <div className="h-full flex items-center justify-center text-xs text-slate-400 ui-text-body">
                 No revenue recorded in period
               </div>
             ) : (
@@ -190,7 +190,7 @@ export const ExecutiveChartsSection: React.FC<ExecutiveChartsSectionProps> = ({
               </ResponsiveContainer>
             )}
           </div>
-          <div className="space-y-1 mt-2 text-[11px]">
+          <div className="space-y-1 mt-2 text-[11px] ui-text-meta">
             {revenueSplit.map((item, idx) => (
               <div key={item.name} className="flex items-center justify-between text-slate-600 dark:text-slate-400">
                 <span className="flex items-center gap-1.5">
@@ -210,12 +210,12 @@ export const ExecutiveChartsSection: React.FC<ExecutiveChartsSectionProps> = ({
 
         {/* Collections by Method Donut */}
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-4">
-          <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">
+          <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2 ui-text-body ui-weight-medium">
             Collections Settlement
           </h4>
           <div className="h-48 w-full">
             {collectionsByMethod.every((c) => c.value === 0) ? (
-              <div className="h-full flex items-center justify-center text-xs text-slate-400">
+              <div className="h-full flex items-center justify-center text-xs text-slate-400 ui-text-body">
                 No collections recorded in period
               </div>
             ) : (
@@ -249,7 +249,7 @@ export const ExecutiveChartsSection: React.FC<ExecutiveChartsSectionProps> = ({
               </ResponsiveContainer>
             )}
           </div>
-          <div className="space-y-1 mt-2 text-[11px]">
+          <div className="space-y-1 mt-2 text-[11px] ui-text-meta">
             {collectionsByMethod.map((item, idx) => (
               <div key={item.name} className="flex items-center justify-between text-slate-600 dark:text-slate-400">
                 <span className="flex items-center gap-1.5">
@@ -269,12 +269,12 @@ export const ExecutiveChartsSection: React.FC<ExecutiveChartsSectionProps> = ({
 
         {/* Receivables Aging Bracket (Bar Chart) */}
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-4">
-          <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">
+          <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2 ui-text-body ui-weight-medium">
             Receivables Aging (&gt; ₹5k)
           </h4>
           <div className="h-48 w-full pt-1">
             {receivablesAging.every((a) => a.amount === 0) ? (
-              <div className="h-full flex items-center justify-center text-xs text-slate-400">
+              <div className="h-full flex items-center justify-center text-xs text-slate-400 ui-text-body">
                 Zero overdue accounts &gt; ₹5,000
               </div>
             ) : (
@@ -302,7 +302,7 @@ export const ExecutiveChartsSection: React.FC<ExecutiveChartsSectionProps> = ({
               </ResponsiveContainer>
             )}
           </div>
-          <div className="space-y-1 mt-2 text-[11px]">
+          <div className="space-y-1 mt-2 text-[11px] ui-text-meta">
             {receivablesAging.map((b) => (
               <div key={b.name} className="flex items-center justify-between text-slate-600 dark:text-slate-400">
                 <span>{b.name} ({b.count} accounts)</span>

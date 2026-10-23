@@ -1,6 +1,7 @@
 import { prisma } from "../db/prisma";
 import { calculateGST } from "../gst/calculator";
 import { sync24HourFolioCharges } from "./folio-service";
+import { receiptBusinessDay } from "./receipt-business-day";
 
 export interface NightAuditChecklist {
   businessDate: string;
@@ -167,11 +168,13 @@ export async function closeOperationalDay(
   const adr = roomsSold > 0 ? roomRevenue / roomsSold : 0;
   const revpar = totalRooms > 0 ? roomRevenue / totalRooms : 0;
 
-  // Receipts collected today
+  // Count receipts for this property-local business day, including signed refunds.
+  const receiptDay = receiptBusinessDay(currentDate, property.timezone);
   const payments = await prisma.payment.findMany({
-    where: { propertyId, status: "SUCCEEDED" },
+    where: { propertyId, status: "SUCCEEDED", receivedAt: { gte: receiptDay.from, lt: receiptDay.to } },
+    select: { amount: true, receivedAt: true },
   });
-  const netReceipts = payments.reduce((sum, p) => sum + p.amount, 0);
+  const netReceipts = payments.filter((payment) => receiptDay.includes(payment.receivedAt)).reduce((sum, payment) => sum + payment.amount, 0);
 
   // 2. Snapshot metrics in database
   const metricsToStore = [
@@ -240,6 +243,7 @@ export async function closeOperationalDay(
       status: "COMPLETED",
       checklistSnapshot: JSON.stringify({ inHouseStays, roomsSold, totalRooms }),
       totalsSnapshot: JSON.stringify({
+        netReceipts: Math.round(netReceipts * 100) / 100,
         roomRevenue,
         fbRevenue,
         totalTaxes,

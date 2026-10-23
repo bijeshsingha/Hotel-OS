@@ -10,44 +10,15 @@ interface SearchInputProps {
   className?: string;
 }
 
-export function SearchInput({
-  value,
-  onChange,
-  placeholder = "Search...",
-  className = "",
-}: SearchInputProps) {
-  return (
-    <div className={`relative flex-1 min-w-[200px] ${className}`}>
-      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-zinc-400 pointer-events-none" />
-      <input
-        type="text"
-        placeholder={placeholder}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="w-full h-9 pl-9 pr-8 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 text-xs sm:text-sm placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 transition font-normal shadow-2xs"
-      />
-      {value && (
-        <button
-          type="button"
-          onClick={() => onChange("")}
-          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 p-0.5 rounded cursor-pointer"
-        >
-          <X className="h-3.5 w-3.5" />
-        </button>
-      )}
-    </div>
-  );
+export function SearchInput({ value, onChange, placeholder = "Search...", className = "" }: SearchInputProps) {
+  return <div className={`ui-search ${className}`}>
+    <Search size={17} aria-hidden="true" />
+    <input type="text" aria-label={placeholder.replace(/\.{3}$/, "")} placeholder={placeholder} value={value} onChange={(event) => onChange(event.target.value)} />
+    {value && <button type="button" aria-label="Clear search" onClick={() => onChange("")} className="ui-search-clear"><X size={16} aria-hidden="true" /></button>}
+  </div>;
 }
 
-interface ToolbarProps {
-  children: React.ReactNode;
-  className?: string;
-}
-
+interface ToolbarProps { children: React.ReactNode; className?: string; }
 export function Toolbar({ children, className = "" }: ToolbarProps) {
-  return (
-    <div className={`flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 flex-wrap ${className}`}>
-      {children}
-    </div>
-  );
+  return <div className={`ui-toolbar ${className}`}>{children}</div>;
 }

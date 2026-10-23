@@ -38,7 +38,7 @@ export function FolioSummaryBanner({
 }: FolioSummaryBannerProps) {
   if (!stay) {
     return (
-      <div className="p-8 text-center rounded-xl bg-white dark:bg-[#121215] border border-zinc-200/60 dark:border-zinc-800/60 text-zinc-400">
+      <div className="p-8 text-center rounded-xl bg-white dark:bg-[#121215] border border-zinc-200/60 dark:border-zinc-800/60 text-zinc-400 ui-surface">
         Select a guest or room from the directory to view the folio ledger.
       </div>
     );
@@ -50,19 +50,19 @@ export function FolioSummaryBanner({
   const hasCompany = Boolean(guest?.companyName);
 
   return (
-    <div className="p-4 sm:p-5 rounded-xl bg-white dark:bg-[#121215] border border-zinc-200/70 dark:border-zinc-800/70 space-y-4">
+    <div className="p-4 sm:p-5 rounded-xl bg-white dark:bg-[#121215] border border-zinc-200/70 dark:border-zinc-800/70 space-y-4 ui-surface">
       {/* Top Row: Room, Guest Profile & Live Balance */}
       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
         <div className="space-y-1">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-xl sm:text-2xl font-bold font-mono text-zinc-900 dark:text-zinc-100">
+            <span className="text-xl sm:text-2xl font-bold font-mono text-zinc-900 dark:text-zinc-100 ui-weight-medium ui-font-body">
               Room {roomNumber}
             </span>
-            <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400">
+            <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 ui-text-body">
               {stay.roomAssignments?.[0]?.room?.roomType?.name || "Standard Room"}
             </span>
             <span
-              className={`text-xs px-2 py-0.5 rounded-full font-bold uppercase ${
+              className={`text-xs px-2 py-0.5 rounded-full font-bold uppercase  ui-text-body ui-weight-medium ${
                 isInHouse
                   ? "bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-200 dark:border-blue-800/60"
                   : "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400"
@@ -76,38 +76,38 @@ export function FolioSummaryBanner({
             <User className="h-4 w-4 text-blue-600 dark:text-blue-400 shrink-0" />
             <span>{guest?.name || "Valued Guest"}</span>
             {guest?.phone && (
-              <span className="text-xs text-zinc-400 font-mono font-normal">
+              <span className="text-xs text-zinc-400 font-mono font-normal ui-text-body ui-font-body">
                 • {guest.phone}
               </span>
             )}
           </div>
 
           {hasCompany && (
-            <div className="flex items-center gap-1.5 text-xs text-amber-700 dark:text-amber-400">
+            <div className="flex items-center gap-1.5 text-xs text-amber-700 dark:text-amber-400 ui-text-body">
               <Building2 className="h-3.5 w-3.5 shrink-0" />
               <span>{guest.companyName}</span>
               {guest.gstin && (
-                <span className="font-mono text-zinc-400">(GSTIN: {guest.gstin})</span>
+                <span className="font-mono text-zinc-400 ui-font-body">(GSTIN: {guest.gstin})</span>
               )}
             </div>
           )}
 
-          <div className="flex items-center gap-2 text-xs text-zinc-500 pt-0.5">
+          <div className="flex items-center gap-2 text-xs text-zinc-500 pt-0.5 ui-text-body">
             <Calendar className="h-3.5 w-3.5 text-zinc-400" />
             <span>
               {formatShortDate(stay.arrivalAt)} → {formatShortDate(stay.expectedDepartureAt)}
             </span>
-            <span className="text-zinc-400 font-mono">({stay.adults || 1} Pax)</span>
+            <span className="text-zinc-400 font-mono ui-font-body">({stay.adults || 1} Pax)</span>
           </div>
         </div>
 
         {/* Financial Balance Callout */}
         <div className="flex flex-col items-start sm:items-end bg-zinc-50 dark:bg-zinc-900/60 p-3 rounded-lg border border-zinc-200/60 dark:border-zinc-800/60 min-w-[160px]">
-          <span className="text-[10.5px] uppercase font-semibold text-zinc-400 tracking-wider">
+          <span className="text-[10.5px] uppercase font-semibold text-zinc-400 tracking-wider ui-text-meta">
             Net Due Balance
           </span>
           <div
-            className={`text-2xl font-bold font-mono tabular-nums ${
+            className={`text-2xl font-bold font-mono tabular-nums  ui-weight-medium ui-font-body ${
               balance > 0.5
                 ? "text-rose-600 dark:text-rose-400"
                 : "text-emerald-600 dark:text-emerald-400"
@@ -115,7 +115,7 @@ export function FolioSummaryBanner({
           >
             {formatINR(balance)}
           </div>
-          <span className="text-[11px] font-medium text-zinc-500">
+          <span className="text-[11px] font-medium text-zinc-500 ui-text-meta">
             {balance > 0.5 ? "Payment Outstanding" : "✓ Folio Cleared"}
           </span>
         </div>
@@ -126,7 +126,7 @@ export function FolioSummaryBanner({
         <div className="flex items-center gap-1.5 flex-wrap">
           <button
             onClick={onOpenPaymentModal}
-            className="h-8 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs flex items-center gap-1.5 transition cursor-pointer shadow-2xs"
+            className="h-8 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs flex items-center gap-1.5 transition cursor-pointer shadow-2xs ui-text-body ui-shadow-quiet ui-control ui-control-sized"
           >
             <CreditCard className="h-3.5 w-3.5" />
             <span>Collect Payment</span>
@@ -134,7 +134,7 @@ export function FolioSummaryBanner({
 
           <button
             onClick={onOpenChargeModal}
-            className="h-8 px-3 rounded-lg bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-100 dark:hover:bg-white text-white dark:text-zinc-950 font-semibold text-xs flex items-center gap-1.5 transition cursor-pointer shadow-2xs"
+            className="h-8 px-3 rounded-lg bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-100 dark:hover:bg-white text-white dark:text-zinc-950 font-semibold text-xs flex items-center gap-1.5 transition cursor-pointer shadow-2xs ui-text-body ui-shadow-quiet ui-control ui-control-sized"
           >
             <Plus className="h-3.5 w-3.5" />
             <span>Add Charge</span>
@@ -142,7 +142,7 @@ export function FolioSummaryBanner({
 
           <button
             onClick={onOpenDiscountModal}
-            className="h-8 px-2.5 rounded-lg bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 font-medium text-xs transition cursor-pointer"
+            className="h-8 px-2.5 rounded-lg bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 font-medium text-xs transition cursor-pointer ui-text-body ui-control ui-control-sized"
           >
             Discount
           </button>
@@ -151,7 +151,7 @@ export function FolioSummaryBanner({
         <div className="flex items-center gap-1.5 flex-wrap">
           <button
             onClick={onOpenInvoiceModal}
-            className="h-8 px-3 rounded-lg border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-800 dark:text-zinc-200 font-semibold text-xs flex items-center gap-1.5 transition cursor-pointer"
+            className="h-8 px-3 rounded-lg border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-800 dark:text-zinc-200 font-semibold text-xs flex items-center gap-1.5 transition cursor-pointer ui-text-body ui-control ui-control-sized"
           >
             <Printer className="h-3.5 w-3.5" />
             <span>Print Tax Invoice</span>
@@ -160,7 +160,7 @@ export function FolioSummaryBanner({
           {isInHouse && (
             <button
               onClick={onOpenCheckoutModal}
-              className="h-8 px-3 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-semibold text-xs flex items-center gap-1.5 transition cursor-pointer shadow-2xs"
+              className="h-8 px-3 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-semibold text-xs flex items-center gap-1.5 transition cursor-pointer shadow-2xs ui-text-body ui-shadow-quiet ui-control ui-control-sized"
             >
               <LogOut className="h-3.5 w-3.5" />
               <span>Checkout & Settle</span>

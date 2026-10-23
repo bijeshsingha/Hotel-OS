@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo, useRef } from "react";
 import Link from "next/link";
 import { useHotel } from "@/lib/context/hotel-context";
 import { formatINR } from "@/lib/gst/calculator";
@@ -53,6 +53,8 @@ import {
   FileSpreadsheet,
   Mail,
 } from "lucide-react";
+import { downloadReportExcel, type ReportCell } from "@/lib/reports/report-export";
+import { matchesReportPeriod, reportDateOf } from "@/lib/reports/report-dates";
 import { apiCache } from "@/lib/cache/api-cache";
 import { PageHeader, StatCard, SegmentedControl } from "@/components/ui";
 import { PrintableTaxInvoiceModal } from "@/components/billing/printable-tax-invoice";
@@ -67,7 +69,14 @@ export default function ReportsPage() {
 
   // Date Filter State for 12 AM - 12 AM Cycle
   const [selectedDate, setSelectedDate] = useState<string>("");
-  const [data, setData] = useState<any | null>(null);
+  const [reportResult, setReportResult] = useState<{ key: string; value: any } | null>(null);
+  const reportKey = `${activeProperty?.id}:${reportType}:${selectedDate || activeProperty?.businessDate}`;
+  const data = reportResult?.key === reportKey ? reportResult.value : null;
+  const requestVersion = useRef(0);
+  const reportAbort = useRef<AbortController | null>(null);
+  const [reportError, setReportError] = useState<string | null>(null);
+  const [exportError, setExportError] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
   const [loading, setLoading] = useState(true);
 
   // Filters for In-House Guest Outstanding Tab
@@ -169,7 +178,7 @@ export default function ReportsPage() {
     if (activeProperty?.businessDate && !selectedDate) {
       setSelectedDate(activeProperty.businessDate);
     }
-  }, [activeProperty?.businessDate]);
+  }, [activeProperty?.businessDate, selectedDate, activeProperty?.timezone]);
 
   // Update Countdown Timer
   useEffect(() => {
@@ -209,36 +218,38 @@ export default function ReportsPage() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
-  // Fetch Report Data with SWR (0ms instant render from cache)
-  const loadReportData = async (forceFresh = false) => {
+  // A result belongs to one property, report and date. Late responses cannot replace it.
+  const loadReportData = async (_forceFresh = false) => {
     if (!activeProperty) return;
-    const dateParam = selectedDate || activeProperty.businessDate;
-    const reportUrl = `/api/v1/reports?propertyId=${activeProperty.id}&type=${reportType}&date=${dateParam}`;
-
-    if (!forceFresh) {
-      const cached = apiCache.get(reportUrl);
-      if (cached) {
-        setData(cached);
-      } else {
-        setLoading(true);
-      }
-    }
-
+    const version = ++requestVersion.current;
+    reportAbort.current?.abort();
+    const controller = new AbortController();
+    reportAbort.current = controller;
+    const timeout = setTimeout(() => controller.abort(), 30000);
+    setLoading(true);
+    setReportError(null);
+    setExportError(null);
+    const reportUrl = `/api/v1/reports?propertyId=${encodeURIComponent(activeProperty.id)}&type=${reportType}&date=${selectedDate || activeProperty.businessDate}`;
     try {
-      const d = await apiCache.swrFetch(reportUrl, undefined, (cached) => {
-        setData(cached);
-      });
-      setData(d);
-    } catch (err) {
-      console.error("Report error:", err);
+      const response = await fetch(reportUrl, { cache: "no-store", signal: controller.signal });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "The report could not be loaded.");
+      if (version === requestVersion.current) setReportResult({ key: reportKey, value: result });
+    } catch (error) {
+      if (version === requestVersion.current) {
+        setReportResult(null);
+        setReportError(controller.signal.aborted ? "The report took too long to load. Please retry." : error instanceof Error ? error.message : "The report could not be loaded.");
+      }
     } finally {
-      setLoading(false);
+      clearTimeout(timeout);
+      if (version === requestVersion.current) setLoading(false);
     }
   };
 
   useEffect(() => {
-    loadReportData();
-  }, [activeProperty, reportType, selectedDate, refreshKey]);
+    void loadReportData();
+    return () => { requestVersion.current++; reportAbort.current?.abort(); };
+  }, [activeProperty?.id, reportType, selectedDate, refreshKey]);
 
   // Navigate Date
   const shiftDate = (days: number) => {
@@ -514,38 +525,7 @@ export default function ReportsPage() {
         }
       }
 
-      // 3. Date Range Filter
-      if (transferDateRange !== "ALL_TIME" && t.transferDate) {
-        const txDate = new Date(t.transferDate);
-        const now = new Date();
-        const todayStr = (activeProperty?.businessDate || now.toISOString().split("T")[0]);
-
-        if (transferDateRange === "TODAY") {
-          const tDateStr = txDate.toISOString().split("T")[0];
-          if (tDateStr !== todayStr) return false;
-        } else if (transferDateRange === "YESTERDAY") {
-          const y = new Date(todayStr);
-          y.setDate(y.getDate() - 1);
-          const yStr = y.toISOString().split("T")[0];
-          const tDateStr = txDate.toISOString().split("T")[0];
-          if (tDateStr !== yStr) return false;
-        } else if (transferDateRange === "LAST_7_DAYS") {
-          const past7 = new Date();
-          past7.setDate(past7.getDate() - 7);
-          if (txDate < past7) return false;
-        } else if (transferDateRange === "THIS_MONTH") {
-          if (txDate.getMonth() !== now.getMonth() || txDate.getFullYear() !== now.getFullYear()) {
-            return false;
-          }
-        } else if (transferDateRange === "CUSTOM") {
-          if (transferCustomStart && txDate < new Date(transferCustomStart)) return false;
-          if (transferCustomEnd) {
-            const end = new Date(transferCustomEnd);
-            end.setHours(23, 59, 59, 999);
-            if (txDate > end) return false;
-          }
-        }
-      }
+      if (!matchesReportPeriod(t.transferDate, transferDateRange, selectedDate || activeProperty?.businessDate || "", transferCustomStart, transferCustomEnd, activeProperty?.timezone || "Asia/Kolkata")) return false;
 
       // 4. Search Filter
       if (transferSearch.trim()) {
@@ -571,7 +551,7 @@ export default function ReportsPage() {
 
       return true;
     });
-  }, [data, transferStatusFilter, transferRoomFilter, transferDateRange, transferCustomStart, transferCustomEnd, transferSearch, activeProperty?.businessDate]);
+  }, [data, transferStatusFilter, transferRoomFilter, transferDateRange, transferCustomStart, transferCustomEnd, transferSearch, activeProperty?.businessDate, selectedDate, activeProperty?.timezone]);
 
   // Filtered Final Bills
   const filteredFinalBills = useMemo(() => {
@@ -593,38 +573,7 @@ export default function ReportsPage() {
         }
       }
 
-      // 3. Date Range Filter (based on check-out or check-in date)
-      if (billDateRange !== "ALL_TIME") {
-        const dateToCheck = new Date(b.checkOutDate || b.checkInDate);
-        const now = new Date();
-        const todayStr = (activeProperty?.businessDate || now.toISOString().split("T")[0]);
-
-        if (billDateRange === "TODAY") {
-          const bDateStr = dateToCheck.toISOString().split("T")[0];
-          if (bDateStr !== todayStr) return false;
-        } else if (billDateRange === "YESTERDAY") {
-          const y = new Date(todayStr);
-          y.setDate(y.getDate() - 1);
-          const yStr = y.toISOString().split("T")[0];
-          const bDateStr = dateToCheck.toISOString().split("T")[0];
-          if (bDateStr !== yStr) return false;
-        } else if (billDateRange === "LAST_7_DAYS") {
-          const past7 = new Date();
-          past7.setDate(past7.getDate() - 7);
-          if (dateToCheck < past7) return false;
-        } else if (billDateRange === "THIS_MONTH") {
-          if (dateToCheck.getMonth() !== now.getMonth() || dateToCheck.getFullYear() !== now.getFullYear()) {
-            return false;
-          }
-        } else if (billDateRange === "CUSTOM") {
-          if (billCustomStart && dateToCheck < new Date(billCustomStart)) return false;
-          if (billCustomEnd) {
-            const end = new Date(billCustomEnd);
-            end.setHours(23, 59, 59, 999);
-            if (dateToCheck > end) return false;
-          }
-        }
-      }
+      if (!matchesReportPeriod(b.checkOutDate || b.checkInDate, billDateRange, selectedDate || activeProperty?.businessDate || "", billCustomStart, billCustomEnd, activeProperty?.timezone || "Asia/Kolkata")) return false;
 
       // 4. Search Filter
       if (billSearch.trim()) {
@@ -652,7 +601,7 @@ export default function ReportsPage() {
 
       return true;
     });
-  }, [data, billStatusFilter, billMethodFilter, billDateRange, billCustomStart, billCustomEnd, billSearch, activeProperty?.businessDate]);
+  }, [data, billStatusFilter, billMethodFilter, billDateRange, billCustomStart, billCustomEnd, billSearch, activeProperty?.businessDate, selectedDate, activeProperty?.timezone]);
 
   // Counts for Final Bills Sub-Tabs
   const finalBillCounts = useMemo(() => {
@@ -699,6 +648,12 @@ export default function ReportsPage() {
     });
   }, [data, reportType, kotDestinationFilter, kotSettlementFilter, kotSearch]);
 
+  const diningSummary = useMemo(() => {
+    const settled = filteredKitchenOrders.filter(row => row.settlementType !== "UNSETTLED");
+    const sum = (rows: any[], key: string) => rows.reduce((total, row) => total + (row[key] ?? 0), 0);
+    return { totalOrdersCount: filteredKitchenOrders.length, totalKotsFired: sum(filteredKitchenOrders, "kotsCount"), totalItemsPrepared: sum(filteredKitchenOrders, "itemCount"), grossCollection: sum(settled, "totalAmount"), taxableSales: sum(settled, "taxableAmount"), gstCollected: sum(settled, "totalTax"), folioPostedAmount: sum(settled.filter(row => row.settlementType === "POSTED_TO_ROOM"), "totalAmount"), directSettledAmount: sum(settled.filter(row => row.settlementType === "DIRECT_PAID"), "totalAmount"), unverifiedTaxAmount: sum(settled.filter(row => row.totalTax == null), "totalAmount"), openOrderValue: sum(filteredKitchenOrders.filter(row => row.settlementType === "UNSETTLED"), "totalAmount") };
+  }, [filteredKitchenOrders]);
+
   // Filtered Revenue & Tax Ledger Entries
   const filteredRevenueEntries = useMemo(() => {
     const list: any[] = data?.rows || [];
@@ -715,34 +670,7 @@ export default function ReportsPage() {
         if (`${r.effectiveTaxRate}%` !== revenueTaxRateFilter) return false;
       }
 
-      // 3. Date Range Filter
-      if (revenueDateRange !== "ALL_TIME") {
-        const entryDate = r.serviceDate || r.postedAt?.split("T")[0];
-        const now = new Date();
-        const todayStr = activeProperty?.businessDate || now.toISOString().split("T")[0];
-
-        if (revenueDateRange === "TODAY") {
-          if (entryDate !== todayStr) return false;
-        } else if (revenueDateRange === "YESTERDAY") {
-          const y = new Date(todayStr);
-          y.setDate(y.getDate() - 1);
-          const yStr = y.toISOString().split("T")[0];
-          if (entryDate !== yStr) return false;
-        } else if (revenueDateRange === "LAST_7_DAYS") {
-          const past7 = new Date();
-          past7.setDate(past7.getDate() - 7);
-          const past7Str = past7.toISOString().split("T")[0];
-          if (entryDate < past7Str) return false;
-        } else if (revenueDateRange === "THIS_MONTH") {
-          const [entryY, entryM] = (entryDate || "").split("-");
-          const curY = String(now.getFullYear());
-          const curM = String(now.getMonth() + 1).padStart(2, "0");
-          if (entryY !== curY || entryM !== curM) return false;
-        } else if (revenueDateRange === "CUSTOM") {
-          if (revenueCustomStart && entryDate < revenueCustomStart) return false;
-          if (revenueCustomEnd && entryDate > revenueCustomEnd) return false;
-        }
-      }
+      if (!matchesReportPeriod(r.serviceDate || r.postedAt, revenueDateRange, selectedDate || activeProperty?.businessDate || "", revenueCustomStart, revenueCustomEnd, activeProperty?.timezone || "Asia/Kolkata")) return false;
 
       // 4. Search Filter
       if (revenueSearch.trim()) {
@@ -777,6 +705,8 @@ export default function ReportsPage() {
     reportType,
     revenueDepartmentFilter,
     revenueTaxRateFilter,
+    selectedDate,
+    activeProperty?.timezone,
     revenueDateRange,
     revenueCustomStart,
     revenueCustomEnd,
@@ -818,6 +748,8 @@ export default function ReportsPage() {
     };
   }, [filteredRevenueEntries]);
 
+  const filteredTransferRooms = useMemo(() => Array.from(new Set(filteredTransfers.flatMap(t => [t.fromRoomNumber, t.toRoomNumber]).filter(Boolean))).sort(), [filteredTransfers]);
+
   // Distinct room numbers for filter dropdown
   const allDistinctRooms = useMemo(() => {
     const set = new Set<string>();
@@ -851,7 +783,18 @@ export default function ReportsPage() {
     });
   }, [data?.rooms, reportType, inhouseStatusFilter, inhouseSearch]);
 
-  const exportInhouseOutstandingCSV = () => {
+  const exportTable = async (headers: string[], rows: ReportCell[][], title: string, period: string) => {
+    if (!data || loading || exporting) return;
+    setExporting(true);
+    setExportError(null);
+    try {
+      await downloadReportExcel({ headers, rows, title, period, property: activeProperty?.displayName || "Hotel" }, `${activeProperty?.code || "HOTEL"}_${title}_${period}`);
+    } catch {
+      setExportError("The Excel file could not be generated. Please try again.");
+    } finally { setExporting(false); }
+  };
+
+  const exportInhouseOutstandingExcel = () => {
     if (!filteredInhouseRooms.length) {
       alert("No in-house guest records to export.");
       return;
@@ -875,34 +818,27 @@ export default function ReportsPage() {
     ];
 
     const rows = filteredInhouseRooms.map((r: any) => [
-      `"${r.roomNumber}"`,
-      `"${r.roomType || ""}"`,
-      `"${(r.guestName || "").replace(/"/g, '""')}"`,
-      `"${r.phone || ""}"`,
-      `"${(r.residentialAddress || "").replace(/"/g, '""')}"`,
-      `"${(r.companyName || "").replace(/"/g, '""')}"`,
-      `"${r.checkIn}"`,
-      `"${r.expectedDeparture}"`,
-      `"${r.rateHandling}"`,
+      r.roomNumber,
+      r.roomType || "",
+      (r.guestName || ""),
+      r.phone || "",
+      (r.residentialAddress || ""),
+      (r.companyName || ""),
+      r.checkIn,
+      r.expectedDeparture,
+      r.rateHandling,
       r.totalCharges,
       r.totalPaid,
       r.balanceDue,
       r.surplusCredit,
-      `"${r.status}"`,
-      `"${data?.asOfDate || selectedDate || activeProperty?.businessDate || ""}"`,
+      r.status,
+      data?.asOfDate || selectedDate || activeProperty?.businessDate || "",
     ]);
 
-    const csvContent = [headers.join(","), ...rows.map((row: any[]) => row.join(","))].join("\n");
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${activeProperty?.code || "HOTEL"}_InHouse_Guest_Outstanding_Report_${selectedDate || new Date().toISOString().slice(0, 10)}.csv`;
-    a.click();
+    void exportTable(headers, rows, "Guest Dues", selectedDate || activeProperty?.businessDate || "");
   };
-
-  // Export CSV Handlers
-  const exportRoomTransfersCSV = () => {
+  // Export Excel Handlers
+  const exportRoomTransfersExcel = () => {
     if (!filteredTransfers.length) {
       alert("No transfer records to export.");
       return;
@@ -929,30 +865,23 @@ export default function ReportsPage() {
       t.transferId,
       t.formattedDate || t.transferDate,
       t.grcNo,
-      JSON.stringify(t.guestName || ""),
+      (t.guestName || ""),
       t.phone,
       t.fromRoomNumber,
-      JSON.stringify(t.fromRoomType || ""),
+      (t.fromRoomType || ""),
       t.toRoomNumber,
-      JSON.stringify(t.toRoomType || ""),
-      JSON.stringify(t.moveReason || ""),
+      (t.toRoomType || ""),
+      (t.moveReason || ""),
       t.rateHandling,
-      t.agreedRate || "0",
+      Number(t.agreedRate ?? 0),
       t.durationText,
       t.stayStatus,
       t.currentRoomStatus,
     ]);
 
-    const csvContent = [headers.join(","), ...rows.map((r: any[]) => r.join(","))].join("\n");
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${activeProperty?.code || "HOTEL"}_Room_Transfers_Report_${new Date().toISOString().slice(0, 10)}.csv`;
-    a.click();
+    void exportTable(headers, rows, "Room Transfers", transferDateRange === "CUSTOM" ? `${transferCustomStart || "Start"} to ${transferCustomEnd || "End"}` : `${transferDateRange} (as of ${selectedDate || activeProperty?.businessDate})`);
   };
-
-  const exportFinalBillsCSV = () => {
+  const exportFinalBillsExcel = () => {
     if (!filteredFinalBills.length) {
       alert("No billing records to export.");
       return;
@@ -970,13 +899,14 @@ export default function ReportsPage() {
       "Check-Out Date",
       "Total Nights",
       "Stay Status",
-      "Base Room Tariff (INR)",
+      "Room Tariff incl. GST (INR)",
       "Extra Pax Charges (INR)",
       "F&B Charges (INR)",
       "Other Services (INR)",
       "Taxable Value (INR)",
       "CGST (INR)",
       "SGST (INR)",
+      "IGST (INR)",
       "Total GST (INR)",
       "Gross Total Bill (INR)",
       "Amount Paid (INR)",
@@ -989,13 +919,13 @@ export default function ReportsPage() {
       b.invoiceNo,
       b.folioId,
       b.grcNo,
-      JSON.stringify(b.guestName || ""),
+      (b.guestName || ""),
       b.phone,
-      JSON.stringify(b.companyName || ""),
-      JSON.stringify(b.gstin || ""),
-      JSON.stringify(b.roomDisplay || ""),
-      new Date(b.checkInDate).toISOString().split("T")[0],
-      new Date(b.checkOutDate).toISOString().split("T")[0],
+      (b.companyName || ""),
+      (b.gstin || ""),
+      (b.roomDisplay || ""),
+      reportDateOf(b.checkInDate, activeProperty?.timezone),
+      reportDateOf(b.checkOutDate, activeProperty?.timezone),
       b.nights,
       b.stayStatus,
       b.roomTariff,
@@ -1005,24 +935,18 @@ export default function ReportsPage() {
       b.taxableAmount,
       b.totalCgst,
       b.totalSgst,
+      b.totalIgst,
       b.totalTax,
       b.grossTotal,
       b.totalPaid,
-      JSON.stringify(b.paymentMethod || ""),
+      (b.paymentMethod || ""),
       b.balance,
       b.settlementStatus,
     ]);
 
-    const csvContent = [headers.join(","), ...rows.map((r: any[]) => r.join(","))].join("\n");
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${activeProperty?.code || "HOTEL"}_Final_Bills_Master_Report_${new Date().toISOString().slice(0, 10)}.csv`;
-    a.click();
+    void exportTable(headers, rows, "Final Bills", billDateRange === "CUSTOM" ? `${billCustomStart || "Start"} to ${billCustomEnd || "End"}` : `${billDateRange} (as of ${selectedDate || activeProperty?.businessDate})`);
   };
-
-  const exportKitchenOrdersCSV = () => {
+  const exportKitchenOrdersExcel = () => {
     if (!filteredKitchenOrders.length) {
       alert("No kitchen order records to export.");
       return;
@@ -1039,9 +963,11 @@ export default function ReportsPage() {
       "Dishes Ordered",
       "Item Count",
       "Taxable Value (INR)",
-      "CGST 2.5% (INR)",
-      "SGST 2.5% (INR)",
-      "Total GST 5% (INR)",
+      "CGST (INR)",
+      "SGST (INR)",
+      "IGST (INR)",
+      "Total GST (INR)",
+      "Tax Record",
       "Gross Total (INR)",
       "Settlement Channel",
       "Order Status",
@@ -1049,34 +975,29 @@ export default function ReportsPage() {
 
     const rows = filteredKitchenOrders.map((o: any) => [
       o.orderNo,
-      JSON.stringify(o.kotNumbers || ""),
+      (o.kotNumbers || ""),
       o.dateFormatted,
       o.timeFormatted,
       o.destinationCategory,
-      JSON.stringify(o.destinationLabel || ""),
+      (o.destinationLabel || ""),
       o.roomNo,
-      JSON.stringify(o.guestName || ""),
-      JSON.stringify(o.itemsSummary || ""),
+      (o.guestName || ""),
+      (o.itemsSummary || ""),
       o.itemCount,
       o.taxableAmount,
       o.cgst,
       o.sgst,
+      o.igst,
       o.totalTax,
+      o.taxStatus,
       o.totalAmount,
       o.settlementType,
       o.status,
     ]);
 
-    const csvContent = [headers.join(","), ...rows.map((r: any[]) => r.join(","))].join("\n");
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${activeProperty?.code || "HOTEL"}_Kitchen_Orders_Report_${selectedDate || new Date().toISOString().slice(0, 10)}.csv`;
-    a.click();
+    void exportTable(headers, rows, "Dining and KOT", selectedDate || activeProperty?.businessDate || "");
   };
-
-  const exportExpensesCSV = () => {
+  const exportExpensesExcel = () => {
     if (!filteredExpenseVouchers.length) {
       alert("No expense records to export for this view.");
       return;
@@ -1097,31 +1018,24 @@ export default function ReportsPage() {
       "Authorized By",
     ];
     const rows = filteredExpenseVouchers.map((e: any) => [
-      `"${e.voucherNo}"`,
-      `"${e.date}"`,
-      `"${e.time}"`,
-      `"${e.category}"`,
-      `"${(e.payeeName || "").replace(/"/g, '""')}"`,
-      `"${(e.description || "").replace(/"/g, '""')}"`,
+      e.voucherNo,
+      e.date,
+      e.time,
+      e.category,
+      (e.payeeName || ""),
+      (e.description || ""),
       e.amount,
-      e.taxAmount || 0,
-      e.totalAmount || e.amount,
-      `"${e.method}"`,
-      `"${(e.reference || "").replace(/"/g, '""')}"`,
-      `"${e.status}"`,
-      `"${(e.authorizedBy || "").replace(/"/g, '""')}"`,
+      e.taxAmount ?? 0,
+      e.totalAmount ?? e.amount,
+      e.method,
+      (e.reference || ""),
+      e.status,
+      (e.authorizedBy || ""),
     ]);
 
-    const csvContent = [headers.join(","), ...rows.map((r: any[]) => r.join(","))].join("\n");
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${activeProperty?.code || "HOTEL"}_Expenses_Register_${selectedDate || new Date().toISOString().slice(0, 10)}.csv`;
-    a.click();
+    void exportTable(headers, rows, "Expenses", selectedDate || activeProperty?.businessDate || "");
   };
-
-  const exportRevenueCSV = () => {
+  const exportRevenueExcel = () => {
     if (!filteredRevenueEntries.length) {
       alert("No revenue entries to export.");
       return;
@@ -1142,6 +1056,7 @@ export default function ReportsPage() {
       "Taxable Base (INR)",
       "CGST (INR)",
       "SGST (INR)",
+      "IGST (INR)",
       "Total GST (INR)",
       "GST Rate (%)",
       "Total Gross Amount (INR)",
@@ -1149,40 +1064,34 @@ export default function ReportsPage() {
     ];
 
     const rows = filteredRevenueEntries.map((r: any) => [
-      `"${r.serviceDate}"`,
-      `"${r.chargeCode}"`,
-      `"${r.departmentLabel}"`,
-      `"${(r.description || "").replace(/"/g, '""')}"`,
-      `"${r.roomNumber}"`,
-      `"${(r.guestName || "").replace(/"/g, '""')}"`,
-      `"${r.phone}"`,
-      `"${(r.companyName || "").replace(/"/g, '""')}"`,
-      `"${r.gstin || ""}"`,
+      r.serviceDate,
+      r.chargeCode,
+      r.departmentLabel,
+      (r.description || ""),
+      r.roomNumber,
+      (r.guestName || ""),
+      r.phone,
+      (r.companyName || ""),
+      r.gstin || "",
       r.qty,
       r.unitAmount,
       r.taxableAmount,
       r.cgstAmount,
       r.sgstAmount,
+      r.igstAmount,
       r.taxAmount,
       `"${r.effectiveTaxRate}%"`,
       r.totalAmount,
-      `"${r.sourceType}"`,
+      r.sourceType,
     ]);
 
-    const csvContent = [headers.join(","), ...rows.map((row) => row.join(","))].join("\n");
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${activeProperty?.code || "HOTEL"}_Revenue_Tax_Ledger_${new Date().toISOString().slice(0, 10)}.csv`;
-    a.click();
+    void exportTable(headers, rows, "Revenue and Tax", revenueDateRange === "CUSTOM" ? `${revenueCustomStart || "Start"} to ${revenueCustomEnd || "End"}` : `${revenueDateRange} (as of ${selectedDate || activeProperty?.businessDate})`);
   };
-
   const summary = data?.summary;
   const isToday = (selectedDate || activeProperty?.businessDate) === activeProperty?.businessDate;
 
   return (
-    <div className="space-y-4 max-w-[1700px] mx-auto w-full text-zinc-900 dark:text-zinc-100 pb-16">
+    <div className="space-y-4 max-w-[1440px] mx-auto w-full text-zinc-900 dark:text-zinc-100 pb-16">
       {/* Top Banner */}
       <PageHeader
         title="Reports"
@@ -1192,7 +1101,7 @@ export default function ReportsPage() {
           <div className="flex items-center gap-2 flex-wrap">
             <button
               onClick={() => setShowEmailModal(true)}
-              className="h-8.5 flex items-center gap-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 px-3 text-xs font-medium text-zinc-700 dark:text-zinc-300 transition shadow-2xs cursor-pointer select-none"
+              className="h-8.5 flex items-center gap-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 px-3 text-xs font-medium text-zinc-700 dark:text-zinc-300 transition shadow-2xs cursor-pointer select-none ui-text-body ui-shadow-quiet ui-control ui-control-sized"
             >
               <Mail className="h-3.5 w-3.5 text-zinc-500 dark:text-zinc-400" />
               <span>Email</span>
@@ -1200,7 +1109,7 @@ export default function ReportsPage() {
 
             <Link
               href="/cashier-shift"
-              className="h-8.5 flex items-center gap-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 px-3 text-xs font-medium text-zinc-700 dark:text-zinc-300 transition shadow-2xs cursor-pointer select-none"
+              className="h-8.5 flex items-center gap-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 px-3 text-xs font-medium text-zinc-700 dark:text-zinc-300 transition shadow-2xs cursor-pointer select-none ui-text-body ui-shadow-quiet"
               title="Open Cashier Shift Ledger"
             >
               <Wallet className="h-3.5 w-3.5 text-zinc-500 dark:text-zinc-400" />
@@ -1211,17 +1120,17 @@ export default function ReportsPage() {
               <>
                 <button
                   onClick={() => setShowInhousePrintModal(true)}
-                  className="h-8.5 flex items-center gap-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 px-3 text-xs font-medium text-zinc-700 dark:text-zinc-300 transition shadow-2xs cursor-pointer select-none"
+                  className="h-8.5 flex items-center gap-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 px-3 text-xs font-medium text-zinc-700 dark:text-zinc-300 transition shadow-2xs cursor-pointer select-none ui-text-body ui-shadow-quiet ui-control ui-control-sized"
                 >
                   <Printer className="h-3.5 w-3.5 text-zinc-500 dark:text-zinc-400" />
                   <span>Print</span>
                 </button>
                 <button
-                  onClick={exportInhouseOutstandingCSV}
-                  className="h-8.5 flex items-center gap-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 px-3 text-xs font-medium text-zinc-700 dark:text-zinc-300 transition shadow-2xs cursor-pointer select-none"
+                  onClick={exportInhouseOutstandingExcel} disabled={loading || exporting || !data}
+                  className="h-8.5 flex items-center gap-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 px-3 text-xs font-medium text-zinc-700 dark:text-zinc-300 transition shadow-2xs cursor-pointer select-none ui-text-body ui-shadow-quiet ui-control ui-control-sized"
                 >
                   <Download className="h-3.5 w-3.5 text-zinc-500 dark:text-zinc-400" />
-                  <span>Export CSV</span>
+                  <span>Export Excel</span>
                 </button>
               </>
             )}
@@ -1230,17 +1139,17 @@ export default function ReportsPage() {
               <>
                 <button
                   onClick={() => setShowTransfersPrintModal(true)}
-                  className="h-8.5 flex items-center gap-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 px-3 text-xs font-medium text-zinc-700 dark:text-zinc-300 transition shadow-2xs cursor-pointer select-none"
+                  className="h-8.5 flex items-center gap-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 px-3 text-xs font-medium text-zinc-700 dark:text-zinc-300 transition shadow-2xs cursor-pointer select-none ui-text-body ui-shadow-quiet ui-control ui-control-sized"
                 >
                   <Printer className="h-3.5 w-3.5 text-zinc-500 dark:text-zinc-400" />
                   <span>Print</span>
                 </button>
                 <button
-                  onClick={exportRoomTransfersCSV}
-                  className="h-8.5 flex items-center gap-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 px-3 text-xs font-medium text-zinc-700 dark:text-zinc-300 transition shadow-2xs cursor-pointer select-none"
+                  onClick={exportRoomTransfersExcel} disabled={loading || exporting || !data}
+                  className="h-8.5 flex items-center gap-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 px-3 text-xs font-medium text-zinc-700 dark:text-zinc-300 transition shadow-2xs cursor-pointer select-none ui-text-body ui-shadow-quiet ui-control ui-control-sized"
                 >
                   <Download className="h-3.5 w-3.5 text-zinc-500 dark:text-zinc-400" />
-                  <span>Export CSV</span>
+                  <span>Export Excel</span>
                 </button>
               </>
             )}
@@ -1249,17 +1158,17 @@ export default function ReportsPage() {
               <>
                 <button
                   onClick={() => setShowFinalBillsPrintModal(true)}
-                  className="h-8.5 flex items-center gap-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 px-3 text-xs font-medium text-zinc-700 dark:text-zinc-300 transition shadow-2xs cursor-pointer select-none"
+                  className="h-8.5 flex items-center gap-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 px-3 text-xs font-medium text-zinc-700 dark:text-zinc-300 transition shadow-2xs cursor-pointer select-none ui-text-body ui-shadow-quiet ui-control ui-control-sized"
                 >
                   <Printer className="h-3.5 w-3.5 text-zinc-500 dark:text-zinc-400" />
                   <span>Print</span>
                 </button>
                 <button
-                  onClick={exportFinalBillsCSV}
-                  className="h-8.5 flex items-center gap-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 px-3 text-xs font-medium text-zinc-700 dark:text-zinc-300 transition shadow-2xs cursor-pointer select-none"
+                  onClick={exportFinalBillsExcel} disabled={loading || exporting || !data}
+                  className="h-8.5 flex items-center gap-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 px-3 text-xs font-medium text-zinc-700 dark:text-zinc-300 transition shadow-2xs cursor-pointer select-none ui-text-body ui-shadow-quiet ui-control ui-control-sized"
                 >
                   <Download className="h-3.5 w-3.5 text-zinc-500 dark:text-zinc-400" />
-                  <span>Export CSV</span>
+                  <span>Export Excel</span>
                 </button>
               </>
             )}
@@ -1268,24 +1177,24 @@ export default function ReportsPage() {
               <>
                 <button
                   onClick={() => setShowAddExpenseModal(true)}
-                  className="h-8.5 flex items-center gap-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-zinc-100 dark:hover:bg-white dark:text-zinc-900 px-3 text-xs font-semibold transition shadow-2xs cursor-pointer select-none"
+                  className="h-8.5 flex items-center gap-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-zinc-100 dark:hover:bg-white dark:text-zinc-900 px-3 text-xs font-semibold transition shadow-2xs cursor-pointer select-none ui-text-body ui-shadow-quiet ui-control ui-control-sized"
                 >
                   <Plus className="h-3.5 w-3.5" />
                   <span>New Expense</span>
                 </button>
                 <button
                   onClick={() => setShowExpensesPrintModal(true)}
-                  className="h-8.5 flex items-center gap-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 px-3 text-xs font-medium text-zinc-700 dark:text-zinc-300 transition shadow-2xs cursor-pointer select-none"
+                  className="h-8.5 flex items-center gap-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 px-3 text-xs font-medium text-zinc-700 dark:text-zinc-300 transition shadow-2xs cursor-pointer select-none ui-text-body ui-shadow-quiet ui-control ui-control-sized"
                 >
                   <Printer className="h-3.5 w-3.5 text-zinc-500 dark:text-zinc-400" />
                   <span>Print</span>
                 </button>
                 <button
-                  onClick={exportExpensesCSV}
-                  className="h-8.5 flex items-center gap-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 px-3 text-xs font-medium text-zinc-700 dark:text-zinc-300 transition shadow-2xs cursor-pointer select-none"
+                  onClick={exportExpensesExcel} disabled={loading || exporting || !data}
+                  className="h-8.5 flex items-center gap-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 px-3 text-xs font-medium text-zinc-700 dark:text-zinc-300 transition shadow-2xs cursor-pointer select-none ui-text-body ui-shadow-quiet ui-control ui-control-sized"
                 >
                   <Download className="h-3.5 w-3.5 text-zinc-500 dark:text-zinc-400" />
-                  <span>Export CSV</span>
+                  <span>Export Excel</span>
                 </button>
               </>
             )}
@@ -1294,17 +1203,17 @@ export default function ReportsPage() {
               <>
                 <button
                   onClick={() => setShowRevenuePrintModal(true)}
-                  className="h-8.5 flex items-center gap-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 px-3 text-xs font-medium text-zinc-700 dark:text-zinc-300 transition shadow-2xs cursor-pointer select-none"
+                  className="h-8.5 flex items-center gap-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 px-3 text-xs font-medium text-zinc-700 dark:text-zinc-300 transition shadow-2xs cursor-pointer select-none ui-text-body ui-shadow-quiet ui-control ui-control-sized"
                 >
                   <Printer className="h-3.5 w-3.5 text-zinc-500 dark:text-zinc-400" />
                   <span>Print</span>
                 </button>
                 <button
-                  onClick={exportRevenueCSV}
-                  className="h-8.5 flex items-center gap-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 px-3 text-xs font-medium text-zinc-700 dark:text-zinc-300 transition shadow-2xs cursor-pointer select-none"
+                  onClick={exportRevenueExcel} disabled={loading || exporting || !data}
+                  className="h-8.5 flex items-center gap-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 px-3 text-xs font-medium text-zinc-700 dark:text-zinc-300 transition shadow-2xs cursor-pointer select-none ui-text-body ui-shadow-quiet ui-control ui-control-sized"
                 >
                   <Download className="h-3.5 w-3.5 text-zinc-500 dark:text-zinc-400" />
-                  <span>Export CSV</span>
+                  <span>Export Excel</span>
                 </button>
               </>
             )}
@@ -1313,32 +1222,32 @@ export default function ReportsPage() {
               <>
                 <button
                   onClick={() => setShowAddIncomeModal(true)}
-                  className="h-8.5 flex items-center gap-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-zinc-100 dark:hover:bg-white dark:text-zinc-900 px-3 text-xs font-semibold transition shadow-2xs cursor-pointer select-none"
+                  className="h-8.5 flex items-center gap-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-zinc-100 dark:hover:bg-white dark:text-zinc-900 px-3 text-xs font-semibold transition shadow-2xs cursor-pointer select-none ui-text-body ui-shadow-quiet ui-control ui-control-sized"
                 >
                   <Plus className="h-3.5 w-3.5" />
                   <span>New Income</span>
                 </button>
                 <button
                   onClick={() => setShowKotPrintModal(true)}
-                  className="h-8.5 flex items-center gap-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 px-3 text-xs font-medium text-zinc-700 dark:text-zinc-300 transition shadow-2xs cursor-pointer select-none"
+                  className="h-8.5 flex items-center gap-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 px-3 text-xs font-medium text-zinc-700 dark:text-zinc-300 transition shadow-2xs cursor-pointer select-none ui-text-body ui-shadow-quiet ui-control ui-control-sized"
                 >
                   <Printer className="h-3.5 w-3.5 text-zinc-500 dark:text-zinc-400" />
                   <span>Print</span>
                 </button>
                 <button
-                  onClick={exportKitchenOrdersCSV}
-                  className="h-8.5 flex items-center gap-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 px-3 text-xs font-medium text-zinc-700 dark:text-zinc-300 transition shadow-2xs cursor-pointer select-none"
+                  onClick={exportKitchenOrdersExcel} disabled={loading || exporting || !data}
+                  className="h-8.5 flex items-center gap-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 px-3 text-xs font-medium text-zinc-700 dark:text-zinc-300 transition shadow-2xs cursor-pointer select-none ui-text-body ui-shadow-quiet ui-control ui-control-sized"
                 >
                   <Download className="h-3.5 w-3.5 text-zinc-500 dark:text-zinc-400" />
-                  <span>Export CSV</span>
+                  <span>Export Excel</span>
                 </button>
               </>
             )}
 
             <button
               onClick={() => loadReportData(true)}
-              className="h-8.5 w-8.5 flex items-center justify-center rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-zinc-500 dark:text-zinc-400 transition shadow-2xs cursor-pointer select-none"
-              title="Refresh Data"
+              className="h-8.5 w-8.5 flex items-center justify-center rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-zinc-500 dark:text-zinc-400 transition shadow-2xs cursor-pointer select-none ui-shadow-quiet ui-control ui-control-sized"
+              title="Refresh Data" aria-label="Refresh Data"
             >
               <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin text-zinc-900 dark:text-zinc-100" : ""}`} />
             </button>
@@ -1347,7 +1256,7 @@ export default function ReportsPage() {
       />
 
       {snapshotMsg && (
-        <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800/60 text-xs font-semibold text-emerald-800 dark:text-emerald-300 flex items-center gap-2 shadow-xs animate-in fade-in">
+        <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800/60 text-xs font-semibold text-emerald-800 dark:text-emerald-300 flex items-center gap-2 shadow-xs   ui-text-body ui-shadow-quiet">
           <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
           {snapshotMsg}
         </div>
@@ -1370,15 +1279,23 @@ export default function ReportsPage() {
         />
       </div>
 
+      {(reportError || exportError) && (
+        <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-900 flex items-center justify-between gap-4">
+          <span>{reportError || exportError}</span>
+          {reportError && <button type="button" onClick={() => loadReportData(true)} className="font-semibold underline">Retry report</button>}
+        </div>
+      )}
+      {loading && <p role="status" className="text-sm text-zinc-600">Loading selected report…</p>}
+      {exporting && <p role="status" className="text-sm text-zinc-600">Preparing Excel download…</p>}
       {/* ========================================================================= */}
       {/* TAB: COMPREHENSIVE HOTEL MASTER REPORT                                    */}
       {/* ========================================================================= */}
       {reportType === "COMPREHENSIVE_AUDIT" && (
-        <div className="space-y-4 animate-in fade-in">
+        <div className="space-y-4  ">
           {loading && !data ? (
-            <div className="p-12 text-center rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 space-y-3">
+            <div className="p-12 text-center rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 space-y-3 ui-radius-panel ui-surface">
               <RefreshCw className="h-6 w-6 animate-spin text-blue-600 mx-auto" />
-              <div className="text-xs text-zinc-500 font-semibold">Generating Comprehensive Hotel Master Audit...</div>
+              <div className="text-xs text-zinc-500 font-semibold ui-text-body">Generating Comprehensive Hotel Master Audit...</div>
             </div>
           ) : data ? (
             <ComprehensiveHotelReportView
@@ -1389,7 +1306,7 @@ export default function ReportsPage() {
               loading={loading}
             />
           ) : (
-            <div className="p-8 text-center text-xs text-zinc-500 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800">
+            <div className="p-8 text-center text-xs text-zinc-500 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 ui-text-body ui-radius-panel ui-surface">
               No report data available for this business date.
             </div>
           )}
@@ -1400,11 +1317,11 @@ export default function ReportsPage() {
       {/* TAB 0: IN-HOUSE GUEST OUTSTANDING & DUE STATUS DAILY REPORT               */}
       {/* ========================================================================= */}
       {reportType === "INHOUSE_OUTSTANDING" && (
-        <div className="space-y-4 animate-in fade-in">
+        <div className="space-y-4  ">
           {/* Date Selector & Shift Controls */}
-          <div className="p-3 sm:p-4 rounded-xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3">
+          <div className="p-3 sm:p-4 rounded-xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3 ui-shadow-quiet ui-surface">
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-xs font-semibold text-zinc-500 flex items-center gap-1.5">
+              <span className="text-xs font-semibold text-zinc-500 flex items-center gap-1.5 ui-text-body">
                 <Calendar className="h-3.5 w-3.5 text-zinc-400" />
                 As of:
               </span>
@@ -1412,8 +1329,8 @@ export default function ReportsPage() {
                 <button
                   type="button"
                   onClick={() => shiftDate(-1)}
-                  className="h-8 w-8 flex items-center justify-center rounded-lg bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 transition cursor-pointer"
-                  title="Previous Day"
+                  className="h-8 w-8 flex items-center justify-center rounded-lg bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 transition cursor-pointer ui-control ui-control-sized"
+                  title="Previous Day" aria-label="Previous Day"
                 >
                   <ChevronLeft className="h-4 w-4" />
                 </button>
@@ -1421,13 +1338,13 @@ export default function ReportsPage() {
                   type="date"
                   value={selectedDate || activeProperty?.businessDate || ""}
                   onChange={(e) => setSelectedDate(e.target.value)}
-                  className="h-8 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 px-2.5 text-xs font-mono font-semibold text-zinc-900 dark:text-white focus:outline-none focus:border-zinc-500"
+                  className="h-8 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 px-2.5 text-xs font-mono font-semibold text-zinc-900 dark:text-white focus:outline-none focus:border-zinc-500 ui-text-body ui-font-body ui-field"
                 />
                 <button
                   type="button"
                   onClick={() => shiftDate(1)}
-                  className="h-8 w-8 flex items-center justify-center rounded-lg bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 transition cursor-pointer"
-                  title="Next Day"
+                  className="h-8 w-8 flex items-center justify-center rounded-lg bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 transition cursor-pointer ui-control ui-control-sized"
+                  title="Next Day" aria-label="Next Day"
                 >
                   <ChevronRight className="h-4 w-4" />
                 </button>
@@ -1435,27 +1352,27 @@ export default function ReportsPage() {
               <button
                 type="button"
                 onClick={handleSetToday}
-                className={`h-8 px-2.5 rounded-lg text-xs font-medium transition cursor-pointer ${
+                className={`h-8 px-2.5 rounded-lg text-xs font-medium transition cursor-pointer  ui-text-body ${
                   isToday
                     ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
                     : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200"
-                }`}
+                } ui-control`}
               >
                 Today
               </button>
               <button
                 type="button"
                 onClick={handleSetYesterday}
-                className="h-8 px-2.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 text-xs font-medium transition cursor-pointer"
+                className="h-8 px-2.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 text-xs font-medium transition cursor-pointer ui-text-body ui-control ui-control-sized"
               >
                 Yesterday
               </button>
             </div>
 
-            <div className="flex items-center gap-1.5 text-xs font-medium text-zinc-500">
+            <div className="flex items-center gap-1.5 text-xs font-medium text-zinc-500 ui-text-body">
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
               <span>
-                Ledger as of: <strong className="font-mono text-zinc-800 dark:text-zinc-200">{data?.asOfDate || selectedDate || activeProperty?.businessDate}</strong>
+                Ledger as of: <strong className="font-mono text-zinc-800 dark:text-zinc-200 ui-font-body">{data?.asOfDate || selectedDate || activeProperty?.businessDate}</strong>
               </span>
             </div>
           </div>
@@ -1463,62 +1380,62 @@ export default function ReportsPage() {
           {/* 4 Summary Stat Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             {/* Card 1: Total Occupied */}
-            <div className="p-4 rounded-xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-1">
+            <div className="p-4 rounded-xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-1 ui-shadow-quiet ui-surface">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">In-House</span>
+                <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider ui-text-meta ui-weight-medium">In-House</span>
                 <BedDouble className="h-4 w-4 text-zinc-400" />
               </div>
-              <div className="text-2xl font-black font-mono text-zinc-900 dark:text-zinc-100">
+              <div className="text-2xl font-black font-mono text-zinc-900 dark:text-zinc-100 ui-weight-medium ui-font-body">
                 {data?.summary?.totalOccupiedRooms ?? 0} Rooms
               </div>
-              <div className="text-[11px] text-zinc-500">Currently occupied</div>
+              <div className="text-[11px] text-zinc-500 ui-text-meta">Currently occupied</div>
             </div>
 
             {/* Card 2: Dues Cleared */}
-            <div className="p-4 rounded-xl bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800/50 shadow-xs space-y-1">
+            <div className="p-4 rounded-xl bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800/50 shadow-xs space-y-1 ui-shadow-quiet">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-emerald-800 dark:text-emerald-400 uppercase tracking-wider">Settled</span>
+                <span className="text-[11px] font-bold text-emerald-800 dark:text-emerald-400 uppercase tracking-wider ui-text-meta ui-weight-medium">Settled</span>
                 <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
               </div>
-              <div className="text-2xl font-black font-mono text-emerald-700 dark:text-emerald-300">
+              <div className="text-2xl font-black font-mono text-emerald-700 dark:text-emerald-300 ui-weight-medium ui-font-body">
                 {data?.summary?.clearedCount ?? 0} Rooms
               </div>
-              <div className="text-[11px] text-emerald-700/80 dark:text-emerald-400/80 font-medium">
+              <div className="text-[11px] text-emerald-700/80 dark:text-emerald-400/80 font-medium ui-text-meta">
                 {data?.summary?.clearedPercentage ?? 0}% fully settled
               </div>
             </div>
 
             {/* Card 3: Due Remaining */}
-            <div className="p-4 rounded-xl bg-rose-50/60 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-800/50 shadow-xs space-y-1">
+            <div className="p-4 rounded-xl bg-rose-50/60 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-800/50 shadow-xs space-y-1 ui-shadow-quiet">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-rose-800 dark:text-rose-400 uppercase tracking-wider">Pending Dues</span>
+                <span className="text-[11px] font-bold text-rose-800 dark:text-rose-400 uppercase tracking-wider ui-text-meta ui-weight-medium">Pending Dues</span>
                 <AlertCircle className="h-4 w-4 text-rose-600 dark:text-rose-400" />
               </div>
-              <div className="text-2xl font-black font-mono text-rose-700 dark:text-rose-300">
+              <div className="text-2xl font-black font-mono text-rose-700 dark:text-rose-300 ui-weight-medium ui-font-body">
                 {formatINR(data?.summary?.totalDueRemaining ?? 0)}
               </div>
-              <div className="text-[11px] text-rose-700/80 dark:text-rose-400/80 font-medium">
+              <div className="text-[11px] text-rose-700/80 dark:text-rose-400/80 font-medium ui-text-meta">
                 {data?.summary?.dueCount ?? 0} rooms with dues
               </div>
             </div>
 
             {/* Card 4: Advance Surplus */}
-            <div className="p-4 rounded-xl bg-blue-50/60 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800/50 shadow-xs space-y-1">
+            <div className="p-4 rounded-xl bg-blue-50/60 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800/50 shadow-xs space-y-1 ui-shadow-quiet">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-blue-800 dark:text-blue-400 uppercase tracking-wider">Advance Credit</span>
+                <span className="text-[11px] font-bold text-blue-800 dark:text-blue-400 uppercase tracking-wider ui-text-meta ui-weight-medium">Advance Credit</span>
                 <Wallet className="h-4 w-4 text-blue-600 dark:text-blue-400" />
               </div>
-              <div className="text-2xl font-black font-mono text-blue-700 dark:text-blue-300">
+              <div className="text-2xl font-black font-mono text-blue-700 dark:text-blue-300 ui-weight-medium ui-font-body">
                 {formatINR(data?.summary?.totalSurplusCredit ?? 0)}
               </div>
-              <div className="text-[11px] text-blue-700/80 dark:text-blue-400/80 font-medium">
+              <div className="text-[11px] text-blue-700/80 dark:text-blue-400/80 font-medium ui-text-meta">
                 {data?.summary?.surplusCount ?? 0} guest accounts
               </div>
             </div>
           </div>
 
           {/* Search & Filter Toolbar */}
-          <div className="p-3 sm:p-4 rounded-xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+          <div className="p-3 sm:p-4 rounded-xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 ui-shadow-quiet ui-surface">
             <div className="relative flex-1 max-w-md">
               <Search className="absolute left-3 top-2.5 h-4 w-4 text-zinc-400" />
               <input
@@ -1526,12 +1443,12 @@ export default function ReportsPage() {
                 placeholder="Search room, guest name, phone..."
                 value={inhouseSearch}
                 onChange={(e) => setInhouseSearch(e.target.value)}
-                className="w-full h-9 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 pl-9 pr-8 text-xs text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:border-zinc-400 font-medium transition"
+                className="w-full h-9 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 pl-9 pr-8 text-xs text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:border-zinc-400 font-medium transition ui-text-body ui-field" aria-label="Search room, guest name, phone"
               />
               {inhouseSearch && (
                 <button
                   onClick={() => setInhouseSearch("")}
-                  className="absolute right-2.5 top-2.5 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 cursor-pointer"
+                  className="absolute right-2.5 top-2.5 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 cursor-pointer ui-control"
                 >
                   <X className="h-4 w-4" />
                 </button>
@@ -1539,15 +1456,15 @@ export default function ReportsPage() {
             </div>
 
             {/* Quick Status Segmented Tabs */}
-            <div className="flex items-center gap-1 p-1 rounded-xl bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs font-semibold">
+            <div className="flex items-center gap-1 p-1 rounded-xl bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs font-semibold ui-text-body">
               <button
                 type="button"
                 onClick={() => setInhouseStatusFilter("ALL")}
                 className={`px-3 py-1.5 rounded-lg transition cursor-pointer ${
                   inhouseStatusFilter === "ALL"
-                    ? "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-xs font-bold"
+                    ? "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-xs font-bold ui-shadow-quiet ui-weight-medium"
                     : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-800"
-                }`}
+                } ui-control`}
               >
                 All ({data?.summary?.totalOccupiedRooms ?? 0})
               </button>
@@ -1556,9 +1473,9 @@ export default function ReportsPage() {
                 onClick={() => setInhouseStatusFilter("DUE_REMAINING")}
                 className={`px-3 py-1.5 rounded-lg transition cursor-pointer ${
                   inhouseStatusFilter === "DUE_REMAINING"
-                    ? "bg-rose-600 text-white shadow-xs font-bold"
+                    ? "bg-rose-600 text-white shadow-xs font-bold ui-shadow-quiet ui-weight-medium"
                     : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-800"
-                }`}
+                } ui-control`}
               >
                 ⚠️ Due Remaining ({data?.summary?.dueCount ?? 0})
               </button>
@@ -1567,9 +1484,9 @@ export default function ReportsPage() {
                 onClick={() => setInhouseStatusFilter("CLEARED")}
                 className={`px-3 py-1.5 rounded-lg transition cursor-pointer ${
                   inhouseStatusFilter === "CLEARED"
-                    ? "bg-emerald-600 text-white shadow-xs font-bold"
+                    ? "bg-emerald-600 text-white shadow-xs font-bold ui-shadow-quiet ui-weight-medium"
                     : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-800"
-                }`}
+                } ui-control`}
               >
                 ✓ Cleared ({data?.summary?.clearedCount ?? 0})
               </button>
@@ -1578,9 +1495,9 @@ export default function ReportsPage() {
                 onClick={() => setInhouseStatusFilter("SURPLUS_CREDIT")}
                 className={`px-3 py-1.5 rounded-lg transition cursor-pointer ${
                   inhouseStatusFilter === "SURPLUS_CREDIT"
-                    ? "bg-blue-600 text-white shadow-xs font-bold"
+                    ? "bg-blue-600 text-white shadow-xs font-bold ui-shadow-quiet ui-weight-medium"
                     : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-800"
-                }`}
+                } ui-control`}
               >
                 💰 Surplus ({data?.summary?.surplusCount ?? 0})
               </button>
@@ -1588,10 +1505,10 @@ export default function ReportsPage() {
           </div>
 
           {/* Master In-House Outstanding Ledger Table */}
-          <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#111114] shadow-xs overflow-hidden">
+          <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#111114] shadow-xs overflow-hidden ui-radius-panel ui-shadow-quiet ui-surface">
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-zinc-50/80 dark:bg-zinc-900/60 text-zinc-500 dark:text-zinc-400 text-[10.5px] uppercase font-semibold tracking-wider border-b border-zinc-200 dark:border-zinc-800">
+              <table className="w-full text-left text-xs ui-text-body ui-data-table">
+                <thead className="bg-zinc-50/80 dark:bg-zinc-900/60 text-zinc-500 dark:text-zinc-400 text-[10.5px] uppercase font-semibold tracking-wider border-b border-zinc-200 dark:border-zinc-800 ui-text-meta">
                   <tr>
                     <th className="py-3 px-4">Room & Type</th>
                     <th className="py-3 px-4">Guest Name & Phone</th>
@@ -1613,10 +1530,10 @@ export default function ReportsPage() {
                     return (
                       <tr key={`${r.stayId}-${r.roomNumber}`} className="hover:bg-zinc-50/60 dark:hover:bg-zinc-900/40 transition-colors">
                         <td className="py-3 px-4">
-                          <div className="font-bold text-sm text-zinc-900 dark:text-white font-mono">
+                          <div className="font-bold text-sm text-zinc-900 dark:text-white font-mono ui-weight-medium ui-font-body">
                             Room {r.roomNumber}
                           </div>
-                          <div className="text-[11px] text-zinc-500 truncate max-w-[120px]">
+                          <div className="text-[11px] text-zinc-500 truncate max-w-[120px] ui-text-meta">
                             {r.roomType}
                           </div>
                         </td>
@@ -1625,54 +1542,54 @@ export default function ReportsPage() {
                           <div className="font-semibold text-zinc-900 dark:text-zinc-100">
                             {r.guestName}
                           </div>
-                          <div className="font-mono text-[11px] text-zinc-500">
+                          <div className="font-mono text-[11px] text-zinc-500 ui-font-body ui-text-meta">
                             {r.phone}
                           </div>
                         </td>
 
                         <td className="py-3 px-4 max-w-[220px]">
-                          <div className="text-zinc-800 dark:text-zinc-200 text-xs truncate" title={r.residentialAddress}>
+                          <div className="text-zinc-800 dark:text-zinc-200 text-xs truncate ui-text-body" title={r.residentialAddress}>
                             {r.residentialAddress}
                           </div>
-                          <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">
+                          <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium ui-text-meta">
                             Personal Residential
                           </div>
                         </td>
 
                         <td className="py-3 px-4 max-w-[160px]">
                           {r.companyName && r.companyName !== "—" ? (
-                            <div className="text-amber-800 dark:text-amber-300 font-medium truncate text-xs" title={r.companyName}>
+                            <div className="text-amber-800 dark:text-amber-300 font-medium truncate text-xs ui-text-body" title={r.companyName}>
                               🏢 {r.companyName}
                             </div>
                           ) : (
-                            <span className="text-zinc-400 text-xs">—</span>
+                            <span className="text-zinc-400 text-xs ui-text-body">—</span>
                           )}
                         </td>
 
-                        <td className="py-3 px-4 font-mono text-[11px] text-zinc-600 dark:text-zinc-400 whitespace-nowrap">
+                        <td className="py-3 px-4 font-mono text-[11px] text-zinc-600 dark:text-zinc-400 whitespace-nowrap ui-font-body ui-text-meta">
                           <div>In: {r.checkIn}</div>
                           <div>Out: {r.expectedDeparture}</div>
                         </td>
 
-                        <td className="py-3 px-4 text-right font-mono font-medium text-zinc-800 dark:text-zinc-200 tabular-nums">
+                        <td className="py-3 px-4 text-right font-mono font-medium text-zinc-800 dark:text-zinc-200 tabular-nums ui-font-body">
                           {formatINR(r.totalCharges)}
                         </td>
 
-                        <td className="py-3 px-4 text-right font-mono font-medium text-emerald-700 dark:text-emerald-400 tabular-nums">
+                        <td className="py-3 px-4 text-right font-mono font-medium text-emerald-700 dark:text-emerald-400 tabular-nums ui-font-body">
                           {formatINR(r.totalPaid)}
                         </td>
 
-                        <td className="py-3 px-4 text-right font-mono font-bold tabular-nums">
+                        <td className="py-3 px-4 text-right font-mono font-bold tabular-nums ui-font-body ui-weight-medium">
                           {isDue ? (
                             <span className="text-rose-600 dark:text-rose-400 text-sm">
                               {formatINR(r.balanceDue)}
                             </span>
                           ) : isSurplus ? (
-                            <span className="text-blue-600 dark:text-blue-400 text-xs font-semibold">
+                            <span className="text-blue-600 dark:text-blue-400 text-xs font-semibold ui-text-body">
                               + {formatINR(r.surplusCredit)} (Surplus)
                             </span>
                           ) : (
-                            <span className="text-emerald-600 dark:text-emerald-400 text-xs font-semibold">
+                            <span className="text-emerald-600 dark:text-emerald-400 text-xs font-semibold ui-text-body">
                               ₹0.00 (Cleared)
                             </span>
                           )}
@@ -1680,15 +1597,15 @@ export default function ReportsPage() {
 
                         <td className="py-3 px-4 text-center whitespace-nowrap">
                           {isDue ? (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10.5px] font-bold bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800/60">
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10.5px] font-bold bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800/60 ui-text-meta ui-weight-medium">
                               <AlertCircle className="h-3 w-3" /> Due Remaining
                             </span>
                           ) : isSurplus ? (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10.5px] font-bold bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800/60">
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10.5px] font-bold bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800/60 ui-text-meta ui-weight-medium">
                               <Wallet className="h-3 w-3" /> Advance Surplus
                             </span>
                           ) : (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10.5px] font-bold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60">
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10.5px] font-bold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60 ui-text-meta ui-weight-medium">
                               <CheckCircle2 className="h-3 w-3" /> Cleared in Full
                             </span>
                           )}
@@ -1697,7 +1614,7 @@ export default function ReportsPage() {
                         <td className="py-3 px-4 text-right">
                           <Link
                             href={`/billing?stayId=${r.stayId}`}
-                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 font-semibold text-xs transition cursor-pointer shadow-2xs"
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 font-semibold text-xs transition cursor-pointer shadow-2xs ui-text-body ui-shadow-quiet"
                           >
                             <span>Open Bill</span>
                             <ExternalLink className="h-3 w-3" />
@@ -1709,7 +1626,7 @@ export default function ReportsPage() {
 
                   {filteredInhouseRooms.length === 0 && (
                     <tr>
-                      <td colSpan={10} className="py-12 px-4 text-center text-zinc-400 dark:text-zinc-500 italic text-xs">
+                      <td colSpan={10} className="py-12 px-4 text-center text-zinc-400 dark:text-zinc-500 italic text-xs ui-text-body">
                         {loading ? "Loading in-house guest data..." : "No in-house guest records match your search or filter criteria."}
                       </td>
                     </tr>
@@ -1725,64 +1642,64 @@ export default function ReportsPage() {
       {/* TAB 1: ROOM TRANSFERS & MOVES AUDIT REPORT */}
       {/* ========================================================================= */}
       {reportType === "ROOM_TRANSFERS" && (
-        <div className="space-y-4 animate-in fade-in">
+        <div className="space-y-4  ">
           {/* Summary Stat Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            <div className="p-4 rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-1">
+            <div className="p-4 rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-1 ui-radius-panel ui-shadow-quiet ui-surface">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">Total Room Moves</span>
+                <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider ui-text-meta ui-weight-medium">Total Room Moves</span>
                 <ArrowRightLeft className="h-4 w-4 text-blue-500" />
               </div>
-              <div className="text-2xl font-black font-mono text-zinc-900 dark:text-zinc-100">
-                {data?.totalCount ?? filteredTransfers.length}
+              <div className="text-2xl font-black font-mono text-zinc-900 dark:text-zinc-100 ui-weight-medium ui-font-body">
+                {filteredTransfers.length}
               </div>
-              <div className="text-[11px] text-zinc-500">Historical & active guest room transfers</div>
+              <div className="text-[11px] text-zinc-500 ui-text-meta">Historical & active guest room transfers</div>
             </div>
 
-            <div className="p-4 rounded-2xl bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800/50 shadow-xs space-y-1">
+            <div className="p-4 rounded-2xl bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800/50 shadow-xs space-y-1 ui-radius-panel ui-shadow-quiet">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-emerald-800 dark:text-emerald-300 uppercase tracking-wider">
+                <span className="text-[11px] font-bold text-emerald-800 dark:text-emerald-300 uppercase tracking-wider ui-text-meta ui-weight-medium">
                   Active In-House Transferred
                 </span>
                 <CheckCircle2 className="h-4 w-4 text-emerald-600" />
               </div>
-              <div className="text-2xl font-black font-mono text-emerald-800 dark:text-emerald-300">
-                {data?.inHouseCount ?? filteredTransfers.filter((t) => t.currentRoomStatus === "CURRENTLY_OCCUPIED").length}
+              <div className="text-2xl font-black font-mono text-emerald-800 dark:text-emerald-300 ui-weight-medium ui-font-body">
+                {filteredTransfers.filter((t) => t.currentRoomStatus === "CURRENTLY_OCCUPIED").length}
               </div>
-              <div className="text-[11px] text-emerald-700/80 dark:text-emerald-400 font-mono">
+              <div className="text-[11px] text-emerald-700/80 dark:text-emerald-400 font-mono ui-text-meta ui-font-body">
                 Currently residing in upgraded/moved room
               </div>
             </div>
 
-            <div className="p-4 rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-1">
+            <div className="p-4 rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-1 ui-radius-panel ui-shadow-quiet ui-surface">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">Rooms Involved</span>
+                <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider ui-text-meta ui-weight-medium">Rooms Involved</span>
                 <Building2 className="h-4 w-4 text-purple-500" />
               </div>
-              <div className="text-2xl font-black font-mono text-purple-600 dark:text-purple-400">
-                {allDistinctRooms.length}
+              <div className="text-2xl font-black font-mono text-purple-600 dark:text-purple-400 ui-weight-medium ui-font-body">
+                {filteredTransferRooms.length}
               </div>
-              <div className="text-[11px] text-zinc-500 truncate">
-                {allDistinctRooms.length > 0 ? `Rooms: ${allDistinctRooms.join(", ")}` : "No transfers"}
+              <div className="text-[11px] text-zinc-500 truncate ui-text-meta">
+                {filteredTransferRooms.length > 0 ? `Rooms: ${filteredTransferRooms.join(", ")}` : "No transfers"}
               </div>
             </div>
 
-            <div className="p-4 rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-1">
+            <div className="p-4 rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-1 ui-radius-panel ui-shadow-quiet ui-surface">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">Latest Transfer</span>
+                <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider ui-text-meta ui-weight-medium">Latest Transfer</span>
                 <Clock className="h-4 w-4 text-amber-500" />
               </div>
-              <div className="text-sm font-bold text-zinc-900 dark:text-zinc-100 truncate">
+              <div className="text-sm font-bold text-zinc-900 dark:text-zinc-100 truncate ui-weight-medium">
                 {filteredTransfers[0] ? `${filteredTransfers[0].guestName} (${filteredTransfers[0].fromRoomNumber} ➔ ${filteredTransfers[0].toRoomNumber})` : "None"}
               </div>
-              <div className="text-[10px] text-zinc-500 font-mono">
+              <div className="text-[10px] text-zinc-500 font-mono ui-text-meta ui-font-body">
                 {filteredTransfers[0]?.formattedDate || "No transfers recorded"}
               </div>
             </div>
           </div>
 
           {/* Filters Bar for Room Transfers */}
-          <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 p-3.5 rounded-xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs">
+          <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 p-3.5 rounded-xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs ui-shadow-quiet ui-surface">
             {/* Search Box */}
             <div className="relative flex-1">
               <Search className="h-4 w-4 absolute left-3 top-2.5 text-zinc-400 pointer-events-none" />
@@ -1791,7 +1708,7 @@ export default function ReportsPage() {
                 placeholder="Search by Guest Name, Mobile, GRC #, From Room, To Room, Move Reason..."
                 value={transferSearch}
                 onChange={(e) => setTransferSearch(e.target.value)}
-                className="w-full h-9 pl-9 pr-3 text-xs rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-zinc-900 dark:text-white placeholder:text-zinc-400 transition-all"
+                className="w-full h-9 pl-9 pr-3 text-xs rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-zinc-900 dark:text-white placeholder:text-zinc-400 transition-colors ui-text-body ui-field" aria-label="Search by Guest Name, Mobile, GRC #, From Room, To Room, Move Reason"
               />
             </div>
 
@@ -1803,7 +1720,7 @@ export default function ReportsPage() {
                 <select
                   value={transferDateRange}
                   onChange={(e: any) => setTransferDateRange(e.target.value)}
-                  className="h-9 pl-8 pr-7 text-xs font-semibold rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 cursor-pointer appearance-none"
+                  className="h-9 pl-8 pr-7 text-xs font-semibold rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 cursor-pointer appearance-none ui-text-body ui-field"
                 >
                   <option value="ALL_TIME">All Time</option>
                   <option value="TODAY">Today</option>
@@ -1821,14 +1738,14 @@ export default function ReportsPage() {
                     type="date"
                     value={transferCustomStart}
                     onChange={(e) => setTransferCustomStart(e.target.value)}
-                    className="text-xs h-9 px-2.5 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 font-mono text-zinc-900 dark:text-zinc-100"
+                    className="text-xs h-9 px-2.5 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 font-mono text-zinc-900 dark:text-zinc-100 ui-text-body ui-font-body ui-field"
                   />
-                  <span className="text-zinc-400 text-xs">to</span>
+                  <span className="text-zinc-400 text-xs ui-text-body">to</span>
                   <input
                     type="date"
                     value={transferCustomEnd}
                     onChange={(e) => setTransferCustomEnd(e.target.value)}
-                    className="text-xs h-9 px-2.5 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 font-mono text-zinc-900 dark:text-zinc-100"
+                    className="text-xs h-9 px-2.5 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 font-mono text-zinc-900 dark:text-zinc-100 ui-text-body ui-font-body ui-field"
                   />
                 </div>
               )}
@@ -1837,7 +1754,7 @@ export default function ReportsPage() {
               <select
                 value={transferRoomFilter}
                 onChange={(e) => setTransferRoomFilter(e.target.value)}
-                className="text-xs h-9 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 px-3 font-medium text-zinc-900 dark:text-zinc-100 cursor-pointer"
+                className="text-xs h-9 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 px-3 font-medium text-zinc-900 dark:text-zinc-100 cursor-pointer ui-text-body ui-field"
               >
                 <option value="ALL">All Rooms</option>
                 {allDistinctRooms.map((r) => (
@@ -1851,7 +1768,7 @@ export default function ReportsPage() {
               <select
                 value={transferStatusFilter}
                 onChange={(e: any) => setTransferStatusFilter(e.target.value)}
-                className="text-xs h-9 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 px-3 font-medium text-zinc-900 dark:text-zinc-100 cursor-pointer"
+                className="text-xs h-9 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 px-3 font-medium text-zinc-900 dark:text-zinc-100 cursor-pointer ui-text-body ui-field"
               >
                 <option value="ALL">All Statuses</option>
                 <option value="CURRENTLY_OCCUPIED">In-House Active</option>
@@ -1868,7 +1785,7 @@ export default function ReportsPage() {
                     setTransferCustomStart("");
                     setTransferCustomEnd("");
                   }}
-                  className="h-9 px-3 rounded-lg bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 font-medium text-xs flex items-center gap-1.5 transition cursor-pointer"
+                  className="h-9 px-3 rounded-lg bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 font-medium text-xs flex items-center gap-1.5 transition cursor-pointer ui-text-body ui-control ui-control-sized"
                 >
                   <X className="h-3.5 w-3.5" />
                   <span>Clear Filters</span>
@@ -1878,20 +1795,20 @@ export default function ReportsPage() {
           </div>
 
           {/* Transfers Audit Table Card */}
-          <div className="p-4 sm:p-5 rounded-xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-3">
-            <div className="flex items-center justify-between pb-3 border-b border-zinc-200 dark:border-zinc-800 text-xs font-bold text-zinc-900 dark:text-zinc-100">
+          <div className="p-4 sm:p-5 rounded-xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-3 ui-shadow-quiet ui-surface">
+            <div className="flex items-center justify-between pb-3 border-b border-zinc-200 dark:border-zinc-800 text-xs font-bold text-zinc-900 dark:text-zinc-100 ui-text-body ui-weight-medium">
               <span className="flex items-center gap-2">
                 <ArrowRightLeft className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
                 <span>Room Transfer Audit Trail ({filteredTransfers.length} records)</span>
               </span>
-              <span className="text-[11px] font-mono text-zinc-500 font-normal">
+              <span className="text-[11px] font-mono text-zinc-500 font-normal ui-text-meta ui-font-body">
                 Showing newest room moves first
               </span>
             </div>
 
             <div className="overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-800">
-              <table className="w-full text-left text-xs border-collapse">
-                <thead className="bg-zinc-50/90 dark:bg-zinc-900/90 text-zinc-500 dark:text-zinc-400 text-[11px] uppercase tracking-wider font-semibold border-b border-zinc-200 dark:border-zinc-800 sticky top-0 z-10 backdrop-blur-xs">
+              <table className="w-full text-left text-xs border-collapse ui-text-body ui-data-table">
+                <thead className="bg-zinc-50/90 dark:bg-zinc-900/90 text-zinc-500 dark:text-zinc-400 text-[11px] uppercase tracking-wider font-semibold border-b border-zinc-200 dark:border-zinc-800 sticky top-0 z-10 backdrop-blur-xs ui-text-meta">
                   <tr>
                     <th className="px-4 py-3 font-semibold whitespace-nowrap">Transfer Time</th>
                     <th className="px-4 py-3 font-semibold whitespace-nowrap">GRC No.</th>
@@ -1903,29 +1820,29 @@ export default function ReportsPage() {
                     <th className="px-4 py-3 font-semibold text-right whitespace-nowrap">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-zinc-200/60 dark:divide-zinc-800/60 font-mono">
+                <tbody className="divide-y divide-zinc-200/60 dark:divide-zinc-800/60 font-mono ui-font-body">
                   {filteredTransfers.length === 0 ? (
                     <tr>
                       <td colSpan={8} className="py-12 text-center text-zinc-500 font-sans">
                         <ArrowRightLeft className="h-8 w-8 mx-auto mb-2 text-zinc-400 opacity-50" />
-                        <p className="font-bold text-sm">No room transfers match the selected filters.</p>
-                        <p className="text-xs text-zinc-400 mt-1">Try expanding your date range or clearing search criteria.</p>
+                        <p className="font-bold text-sm ui-weight-medium">No room transfers match the selected filters.</p>
+                        <p className="text-xs text-zinc-400 mt-1 ui-text-body">Try expanding your date range or clearing search criteria.</p>
                       </td>
                     </tr>
                   ) : (
                     filteredTransfers.map((t) => (
                       <tr key={t.transferId} className="hover:bg-zinc-50/80 dark:hover:bg-zinc-900/40 transition-colors">
                         <td className="px-4 py-3 text-zinc-800 dark:text-zinc-200 whitespace-nowrap">
-                          <span className="font-semibold block font-sans text-xs text-zinc-900 dark:text-zinc-100">
+                          <span className="font-semibold block font-sans text-xs text-zinc-900 dark:text-zinc-100 ui-text-body">
                             {t.formattedDate || new Date(t.transferDate).toLocaleDateString()}
                           </span>
-                          <span className="text-[10px] text-zinc-400 dark:text-zinc-500 font-mono">
+                          <span className="text-[10px] text-zinc-400 dark:text-zinc-500 font-mono ui-text-meta ui-font-body">
                             {new Date(t.transferDate).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                           </span>
                         </td>
 
                         <td className="px-4 py-3 whitespace-nowrap">
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-blue-50/80 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900/50 text-blue-700 dark:text-blue-300 font-semibold text-[11px]">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-blue-50/80 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900/50 text-blue-700 dark:text-blue-300 font-semibold text-[11px] ui-text-meta">
                             {t.grcNo}
                           </span>
                         </td>
@@ -1934,7 +1851,7 @@ export default function ReportsPage() {
                           <span className="font-medium font-sans text-zinc-900 dark:text-white block">
                             {t.guestName}
                           </span>
-                          <span className="text-[11px] text-zinc-500 font-mono">
+                          <span className="text-[11px] text-zinc-500 font-mono ui-text-meta ui-font-body">
                             {t.phone}
                           </span>
                         </td>
@@ -1942,42 +1859,42 @@ export default function ReportsPage() {
                         <td className="px-4 py-3 whitespace-nowrap font-sans">
                           <div className="flex items-center gap-2">
                             <div className="px-2.5 py-1 rounded-md bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-800 dark:text-zinc-200">
-                              <span className="font-semibold font-mono text-xs">Room {t.fromRoomNumber}</span>
-                              <span className="block text-[10px] text-zinc-500">{t.fromRoomType}</span>
+                              <span className="font-semibold font-mono text-xs ui-font-body ui-text-body">Room {t.fromRoomNumber}</span>
+                              <span className="block text-[10px] text-zinc-500 ui-text-meta">{t.fromRoomType}</span>
                             </div>
 
-                            <span className="text-zinc-400 font-bold">→</span>
+                            <span className="text-zinc-400 font-bold ui-weight-medium">→</span>
 
                             <div className="px-2.5 py-1 rounded-md bg-emerald-50/80 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900/50 text-emerald-800 dark:text-emerald-300">
-                              <span className="font-semibold font-mono text-xs">Room {t.toRoomNumber}</span>
-                              <span className="block text-[10px] opacity-80">{t.toRoomType}</span>
+                              <span className="font-semibold font-mono text-xs ui-font-body ui-text-body">Room {t.toRoomNumber}</span>
+                              <span className="block text-[10px] opacity-80 ui-text-meta">{t.toRoomType}</span>
                             </div>
                           </div>
                         </td>
 
                         <td className="px-4 py-3 text-zinc-700 dark:text-zinc-300 font-medium whitespace-nowrap">
-                          <span className="px-2 py-0.5 rounded-md bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-xs font-mono">
+                          <span className="px-2 py-0.5 rounded-md bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-xs font-mono ui-text-body ui-font-body">
                             {t.durationText}
                           </span>
                         </td>
 
                         <td className="px-4 py-3 font-sans max-w-xs">
-                          <p className="text-zinc-800 dark:text-zinc-200 font-medium text-xs truncate" title={t.moveReason}>
+                          <p className="text-zinc-800 dark:text-zinc-200 font-medium text-xs truncate ui-text-body" title={t.moveReason}>
                             {t.moveReason}
                           </p>
-                          <span className="text-[10px] font-mono text-zinc-500 block">
+                          <span className="text-[10px] font-mono text-zinc-500 block ui-text-meta ui-font-body">
                             Rate: {t.rateHandling} {t.agreedRate > 0 ? `(₹${t.agreedRate}/nt)` : ""}
                           </span>
                         </td>
 
                         <td className="px-4 py-3 whitespace-nowrap">
                           {t.currentRoomStatus === "CURRENTLY_OCCUPIED" ? (
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50/80 text-emerald-700 border border-emerald-200/80 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-900/50 font-medium text-[11px]">
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50/80 text-emerald-700 border border-emerald-200/80 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-900/50 font-medium text-[11px] ui-text-meta">
                               <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
                               IN-HOUSE (ROOM {t.toRoomNumber})
                             </span>
                           ) : (
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-zinc-100 text-zinc-700 border border-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:border-zinc-700 font-medium text-[11px]">
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-zinc-100 text-zinc-700 border border-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:border-zinc-700 font-medium text-[11px] ui-text-meta">
                               <span className="h-1.5 w-1.5 rounded-full bg-zinc-400 dark:bg-zinc-500" />
                               CHECKED OUT
                             </span>
@@ -1987,7 +1904,7 @@ export default function ReportsPage() {
                         <td className="px-4 py-3 text-right whitespace-nowrap">
                           <Link
                             href={`/billing?stayId=${t.stayId}`}
-                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 border border-zinc-200 dark:border-zinc-700 font-medium text-[11px] text-zinc-800 dark:text-zinc-200 transition font-sans shadow-xs"
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 border border-zinc-200 dark:border-zinc-700 font-medium text-[11px] text-zinc-800 dark:text-zinc-200 transition font-sans shadow-xs ui-text-meta ui-shadow-quiet"
                           >
                             <span>Open Folio</span>
                             <ExternalLink className="h-3 w-3" />
@@ -2007,66 +1924,66 @@ export default function ReportsPage() {
       {/* TAB 2: FINAL BILLS & INVOICES MASTER LIST */}
       {/* ========================================================================= */}
       {reportType === "FINAL_BILLS" && (
-        <div className="space-y-4 animate-in fade-in">
+        <div className="space-y-4  ">
           {/* Summary Stat Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-            <div className="p-4 rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-1">
+            <div className="p-4 rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-1 ui-radius-panel ui-shadow-quiet ui-surface">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">Total Bills Logged</span>
+                <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider ui-text-meta ui-weight-medium">Total Bills Logged</span>
                 <Receipt className="h-4 w-4 text-blue-500" />
               </div>
-              <div className="text-2xl font-black font-mono text-zinc-900 dark:text-zinc-100">
-                {data?.summary?.totalBills ?? filteredFinalBills.length}
+              <div className="text-2xl font-black font-mono text-zinc-900 dark:text-zinc-100 ui-weight-medium ui-font-body">
+                {filteredFinalBills.length}
               </div>
-              <div className="text-[11px] text-zinc-500">Master tax folios & invoices</div>
+              <div className="text-[11px] text-zinc-500 ui-text-meta">Master tax folios & invoices</div>
             </div>
 
-            <div className="p-4 rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-1">
+            <div className="p-4 rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-1 ui-radius-panel ui-shadow-quiet ui-surface">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">Gross Billed</span>
+                <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider ui-text-meta ui-weight-medium">Gross Billed</span>
                 <TrendingUp className="h-4 w-4 text-emerald-500" />
               </div>
-              <div className="text-2xl font-black font-mono text-emerald-600 dark:text-emerald-400">
-                {formatINR(data?.summary?.totalGrossRevenue ?? filteredFinalBills.reduce((s, b) => s + b.grossTotal, 0))}
+              <div className="text-2xl font-black font-mono text-emerald-600 dark:text-emerald-400 ui-weight-medium ui-font-body">
+                {formatINR(filteredFinalBills.reduce((s, b) => s + b.grossTotal, 0))}
               </div>
-              <div className="text-[11px] text-zinc-500 font-mono">Total guest charges posted</div>
+              <div className="text-[11px] text-zinc-500 font-mono ui-text-meta ui-font-body">Total guest charges posted</div>
             </div>
 
-            <div className="p-4 rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-1">
+            <div className="p-4 rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-1 ui-radius-panel ui-shadow-quiet ui-surface">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">Total Collected</span>
+                <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider ui-text-meta ui-weight-medium">Total Collected</span>
                 <ArrowDownLeft className="h-4 w-4 text-emerald-500" />
               </div>
-              <div className="text-2xl font-black font-mono text-zinc-900 dark:text-zinc-100">
-                {formatINR(data?.summary?.totalCollected ?? filteredFinalBills.reduce((s, b) => s + b.totalPaid, 0))}
+              <div className="text-2xl font-black font-mono text-zinc-900 dark:text-zinc-100 ui-weight-medium ui-font-body">
+                {formatINR(filteredFinalBills.reduce((s, b) => s + b.totalPaid, 0))}
               </div>
-              <div className="text-[11px] text-zinc-500 font-mono">Advances + Settlements</div>
+              <div className="text-[11px] text-zinc-500 font-mono ui-text-meta ui-font-body">Advances + Settlements</div>
             </div>
 
-            <div className="p-4 rounded-2xl bg-rose-50/50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-800/50 shadow-xs space-y-1">
+            <div className="p-4 rounded-2xl bg-rose-50/50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-800/50 shadow-xs space-y-1 ui-radius-panel ui-shadow-quiet">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-rose-800 dark:text-rose-300 uppercase tracking-wider">
+                <span className="text-[11px] font-bold text-rose-800 dark:text-rose-300 uppercase tracking-wider ui-text-meta ui-weight-medium">
                   Outstanding Balance
                 </span>
                 <AlertCircle className="h-4 w-4 text-rose-600" />
               </div>
-              <div className="text-2xl font-black font-mono text-rose-700 dark:text-rose-300">
-                {formatINR(data?.summary?.totalOutstandingBalance ?? filteredFinalBills.reduce((s, b) => s + Math.max(0, b.balance), 0))}
+              <div className="text-2xl font-black font-mono text-rose-700 dark:text-rose-300 ui-weight-medium ui-font-body">
+                {formatINR(filteredFinalBills.reduce((s, b) => s + Math.max(0, b.balance), 0))}
               </div>
-              <div className="text-[11px] text-rose-700/80 dark:text-rose-400 font-mono">
+              <div className="text-[11px] text-rose-700/80 dark:text-rose-400 font-mono ui-text-meta ui-font-body">
                 Unsettled / In-House ledgers
               </div>
             </div>
 
-            <div className="p-4 rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-1">
+            <div className="p-4 rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-1 ui-radius-panel ui-shadow-quiet ui-surface">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">Total GST Tax</span>
+                <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider ui-text-meta ui-weight-medium">Total GST Tax</span>
                 <ShieldCheck className="h-4 w-4 text-indigo-500" />
               </div>
-              <div className="text-2xl font-black font-mono text-indigo-600 dark:text-indigo-400">
-                {formatINR(data?.summary?.totalTaxCollected ?? filteredFinalBills.reduce((s, b) => s + b.totalTax, 0))}
+              <div className="text-2xl font-black font-mono text-indigo-600 dark:text-indigo-400 ui-weight-medium ui-font-body">
+                {formatINR(filteredFinalBills.reduce((s, b) => s + b.totalTax, 0))}
               </div>
-              <div className="text-[11px] text-zinc-500 font-mono">CGST + SGST statutory tax</div>
+              <div className="text-[11px] text-zinc-500 font-mono ui-text-meta ui-font-body">CGST, SGST & IGST recorded tax</div>
             </div>
           </div>
 
@@ -2074,15 +1991,15 @@ export default function ReportsPage() {
           <div className="flex items-center gap-2 overflow-x-auto pb-1">
             <button
               onClick={() => setBillStatusFilter("ALL")}
-              className={`h-9 px-3.5 rounded-xl font-bold text-xs flex items-center gap-2 transition cursor-pointer shrink-0 ${
+              className={`h-9 px-3.5 rounded-xl font-bold text-xs flex items-center gap-2 transition cursor-pointer shrink-0  ui-weight-medium ui-text-body ${
                 billStatusFilter === "ALL"
-                  ? "bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 shadow-xs"
+                  ? "bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 shadow-xs ui-shadow-quiet"
                   : "bg-white dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/60"
-              }`}
+              } ui-control`}
             >
               <Receipt className="h-3.5 w-3.5" />
               <span>All Master Bills</span>
-              <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-mono ${
+              <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-mono  ui-text-meta ui-font-body ${
                 billStatusFilter === "ALL" ? "bg-zinc-700 text-white dark:bg-zinc-200 dark:text-zinc-900" : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400"
               }`}>
                 {finalBillCounts.all}
@@ -2091,15 +2008,15 @@ export default function ReportsPage() {
 
             <button
               onClick={() => setBillStatusFilter("SETTLED")}
-              className={`h-9 px-3.5 rounded-xl font-bold text-xs flex items-center gap-2 transition cursor-pointer shrink-0 ${
+              className={`h-9 px-3.5 rounded-xl font-bold text-xs flex items-center gap-2 transition cursor-pointer shrink-0  ui-weight-medium ui-text-body ${
                 billStatusFilter === "SETTLED"
-                  ? "bg-emerald-600 text-white shadow-xs"
+                  ? "bg-emerald-600 text-white shadow-xs ui-shadow-quiet"
                   : "bg-white dark:bg-zinc-900 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/60 hover:bg-emerald-50/50 dark:hover:bg-emerald-950/30"
-              }`}
+              } ui-control`}
             >
               <CheckCircle2 className="h-3.5 w-3.5" />
               <span>Settled Invoices (Paid)</span>
-              <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-mono ${
+              <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-mono  ui-text-meta ui-font-body ${
                 billStatusFilter === "SETTLED" ? "bg-emerald-700 text-white" : "bg-emerald-100 dark:bg-emerald-900/50 text-emerald-800 dark:text-emerald-300"
               }`}>
                 {finalBillCounts.settled}
@@ -2108,15 +2025,15 @@ export default function ReportsPage() {
 
             <button
               onClick={() => setBillStatusFilter("OUTSTANDING")}
-              className={`h-9 px-3.5 rounded-xl font-bold text-xs flex items-center gap-2 transition cursor-pointer shrink-0 ${
+              className={`h-9 px-3.5 rounded-xl font-bold text-xs flex items-center gap-2 transition cursor-pointer shrink-0  ui-weight-medium ui-text-body ${
                 billStatusFilter === "OUTSTANDING"
-                  ? "bg-rose-600 text-white shadow-xs"
+                  ? "bg-rose-600 text-white shadow-xs ui-shadow-quiet"
                   : "bg-white dark:bg-zinc-900 text-rose-700 dark:text-rose-400 border border-rose-200 dark:border-rose-900/60 hover:bg-rose-50/50 dark:hover:bg-rose-950/30"
-              }`}
+              } ui-control`}
             >
               <AlertCircle className="h-3.5 w-3.5" />
               <span>Outstanding Balances (Receivables)</span>
-              <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-mono ${
+              <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-mono  ui-text-meta ui-font-body ${
                 billStatusFilter === "OUTSTANDING" ? "bg-rose-700 text-white" : "bg-rose-100 dark:bg-rose-900/50 text-rose-800 dark:text-rose-300"
               }`}>
                 {finalBillCounts.outstanding}
@@ -2125,15 +2042,15 @@ export default function ReportsPage() {
 
             <button
               onClick={() => setBillStatusFilter("IN_HOUSE")}
-              className={`h-9 px-3.5 rounded-xl font-bold text-xs flex items-center gap-2 transition cursor-pointer shrink-0 ${
+              className={`h-9 px-3.5 rounded-xl font-bold text-xs flex items-center gap-2 transition cursor-pointer shrink-0  ui-weight-medium ui-text-body ${
                 billStatusFilter === "IN_HOUSE"
-                  ? "bg-blue-600 text-white shadow-xs"
+                  ? "bg-blue-600 text-white shadow-xs ui-shadow-quiet"
                   : "bg-white dark:bg-zinc-900 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-900/60 hover:bg-blue-50/50 dark:hover:bg-blue-950/30"
-              }`}
+              } ui-control`}
             >
               <BedDouble className="h-3.5 w-3.5" />
               <span>In-House Guests</span>
-              <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-mono ${
+              <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-mono  ui-text-meta ui-font-body ${
                 billStatusFilter === "IN_HOUSE" ? "bg-blue-700 text-white" : "bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-300"
               }`}>
                 {finalBillCounts.inHouse}
@@ -2142,7 +2059,7 @@ export default function ReportsPage() {
           </div>
 
           {/* Filters Bar for Final Bills */}
-          <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 p-3.5 rounded-xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs">
+          <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 p-3.5 rounded-xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs ui-shadow-quiet ui-surface">
             {/* Search Box */}
             <div className="relative flex-1">
               <Search className="h-4 w-4 absolute left-3 top-2.5 text-zinc-400 pointer-events-none" />
@@ -2151,7 +2068,7 @@ export default function ReportsPage() {
                 placeholder="Search by Invoice #, Guest Name, Mobile, GRC #, Room(s), Company, GSTIN..."
                 value={billSearch}
                 onChange={(e) => setBillSearch(e.target.value)}
-                className="w-full h-9 pl-9 pr-3 text-xs rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-zinc-900 dark:text-white placeholder:text-zinc-400 transition-all"
+                className="w-full h-9 pl-9 pr-3 text-xs rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-zinc-900 dark:text-white placeholder:text-zinc-400 transition-colors ui-text-body ui-field" aria-label="Search by Invoice #, Guest Name, Mobile, GRC #, Room(s), Company, GSTIN"
               />
             </div>
 
@@ -2163,7 +2080,7 @@ export default function ReportsPage() {
                 <select
                   value={billDateRange}
                   onChange={(e: any) => setBillDateRange(e.target.value)}
-                  className="h-9 pl-8 pr-7 text-xs font-semibold rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 cursor-pointer appearance-none"
+                  className="h-9 pl-8 pr-7 text-xs font-semibold rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 cursor-pointer appearance-none ui-text-body ui-field"
                 >
                   <option value="ALL_TIME">All Time (Master Bills)</option>
                   <option value="TODAY">Today ({activeProperty?.businessDate || "Live"})</option>
@@ -2177,19 +2094,19 @@ export default function ReportsPage() {
 
               {billDateRange === "CUSTOM" && (
                 <div className="flex items-center gap-1.5 p-1 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800">
-                  <span className="text-[11px] text-zinc-500 font-medium pl-1.5">From:</span>
+                  <span className="text-[11px] text-zinc-500 font-medium pl-1.5 ui-text-meta">From:</span>
                   <input
                     type="date"
                     value={billCustomStart}
                     onChange={(e) => setBillCustomStart(e.target.value)}
-                    className="text-xs h-7 px-2 rounded-md bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 font-mono text-zinc-900 dark:text-zinc-100"
+                    className="text-xs h-7 px-2 rounded-md bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 font-mono text-zinc-900 dark:text-zinc-100 ui-text-body ui-font-body ui-field"
                   />
-                  <span className="text-zinc-400 text-xs">To:</span>
+                  <span className="text-zinc-400 text-xs ui-text-body">To:</span>
                   <input
                     type="date"
                     value={billCustomEnd}
                     onChange={(e) => setBillCustomEnd(e.target.value)}
-                    className="text-xs h-7 px-2 rounded-md bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 font-mono text-zinc-900 dark:text-zinc-100"
+                    className="text-xs h-7 px-2 rounded-md bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 font-mono text-zinc-900 dark:text-zinc-100 ui-text-body ui-font-body ui-field"
                   />
                 </div>
               )}
@@ -2199,7 +2116,7 @@ export default function ReportsPage() {
                 <select
                   value={billStatusFilter}
                   onChange={(e: any) => setBillStatusFilter(e.target.value)}
-                  className="text-xs h-9 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 pl-3 pr-7 font-medium text-zinc-900 dark:text-zinc-100 cursor-pointer appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                  className="text-xs h-9 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 pl-3 pr-7 font-medium text-zinc-900 dark:text-zinc-100 cursor-pointer appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 ui-text-body ui-field"
                 >
                   <option value="ALL">All Bill Statuses</option>
                   <option value="SETTLED">Settled Invoices (Paid)</option>
@@ -2214,7 +2131,7 @@ export default function ReportsPage() {
                 <select
                   value={billMethodFilter}
                   onChange={(e) => setBillMethodFilter(e.target.value)}
-                  className="text-xs h-9 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 pl-3 pr-7 font-medium text-zinc-900 dark:text-zinc-100 cursor-pointer appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                  className="text-xs h-9 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 pl-3 pr-7 font-medium text-zinc-900 dark:text-zinc-100 cursor-pointer appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 ui-text-body ui-field"
                 >
                   <option value="ALL">All Payment Methods</option>
                   <option value="CASH">Cash</option>
@@ -2236,7 +2153,7 @@ export default function ReportsPage() {
                     setBillCustomStart("");
                     setBillCustomEnd("");
                   }}
-                  className="h-9 px-3 rounded-lg bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 font-medium text-xs flex items-center gap-1.5 transition cursor-pointer"
+                  className="h-9 px-3 rounded-lg bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 font-medium text-xs flex items-center gap-1.5 transition cursor-pointer ui-text-body ui-control ui-control-sized"
                 >
                   <X className="h-3.5 w-3.5" />
                   <span>Clear Filters</span>
@@ -2246,20 +2163,20 @@ export default function ReportsPage() {
           </div>
 
           {/* Final Bills Data Table */}
-          <div className="p-4 sm:p-5 rounded-xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-3">
-            <div className="flex items-center justify-between pb-3 border-b border-zinc-200 dark:border-zinc-800 text-xs font-bold text-zinc-900 dark:text-zinc-100">
+          <div className="p-4 sm:p-5 rounded-xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-3 ui-shadow-quiet ui-surface">
+            <div className="flex items-center justify-between pb-3 border-b border-zinc-200 dark:border-zinc-800 text-xs font-bold text-zinc-900 dark:text-zinc-100 ui-text-body ui-weight-medium">
               <span className="flex items-center gap-2">
                 <Receipt className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
                 <span>Master Final Bills & Tax Invoices ({filteredFinalBills.length} records)</span>
               </span>
-              <span className="text-[11px] font-mono text-zinc-500 font-normal">
+              <span className="text-[11px] font-mono text-zinc-500 font-normal ui-text-meta ui-font-body">
                 Includes full GST and SAC charge bifurcations
               </span>
             </div>
 
             <div className="overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-800">
-              <table className="w-full text-left text-xs border-collapse">
-                <thead className="bg-zinc-50/90 dark:bg-zinc-900/90 text-zinc-500 dark:text-zinc-400 text-[11px] uppercase tracking-wider font-semibold border-b border-zinc-200 dark:border-zinc-800 sticky top-0 z-10 backdrop-blur-xs">
+              <table className="w-full text-left text-xs border-collapse ui-text-body ui-data-table">
+                <thead className="bg-zinc-50/90 dark:bg-zinc-900/90 text-zinc-500 dark:text-zinc-400 text-[11px] uppercase tracking-wider font-semibold border-b border-zinc-200 dark:border-zinc-800 sticky top-0 z-10 backdrop-blur-xs ui-text-meta">
                   <tr>
                     <th className="px-4 py-3 font-semibold whitespace-nowrap">Invoice / Folio</th>
                     <th className="px-4 py-3 font-semibold whitespace-nowrap">GRC No.</th>
@@ -2276,13 +2193,13 @@ export default function ReportsPage() {
                     <th className="px-4 py-3 font-semibold text-right whitespace-nowrap">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-zinc-200/60 dark:divide-zinc-800/60 font-mono">
+                <tbody className="divide-y divide-zinc-200/60 dark:divide-zinc-800/60 font-mono ui-font-body">
                   {filteredFinalBills.length === 0 ? (
                     <tr>
                       <td colSpan={13} className="py-12 text-center text-zinc-500 font-sans">
                         <Receipt className="h-8 w-8 mx-auto mb-2 text-zinc-400 opacity-50" />
-                        <p className="font-bold text-sm">No billing records match the selected filters.</p>
-                        <p className="text-xs text-zinc-400 mt-1">Try clearing search filters or changing the date scope.</p>
+                        <p className="font-bold text-sm ui-weight-medium">No billing records match the selected filters.</p>
+                        <p className="text-xs text-zinc-400 mt-1 ui-text-body">Try clearing search filters or changing the date scope.</p>
                       </td>
                     </tr>
                   ) : (
@@ -2296,33 +2213,33 @@ export default function ReportsPage() {
                                 setSelectedInvoiceForModal(b.primaryInvoice || null);
                                 setShowTaxInvoiceModal(true);
                               }}
-                              className="font-bold font-mono text-blue-600 dark:text-blue-400 hover:underline block text-xs cursor-pointer text-left"
-                              title="Click to view & print official tax invoice"
+                              className="font-bold font-mono text-blue-600 dark:text-blue-400 hover:underline block text-xs cursor-pointer text-left ui-weight-medium ui-font-body ui-text-body ui-control"
+                              title="Click to view & print official tax invoice" aria-label="Click to view & print official tax invoice"
                             >
                               {b.invoiceNo}
                             </button>
                             {b.allInvoices && b.allInvoices.length > 1 && (
-                              <span className="px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300 text-[10px] font-mono font-bold" title={`${b.allInvoices.length} invoices linked`}>
+                              <span className="px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300 text-[10px] font-mono font-bold ui-text-meta ui-font-body ui-weight-medium" title={`${b.allInvoices.length} invoices linked`}>
                                 +{b.allInvoices.length - 1}
                               </span>
                             )}
                           </div>
-                          <span className="text-[10px] text-zinc-400 dark:text-zinc-500 font-mono block">
+                          <span className="text-[10px] text-zinc-400 dark:text-zinc-500 font-mono block ui-text-meta ui-font-body">
                             {new Date(b.checkOutDate).toLocaleDateString()}
                           </span>
                         </td>
 
                         <td className="px-4 py-3 whitespace-nowrap">
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 font-medium text-[11px]">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 font-medium text-[11px] ui-text-meta">
                             {b.grcNo}
                           </span>
                         </td>
 
                         <td className="px-4 py-3 whitespace-nowrap font-sans">
-                          <span className="font-medium text-zinc-900 dark:text-white block text-xs">
+                          <span className="font-medium text-zinc-900 dark:text-white block text-xs ui-text-body">
                             {b.guestName}
                           </span>
-                          <div className="flex items-center gap-1.5 text-[10px] text-zinc-500 font-mono">
+                          <div className="flex items-center gap-1.5 text-[10px] text-zinc-500 font-mono ui-text-meta ui-font-body">
                             <span>{b.phone}</span>
                             {b.companyName && b.companyName !== "—" && (
                               <span className="text-blue-600 dark:text-blue-400 font-medium font-sans truncate max-w-[120px]">
@@ -2333,56 +2250,56 @@ export default function ReportsPage() {
                         </td>
 
                         <td className="px-4 py-3 whitespace-nowrap font-sans">
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-md bg-blue-50/80 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900/50 text-blue-700 dark:text-blue-300 font-mono text-xs font-medium">
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-md bg-blue-50/80 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900/50 text-blue-700 dark:text-blue-300 font-mono text-xs font-medium ui-font-body ui-text-body">
                             {b.roomDisplay}
                           </span>
                         </td>
 
                         <td className="px-4 py-3 text-zinc-700 dark:text-zinc-300 whitespace-nowrap">
-                          <span className="px-2 py-0.5 rounded-md bg-zinc-100 dark:bg-zinc-800 font-mono text-xs">
+                          <span className="px-2 py-0.5 rounded-md bg-zinc-100 dark:bg-zinc-800 font-mono text-xs ui-font-body ui-text-body">
                             {b.nights} nt{b.nights > 1 ? "s" : ""}
                           </span>
                         </td>
 
-                        <td className="px-4 py-3 text-right text-zinc-900 dark:text-zinc-100 font-mono tabular-nums font-medium whitespace-nowrap">
+                        <td className="px-4 py-3 text-right text-zinc-900 dark:text-zinc-100 font-mono tabular-nums font-medium whitespace-nowrap ui-font-body">
                           {formatINR(b.roomTariff)}
                         </td>
 
-                        <td className="px-4 py-3 text-right text-zinc-600 dark:text-zinc-400 font-mono tabular-nums font-medium whitespace-nowrap">
+                        <td className="px-4 py-3 text-right text-zinc-600 dark:text-zinc-400 font-mono tabular-nums font-medium whitespace-nowrap ui-font-body">
                           {formatINR(b.fnbCharges + b.extraPax + b.otherCharges)}
                         </td>
 
-                        <td className="px-4 py-3 text-right text-indigo-600 dark:text-indigo-400 font-mono tabular-nums font-medium whitespace-nowrap">
+                        <td className="px-4 py-3 text-right text-indigo-600 dark:text-indigo-400 font-mono tabular-nums font-medium whitespace-nowrap ui-font-body">
                           {formatINR(b.totalTax)}
                         </td>
 
-                        <td className="px-4 py-3 text-right text-emerald-600 dark:text-emerald-400 font-mono tabular-nums font-semibold text-xs whitespace-nowrap">
+                        <td className="px-4 py-3 text-right text-emerald-600 dark:text-emerald-400 font-mono tabular-nums font-semibold text-xs whitespace-nowrap ui-font-body ui-text-body">
                           {formatINR(b.grossTotal)}
                         </td>
 
-                        <td className="px-4 py-3 text-right text-zinc-800 dark:text-zinc-200 font-mono tabular-nums font-medium whitespace-nowrap">
+                        <td className="px-4 py-3 text-right text-zinc-800 dark:text-zinc-200 font-mono tabular-nums font-medium whitespace-nowrap ui-font-body">
                           {formatINR(b.totalPaid)}
                         </td>
 
-                        <td className="px-4 py-3 text-right font-mono tabular-nums font-semibold whitespace-nowrap">
-                          <span className={b.balance > 0.5 ? "text-rose-600 dark:text-rose-400 font-bold" : "text-emerald-600 dark:text-emerald-400"}>
+                        <td className="px-4 py-3 text-right font-mono tabular-nums font-semibold whitespace-nowrap ui-font-body">
+                          <span className={b.balance > 0.5 ? "text-rose-600 dark:text-rose-400 font-bold ui-weight-medium" : "text-emerald-600 dark:text-emerald-400"}>
                             {formatINR(b.balance)}
                           </span>
                         </td>
 
                         <td className="px-4 py-3 whitespace-nowrap font-sans">
                           {b.balance > 0.5 ? (
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-rose-50/90 text-rose-700 border border-rose-200/90 dark:bg-rose-950/50 dark:text-rose-300 dark:border-rose-900/60 font-bold text-[11px]">
-                              <span className="h-1.5 w-1.5 rounded-full bg-rose-500 animate-pulse" />
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-rose-50/90 text-rose-700 border border-rose-200/90 dark:bg-rose-950/50 dark:text-rose-300 dark:border-rose-900/60 font-bold text-[11px] ui-weight-medium ui-text-meta">
+                              <span className="h-1.5 w-1.5 rounded-full bg-rose-500 " />
                               OUTSTANDING DUE
                             </span>
                           ) : b.stayStatus === "IN_HOUSE" ? (
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-blue-50/80 text-blue-700 border border-blue-200/80 dark:bg-blue-950/40 dark:text-blue-400 dark:border-blue-900/50 font-medium text-[11px]">
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-blue-50/80 text-blue-700 border border-blue-200/80 dark:bg-blue-950/40 dark:text-blue-400 dark:border-blue-900/50 font-medium text-[11px] ui-text-meta">
                               <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />
                               IN-HOUSE
                             </span>
                           ) : (
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50/80 text-emerald-700 border border-emerald-200/80 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-900/50 font-medium text-[11px]">
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50/80 text-emerald-700 border border-emerald-200/80 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-900/50 font-medium text-[11px] ui-text-meta">
                               <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
                               SETTLED
                             </span>
@@ -2397,15 +2314,15 @@ export default function ReportsPage() {
                                 setSelectedInvoiceForModal(b.primaryInvoice || null);
                                 setShowTaxInvoiceModal(true);
                               }}
-                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-zinc-900 hover:bg-zinc-800 dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-200 text-white font-bold text-[11px] transition shadow-xs cursor-pointer font-sans"
-                              title="View & Print Official Tax Invoice"
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-zinc-900 hover:bg-zinc-800 dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-200 text-white font-bold text-[11px] transition shadow-xs cursor-pointer font-sans ui-weight-medium ui-text-meta ui-shadow-quiet ui-control"
+                              title="View & Print Official Tax Invoice" aria-label="View & Print Official Tax Invoice"
                             >
                               <Printer className="h-3 w-3" />
                               <span>View Tax Invoice</span>
                             </button>
                             <Link
                               href={`/billing?stayId=${b.stayId}`}
-                              className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 font-medium text-[11px] text-zinc-700 dark:text-zinc-300 transition font-sans shadow-xs"
+                              className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 font-medium text-[11px] text-zinc-700 dark:text-zinc-300 transition font-sans shadow-xs ui-text-meta ui-shadow-quiet"
                               title="Open Stay Folio"
                             >
                               <Eye className="h-3 w-3" />
@@ -2427,66 +2344,66 @@ export default function ReportsPage() {
       {/* TAB: EXPENSE REGISTER & OUTFLOW AUDIT */}
       {/* ========================================================================= */}
       {reportType === "EXPENSES" && (
-        <div className="space-y-4 animate-in fade-in">
+        <div className="space-y-4  ">
           {/* Summary Stat Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            <div className="p-4 rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-1">
+            <div className="p-4 rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-1 ui-radius-panel ui-shadow-quiet ui-surface">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">Total Expenses</span>
+                <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider ui-text-meta ui-weight-medium">Total Expenses</span>
                 <ArrowUpRight className="h-4 w-4 text-rose-500" />
               </div>
-              <div className="text-2xl font-black font-mono text-rose-600 dark:text-rose-400">
+              <div className="text-2xl font-black font-mono text-rose-600 dark:text-rose-400 ui-weight-medium ui-font-body">
                 {formatINR(expenseKPIs.totalOutflow)}
               </div>
-              <div className="text-[11px] text-zinc-500 font-mono">
+              <div className="text-[11px] text-zinc-500 font-mono ui-text-meta ui-font-body">
                 {expenseKPIs.totalCount} vouchers
               </div>
             </div>
 
-            <div className="p-4 rounded-2xl bg-rose-50/50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-800/50 shadow-xs space-y-1">
+            <div className="p-4 rounded-2xl bg-rose-50/50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-800/50 shadow-xs space-y-1 ui-radius-panel ui-shadow-quiet">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-rose-800 dark:text-rose-300 uppercase tracking-wider">
+                <span className="text-[11px] font-bold text-rose-800 dark:text-rose-300 uppercase tracking-wider ui-text-meta ui-weight-medium">
                   Cash Outflow
                 </span>
                 <Banknote className="h-4 w-4 text-rose-600" />
               </div>
-              <div className="text-2xl font-black font-mono text-rose-800 dark:text-rose-300">
+              <div className="text-2xl font-black font-mono text-rose-800 dark:text-rose-300 ui-weight-medium ui-font-body">
                 {formatINR(expenseKPIs.cashOutflow)}
               </div>
-              <div className="text-[11px] text-rose-700/80 dark:text-rose-400 font-mono">
+              <div className="text-[11px] text-rose-700/80 dark:text-rose-400 font-mono ui-text-meta ui-font-body">
                 Direct cash payments
               </div>
             </div>
 
-            <div className="p-4 rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-1">
+            <div className="p-4 rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-1 ui-radius-panel ui-shadow-quiet ui-surface">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">UPI & Bank Outflows</span>
+                <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider ui-text-meta ui-weight-medium">UPI & Bank Outflows</span>
                 <Landmark className="h-4 w-4 text-indigo-500" />
               </div>
-              <div className="text-2xl font-black font-mono text-indigo-600 dark:text-indigo-400">
+              <div className="text-2xl font-black font-mono text-indigo-600 dark:text-indigo-400 ui-weight-medium ui-font-body">
                 {formatINR(expenseKPIs.upiOutflow + expenseKPIs.bankOutflow)}
               </div>
-              <div className="text-[11px] text-zinc-500 font-mono">
+              <div className="text-[11px] text-zinc-500 font-mono ui-text-meta ui-font-body">
                 UPI: {formatINR(expenseKPIs.upiOutflow)} • Bank: {formatINR(expenseKPIs.bankOutflow)}
               </div>
             </div>
 
-            <div className="p-4 rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-1">
+            <div className="p-4 rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-1 ui-radius-panel ui-shadow-quiet ui-surface">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">Top Category</span>
+                <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider ui-text-meta ui-weight-medium">Top Category</span>
                 <Tag className="h-4 w-4 text-amber-500" />
               </div>
-              <div className="text-sm font-bold text-zinc-900 dark:text-zinc-100 truncate">
+              <div className="text-sm font-bold text-zinc-900 dark:text-zinc-100 truncate ui-weight-medium">
                 {expenseKPIs.topCategory}
               </div>
-              <div className="text-[11px] text-zinc-500 font-mono">
+              <div className="text-[11px] text-zinc-500 font-mono ui-text-meta ui-font-body">
                 {expenseKPIs.topCategoryAmount > 0 ? `${formatINR(expenseKPIs.topCategoryAmount)} spent` : "No expenses"}
               </div>
             </div>
           </div>
 
           {/* Filters Bar for Expenses */}
-          <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 p-3.5 rounded-xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs">
+          <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 p-3.5 rounded-xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs ui-shadow-quiet ui-surface">
             {/* Search Box */}
             <div className="relative flex-1">
               <Search className="h-4 w-4 absolute left-3 top-2.5 text-zinc-400 pointer-events-none" />
@@ -2495,7 +2412,7 @@ export default function ReportsPage() {
                 placeholder="Search vouchers, payees, particulars..."
                 value={expenseSearch}
                 onChange={(e) => setExpenseSearch(e.target.value)}
-                className="w-full h-9 pl-9 pr-3 text-xs rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 text-zinc-900 dark:text-white placeholder:text-zinc-400 transition-all"
+                className="w-full h-9 pl-9 pr-3 text-xs rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 text-zinc-900 dark:text-white placeholder:text-zinc-400 transition-colors ui-text-body ui-field" aria-label="Search vouchers, payees, particulars"
               />
             </div>
 
@@ -2506,7 +2423,7 @@ export default function ReportsPage() {
                 <select
                   value={expenseCategoryFilter}
                   onChange={(e) => setExpenseCategoryFilter(e.target.value)}
-                  className="text-xs h-9 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 pl-3 pr-7 font-medium text-zinc-900 dark:text-zinc-100 cursor-pointer appearance-none focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500"
+                  className="text-xs h-9 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 pl-3 pr-7 font-medium text-zinc-900 dark:text-zinc-100 cursor-pointer appearance-none focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 ui-text-body ui-field"
                 >
                   <option value="ALL">All Categories</option>
                   <option value="OWNER_PAYOUT">Owner Payout / Drawing</option>
@@ -2529,7 +2446,7 @@ export default function ReportsPage() {
                 <select
                   value={expenseMethodFilter}
                   onChange={(e) => setExpenseMethodFilter(e.target.value)}
-                  className="text-xs h-9 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 pl-3 pr-7 font-medium text-zinc-900 dark:text-zinc-100 cursor-pointer appearance-none focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500"
+                  className="text-xs h-9 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 pl-3 pr-7 font-medium text-zinc-900 dark:text-zinc-100 cursor-pointer appearance-none focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 ui-text-body ui-field"
                 >
                   <option value="ALL">All Payment Modes</option>
                   <option value="CASH">Cash</option>
@@ -2548,7 +2465,7 @@ export default function ReportsPage() {
                     setExpenseCategoryFilter("ALL");
                     setExpenseMethodFilter("ALL");
                   }}
-                  className="h-9 px-3 rounded-lg bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 font-medium text-xs flex items-center gap-1.5 transition cursor-pointer"
+                  className="h-9 px-3 rounded-lg bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 font-medium text-xs flex items-center gap-1.5 transition cursor-pointer ui-text-body ui-control ui-control-sized"
                 >
                   <X className="h-3.5 w-3.5" />
                   <span>Clear</span>
@@ -2557,7 +2474,7 @@ export default function ReportsPage() {
 
               <button
                 onClick={() => setShowAddExpenseModal(true)}
-                className="h-9 px-3 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-zinc-100 dark:hover:bg-white dark:text-zinc-900 font-medium text-xs flex items-center gap-1.5 transition cursor-pointer shadow-2xs select-none"
+                className="h-9 px-3 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-zinc-100 dark:hover:bg-white dark:text-zinc-900 font-medium text-xs flex items-center gap-1.5 transition cursor-pointer shadow-2xs select-none ui-text-body ui-shadow-quiet ui-control ui-control-sized"
               >
                 <Plus className="h-3.5 w-3.5" />
                 <span>New Expense</span>
@@ -2566,20 +2483,20 @@ export default function ReportsPage() {
           </div>
 
           {/* Expense Records Data Table */}
-          <div className="p-4 sm:p-5 rounded-xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-3">
-            <div className="flex items-center justify-between pb-3 border-b border-zinc-200 dark:border-zinc-800 text-xs font-bold text-zinc-900 dark:text-zinc-100">
+          <div className="p-4 sm:p-5 rounded-xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-3 ui-shadow-quiet ui-surface">
+            <div className="flex items-center justify-between pb-3 border-b border-zinc-200 dark:border-zinc-800 text-xs font-bold text-zinc-900 dark:text-zinc-100 ui-text-body ui-weight-medium">
               <span className="flex items-center gap-2">
                 <ArrowUpRight className="h-4 w-4 text-rose-600 dark:text-rose-400" />
                 <span>Expense Vouchers ({filteredExpenseVouchers.length})</span>
               </span>
-              <span className="text-[11px] font-mono text-zinc-500 font-normal">
+              <span className="text-[11px] font-mono text-zinc-500 font-normal ui-text-meta ui-font-body">
                 Total: {formatINR(filteredExpenseVouchers.reduce((s: number, e: any) => s + (e.totalAmount || e.amount || 0), 0))}
               </span>
             </div>
 
             <div className="overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-800">
-              <table className="w-full text-left text-xs border-collapse">
-                <thead className="bg-zinc-50/90 dark:bg-zinc-900/90 text-zinc-500 dark:text-zinc-400 text-[11px] uppercase tracking-wider font-semibold border-b border-zinc-200 dark:border-zinc-800 sticky top-0 z-10 backdrop-blur-xs">
+              <table className="w-full text-left text-xs border-collapse ui-text-body ui-data-table">
+                <thead className="bg-zinc-50/90 dark:bg-zinc-900/90 text-zinc-500 dark:text-zinc-400 text-[11px] uppercase tracking-wider font-semibold border-b border-zinc-200 dark:border-zinc-800 sticky top-0 z-10 backdrop-blur-xs ui-text-meta">
                   <tr>
                     <th className="px-4 py-3 font-semibold whitespace-nowrap">Voucher #</th>
                     <th className="px-4 py-3 font-semibold whitespace-nowrap">Date & Time</th>
@@ -2593,29 +2510,29 @@ export default function ReportsPage() {
                     <th className="px-4 py-3 font-semibold whitespace-nowrap">Staff</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-zinc-200/60 dark:divide-zinc-800/60 font-mono">
+                <tbody className="divide-y divide-zinc-200/60 dark:divide-zinc-800/60 font-mono ui-font-body">
                   {filteredExpenseVouchers.length === 0 ? (
                     <tr>
                       <td colSpan={10} className="py-12 text-center text-zinc-500 font-sans">
                         <ArrowUpRight className="h-8 w-8 mx-auto mb-2 text-zinc-400 opacity-50" />
-                        <p className="font-bold text-sm">No expense vouchers found.</p>
-                        <p className="text-xs text-zinc-400 mt-1">Record a new expense to get started.</p>
+                        <p className="font-bold text-sm ui-weight-medium">No expense vouchers found.</p>
+                        <p className="text-xs text-zinc-400 mt-1 ui-text-body">Record a new expense to get started.</p>
                       </td>
                     </tr>
                   ) : (
                     filteredExpenseVouchers.map((e: any) => (
                       <tr key={e.id} className="hover:bg-zinc-50/80 dark:hover:bg-zinc-900/40 transition-colors">
                         <td className="px-4 py-3 whitespace-nowrap">
-                          <span className="font-bold font-mono text-zinc-900 dark:text-white block text-xs">
+                          <span className="font-bold font-mono text-zinc-900 dark:text-white block text-xs ui-weight-medium ui-font-body ui-text-body">
                             {e.voucherNo}
                           </span>
                         </td>
-                        <td className="px-4 py-3 text-zinc-500 dark:text-zinc-400 whitespace-nowrap text-[11px]">
+                        <td className="px-4 py-3 text-zinc-500 dark:text-zinc-400 whitespace-nowrap text-[11px] ui-text-meta">
                           {e.date} {e.time}
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap font-sans">
                           <span
-                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-medium text-[11px] ${
+                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-medium text-[11px]  ui-text-meta ${
                               e.category === "OWNER_PAYOUT"
                                 ? "bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800 text-purple-700 dark:text-purple-300 font-semibold"
                                 : "bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-800 dark:text-zinc-200"
@@ -2631,23 +2548,23 @@ export default function ReportsPage() {
                           {e.description}
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap">
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 text-[11px] font-medium font-sans">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 text-[11px] font-medium font-sans ui-text-meta">
                             {e.method}
                           </span>
                         </td>
-                        <td className="px-4 py-3 text-zinc-500 dark:text-zinc-400 whitespace-nowrap text-[11px] font-mono">
+                        <td className="px-4 py-3 text-zinc-500 dark:text-zinc-400 whitespace-nowrap text-[11px] font-mono ui-text-meta ui-font-body">
                           {e.reference || "—"}
                         </td>
-                        <td className="px-4 py-3 text-right font-mono tabular-nums font-bold text-rose-600 dark:text-rose-400 whitespace-nowrap">
+                        <td className="px-4 py-3 text-right font-mono tabular-nums font-bold text-rose-600 dark:text-rose-400 whitespace-nowrap ui-font-body ui-weight-medium">
                           {formatINR(e.totalAmount || e.amount)}
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap font-sans">
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50/80 text-emerald-700 border border-emerald-200/80 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-900/50 font-medium text-[11px]">
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50/80 text-emerald-700 border border-emerald-200/80 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-900/50 font-medium text-[11px] ui-text-meta">
                             <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
                             {e.status || "PAID"}
                           </span>
                         </td>
-                        <td className="px-4 py-3 text-zinc-500 dark:text-zinc-400 whitespace-nowrap font-sans text-[11px]">
+                        <td className="px-4 py-3 text-zinc-500 dark:text-zinc-400 whitespace-nowrap font-sans text-[11px] ui-text-meta">
                           {e.authorizedBy}
                         </td>
                       </tr>
@@ -2665,76 +2582,76 @@ export default function ReportsPage() {
       {/* TAB 5: REVENUE & TAX LEDGER */}
       {/* ========================================================================= */}
       {reportType === "REVENUE" && (
-        <div className="space-y-4 animate-in fade-in">
+        <div className="space-y-4  ">
           {/* Executive Revenue & Tax Stat Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             {/* 1. Gross Revenue Recognized */}
-            <div className="p-4 rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-1">
+            <div className="p-4 rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-1 ui-radius-panel ui-shadow-quiet ui-surface">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">
+                <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider ui-text-meta ui-weight-medium">
                   Gross Recognized Revenue
                 </span>
                 <TrendingUp className="h-4 w-4 text-emerald-500" />
               </div>
-              <div className="text-2xl font-black font-mono text-zinc-900 dark:text-zinc-100">
+              <div className="text-2xl font-black font-mono text-zinc-900 dark:text-zinc-100 ui-weight-medium ui-font-body">
                 {formatINR(revenueKPIs.totalGross)}
               </div>
-              <div className="text-[11px] text-zinc-500 font-mono">
+              <div className="text-[11px] text-zinc-500 font-mono ui-text-meta ui-font-body">
                 {filteredRevenueEntries.length} Posted Charges • Rooms: {formatINR(revenueKPIs.roomsRev)}
               </div>
             </div>
 
             {/* 2. Net Taxable Base Turnover */}
-            <div className="p-4 rounded-2xl bg-blue-50/50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800/50 shadow-xs space-y-1">
+            <div className="p-4 rounded-2xl bg-blue-50/50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800/50 shadow-xs space-y-1 ui-radius-panel ui-shadow-quiet">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-blue-800 dark:text-blue-300 uppercase tracking-wider">
+                <span className="text-[11px] font-bold text-blue-800 dark:text-blue-300 uppercase tracking-wider ui-text-meta ui-weight-medium">
                   Net Taxable Base Turnover
                 </span>
                 <Receipt className="h-4 w-4 text-blue-600" />
               </div>
-              <div className="text-2xl font-black font-mono text-blue-800 dark:text-blue-300">
+              <div className="text-2xl font-black font-mono text-blue-800 dark:text-blue-300 ui-weight-medium ui-font-body">
                 {formatINR(revenueKPIs.totalTaxable)}
               </div>
-              <div className="text-[11px] text-blue-700/80 dark:text-blue-400 font-mono">
+              <div className="text-[11px] text-blue-700/80 dark:text-blue-400 font-mono ui-text-meta ui-font-body">
                 Base taxable revenue excluding GST
               </div>
             </div>
 
             {/* 3. Total GST Output Tax */}
-            <div className="p-4 rounded-2xl bg-indigo-50/50 dark:bg-indigo-950/20 border border-indigo-200 dark:border-indigo-800/50 shadow-xs space-y-1">
+            <div className="p-4 rounded-2xl bg-indigo-50/50 dark:bg-indigo-950/20 border border-indigo-200 dark:border-indigo-800/50 shadow-xs space-y-1 ui-radius-panel ui-shadow-quiet">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-indigo-800 dark:text-indigo-300 uppercase tracking-wider">
+                <span className="text-[11px] font-bold text-indigo-800 dark:text-indigo-300 uppercase tracking-wider ui-text-meta ui-weight-medium">
                   Total GST Output Tax
                 </span>
                 <DollarSign className="h-4 w-4 text-indigo-600" />
               </div>
-              <div className="text-2xl font-black font-mono text-indigo-800 dark:text-indigo-300">
+              <div className="text-2xl font-black font-mono text-indigo-800 dark:text-indigo-300 ui-weight-medium ui-font-body">
                 {formatINR(revenueKPIs.totalTax)}
               </div>
-              <div className="text-[11px] text-indigo-700/80 dark:text-indigo-400 font-mono">
+              <div className="text-[11px] text-indigo-700/80 dark:text-indigo-400 font-mono ui-text-meta ui-font-body">
                 CGST: {formatINR(revenueKPIs.totalCgst)} • SGST: {formatINR(revenueKPIs.totalSgst)}
               </div>
             </div>
 
             {/* 4. Departmental Breakdown */}
-            <div className="p-4 rounded-2xl bg-purple-50/50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-800/50 shadow-xs space-y-1">
+            <div className="p-4 rounded-2xl bg-purple-50/50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-800/50 shadow-xs space-y-1 ui-radius-panel ui-shadow-quiet">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-purple-800 dark:text-purple-300 uppercase tracking-wider">
+                <span className="text-[11px] font-bold text-purple-800 dark:text-purple-300 uppercase tracking-wider ui-text-meta ui-weight-medium">
                   Departmental Split
                 </span>
                 <Layers className="h-4 w-4 text-purple-600" />
               </div>
-              <div className="text-2xl font-black font-mono text-purple-800 dark:text-purple-300">
+              <div className="text-2xl font-black font-mono text-purple-800 dark:text-purple-300 ui-weight-medium ui-font-body">
                 {formatINR(revenueKPIs.fnbRev + revenueKPIs.extraRev + revenueKPIs.miscRev)}
               </div>
-              <div className="text-[11px] text-purple-700/80 dark:text-purple-400 font-mono">
+              <div className="text-[11px] text-purple-700/80 dark:text-purple-400 font-mono ui-text-meta ui-font-body">
                 F&B: {formatINR(revenueKPIs.fnbRev)} • Extra/Misc: {formatINR(revenueKPIs.extraRev + revenueKPIs.miscRev)}
               </div>
             </div>
           </div>
 
           {/* Master Table & Interactive Filters Card */}
-          <div className="p-4 sm:p-5 rounded-xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-3">
+          <div className="p-4 sm:p-5 rounded-xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-3 ui-shadow-quiet ui-surface">
             {/* Filter Toolbar */}
             <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 pb-3 border-b border-zinc-200 dark:border-zinc-800">
               <div className="flex items-center gap-2 flex-wrap flex-1">
@@ -2746,12 +2663,12 @@ export default function ReportsPage() {
                     placeholder="Search by Guest, Room #, Description, Charge Code, GSTIN..."
                     value={revenueSearch}
                     onChange={(e) => setRevenueSearch(e.target.value)}
-                    className="w-full pl-9 pr-3 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-xs text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-none focus:border-emerald-500"
+                    className="w-full pl-9 pr-3 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-xs text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-none focus:border-emerald-500 ui-text-body ui-field" aria-label="Search by Guest, Room #, Description, Charge Code, GSTIN"
                   />
                   {revenueSearch && (
                     <button
                       onClick={() => setRevenueSearch("")}
-                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 ui-control"
                     >
                       <X className="h-3.5 w-3.5" />
                     </button>
@@ -2764,7 +2681,7 @@ export default function ReportsPage() {
                   <select
                     value={revenueDateRange}
                     onChange={(e) => setRevenueDateRange(e.target.value as any)}
-                    className="h-9 pl-8 pr-7 text-xs font-semibold rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:border-emerald-500 cursor-pointer appearance-none"
+                    className="h-9 pl-8 pr-7 text-xs font-semibold rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:border-emerald-500 cursor-pointer appearance-none ui-text-body ui-field"
                   >
                     <option value="ALL_TIME">All Time (Master Ledger)</option>
                     <option value="TODAY">Today ({activeProperty?.businessDate || "Live"})</option>
@@ -2781,7 +2698,7 @@ export default function ReportsPage() {
                   <select
                     value={revenueDepartmentFilter}
                     onChange={(e) => setRevenueDepartmentFilter(e.target.value)}
-                    className="h-9 pl-3 pr-7 text-xs font-semibold rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:border-emerald-500 cursor-pointer appearance-none"
+                    className="h-9 pl-3 pr-7 text-xs font-semibold rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:border-emerald-500 cursor-pointer appearance-none ui-text-body ui-field"
                   >
                     <option value="ALL">All Departments</option>
                     <option value="ROOMS">Room Tariffs</option>
@@ -2797,7 +2714,7 @@ export default function ReportsPage() {
                   <select
                     value={revenueTaxRateFilter}
                     onChange={(e) => setRevenueTaxRateFilter(e.target.value)}
-                    className="h-9 pl-3 pr-7 text-xs font-semibold rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:border-emerald-500 cursor-pointer appearance-none"
+                    className="h-9 pl-3 pr-7 text-xs font-semibold rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:border-emerald-500 cursor-pointer appearance-none ui-text-body ui-field"
                   >
                     <option value="ALL">All GST Rates</option>
                     <option value="0%">0% GST (Nil / Exempt)</option>
@@ -2809,21 +2726,21 @@ export default function ReportsPage() {
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400 font-mono self-end lg:self-auto">
+              <div className="flex items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400 font-mono self-end lg:self-auto ui-text-body ui-font-body">
                 <span>Showing <strong>{filteredRevenueEntries.length}</strong> of {data?.rows?.length || 0} entries</span>
               </div>
             </div>
 
             {/* Custom Date Inputs if CUSTOM selected */}
             {revenueDateRange === "CUSTOM" && (
-              <div className="flex items-center gap-3 p-3 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs">
+              <div className="flex items-center gap-3 p-3 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs ui-text-body">
                 <div className="flex items-center gap-1.5">
                   <span className="text-zinc-500 font-medium">From:</span>
                   <input
                     type="date"
                     value={revenueCustomStart}
                     onChange={(e) => setRevenueCustomStart(e.target.value)}
-                    className="rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-2 py-1 font-mono text-xs"
+                    className="rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-2 py-1 font-mono text-xs ui-font-body ui-text-body ui-field"
                   />
                 </div>
                 <div className="flex items-center gap-1.5">
@@ -2832,7 +2749,7 @@ export default function ReportsPage() {
                     type="date"
                     value={revenueCustomEnd}
                     onChange={(e) => setRevenueCustomEnd(e.target.value)}
-                    className="rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-2 py-1 font-mono text-xs"
+                    className="rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-2 py-1 font-mono text-xs ui-font-body ui-text-body ui-field"
                   />
                 </div>
               </div>
@@ -2840,8 +2757,8 @@ export default function ReportsPage() {
 
             {/* Revenue & Tax Table */}
             <div className="overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-800">
-              <table className="w-full text-left text-xs border-collapse">
-                <thead className="bg-zinc-50/90 dark:bg-zinc-900/90 text-zinc-500 dark:text-zinc-400 text-[11px] uppercase tracking-wider font-semibold border-b border-zinc-200 dark:border-zinc-800 sticky top-0 z-10 backdrop-blur-xs">
+              <table className="w-full text-left text-xs border-collapse ui-text-body ui-data-table">
+                <thead className="bg-zinc-50/90 dark:bg-zinc-900/90 text-zinc-500 dark:text-zinc-400 text-[11px] uppercase tracking-wider font-semibold border-b border-zinc-200 dark:border-zinc-800 sticky top-0 z-10 backdrop-blur-xs ui-text-meta">
                   <tr>
                     <th className="px-4 py-3 font-semibold whitespace-nowrap">Service Date</th>
                     <th className="px-4 py-3 font-semibold whitespace-nowrap">Room & Stay</th>
@@ -2853,7 +2770,7 @@ export default function ReportsPage() {
                     <th className="px-4 py-3 font-semibold text-right whitespace-nowrap">Total Gross</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-zinc-200/60 dark:divide-zinc-800/60 font-mono">
+                <tbody className="divide-y divide-zinc-200/60 dark:divide-zinc-800/60 font-mono ui-font-body">
                   {filteredRevenueEntries.length === 0 ? (
                     <tr>
                       <td colSpan={8} className="px-4 py-16 text-center text-zinc-400 dark:text-zinc-500">
@@ -2861,7 +2778,7 @@ export default function ReportsPage() {
                         <p className="text-sm font-medium text-zinc-800 dark:text-zinc-200">
                           No revenue or tax records found for the selected filter
                         </p>
-                        <p className="text-xs mt-1 text-zinc-400">
+                        <p className="text-xs mt-1 text-zinc-400 ui-text-body">
                           Try adjusting the date range or clearing the department and search filters
                         </p>
                         <button
@@ -2871,7 +2788,7 @@ export default function ReportsPage() {
                             setRevenueTaxRateFilter("ALL");
                             setRevenueSearch("");
                           }}
-                          className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 transition cursor-pointer"
+                          className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 transition cursor-pointer ui-text-body ui-control"
                         >
                           <RefreshCw className="h-3.5 w-3.5" />
                           Reset Filters to All Time
@@ -2882,18 +2799,18 @@ export default function ReportsPage() {
                     filteredRevenueEntries.map((e: any) => (
                       <tr key={e.id} className="hover:bg-zinc-50/80 dark:hover:bg-zinc-900/40 transition-colors">
                         {/* Service Date */}
-                        <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400 whitespace-nowrap text-[11px] font-mono">
+                        <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400 whitespace-nowrap text-[11px] font-mono ui-text-meta ui-font-body">
                           {e.serviceDate}
                         </td>
 
                         {/* Room & Stay Ref */}
                         <td className="px-4 py-3 whitespace-nowrap">
                           {e.roomNumber && e.roomNumber !== "—" ? (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-mono text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-mono text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800 ui-font-body ui-text-meta ui-weight-medium">
                               Room {e.roomNumber}
                             </span>
                           ) : (
-                            <span className="text-zinc-400 text-[11px]">Direct Folio</span>
+                            <span className="text-zinc-400 text-[11px] ui-text-meta">Direct Folio</span>
                           )}
                         </td>
 
@@ -2901,10 +2818,10 @@ export default function ReportsPage() {
                         <td className="px-4 py-3 font-sans font-medium text-zinc-900 dark:text-zinc-100 whitespace-nowrap">
                           <div>{e.guestName}</div>
                           {e.companyName && (
-                            <div className="text-[10px] text-zinc-500 font-sans">{e.companyName}</div>
+                            <div className="text-[10px] text-zinc-500 font-sans ui-text-meta">{e.companyName}</div>
                           )}
                           {e.gstin && (
-                            <div className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400">
+                            <div className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 ui-text-meta ui-font-body">
                               GST: {e.gstin}
                             </div>
                           )}
@@ -2913,7 +2830,7 @@ export default function ReportsPage() {
                         {/* Department & Charge Code */}
                         <td className="px-4 py-3 whitespace-nowrap">
                           <span
-                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold font-sans uppercase ${
+                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold font-sans uppercase  ui-text-meta ui-weight-medium ${
                               e.department === "ROOMS"
                                 ? "bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800"
                                 : e.department === "FNB"
@@ -2925,7 +2842,7 @@ export default function ReportsPage() {
                           >
                             {e.departmentLabel}
                           </span>
-                          <span className="ml-1.5 text-[10px] font-mono text-zinc-400">{e.chargeCode}</span>
+                          <span className="ml-1.5 text-[10px] font-mono text-zinc-400 ui-text-meta ui-font-body">{e.chargeCode}</span>
                         </td>
 
                         {/* Description */}
@@ -2934,22 +2851,22 @@ export default function ReportsPage() {
                         </td>
 
                         {/* Taxable Base */}
-                        <td className="px-4 py-3 text-right font-mono tabular-nums font-medium text-zinc-800 dark:text-zinc-200 whitespace-nowrap">
+                        <td className="px-4 py-3 text-right font-mono tabular-nums font-medium text-zinc-800 dark:text-zinc-200 whitespace-nowrap ui-font-body">
                           {formatINR(e.taxableAmount)}
                         </td>
 
                         {/* GST Amount & Rate */}
-                        <td className="px-4 py-3 text-right font-mono tabular-nums whitespace-nowrap">
+                        <td className="px-4 py-3 text-right font-mono tabular-nums whitespace-nowrap ui-font-body">
                           <span className="font-semibold text-indigo-600 dark:text-indigo-400">
                             {formatINR(e.taxAmount)}
                           </span>
-                          <span className="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 font-sans">
+                          <span className="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 font-sans ui-text-meta">
                             {e.effectiveTaxRate}%
                           </span>
                         </td>
 
                         {/* Total Amount */}
-                        <td className="px-4 py-3 text-right font-mono tabular-nums font-bold text-emerald-600 dark:text-emerald-400 whitespace-nowrap">
+                        <td className="px-4 py-3 text-right font-mono tabular-nums font-bold text-emerald-600 dark:text-emerald-400 whitespace-nowrap ui-font-body ui-weight-medium">
                           {formatINR(e.totalAmount)}
                         </td>
                       </tr>
@@ -2966,70 +2883,76 @@ export default function ReportsPage() {
       {/* TAB 6: KITCHEN ORDERS & DINING COLLECTIONS */}
       {/* ========================================================================= */}
       {reportType === "FNB" && (
-        <div className="space-y-4 animate-in fade-in">
+        <div className="space-y-4  ">
           {/* Summary Stat Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            <div className="p-4 rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-1">
+            <div className="p-4 rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-1 ui-radius-panel ui-shadow-quiet ui-surface">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">Total Kitchen Orders</span>
+                <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider ui-text-meta ui-weight-medium">Total Kitchen Orders</span>
                 <UtensilsCrossed className="h-4 w-4 text-orange-500" />
               </div>
-              <div className="text-2xl font-black font-mono text-zinc-900 dark:text-zinc-100">
-                {data?.summary?.totalOrdersCount ?? filteredKitchenOrders.length}
+              <div className="text-2xl font-black font-mono text-zinc-900 dark:text-zinc-100 ui-weight-medium ui-font-body">
+                {diningSummary.totalOrdersCount ?? filteredKitchenOrders.length}
               </div>
-              <div className="text-[11px] text-zinc-500 font-mono">
-                {data?.summary?.totalKotsFired ?? 0} KOTs • {data?.summary?.totalItemsPrepared ?? 0} Dishes Prepared
+              <div className="text-[11px] text-zinc-500 font-mono ui-text-meta ui-font-body">
+                {diningSummary.totalKotsFired ?? 0} KOTs • {diningSummary.totalItemsPrepared ?? 0} Dishes Prepared
               </div>
             </div>
 
-            <div className="p-4 rounded-2xl bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800/50 shadow-xs space-y-1">
+            <div className="p-4 rounded-2xl bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800/50 shadow-xs space-y-1 ui-radius-panel ui-shadow-quiet">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-emerald-800 dark:text-emerald-300 uppercase tracking-wider">
-                  Gross F&B Collections
+                <span className="text-[11px] font-bold text-emerald-800 dark:text-emerald-300 uppercase tracking-wider ui-text-meta ui-weight-medium">
+                  F&B Receipts & Room Postings
                 </span>
                 <DollarSign className="h-4 w-4 text-emerald-600" />
               </div>
-              <div className="text-2xl font-black font-mono text-emerald-800 dark:text-emerald-300">
-                {formatINR(data?.summary?.grossCollection ?? 0)}
+              <div className="text-2xl font-black font-mono text-emerald-800 dark:text-emerald-300 ui-weight-medium ui-font-body">
+                {formatINR(diningSummary.grossCollection ?? 0)}
               </div>
-              <div className="text-[11px] text-emerald-700/80 dark:text-emerald-400 font-mono">
-                Base: {formatINR(data?.summary?.taxableSales ?? 0)} • GST 5%: {formatINR(data?.summary?.gstCollected ?? 0)}
+              <div className="text-[11px] text-emerald-700/80 dark:text-emerald-400 font-mono ui-text-meta ui-font-body">
+                Base: {formatINR(diningSummary.taxableSales ?? 0)} • Recorded GST: {formatINR(diningSummary.gstCollected ?? 0)}
               </div>
             </div>
 
-            <div className="p-4 rounded-2xl bg-blue-50/50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800/50 shadow-xs space-y-1">
+            <div className="p-4 rounded-2xl bg-blue-50/50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800/50 shadow-xs space-y-1 ui-radius-panel ui-shadow-quiet">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-blue-800 dark:text-blue-300 uppercase tracking-wider">
+                <span className="text-[11px] font-bold text-blue-800 dark:text-blue-300 uppercase tracking-wider ui-text-meta ui-weight-medium">
                   Room Folio Transferred
                 </span>
                 <BedDouble className="h-4 w-4 text-blue-600" />
               </div>
-              <div className="text-2xl font-black font-mono text-blue-800 dark:text-blue-300">
-                {formatINR(data?.summary?.folioPostedAmount ?? 0)}
+              <div className="text-2xl font-black font-mono text-blue-800 dark:text-blue-300 ui-weight-medium ui-font-body">
+                {formatINR(diningSummary.folioPostedAmount ?? 0)}
               </div>
-              <div className="text-[11px] text-blue-700/80 dark:text-blue-400 font-mono">
+              <div className="text-[11px] text-blue-700/80 dark:text-blue-400 font-mono ui-text-meta ui-font-body">
                 Billed to in-house guest rooms
               </div>
             </div>
 
-            <div className="p-4 rounded-2xl bg-purple-50/50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-800/50 shadow-xs space-y-1">
+            <div className="p-4 rounded-2xl bg-purple-50/50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-800/50 shadow-xs space-y-1 ui-radius-panel ui-shadow-quiet">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-purple-800 dark:text-purple-300 uppercase tracking-wider">
+                <span className="text-[11px] font-bold text-purple-800 dark:text-purple-300 uppercase tracking-wider ui-text-meta ui-weight-medium">
                   Direct Counter Settle
                 </span>
                 <Wallet className="h-4 w-4 text-purple-600" />
               </div>
-              <div className="text-2xl font-black font-mono text-purple-800 dark:text-purple-300">
-                {formatINR(data?.summary?.directSettledAmount ?? 0)}
+              <div className="text-2xl font-black font-mono text-purple-800 dark:text-purple-300 ui-weight-medium ui-font-body">
+                {formatINR(diningSummary.directSettledAmount ?? 0)}
               </div>
-              <div className="text-[11px] text-purple-700/80 dark:text-purple-400 font-mono">
+              <div className="text-[11px] text-purple-700/80 dark:text-purple-400 font-mono ui-text-meta ui-font-body">
                 Cash, UPI & Card collections
               </div>
             </div>
           </div>
 
+          {(diningSummary.unverifiedTaxAmount > 0 || diningSummary.openOrderValue > 0) && (
+            <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+              {diningSummary.unverifiedTaxAmount > 0 && <span>Receipts of {formatINR(diningSummary.unverifiedTaxAmount)} have no recorded tax split, including any advances. Their GST is left blank in Excel. </span>}
+              {diningSummary.openOrderValue > 0 && <span>Open order value of {formatINR(diningSummary.openOrderValue)} is excluded from settled totals.</span>}
+            </p>
+          )}
           {/* Search & Filter Bar */}
-          <div className="flex flex-col md:flex-row items-center gap-2 p-3.5 rounded-xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs">
+          <div className="flex flex-col md:flex-row items-center gap-2 p-3.5 rounded-xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs ui-shadow-quiet ui-surface">
             <div className="relative flex-1 w-full">
               <Search className="h-4 w-4 absolute left-3 top-2.5 text-zinc-400 pointer-events-none" />
               <input
@@ -3037,7 +2960,7 @@ export default function ReportsPage() {
                 placeholder="Search by Order #, KOT #, destination, room, guest, dish..."
                 value={kotSearch}
                 onChange={(e) => setKotSearch(e.target.value)}
-                className="w-full h-9 pl-9 pr-3 text-xs rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-zinc-900 dark:text-white placeholder:text-zinc-400 transition-all"
+                className="w-full h-9 pl-9 pr-3 text-xs rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-zinc-900 dark:text-white placeholder:text-zinc-400 transition-colors ui-text-body ui-field" aria-label="Search by Order #, KOT #, destination, room, guest, dish"
               />
             </div>
 
@@ -3045,7 +2968,7 @@ export default function ReportsPage() {
               <select
                 value={kotDestinationFilter}
                 onChange={(e) => setKotDestinationFilter(e.target.value)}
-                className="text-xs h-9 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 px-3 font-medium text-zinc-900 dark:text-zinc-100 cursor-pointer"
+                className="text-xs h-9 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 px-3 font-medium text-zinc-900 dark:text-zinc-100 cursor-pointer ui-text-body ui-field"
               >
                 <option value="ALL">All Destinations</option>
                 <option value="ROOM_SERVICE">Room Service</option>
@@ -3057,7 +2980,7 @@ export default function ReportsPage() {
               <select
                 value={kotSettlementFilter}
                 onChange={(e) => setKotSettlementFilter(e.target.value)}
-                className="text-xs h-9 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 px-3 font-medium text-zinc-900 dark:text-zinc-100 cursor-pointer"
+                className="text-xs h-9 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 px-3 font-medium text-zinc-900 dark:text-zinc-100 cursor-pointer ui-text-body ui-field"
               >
                 <option value="ALL">All Settlements</option>
                 <option value="POSTED_TO_ROOM">Posted to Room Folio</option>
@@ -3068,19 +2991,19 @@ export default function ReportsPage() {
           </div>
 
           {/* Kitchen Orders Table */}
-          <div className="p-4 sm:p-5 rounded-xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-3">
+          <div className="p-4 sm:p-5 rounded-xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-3 ui-shadow-quiet ui-surface">
             <div className="flex items-center justify-between pb-3 border-b border-zinc-200 dark:border-zinc-800">
-              <span className="font-semibold text-xs uppercase tracking-wider text-zinc-600 dark:text-zinc-400">
+              <span className="font-semibold text-xs uppercase tracking-wider text-zinc-600 dark:text-zinc-400 ui-text-body">
                 Kitchen Orders & Collections Register ({filteredKitchenOrders.length} Records)
               </span>
-              <span className="text-xs font-mono font-semibold text-emerald-600 dark:text-emerald-400">
-                GST SAC 996331 (5% Composite Food & Beverage Supply)
+              <span className="text-xs font-mono font-semibold text-emerald-600 dark:text-emerald-400 ui-text-body ui-font-body">
+                Recorded bills, manual KOT charges and standalone receipts. Open tickets remain unsettled.
               </span>
             </div>
 
             <div className="overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-800">
-              <table className="w-full text-left text-xs border-collapse">
-                <thead className="bg-zinc-50/90 dark:bg-zinc-900/90 text-zinc-500 dark:text-zinc-400 text-[11px] uppercase tracking-wider font-semibold border-b border-zinc-200 dark:border-zinc-800 sticky top-0 z-10 backdrop-blur-xs">
+              <table className="w-full text-left text-xs border-collapse ui-text-body ui-data-table">
+                <thead className="bg-zinc-50/90 dark:bg-zinc-900/90 text-zinc-500 dark:text-zinc-400 text-[11px] uppercase tracking-wider font-semibold border-b border-zinc-200 dark:border-zinc-800 sticky top-0 z-10 backdrop-blur-xs ui-text-meta">
                   <tr>
                     <th className="px-4 py-3 font-semibold whitespace-nowrap">Order / KOT #</th>
                     <th className="px-4 py-3 font-semibold whitespace-nowrap">Time</th>
@@ -3088,12 +3011,12 @@ export default function ReportsPage() {
                     <th className="px-4 py-3 font-semibold whitespace-nowrap">Guest / Payee</th>
                     <th className="px-4 py-3 font-semibold whitespace-nowrap">Dishes Ordered</th>
                     <th className="px-4 py-3 font-semibold text-right whitespace-nowrap">Taxable</th>
-                    <th className="px-4 py-3 font-semibold text-right whitespace-nowrap">GST (5%)</th>
+                    <th className="px-4 py-3 font-semibold text-right whitespace-nowrap">GST recorded</th>
                     <th className="px-4 py-3 font-semibold text-right whitespace-nowrap">Total Bill</th>
                     <th className="px-4 py-3 font-semibold text-center whitespace-nowrap">Settlement</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-zinc-200/60 dark:divide-zinc-800/60 font-mono">
+                <tbody className="divide-y divide-zinc-200/60 dark:divide-zinc-800/60 font-mono ui-font-body">
                   {filteredKitchenOrders.length === 0 ? (
                     <tr>
                       <td colSpan={9} className="py-12 text-center text-zinc-400 dark:text-zinc-500 font-sans">
@@ -3105,12 +3028,12 @@ export default function ReportsPage() {
                       <tr key={o.id} className="hover:bg-zinc-50/80 dark:hover:bg-zinc-900/40 transition-colors">
                         <td className="px-4 py-3 font-semibold text-zinc-900 dark:text-zinc-100 whitespace-nowrap">
                           <div>{o.orderNo}</div>
-                          <div className="text-[10px] font-normal text-amber-600 dark:text-amber-400">{o.kotNumbers}</div>
+                          <div className="text-[10px] font-normal text-amber-600 dark:text-amber-400 ui-text-meta">{o.kotNumbers}</div>
                         </td>
-                        <td className="px-4 py-3 text-zinc-500 dark:text-zinc-400 whitespace-nowrap text-[11px]">{o.timeFormatted}</td>
+                        <td className="px-4 py-3 text-zinc-500 dark:text-zinc-400 whitespace-nowrap text-[11px] ui-text-meta">{o.timeFormatted}</td>
                         <td className="px-4 py-3 font-sans whitespace-nowrap">
                           <span
-                            className={`inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium border ${
+                            className={`inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium border  ui-text-meta ${
                               o.destinationCategory === "ROOM_SERVICE"
                                 ? "bg-blue-50/80 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 border-blue-200 dark:border-blue-900/50"
                                 : o.destinationCategory === "BAR_LOUNGE"
@@ -3129,22 +3052,22 @@ export default function ReportsPage() {
                         <td className="px-4 py-3 font-sans text-zinc-700 dark:text-zinc-300 max-w-xs truncate" title={o.itemsSummary}>
                           {o.itemsSummary}
                         </td>
-                        <td className="px-4 py-3 text-right font-mono tabular-nums font-medium whitespace-nowrap">{formatINR(o.taxableAmount)}</td>
-                        <td className="px-4 py-3 text-right font-mono tabular-nums font-medium text-indigo-600 dark:text-indigo-400 whitespace-nowrap">{formatINR(o.totalTax)}</td>
-                        <td className="px-4 py-3 text-right font-mono tabular-nums font-semibold text-emerald-600 dark:text-emerald-400 whitespace-nowrap">{formatINR(o.totalAmount)}</td>
+                        <td className="px-4 py-3 text-right font-mono tabular-nums font-medium whitespace-nowrap ui-font-body">{formatINR(o.taxableAmount)}</td>
+                        <td className="px-4 py-3 text-right font-mono tabular-nums font-medium text-indigo-600 dark:text-indigo-400 whitespace-nowrap ui-font-body">{o.totalTax == null ? "Not recorded" : formatINR(o.totalTax)}</td>
+                        <td className="px-4 py-3 text-right font-mono tabular-nums font-semibold text-emerald-600 dark:text-emerald-400 whitespace-nowrap ui-font-body">{formatINR(o.totalAmount)}</td>
                         <td className="px-4 py-3 text-center font-sans whitespace-nowrap">
                           {o.settlementType === "POSTED_TO_ROOM" ? (
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-blue-50/80 text-blue-700 border border-blue-200/80 dark:bg-blue-950/40 dark:text-blue-400 dark:border-blue-900/50 text-[11px] font-medium">
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-blue-50/80 text-blue-700 border border-blue-200/80 dark:bg-blue-950/40 dark:text-blue-400 dark:border-blue-900/50 text-[11px] font-medium ui-text-meta">
                               <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />
                               Room Folio
                             </span>
                           ) : o.settlementType === "DIRECT_PAID" ? (
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50/80 text-emerald-700 border border-emerald-200/80 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-900/50 text-[11px] font-medium">
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50/80 text-emerald-700 border border-emerald-200/80 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-900/50 text-[11px] font-medium ui-text-meta">
                               <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
                               Paid Settle
                             </span>
                           ) : (
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-zinc-100 text-zinc-700 border border-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:border-zinc-700 text-[11px] font-medium">
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-zinc-100 text-zinc-700 border border-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:border-zinc-700 text-[11px] font-medium ui-text-meta">
                               <span className="h-1.5 w-1.5 rounded-full bg-zinc-400 dark:bg-zinc-500" />
                               Open Ticket
                             </span>
@@ -3165,40 +3088,40 @@ export default function ReportsPage() {
       {/* ========================================================================= */}
       {showAddExpenseModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-          <div className="w-full max-w-lg rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#111114] p-6 shadow-2xl space-y-4">
+          <div className="w-full max-w-lg rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#111114] p-6 shadow-2xl space-y-4 ui-radius-panel ui-dialog-surface ui-surface">
             <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 pb-3">
-              <h3 className="font-bold text-sm text-zinc-900 dark:text-white flex items-center gap-2">
+              <h3 className="font-bold text-sm text-zinc-900 dark:text-white flex items-center gap-2 ui-weight-medium">
                 <Plus className="h-4 w-4 text-rose-500" />
                 Record Cash/Bank Expense Voucher
               </h3>
               <button
                 onClick={() => setShowAddExpenseModal(false)}
-                className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 cursor-pointer"
+                className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 cursor-pointer ui-control"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
 
             {expenseError && (
-              <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-300 dark:border-rose-800/60 text-xs font-semibold text-rose-800 dark:text-rose-300">
+              <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-300 dark:border-rose-800/60 text-xs font-semibold text-rose-800 dark:text-rose-300 ui-text-body">
                 {expenseError}
               </div>
             )}
 
             {expenseSuccess && (
-              <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800/60 text-xs font-semibold text-emerald-800 dark:text-emerald-300">
+              <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800/60 text-xs font-semibold text-emerald-800 dark:text-emerald-300 ui-text-body">
                 {expenseSuccess}
               </div>
             )}
 
-            <form onSubmit={handleAddExpenseSubmit} className="space-y-3 text-xs">
+            <form onSubmit={handleAddExpenseSubmit} className="space-y-3 text-xs ui-text-body">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-zinc-500 font-bold mb-1">Expense Category *</label>
+                  <label className="block text-zinc-500 font-bold mb-1 ui-weight-medium ui-label">Expense Category *</label>
                   <select
                     value={expenseForm.category}
                     onChange={(e) => setExpenseForm({ ...expenseForm, category: e.target.value })}
-                    className="w-full rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-3 py-2 focus:border-rose-500 focus:outline-none"
+                    className="w-full rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-3 py-2 focus:border-rose-500 focus:outline-none ui-radius-control ui-field" aria-label="Expense Category"
                   >
                     <option value="DRIVER_COMMISSION">Driver Commission</option>
                     <option value="OWNER_PAYOUT">👑 Owner Payout / Drawing</option>
@@ -3213,11 +3136,11 @@ export default function ReportsPage() {
                 </div>
 
                 <div>
-                  <label className="block text-zinc-500 font-bold mb-1">Payment Method *</label>
+                  <label className="block text-zinc-500 font-bold mb-1 ui-weight-medium ui-label">Payment Method *</label>
                   <select
                     value={expenseForm.paymentMethod}
                     onChange={(e) => setExpenseForm({ ...expenseForm, paymentMethod: e.target.value })}
-                    className="w-full rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-3 py-2 focus:border-rose-500 focus:outline-none"
+                    className="w-full rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-3 py-2 focus:border-rose-500 focus:outline-none ui-radius-control ui-field" aria-label="Payment Method"
                   >
                     <option value="CASH">Physical Cash Drawer</option>
                     <option value="UPI">UPI / GooglePay</option>
@@ -3228,19 +3151,19 @@ export default function ReportsPage() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-zinc-500 font-bold mb-1">Payee / Vendor Name *</label>
+                  <label className="block text-zinc-500 font-bold mb-1 ui-weight-medium ui-label">Payee / Vendor Name *</label>
                   <input
                     required
                     type="text"
                     placeholder="e.g. Raju Driver, Local Dairy"
                     value={expenseForm.payeeName}
                     onChange={(e) => setExpenseForm({ ...expenseForm, payeeName: e.target.value })}
-                    className="w-full rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-3 py-2 focus:border-rose-500 focus:outline-none"
+                    className="w-full rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-3 py-2 focus:border-rose-500 focus:outline-none ui-radius-control ui-field" aria-label="Payee / Vendor Name"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-zinc-500 font-bold mb-1">Amount (INR) *</label>
+                  <label className="block text-zinc-500 font-bold mb-1 ui-weight-medium ui-label">Amount (INR) *</label>
                   <input
                     required
                     type="number"
@@ -3248,20 +3171,20 @@ export default function ReportsPage() {
                     placeholder="e.g. 500"
                     value={expenseForm.amount}
                     onChange={(e) => setExpenseForm({ ...expenseForm, amount: e.target.value })}
-                    className="w-full rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-3 py-2 font-mono font-bold focus:border-rose-500 focus:outline-none"
+                    className="w-full rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-3 py-2 font-mono font-bold focus:border-rose-500 focus:outline-none ui-radius-control ui-font-body ui-weight-medium ui-field" aria-label="Amount (INR)"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-zinc-500 font-bold mb-1">Description / Particulars *</label>
+                <label className="block text-zinc-500 font-bold mb-1 ui-weight-medium ui-label">Description / Particulars *</label>
                 <input
                   required
                   type="text"
                   placeholder="Details of expense"
                   value={expenseForm.description}
                   onChange={(e) => setExpenseForm({ ...expenseForm, description: e.target.value })}
-                  className="w-full rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-3 py-2 focus:border-rose-500 focus:outline-none"
+                  className="w-full rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-3 py-2 focus:border-rose-500 focus:outline-none ui-radius-control ui-field" aria-label="Description / Particulars"
                 />
               </div>
 
@@ -3269,14 +3192,14 @@ export default function ReportsPage() {
                 <button
                   type="button"
                   onClick={() => setShowAddExpenseModal(false)}
-                  className="rounded-xl border border-zinc-300 dark:border-zinc-700 px-4 py-2 font-bold text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer"
+                  className="rounded-xl border border-zinc-300 dark:border-zinc-700 px-4 py-2 font-bold text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer ui-radius-control ui-weight-medium ui-control"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={expenseSubmitting}
-                  className="rounded-xl bg-rose-600 hover:bg-rose-500 text-white px-5 py-2 font-bold shadow-xs transition cursor-pointer"
+                  className="rounded-xl bg-rose-600 hover:bg-rose-500 text-white px-5 py-2 font-bold shadow-xs transition cursor-pointer ui-radius-control ui-weight-medium ui-shadow-quiet ui-control"
                 >
                   {expenseSubmitting ? "Saving Voucher..." : "Record Expense Voucher"}
                 </button>
@@ -3290,62 +3213,62 @@ export default function ReportsPage() {
       {/* MODAL: RECORD DIRECT NON-ROOM INCOME (BAR, BANQUET, WALK-IN DINING) */}
       {/* ========================================================================= */}
       {showAddIncomeModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-xs p-4 overflow-y-auto animate-in fade-in">
-          <div className="w-full max-w-lg rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#111114] p-6 shadow-2xl space-y-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-xs p-4 overflow-y-auto  ">
+          <div className="w-full max-w-lg rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#111114] p-6 shadow-2xl space-y-4 ui-radius-panel ui-dialog-surface ui-surface">
             <div className="flex items-center justify-between pb-3 border-b border-zinc-200 dark:border-zinc-800">
               <div className="flex items-center gap-2.5">
                 <div className="p-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60">
                   <Banknote className="h-5 w-5" />
                 </div>
                 <div>
-                  <h2 className="text-sm font-black text-zinc-900 dark:text-zinc-100">
+                  <h2 className="text-sm font-black text-zinc-900 dark:text-zinc-100 ui-weight-medium ui-section-title">
                     Record Direct Collection / Income
                   </h2>
-                  <p className="text-[11px] text-zinc-500">
+                  <p className="text-[11px] text-zinc-500 ui-text-meta">
                     Interim manual register for Bar, Banquet advances & Walk-in dining
                   </p>
                 </div>
               </div>
               <button
                 onClick={() => setShowAddIncomeModal(false)}
-                className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 transition cursor-pointer"
+                className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 transition cursor-pointer ui-control"
               >
                 <X className="h-5 w-5" />
               </button>
             </div>
 
             {incomeError && (
-              <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-xs text-rose-700 dark:text-rose-300 font-semibold flex items-center gap-2">
+              <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-xs text-rose-700 dark:text-rose-300 font-semibold flex items-center gap-2 ui-text-body">
                 <AlertCircle className="h-4 w-4 shrink-0" />
                 <span>{incomeError}</span>
               </div>
             )}
 
             {incomeSuccess && (
-              <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-xs text-emerald-700 dark:text-emerald-300 font-semibold flex items-center gap-2">
+              <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-xs text-emerald-700 dark:text-emerald-300 font-semibold flex items-center gap-2 ui-text-body">
                 <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
                 <span>{incomeSuccess}</span>
               </div>
             )}
 
-            <form onSubmit={handleAddIncomeSubmit} className="space-y-3.5 text-xs">
+            <form onSubmit={handleAddIncomeSubmit} className="space-y-3.5 text-xs ui-text-body">
               {/* Income Category Dropdown */}
               <div>
-                <label className="block text-zinc-700 dark:text-zinc-300 font-bold mb-1">
+                <label className="block text-zinc-700 dark:text-zinc-300 font-bold mb-1 ui-weight-medium ui-label">
                   Collection Source / Category *
                 </label>
                 <select
                   required
                   value={incomeForm.category}
                   onChange={(e) => setIncomeForm({ ...incomeForm, category: e.target.value })}
-                  className="w-full rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-3 py-2.5 font-medium text-zinc-900 dark:text-zinc-100 focus:border-emerald-500 focus:outline-none cursor-pointer"
+                  className="w-full rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-3 py-2.5 font-medium text-zinc-900 dark:text-zinc-100 focus:border-emerald-500 focus:outline-none cursor-pointer ui-radius-control ui-field" aria-label="Collection Source / Category"
                 >
                   <option value="BAR_FOOD_BILL">Bar Food Orders (Kitchen Food Bill)</option>
                   <option value="BANQUET_EVENT_ADVANCE">Banquet & Event Advance Deposit</option>
                   <option value="OUTSIDER_WALKIN_DINING">Direct Non-Resident Walk-In Dining</option>
                   <option value="MISC_OUTLET_REVENUE">Ancillary & Other Outlet Collections</option>
                 </select>
-                <p className="text-[10px] text-zinc-500 dark:text-zinc-400 mt-1 font-mono">
+                <p className="text-[10px] text-zinc-500 dark:text-zinc-400 mt-1 font-mono ui-text-meta ui-font-body">
                   {incomeForm.category === "BAR_FOOD_BILL" && "Direct collection for food dispatched from kitchen to Bar/Lounge. (Bar liquor & drinks sales are not tracked in Hotel OS)."}
                   {incomeForm.category === "BANQUET_EVENT_ADVANCE" && "Advance deposits or hall bookings. Client contact is mandatory; supports corporate GST details."}
                   {incomeForm.category === "OUTSIDER_WALKIN_DINING" && "Direct food bill settlement for outside walk-in dining guests without room folio settlement."}
@@ -3357,18 +3280,18 @@ export default function ReportsPage() {
               {incomeForm.category === "BANQUET_EVENT_ADVANCE" && (
                 <div className="p-3 rounded-xl bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-200/80 dark:border-emerald-800/40 space-y-3">
                   <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-bold text-emerald-900 dark:text-emerald-300 flex items-center gap-1.5">
+                    <span className="text-[11px] font-bold text-emerald-900 dark:text-emerald-300 flex items-center gap-1.5 ui-text-meta ui-weight-medium">
                       <Building2 className="h-3.5 w-3.5" /> Client / Booking Type
                     </span>
-                    <div className="flex rounded-lg bg-zinc-200 dark:bg-zinc-800 p-0.5 text-[10px] font-bold">
+                    <div className="flex rounded-lg bg-zinc-200 dark:bg-zinc-800 p-0.5 text-[10px] font-bold ui-text-meta ui-weight-medium">
                       <button
                         type="button"
                         onClick={() => setIncomeForm({ ...incomeForm, clientType: "INDIVIDUAL" })}
                         className={`px-2.5 py-1 rounded-md transition cursor-pointer ${
                           incomeForm.clientType === "INDIVIDUAL"
-                            ? "bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 shadow-xs"
+                            ? "bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 shadow-xs ui-shadow-quiet"
                             : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900"
-                        }`}
+                        } ui-control`}
                       >
                         Individual Host
                       </button>
@@ -3377,9 +3300,9 @@ export default function ReportsPage() {
                         onClick={() => setIncomeForm({ ...incomeForm, clientType: "COMPANY" })}
                         className={`px-2.5 py-1 rounded-md transition cursor-pointer ${
                           incomeForm.clientType === "COMPANY"
-                            ? "bg-emerald-600 text-white shadow-xs"
+                            ? "bg-emerald-600 text-white shadow-xs ui-shadow-quiet"
                             : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900"
-                        }`}
+                        } ui-control`}
                       >
                         Corporate / Company
                       </button>
@@ -3390,7 +3313,7 @@ export default function ReportsPage() {
                     <div className="space-y-2 pt-1">
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         <div>
-                          <label className="block text-zinc-700 dark:text-zinc-300 font-bold mb-1 text-[11px]">
+                          <label className="block text-zinc-700 dark:text-zinc-300 font-bold mb-1 text-[11px] ui-weight-medium ui-text-meta ui-label">
                             Company / Organization Name *
                           </label>
                           <input
@@ -3399,11 +3322,11 @@ export default function ReportsPage() {
                             placeholder="e.g. Tata Consultancy Services Ltd"
                             value={incomeForm.companyName}
                             onChange={(e) => setIncomeForm({ ...incomeForm, companyName: e.target.value })}
-                            className="w-full rounded-lg bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 px-2.5 py-1.5 text-zinc-900 dark:text-zinc-100 focus:border-emerald-500 focus:outline-none"
+                            className="w-full rounded-lg bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 px-2.5 py-1.5 text-zinc-900 dark:text-zinc-100 focus:border-emerald-500 focus:outline-none ui-field" aria-label="Company / Organization Name"
                           />
                         </div>
                         <div>
-                          <label className="block text-zinc-700 dark:text-zinc-300 font-bold mb-1 text-[11px]">
+                          <label className="block text-zinc-700 dark:text-zinc-300 font-bold mb-1 text-[11px] ui-weight-medium ui-text-meta ui-label">
                             Company GSTIN (15 Digits)
                           </label>
                           <input
@@ -3412,14 +3335,14 @@ export default function ReportsPage() {
                             placeholder="e.g. 18AABCT1332L1Z1"
                             value={incomeForm.gstin}
                             onChange={(e) => setIncomeForm({ ...incomeForm, gstin: e.target.value.toUpperCase() })}
-                            className="w-full rounded-lg bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 px-2.5 py-1.5 font-mono text-zinc-900 dark:text-zinc-100 focus:border-emerald-500 focus:outline-none uppercase"
+                            className="w-full rounded-lg bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 px-2.5 py-1.5 font-mono text-zinc-900 dark:text-zinc-100 focus:border-emerald-500 focus:outline-none uppercase ui-font-body ui-field" aria-label="Company GSTIN (15 Digits)"
                           />
                         </div>
                       </div>
 
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         <div>
-                          <label className="block text-zinc-700 dark:text-zinc-300 font-bold mb-1 text-[11px]">
+                          <label className="block text-zinc-700 dark:text-zinc-300 font-bold mb-1 text-[11px] ui-weight-medium ui-text-meta ui-label">
                             Company Billing Address
                           </label>
                           <input
@@ -3427,11 +3350,11 @@ export default function ReportsPage() {
                             placeholder="e.g. GS Road, Guwahati, Assam - 781005"
                             value={incomeForm.billingAddress}
                             onChange={(e) => setIncomeForm({ ...incomeForm, billingAddress: e.target.value })}
-                            className="w-full rounded-lg bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 px-2.5 py-1.5 text-zinc-900 dark:text-zinc-100 focus:border-emerald-500 focus:outline-none"
+                            className="w-full rounded-lg bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 px-2.5 py-1.5 text-zinc-900 dark:text-zinc-100 focus:border-emerald-500 focus:outline-none ui-field" aria-label="Company Billing Address"
                           />
                         </div>
                         <div>
-                          <label className="block text-zinc-700 dark:text-zinc-300 font-bold mb-1 text-[11px]">
+                          <label className="block text-zinc-700 dark:text-zinc-300 font-bold mb-1 text-[11px] ui-weight-medium ui-text-meta ui-label">
                             Event / Function Details
                           </label>
                           <input
@@ -3439,7 +3362,7 @@ export default function ReportsPage() {
                             placeholder="e.g. Annual Conference & Gala Dinner"
                             value={incomeForm.eventDetails}
                             onChange={(e) => setIncomeForm({ ...incomeForm, eventDetails: e.target.value })}
-                            className="w-full rounded-lg bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 px-2.5 py-1.5 text-zinc-900 dark:text-zinc-100 focus:border-emerald-500 focus:outline-none"
+                            className="w-full rounded-lg bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 px-2.5 py-1.5 text-zinc-900 dark:text-zinc-100 focus:border-emerald-500 focus:outline-none ui-field" aria-label="Event / Function Details"
                           />
                         </div>
                       </div>
@@ -3451,7 +3374,7 @@ export default function ReportsPage() {
               {/* Guest / Party Name & Mobile */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-zinc-700 dark:text-zinc-300 font-bold mb-1">
+                  <label className="block text-zinc-700 dark:text-zinc-300 font-bold mb-1 ui-weight-medium ui-label">
                     {incomeForm.category === "BANQUET_EVENT_ADVANCE"
                       ? "Contact Person / Host Name *"
                       : "Guest / Party Name (Optional)"}
@@ -3468,12 +3391,12 @@ export default function ReportsPage() {
                     }
                     value={incomeForm.payerName}
                     onChange={(e) => setIncomeForm({ ...incomeForm, payerName: e.target.value })}
-                    className="w-full rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-3 py-2 text-zinc-900 dark:text-zinc-100 focus:border-emerald-500 focus:outline-none"
+                    className="w-full rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-3 py-2 text-zinc-900 dark:text-zinc-100 focus:border-emerald-500 focus:outline-none ui-radius-control ui-field"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-zinc-700 dark:text-zinc-300 font-bold mb-1">
+                  <label className="block text-zinc-700 dark:text-zinc-300 font-bold mb-1 ui-weight-medium ui-label">
                     {incomeForm.category === "BANQUET_EVENT_ADVANCE"
                       ? "Contact Mobile Number *"
                       : "Contact Mobile (Optional)"}
@@ -3484,7 +3407,7 @@ export default function ReportsPage() {
                     placeholder="e.g. 9876543210"
                     value={incomeForm.payerPhone}
                     onChange={(e) => setIncomeForm({ ...incomeForm, payerPhone: e.target.value })}
-                    className="w-full rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-3 py-2 text-zinc-900 dark:text-zinc-100 focus:border-emerald-500 focus:outline-none"
+                    className="w-full rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-3 py-2 text-zinc-900 dark:text-zinc-100 focus:border-emerald-500 focus:outline-none ui-radius-control ui-field" aria-label="e.g. 9876543210"
                   />
                 </div>
               </div>
@@ -3493,7 +3416,7 @@ export default function ReportsPage() {
               {incomeForm.category !== "BANQUET_EVENT_ADVANCE" && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-zinc-700 dark:text-zinc-300 font-bold mb-1 flex items-center gap-1">
+                    <label className="block text-zinc-700 dark:text-zinc-300 font-bold mb-1 flex items-center gap-1 ui-weight-medium ui-label">
                       <UtensilsCrossed className="h-3.5 w-3.5 text-orange-600 dark:text-orange-400" />
                       <span>KOT / Kitchen Slip # (Optional)</span>
                     </label>
@@ -3502,12 +3425,12 @@ export default function ReportsPage() {
                       placeholder="e.g. KOT-104, KOT-42"
                       value={incomeForm.kotNo}
                       onChange={(e) => setIncomeForm({ ...incomeForm, kotNo: e.target.value })}
-                      className="w-full rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-3 py-2 text-zinc-900 dark:text-zinc-100 focus:border-emerald-500 focus:outline-none font-mono"
+                      className="w-full rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-3 py-2 text-zinc-900 dark:text-zinc-100 focus:border-emerald-500 focus:outline-none font-mono ui-radius-control ui-font-body ui-field" aria-label="e.g. KOT-104, KOT-42"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-zinc-700 dark:text-zinc-300 font-bold mb-1">
+                    <label className="block text-zinc-700 dark:text-zinc-300 font-bold mb-1 ui-weight-medium ui-label">
                       Bill / POS Slip / UTR # (Optional)
                     </label>
                     <input
@@ -3515,7 +3438,7 @@ export default function ReportsPage() {
                       placeholder="e.g. Slip #8812, UTR 29384"
                       value={incomeForm.reference}
                       onChange={(e) => setIncomeForm({ ...incomeForm, reference: e.target.value })}
-                      className="w-full rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-3 py-2 text-zinc-900 dark:text-zinc-100 focus:border-emerald-500 focus:outline-none font-mono"
+                      className="w-full rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-3 py-2 text-zinc-900 dark:text-zinc-100 focus:border-emerald-500 focus:outline-none font-mono ui-radius-control ui-font-body ui-field" aria-label="Bill / POS Slip / UTR # (Optional)"
                     />
                   </div>
                 </div>
@@ -3524,7 +3447,7 @@ export default function ReportsPage() {
               {/* Amount and Payment Mode */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-zinc-700 dark:text-zinc-300 font-bold mb-1">
+                  <label className="block text-zinc-700 dark:text-zinc-300 font-bold mb-1 ui-weight-medium ui-label">
                     Collected Amount (INR) *
                   </label>
                   <input
@@ -3535,18 +3458,18 @@ export default function ReportsPage() {
                     placeholder="e.g. 1500"
                     value={incomeForm.amount}
                     onChange={(e) => setIncomeForm({ ...incomeForm, amount: e.target.value })}
-                    className="w-full rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-3 py-2 font-mono font-bold text-zinc-900 dark:text-zinc-100 focus:border-emerald-500 focus:outline-none"
+                    className="w-full rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-3 py-2 font-mono font-bold text-zinc-900 dark:text-zinc-100 focus:border-emerald-500 focus:outline-none ui-radius-control ui-font-body ui-weight-medium ui-field" aria-label="Collected Amount (INR)"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-zinc-700 dark:text-zinc-300 font-bold mb-1">
+                  <label className="block text-zinc-700 dark:text-zinc-300 font-bold mb-1 ui-weight-medium ui-label">
                     Payment Method *
                   </label>
                   <select
                     value={incomeForm.paymentMethod}
                     onChange={(e) => setIncomeForm({ ...incomeForm, paymentMethod: e.target.value })}
-                    className="w-full rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-3 py-2 text-zinc-900 dark:text-zinc-100 focus:border-emerald-500 focus:outline-none cursor-pointer"
+                    className="w-full rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-3 py-2 text-zinc-900 dark:text-zinc-100 focus:border-emerald-500 focus:outline-none cursor-pointer ui-radius-control ui-field" aria-label="Payment Method"
                   >
                     <option value="CASH">Cash (Drawer Handover)</option>
                     <option value="UPI">UPI / QR Code</option>
@@ -3558,7 +3481,7 @@ export default function ReportsPage() {
 
               {/* Narration and Notes */}
               <div>
-                <label className="block text-zinc-700 dark:text-zinc-300 font-bold mb-1">
+                <label className="block text-zinc-700 dark:text-zinc-300 font-bold mb-1 ui-weight-medium ui-label">
                   Narration / Remarks (Optional)
                 </label>
                 <textarea
@@ -3566,7 +3489,7 @@ export default function ReportsPage() {
                   placeholder="Additional billing details, guest requests, or event schedule..."
                   value={incomeForm.notes}
                   onChange={(e) => setIncomeForm({ ...incomeForm, notes: e.target.value })}
-                  className="w-full rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-3 py-2 text-zinc-900 dark:text-zinc-100 focus:border-emerald-500 focus:outline-none resize-none"
+                  className="w-full rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-3 py-2 text-zinc-900 dark:text-zinc-100 focus:border-emerald-500 focus:outline-none resize-none ui-radius-control ui-field" aria-label="Narration / Remarks (Optional)"
                 />
               </div>
 
@@ -3574,14 +3497,14 @@ export default function ReportsPage() {
                 <button
                   type="button"
                   onClick={() => setShowAddIncomeModal(false)}
-                  className="rounded-xl border border-zinc-300 dark:border-zinc-700 px-4 py-2 font-bold text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer transition"
+                  className="rounded-xl border border-zinc-300 dark:border-zinc-700 px-4 py-2 font-bold text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer transition ui-radius-control ui-weight-medium ui-control"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={incomeSubmitting}
-                  className="rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-2 font-bold shadow-xs transition cursor-pointer flex items-center gap-1.5"
+                  className="rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-2 font-bold shadow-xs transition cursor-pointer flex items-center gap-1.5 ui-radius-control ui-weight-medium ui-shadow-quiet ui-control"
                 >
                   {incomeSubmitting ? (
                     <>
@@ -3606,19 +3529,19 @@ export default function ReportsPage() {
       {/* ========================================================================= */}
       {showExpensesPrintModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4 overflow-y-auto">
-          <div className="w-full max-w-5xl rounded-2xl border border-zinc-700 bg-white text-zinc-950 p-6 shadow-2xl space-y-4 font-sans text-xs">
+          <div className="w-full max-w-5xl rounded-2xl border border-zinc-700 bg-white text-zinc-950 p-6 shadow-2xl space-y-4 font-sans text-xs ui-radius-panel ui-dialog-surface ui-text-body ui-surface">
             <div className="flex items-center justify-between pb-3 border-b border-zinc-200">
-              <span className="text-xs font-bold uppercase font-mono text-zinc-600">
+              <span className="text-xs font-bold uppercase font-mono text-zinc-600 ui-text-body ui-weight-medium ui-font-body">
                 Official Operational Expense Register
               </span>
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => window.print()}
-                  className="flex items-center gap-1.5 rounded-lg bg-zinc-950 px-3 py-1.5 text-xs font-bold text-white hover:bg-zinc-800 transition shadow-sm cursor-pointer"
+                  className="flex items-center gap-1.5 rounded-lg bg-zinc-950 px-3 py-1.5 text-xs font-bold text-white hover:bg-zinc-800 transition shadow-sm cursor-pointer ui-text-body ui-weight-medium ui-shadow-quiet ui-control"
                 >
                   <Printer className="h-3.5 w-3.5" /> Print Expense Sheet
                 </button>
-                <button onClick={() => setShowExpensesPrintModal(false)} className="text-zinc-500 hover:text-zinc-900 cursor-pointer">
+                <button onClick={() => setShowExpensesPrintModal(false)} className="text-zinc-500 hover:text-zinc-900 cursor-pointer ui-control">
                   <X className="h-4 w-4" />
                 </button>
               </div>
@@ -3627,25 +3550,25 @@ export default function ReportsPage() {
             <div className="space-y-4">
               <div className="flex justify-between items-start border-b border-zinc-300 pb-3">
                 <div>
-                  <h1 className="text-base font-black uppercase text-zinc-950">{activeProperty?.displayName || "Hotel Report"}</h1>
-                  <p className="text-[11px] text-zinc-600">{activeProperty?.legalName}</p>
-                  <p className="font-mono text-[11px] text-zinc-700">
+                  <h1 className="text-base font-black uppercase text-zinc-950 ui-weight-medium ui-page-title">{activeProperty?.displayName || "Hotel Report"}</h1>
+                  <p className="text-[11px] text-zinc-600 ui-text-meta">{activeProperty?.legalName}</p>
+                  <p className="font-mono text-[11px] text-zinc-700 ui-font-body ui-text-meta">
                     GSTIN: {activeProperty?.gstin || "N/A"} | State: {activeProperty?.stateCode || "18"}
                   </p>
                 </div>
-                <div className="text-right font-mono">
-                  <div className="font-bold text-zinc-950">EXPENSE REGISTER & CASH OUTFLOWS</div>
-                  <div className="text-zinc-600 text-[11px]">Business Date: {selectedDate || activeProperty?.businessDate}</div>
-                  <div className="text-zinc-600 text-[11px]">Printed: {new Date().toLocaleString()}</div>
-                  <div className="font-bold text-rose-700 text-sm mt-1">
+                <div className="text-right font-mono ui-font-body">
+                  <div className="font-bold text-zinc-950 ui-weight-medium">EXPENSE REGISTER & CASH OUTFLOWS</div>
+                  <div className="text-zinc-600 text-[11px] ui-text-meta">Business Date: {selectedDate || activeProperty?.businessDate}</div>
+                  <div className="text-zinc-600 text-[11px] ui-text-meta">Printed: {new Date().toLocaleString()}</div>
+                  <div className="font-bold text-rose-700 text-sm mt-1 ui-weight-medium">
                     Total Outflows: {formatINR(expenseKPIs.totalOutflow)} ({filteredExpenseVouchers.length} Vouchers)
                   </div>
                 </div>
               </div>
 
-              <table className="w-full text-left text-xs border border-zinc-200">
+              <div className="ui-table-scroll"><table className="w-full text-left text-xs border border-zinc-200 ui-text-body ui-data-table">
                 <thead>
-                  <tr className="bg-zinc-100 border-b border-zinc-200 text-[10px] font-bold text-zinc-600 uppercase font-mono">
+                  <tr className="bg-zinc-100 border-b border-zinc-200 text-[10px] font-bold text-zinc-600 uppercase font-mono ui-text-meta ui-weight-medium ui-font-body">
                     <th className="p-2">Voucher #</th>
                     <th className="p-2">Time</th>
                     <th className="p-2">Category</th>
@@ -3657,31 +3580,31 @@ export default function ReportsPage() {
                     <th className="p-2">Authorized By</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-zinc-200 font-mono text-[11px]">
+                <tbody className="divide-y divide-zinc-200 font-mono text-[11px] ui-font-body ui-text-meta">
                   {filteredExpenseVouchers.map((e: any) => (
                     <tr key={e.id}>
-                      <td className="p-2 font-bold">{e.voucherNo}</td>
+                      <td className="p-2 font-bold ui-weight-medium">{e.voucherNo}</td>
                       <td className="p-2">{e.time}</td>
                       <td className="p-2 font-sans">{e.category.replace(/_/g, " ")}</td>
                       <td className="p-2 font-sans font-medium">{e.payeeName}</td>
                       <td className="p-2 font-sans">{e.description}</td>
                       <td className="p-2">{e.method}</td>
                       <td className="p-2">{e.reference || "—"}</td>
-                      <td className="p-2 text-right font-bold text-rose-700">{formatINR(e.totalAmount || e.amount)}</td>
+                      <td className="p-2 text-right font-bold text-rose-700 ui-weight-medium">{formatINR(e.totalAmount || e.amount)}</td>
                       <td className="p-2 font-sans">{e.authorizedBy}</td>
                     </tr>
                   ))}
                 </tbody>
-              </table>
+              </table></div>
 
-              <div className="pt-8 flex justify-between items-end text-[11px]">
+              <div className="pt-8 flex justify-between items-end text-[11px] ui-text-meta">
                 <div className="text-center">
                   <div className="w-40 border-b border-zinc-400 pb-6 text-zinc-400 italic">Front Desk Cashier</div>
-                  <span className="font-bold">Disbursed By</span>
+                  <span className="font-bold ui-weight-medium">Disbursed By</span>
                 </div>
                 <div className="text-center">
                   <div className="w-40 border-b border-zinc-400 pb-6 text-zinc-400 italic">Duty Manager / Auditor</div>
-                  <span className="font-bold">Audited & Approved By</span>
+                  <span className="font-bold ui-weight-medium">Audited & Approved By</span>
                 </div>
               </div>
             </div>
@@ -3694,19 +3617,19 @@ export default function ReportsPage() {
       {/* ========================================================================= */}
       {showTransfersPrintModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4 overflow-y-auto">
-          <div className="w-full max-w-4xl rounded-2xl border border-zinc-700 bg-white text-zinc-950 p-6 shadow-2xl space-y-4 font-sans text-xs">
+          <div className="w-full max-w-4xl rounded-2xl border border-zinc-700 bg-white text-zinc-950 p-6 shadow-2xl space-y-4 font-sans text-xs ui-radius-panel ui-dialog-surface ui-text-body ui-surface">
             <div className="flex items-center justify-between pb-3 border-b border-zinc-200">
-              <span className="text-xs font-bold uppercase font-mono text-zinc-600">
+              <span className="text-xs font-bold uppercase font-mono text-zinc-600 ui-text-body ui-weight-medium ui-font-body">
                 Official Room Transfers Audit Register
               </span>
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => window.print()}
-                  className="flex items-center gap-1.5 rounded-lg bg-zinc-950 px-3 py-1.5 text-xs font-bold text-white hover:bg-zinc-800 transition shadow-sm cursor-pointer"
+                  className="flex items-center gap-1.5 rounded-lg bg-zinc-950 px-3 py-1.5 text-xs font-bold text-white hover:bg-zinc-800 transition shadow-sm cursor-pointer ui-text-body ui-weight-medium ui-shadow-quiet ui-control"
                 >
                   <Printer className="h-3.5 w-3.5" /> Print Sheet
                 </button>
-                <button onClick={() => setShowTransfersPrintModal(false)} className="text-zinc-500 hover:text-zinc-900 cursor-pointer">
+                <button onClick={() => setShowTransfersPrintModal(false)} className="text-zinc-500 hover:text-zinc-900 cursor-pointer ui-control">
                   <X className="h-4 w-4" />
                 </button>
               </div>
@@ -3715,22 +3638,22 @@ export default function ReportsPage() {
             <div className="space-y-4">
               <div className="flex justify-between items-start border-b border-zinc-300 pb-3">
                 <div>
-                  <h1 className="text-base font-black uppercase text-zinc-950">{activeProperty?.displayName || "Hotel Report"}</h1>
-                  <p className="text-[11px] text-zinc-600">{activeProperty?.legalName}</p>
-                  <p className="font-mono text-[11px] text-zinc-700">
+                  <h1 className="text-base font-black uppercase text-zinc-950 ui-weight-medium ui-page-title">{activeProperty?.displayName || "Hotel Report"}</h1>
+                  <p className="text-[11px] text-zinc-600 ui-text-meta">{activeProperty?.legalName}</p>
+                  <p className="font-mono text-[11px] text-zinc-700 ui-font-body ui-text-meta">
                     GSTIN: {activeProperty?.gstin || "N/A"} | State: {activeProperty?.stateCode || "18"}
                   </p>
                 </div>
-                <div className="text-right font-mono">
-                  <div className="font-bold text-zinc-950">ROOM TRANSFERS AUDIT</div>
-                  <div className="text-zinc-600 text-[11px]">Printed: {new Date().toLocaleString()}</div>
-                  <div className="text-zinc-600 text-[11px]">Total Transfers: {filteredTransfers.length}</div>
+                <div className="text-right font-mono ui-font-body">
+                  <div className="font-bold text-zinc-950 ui-weight-medium">ROOM TRANSFERS AUDIT</div>
+                  <div className="text-zinc-600 text-[11px] ui-text-meta">Printed: {new Date().toLocaleString()}</div>
+                  <div className="text-zinc-600 text-[11px] ui-text-meta">Total Transfers: {filteredTransfers.length}</div>
                 </div>
               </div>
 
-              <table className="w-full text-left text-xs border border-zinc-200">
+              <div className="ui-table-scroll"><table className="w-full text-left text-xs border border-zinc-200 ui-text-body ui-data-table">
                 <thead>
-                  <tr className="bg-zinc-100 border-b border-zinc-200 text-[10px] font-bold text-zinc-600 uppercase font-mono">
+                  <tr className="bg-zinc-100 border-b border-zinc-200 text-[10px] font-bold text-zinc-600 uppercase font-mono ui-text-meta ui-weight-medium ui-font-body">
                     <th className="p-2">Transfer Time</th>
                     <th className="p-2">GRC #</th>
                     <th className="p-2">Guest Name & Phone</th>
@@ -3740,29 +3663,29 @@ export default function ReportsPage() {
                     <th className="p-2">Move Reason</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-zinc-200 font-mono text-[11px]">
+                <tbody className="divide-y divide-zinc-200 font-mono text-[11px] ui-font-body ui-text-meta">
                   {filteredTransfers.map((t) => (
                     <tr key={t.transferId}>
                       <td className="p-2">{t.formattedDate}</td>
-                      <td className="p-2 font-bold">{t.grcNo}</td>
+                      <td className="p-2 font-bold ui-weight-medium">{t.grcNo}</td>
                       <td className="p-2 font-sans font-medium">{t.guestName} ({t.phone})</td>
-                      <td className="p-2 font-bold text-rose-700">Room {t.fromRoomNumber}</td>
-                      <td className="p-2 font-bold text-emerald-700">Room {t.toRoomNumber}</td>
+                      <td className="p-2 font-bold text-rose-700 ui-weight-medium">Room {t.fromRoomNumber}</td>
+                      <td className="p-2 font-bold text-emerald-700 ui-weight-medium">Room {t.toRoomNumber}</td>
                       <td className="p-2">{t.durationText}</td>
                       <td className="p-2 font-sans">{t.moveReason}</td>
                     </tr>
                   ))}
                 </tbody>
-              </table>
+              </table></div>
 
-              <div className="pt-8 flex justify-between items-end text-[11px]">
+              <div className="pt-8 flex justify-between items-end text-[11px] ui-text-meta">
                 <div className="text-center">
                   <div className="w-40 border-b border-zinc-400 pb-6 text-zinc-400 italic">Front Desk Executive</div>
-                  <span className="font-bold">Prepared By</span>
+                  <span className="font-bold ui-weight-medium">Prepared By</span>
                 </div>
                 <div className="text-center">
                   <div className="w-40 border-b border-zinc-400 pb-6 text-zinc-400 italic">Duty Manager / Auditor</div>
-                  <span className="font-bold">Verified By</span>
+                  <span className="font-bold ui-weight-medium">Verified By</span>
                 </div>
               </div>
             </div>
@@ -3775,19 +3698,19 @@ export default function ReportsPage() {
       {/* ========================================================================= */}
       {showFinalBillsPrintModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4 overflow-y-auto">
-          <div className="w-full max-w-5xl rounded-2xl border border-zinc-700 bg-white text-zinc-950 p-6 shadow-2xl space-y-4 font-sans text-xs">
+          <div className="w-full max-w-5xl rounded-2xl border border-zinc-700 bg-white text-zinc-950 p-6 shadow-2xl space-y-4 font-sans text-xs ui-radius-panel ui-dialog-surface ui-text-body ui-surface">
             <div className="flex items-center justify-between pb-3 border-b border-zinc-200">
-              <span className="text-xs font-bold uppercase font-mono text-zinc-600">
+              <span className="text-xs font-bold uppercase font-mono text-zinc-600 ui-text-body ui-weight-medium ui-font-body">
                 Official Final Bills & Tax Invoice Register
               </span>
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => window.print()}
-                  className="flex items-center gap-1.5 rounded-lg bg-zinc-950 px-3 py-1.5 text-xs font-bold text-white hover:bg-zinc-800 transition shadow-sm cursor-pointer"
+                  className="flex items-center gap-1.5 rounded-lg bg-zinc-950 px-3 py-1.5 text-xs font-bold text-white hover:bg-zinc-800 transition shadow-sm cursor-pointer ui-text-body ui-weight-medium ui-shadow-quiet ui-control"
                 >
                   <Printer className="h-3.5 w-3.5" /> Print Register
                 </button>
-                <button onClick={() => setShowFinalBillsPrintModal(false)} className="text-zinc-500 hover:text-zinc-900 cursor-pointer">
+                <button onClick={() => setShowFinalBillsPrintModal(false)} className="text-zinc-500 hover:text-zinc-900 cursor-pointer ui-control">
                   <X className="h-4 w-4" />
                 </button>
               </div>
@@ -3796,29 +3719,29 @@ export default function ReportsPage() {
             <div className="space-y-4">
               <div className="flex justify-between items-start border-b border-zinc-300 pb-3">
                 <div>
-                  <h1 className="text-base font-black uppercase text-zinc-950">{activeProperty?.displayName || "Hotel Report"}</h1>
-                  <p className="text-[11px] text-zinc-600">{activeProperty?.legalName}</p>
-                  <p className="font-mono text-[11px] text-zinc-700">
+                  <h1 className="text-base font-black uppercase text-zinc-950 ui-weight-medium ui-page-title">{activeProperty?.displayName || "Hotel Report"}</h1>
+                  <p className="text-[11px] text-zinc-600 ui-text-meta">{activeProperty?.legalName}</p>
+                  <p className="font-mono text-[11px] text-zinc-700 ui-font-body ui-text-meta">
                     GSTIN: {activeProperty?.gstin || "N/A"} | State: {activeProperty?.stateCode || "18"}
                   </p>
                 </div>
-                <div className="text-right font-mono">
-                  <div className="font-bold text-zinc-950">TAX INVOICE MASTER REGISTER</div>
-                  <div className="text-zinc-600 text-[11px]">Printed: {new Date().toLocaleString()}</div>
-                  <div className="text-zinc-600 text-[11px]">Total Bills: {filteredFinalBills.length}</div>
+                <div className="text-right font-mono ui-font-body">
+                  <div className="font-bold text-zinc-950 ui-weight-medium">TAX INVOICE MASTER REGISTER</div>
+                  <div className="text-zinc-600 text-[11px] ui-text-meta">Printed: {new Date().toLocaleString()}</div>
+                  <div className="text-zinc-600 text-[11px] ui-text-meta">Total Bills: {filteredFinalBills.length}</div>
                 </div>
               </div>
 
-              <div className="grid grid-cols-4 gap-2 bg-zinc-100 p-2.5 rounded font-mono text-xs">
+              <div className="grid grid-cols-4 gap-2 bg-zinc-100 p-2.5 rounded font-mono text-xs ui-font-body ui-text-body">
                 <div>Total Gross: <strong>{formatINR(filteredFinalBills.reduce((s, b) => s + b.grossTotal, 0))}</strong></div>
                 <div>Total Tax (GST): <strong>{formatINR(filteredFinalBills.reduce((s, b) => s + b.totalTax, 0))}</strong></div>
                 <div>Total Paid: <strong>{formatINR(filteredFinalBills.reduce((s, b) => s + b.totalPaid, 0))}</strong></div>
                 <div>Outstanding: <strong>{formatINR(filteredFinalBills.reduce((s, b) => s + Math.max(0, b.balance), 0))}</strong></div>
               </div>
 
-              <table className="w-full text-left text-[11px] border border-zinc-200">
+              <div className="ui-table-scroll"><table className="w-full text-left text-[11px] border border-zinc-200 ui-text-meta ui-data-table">
                 <thead>
-                  <tr className="bg-zinc-100 border-b border-zinc-200 text-[10px] font-bold text-zinc-600 uppercase font-mono">
+                  <tr className="bg-zinc-100 border-b border-zinc-200 text-[10px] font-bold text-zinc-600 uppercase font-mono ui-text-meta ui-weight-medium ui-font-body">
                     <th className="p-2">Invoice #</th>
                     <th className="p-2">GRC #</th>
                     <th className="p-2">Guest / Company</th>
@@ -3830,31 +3753,31 @@ export default function ReportsPage() {
                     <th className="p-2 text-right">Balance</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-zinc-200 font-mono">
+                <tbody className="divide-y divide-zinc-200 font-mono ui-font-body">
                   {filteredFinalBills.map((b) => (
                     <tr key={b.stayId}>
-                      <td className="p-2 font-bold">{b.invoiceNo}</td>
+                      <td className="p-2 font-bold ui-weight-medium">{b.invoiceNo}</td>
                       <td className="p-2">{b.grcNo}</td>
                       <td className="p-2 font-sans font-medium">{b.guestName}</td>
                       <td className="p-2">{b.roomDisplay}</td>
                       <td className="p-2 text-right">{formatINR(b.taxableAmount)}</td>
                       <td className="p-2 text-right text-indigo-700">{formatINR(b.totalTax)}</td>
-                      <td className="p-2 text-right font-bold text-emerald-800">{formatINR(b.grossTotal)}</td>
+                      <td className="p-2 text-right font-bold text-emerald-800 ui-weight-medium">{formatINR(b.grossTotal)}</td>
                       <td className="p-2 text-right">{formatINR(b.totalPaid)}</td>
-                      <td className="p-2 text-right font-bold text-rose-700">{formatINR(b.balance)}</td>
+                      <td className="p-2 text-right font-bold text-rose-700 ui-weight-medium">{formatINR(b.balance)}</td>
                     </tr>
                   ))}
                 </tbody>
-              </table>
+              </table></div>
 
-              <div className="pt-8 flex justify-between items-end text-[11px]">
+              <div className="pt-8 flex justify-between items-end text-[11px] ui-text-meta">
                 <div className="text-center">
                   <div className="w-40 border-b border-zinc-400 pb-6 text-zinc-400 italic">Cashier / Billing Desk</div>
-                  <span className="font-bold">Prepared By</span>
+                  <span className="font-bold ui-weight-medium">Prepared By</span>
                 </div>
                 <div className="text-center">
                   <div className="w-40 border-b border-zinc-400 pb-6 text-zinc-400 italic">Financial Auditor</div>
-                  <span className="font-bold">Audited By</span>
+                  <span className="font-bold ui-weight-medium">Audited By</span>
                 </div>
               </div>
             </div>
@@ -3869,19 +3792,19 @@ export default function ReportsPage() {
       {/* ========================================================================= */}
       {showKotPrintModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4 overflow-y-auto">
-          <div className="w-full max-w-4xl rounded-2xl border border-zinc-700 bg-white text-zinc-950 p-6 shadow-2xl space-y-4 font-sans text-xs">
+          <div className="w-full max-w-4xl rounded-2xl border border-zinc-700 bg-white text-zinc-950 p-6 shadow-2xl space-y-4 font-sans text-xs ui-radius-panel ui-dialog-surface ui-text-body ui-surface">
             <div className="flex items-center justify-between pb-3 border-b border-zinc-200">
-              <span className="text-xs font-bold uppercase font-mono text-zinc-600">
+              <span className="text-xs font-bold uppercase font-mono text-zinc-600 ui-text-body ui-weight-medium ui-font-body">
                 Official Kitchen & Dining Collections Register
               </span>
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => window.print()}
-                  className="flex items-center gap-1.5 rounded-lg bg-zinc-950 px-3 py-1.5 text-xs font-bold text-white hover:bg-zinc-800 transition shadow-sm cursor-pointer"
+                  className="flex items-center gap-1.5 rounded-lg bg-zinc-950 px-3 py-1.5 text-xs font-bold text-white hover:bg-zinc-800 transition shadow-sm cursor-pointer ui-text-body ui-weight-medium ui-shadow-quiet ui-control"
                 >
                   <Printer className="h-3.5 w-3.5" /> Print Sheet
                 </button>
-                <button onClick={() => setShowKotPrintModal(false)} className="text-zinc-500 hover:text-zinc-900 cursor-pointer">
+                <button onClick={() => setShowKotPrintModal(false)} className="text-zinc-500 hover:text-zinc-900 cursor-pointer ui-control">
                   <X className="h-4 w-4" />
                 </button>
               </div>
@@ -3891,30 +3814,30 @@ export default function ReportsPage() {
             <div className="space-y-4">
               <div className="flex justify-between items-start border-b border-zinc-300 pb-3">
                 <div>
-                  <h1 className="text-base font-black uppercase text-zinc-950">{activeProperty?.displayName || "Hotel Report"}</h1>
-                  <p className="text-[11px] text-zinc-600">{activeProperty?.legalName}</p>
-                  <p className="font-mono text-[11px] text-zinc-700">
+                  <h1 className="text-base font-black uppercase text-zinc-950 ui-weight-medium ui-page-title">{activeProperty?.displayName || "Hotel Report"}</h1>
+                  <p className="text-[11px] text-zinc-600 ui-text-meta">{activeProperty?.legalName}</p>
+                  <p className="font-mono text-[11px] text-zinc-700 ui-font-body ui-text-meta">
                     GSTIN: {activeProperty?.gstin || "N/A"} | State: {activeProperty?.stateCode || "18"}
                   </p>
                 </div>
-                <div className="text-right font-mono">
-                  <div className="font-bold text-zinc-950">KITCHEN & RESTAURANT REGISTER</div>
-                  <div className="text-zinc-600 text-[11px]">Business Date: {selectedDate || activeProperty?.businessDate}</div>
-                  <div className="text-zinc-600 text-[11px]">Printed: {new Date().toLocaleString()}</div>
+                <div className="text-right font-mono ui-font-body">
+                  <div className="font-bold text-zinc-950 ui-weight-medium">KITCHEN & RESTAURANT REGISTER</div>
+                  <div className="text-zinc-600 text-[11px] ui-text-meta">Business Date: {selectedDate || activeProperty?.businessDate}</div>
+                  <div className="text-zinc-600 text-[11px] ui-text-meta">Printed: {new Date().toLocaleString()}</div>
                 </div>
               </div>
 
               {/* Summary Numbers */}
-              <div className="grid grid-cols-4 gap-2 bg-zinc-100 p-2.5 rounded font-mono text-xs">
-                <div>Total Orders: <strong>{data?.summary?.totalOrdersCount ?? filteredKitchenOrders.length}</strong></div>
-                <div>Dishes Prepared: <strong>{data?.summary?.totalItemsPrepared ?? 0}</strong></div>
-                <div>Gross Sales: <strong>{formatINR(data?.summary?.grossCollection ?? 0)}</strong></div>
-                <div>GST 5%: <strong>{formatINR(data?.summary?.gstCollected ?? 0)}</strong></div>
+              <div className="grid grid-cols-4 gap-2 bg-zinc-100 p-2.5 rounded font-mono text-xs ui-font-body ui-text-body">
+                <div>Total Orders: <strong>{diningSummary.totalOrdersCount ?? filteredKitchenOrders.length}</strong></div>
+                <div>Dishes Prepared: <strong>{diningSummary.totalItemsPrepared ?? 0}</strong></div>
+                <div>Gross Sales: <strong>{formatINR(diningSummary.grossCollection ?? 0)}</strong></div>
+                <div>GST recorded: <strong>{formatINR(diningSummary.gstCollected ?? 0)}</strong></div>
               </div>
 
-              <table className="w-full text-left text-[11px] border border-zinc-200">
+              <div className="ui-table-scroll"><table className="w-full text-left text-[11px] border border-zinc-200 ui-text-meta ui-data-table">
                 <thead>
-                  <tr className="bg-zinc-100 border-b border-zinc-200 text-[10px] font-bold text-zinc-600 uppercase font-mono">
+                  <tr className="bg-zinc-100 border-b border-zinc-200 text-[10px] font-bold text-zinc-600 uppercase font-mono ui-text-meta ui-weight-medium ui-font-body">
                     <th className="p-2">Order #</th>
                     <th className="p-2">KOT #</th>
                     <th className="p-2">Time</th>
@@ -3922,39 +3845,39 @@ export default function ReportsPage() {
                     <th className="p-2">Guest / Payee</th>
                     <th className="p-2">Dishes Ordered</th>
                     <th className="p-2 text-right">Taxable</th>
-                    <th className="p-2 text-right">GST (5%)</th>
+                    <th className="p-2 text-right">GST recorded</th>
                     <th className="p-2 text-right">Gross Total</th>
                     <th className="p-2 text-center">Settlement</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-zinc-200 font-mono">
+                <tbody className="divide-y divide-zinc-200 font-mono ui-font-body">
                   {filteredKitchenOrders.map((o: any) => (
                     <tr key={o.id}>
-                      <td className="p-2 font-bold">{o.orderNo}</td>
+                      <td className="p-2 font-bold ui-weight-medium">{o.orderNo}</td>
                       <td className="p-2 text-orange-700">{o.kotNumbers}</td>
                       <td className="p-2 text-zinc-600">{o.timeFormatted}</td>
                       <td className="p-2 font-sans font-medium">{o.destinationLabel}</td>
                       <td className="p-2 font-sans">{o.guestName}</td>
                       <td className="p-2 font-sans max-w-xs truncate">{o.itemsSummary}</td>
                       <td className="p-2 text-right">{formatINR(o.taxableAmount)}</td>
-                      <td className="p-2 text-right text-indigo-700">{formatINR(o.totalTax)}</td>
-                      <td className="p-2 text-right font-bold text-emerald-800">{formatINR(o.totalAmount)}</td>
-                      <td className="p-2 text-center font-sans text-[10px]">
+                      <td className="p-2 text-right text-indigo-700">{o.totalTax == null ? "Not recorded" : formatINR(o.totalTax)}</td>
+                      <td className="p-2 text-right font-bold text-emerald-800 ui-weight-medium">{formatINR(o.totalAmount)}</td>
+                      <td className="p-2 text-center font-sans text-[10px] ui-text-meta">
                         {o.settlementType === "POSTED_TO_ROOM" ? "Room Folio" : o.settlementType === "DIRECT_PAID" ? "Paid" : "Open"}
                       </td>
                     </tr>
                   ))}
                 </tbody>
-              </table>
+              </table></div>
 
-              <div className="pt-8 flex justify-between items-end text-[11px]">
+              <div className="pt-8 flex justify-between items-end text-[11px] ui-text-meta">
                 <div className="text-center">
                   <div className="w-40 border-b border-zinc-400 pb-6 text-zinc-400 italic">Chef / F&B Captain</div>
-                  <span className="font-bold">Prepared By</span>
+                  <span className="font-bold ui-weight-medium">Prepared By</span>
                 </div>
                 <div className="text-center">
                   <div className="w-40 border-b border-zinc-400 pb-6 text-zinc-400 italic">Front Desk / Auditor</div>
-                  <span className="font-bold">Audited By</span>
+                  <span className="font-bold ui-weight-medium">Audited By</span>
                 </div>
               </div>
             </div>
@@ -3967,21 +3890,21 @@ export default function ReportsPage() {
       {/* ========================================================================= */}
       {showRevenuePrintModal && (
         <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/85 backdrop-blur-md p-4 md:py-8 overflow-y-auto">
-          <div className="w-full max-w-5xl rounded-2xl border border-zinc-700 bg-white text-zinc-950 p-6 shadow-2xl space-y-4 font-sans text-xs my-auto">
+          <div className="w-full max-w-5xl rounded-2xl border border-zinc-700 bg-white text-zinc-950 p-6 shadow-2xl space-y-4 font-sans text-xs my-auto ui-radius-panel ui-dialog-surface ui-text-body ui-surface">
             <div className="flex items-center justify-between pb-3 border-b border-zinc-200">
-              <span className="text-xs font-bold uppercase font-mono text-zinc-600">
+              <span className="text-xs font-bold uppercase font-mono text-zinc-600 ui-text-body ui-weight-medium ui-font-body">
                 Official Revenue Recognition & GST Output Journal
               </span>
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => window.print()}
-                  className="flex items-center gap-1.5 rounded-lg bg-zinc-950 px-3 py-1.5 text-xs font-bold text-white hover:bg-zinc-800 transition shadow-sm cursor-pointer"
+                  className="flex items-center gap-1.5 rounded-lg bg-zinc-950 px-3 py-1.5 text-xs font-bold text-white hover:bg-zinc-800 transition shadow-sm cursor-pointer ui-text-body ui-weight-medium ui-shadow-quiet ui-control"
                 >
                   <Printer className="h-3.5 w-3.5" /> Print Tax Ledger
                 </button>
                 <button
                   onClick={() => setShowRevenuePrintModal(false)}
-                  className="text-zinc-500 hover:text-zinc-900 cursor-pointer"
+                  className="text-zinc-500 hover:text-zinc-900 cursor-pointer ui-control"
                 >
                   <X className="h-4 w-4" />
                 </button>
@@ -3991,28 +3914,28 @@ export default function ReportsPage() {
             <div className="space-y-4">
               <div className="flex justify-between items-start border-b border-zinc-300 pb-3">
                 <div>
-                  <h1 className="text-base font-black uppercase text-zinc-950">
+                  <h1 className="text-base font-black uppercase text-zinc-950 ui-weight-medium ui-page-title">
                     {activeProperty?.displayName || "Hotel Report"}
                   </h1>
-                  <p className="text-[11px] text-zinc-600">{activeProperty?.legalName}</p>
-                  <p className="font-mono text-[11px] text-zinc-700">
+                  <p className="text-[11px] text-zinc-600 ui-text-meta">{activeProperty?.legalName}</p>
+                  <p className="font-mono text-[11px] text-zinc-700 ui-font-body ui-text-meta">
                     GSTIN: {activeProperty?.gstin || "N/A"} | State: {activeProperty?.stateCode || "18"}
                   </p>
                 </div>
-                <div className="text-right font-mono">
-                  <div className="font-bold text-zinc-950">REVENUE & GST OUTPUT JOURNAL</div>
-                  <div className="text-zinc-600 text-[11px]">
+                <div className="text-right font-mono ui-font-body">
+                  <div className="font-bold text-zinc-950 ui-weight-medium">REVENUE & GST OUTPUT JOURNAL</div>
+                  <div className="text-zinc-600 text-[11px] ui-text-meta">
                     Period: {revenueDateRange.replace(/_/g, " ")}
                   </div>
-                  <div className="text-zinc-600 text-[11px]">Printed: {new Date().toLocaleString()}</div>
-                  <div className="font-bold text-emerald-800 text-sm mt-1">
+                  <div className="text-zinc-600 text-[11px] ui-text-meta">Printed: {new Date().toLocaleString()}</div>
+                  <div className="font-bold text-emerald-800 text-sm mt-1 ui-weight-medium">
                     Gross Revenue: {formatINR(revenueKPIs.totalGross)} ({filteredRevenueEntries.length} Records)
                   </div>
                 </div>
               </div>
 
               {/* Tax & Department Summary Box */}
-              <div className="grid grid-cols-4 gap-2 bg-zinc-100 p-2.5 rounded font-mono text-xs">
+              <div className="grid grid-cols-4 gap-2 bg-zinc-100 p-2.5 rounded font-mono text-xs ui-font-body ui-text-body">
                 <div>
                   Gross Revenue: <strong>{formatINR(revenueKPIs.totalGross)}</strong>
                 </div>
@@ -4027,9 +3950,9 @@ export default function ReportsPage() {
                 </div>
               </div>
 
-              <table className="w-full text-left text-[11px] border border-zinc-200">
+              <div className="ui-table-scroll"><table className="w-full text-left text-[11px] border border-zinc-200 ui-text-meta ui-data-table">
                 <thead>
-                  <tr className="bg-zinc-100 border-b border-zinc-200 text-[10px] font-bold text-zinc-600 uppercase font-mono">
+                  <tr className="bg-zinc-100 border-b border-zinc-200 text-[10px] font-bold text-zinc-600 uppercase font-mono ui-text-meta ui-weight-medium ui-font-body">
                     <th className="p-2">Date</th>
                     <th className="p-2">Room</th>
                     <th className="p-2">Guest / Entity</th>
@@ -4040,11 +3963,11 @@ export default function ReportsPage() {
                     <th className="p-2 text-right">Gross Total</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-zinc-200 font-mono">
+                <tbody className="divide-y divide-zinc-200 font-mono ui-font-body">
                   {filteredRevenueEntries.map((e: any) => (
                     <tr key={e.id}>
                       <td className="p-2">{e.serviceDate}</td>
-                      <td className="p-2 font-bold">{e.roomNumber && e.roomNumber !== "—" ? `Room ${e.roomNumber}` : "Folio"}</td>
+                      <td className="p-2 font-bold ui-weight-medium">{e.roomNumber && e.roomNumber !== "—" ? `Room ${e.roomNumber}` : "Folio"}</td>
                       <td className="p-2 font-sans font-medium">{e.guestName}</td>
                       <td className="p-2 font-sans">{e.departmentLabel}</td>
                       <td className="p-2 font-sans max-w-xs truncate">{e.description}</td>
@@ -4052,20 +3975,20 @@ export default function ReportsPage() {
                       <td className="p-2 text-right text-indigo-700">
                         {formatINR(e.taxAmount)} ({e.effectiveTaxRate}%)
                       </td>
-                      <td className="p-2 text-right font-bold text-emerald-800">{formatINR(e.totalAmount)}</td>
+                      <td className="p-2 text-right font-bold text-emerald-800 ui-weight-medium">{formatINR(e.totalAmount)}</td>
                     </tr>
                   ))}
                 </tbody>
-              </table>
+              </table></div>
 
-              <div className="pt-8 flex justify-between items-end text-[11px]">
+              <div className="pt-8 flex justify-between items-end text-[11px] ui-text-meta">
                 <div className="text-center">
                   <div className="w-40 border-b border-zinc-400 pb-6 text-zinc-400 italic">Front Desk Auditor</div>
-                  <span className="font-bold">Prepared By</span>
+                  <span className="font-bold ui-weight-medium">Prepared By</span>
                 </div>
                 <div className="text-center">
                   <div className="w-40 border-b border-zinc-400 pb-6 text-zinc-400 italic">Chartered Accountant / GM</div>
-                  <span className="font-bold">Audited & Approved By</span>
+                  <span className="font-bold ui-weight-medium">Audited & Approved By</span>
                 </div>
               </div>
             </div>
@@ -4078,19 +4001,19 @@ export default function ReportsPage() {
       {/* ========================================================================= */}
       {showInhousePrintModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4 overflow-y-auto">
-          <div className="w-full max-w-5xl rounded-2xl border border-zinc-700 bg-white text-zinc-950 p-6 shadow-2xl space-y-4 font-sans text-xs">
+          <div className="w-full max-w-5xl rounded-2xl border border-zinc-700 bg-white text-zinc-950 p-6 shadow-2xl space-y-4 font-sans text-xs ui-radius-panel ui-dialog-surface ui-text-body ui-surface">
             <div className="flex items-center justify-between pb-3 border-b border-zinc-200">
-              <span className="text-xs font-bold uppercase font-mono text-zinc-600">
+              <span className="text-xs font-bold uppercase font-mono text-zinc-600 ui-text-body ui-weight-medium ui-font-body">
                 Official In-House Guest Outstanding Ledger & Audit Register
               </span>
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => window.print()}
-                  className="flex items-center gap-1.5 rounded-lg bg-zinc-950 px-3 py-1.5 text-xs font-bold text-white hover:bg-zinc-800 transition shadow-sm cursor-pointer"
+                  className="flex items-center gap-1.5 rounded-lg bg-zinc-950 px-3 py-1.5 text-xs font-bold text-white hover:bg-zinc-800 transition shadow-sm cursor-pointer ui-text-body ui-weight-medium ui-shadow-quiet ui-control"
                 >
                   <Printer className="h-3.5 w-3.5" /> Print Sheet
                 </button>
-                <button onClick={() => setShowInhousePrintModal(false)} className="text-zinc-500 hover:text-zinc-900 cursor-pointer">
+                <button onClick={() => setShowInhousePrintModal(false)} className="text-zinc-500 hover:text-zinc-900 cursor-pointer ui-control">
                   <X className="h-4 w-4" />
                 </button>
               </div>
@@ -4099,42 +4022,42 @@ export default function ReportsPage() {
             <div className="space-y-4">
               <div className="flex justify-between items-start border-b border-zinc-300 pb-3">
                 <div>
-                  <h1 className="text-base font-black uppercase text-zinc-950">{activeProperty?.displayName || "Hotel Report"}</h1>
-                  <p className="text-[11px] text-zinc-600">{activeProperty?.legalName}</p>
-                  <p className="font-mono text-[11px] text-zinc-700">
+                  <h1 className="text-base font-black uppercase text-zinc-950 ui-weight-medium ui-page-title">{activeProperty?.displayName || "Hotel Report"}</h1>
+                  <p className="text-[11px] text-zinc-600 ui-text-meta">{activeProperty?.legalName}</p>
+                  <p className="font-mono text-[11px] text-zinc-700 ui-font-body ui-text-meta">
                     GSTIN: {activeProperty?.gstin || "N/A"} | State: {activeProperty?.stateCode || "18"}
                   </p>
                 </div>
-                <div className="text-right font-mono">
-                  <div className="font-bold text-zinc-950">DAILY IN-HOUSE GUEST OUTSTANDING REPORT</div>
-                  <div className="text-zinc-600 text-[11px]">As Of Date: {data?.asOfDate || selectedDate || activeProperty?.businessDate}</div>
-                  <div className="text-zinc-600 text-[11px]">Printed: {new Date().toLocaleString()}</div>
+                <div className="text-right font-mono ui-font-body">
+                  <div className="font-bold text-zinc-950 ui-weight-medium">DAILY IN-HOUSE GUEST OUTSTANDING REPORT</div>
+                  <div className="text-zinc-600 text-[11px] ui-text-meta">As Of Date: {data?.asOfDate || selectedDate || activeProperty?.businessDate}</div>
+                  <div className="text-zinc-600 text-[11px] ui-text-meta">Printed: {new Date().toLocaleString()}</div>
                 </div>
               </div>
 
               {/* KPI Summary Strip */}
-              <div className="grid grid-cols-4 gap-2 text-center p-2.5 bg-zinc-100 border border-zinc-200 font-mono text-xs">
+              <div className="grid grid-cols-4 gap-2 text-center p-2.5 bg-zinc-100 border border-zinc-200 font-mono text-xs ui-font-body ui-text-body">
                 <div>
-                  <span className="text-[10px] text-zinc-500 block uppercase">Total Occupied</span>
-                  <span className="font-bold text-zinc-900 text-sm">{data?.summary?.totalOccupiedRooms ?? 0} Rooms</span>
+                  <span className="text-[10px] text-zinc-500 block uppercase ui-text-meta">Total Occupied</span>
+                  <span className="font-bold text-zinc-900 text-sm ui-weight-medium">{data?.summary?.totalOccupiedRooms ?? 0} Rooms</span>
                 </div>
                 <div>
-                  <span className="text-[10px] text-emerald-700 block uppercase">Dues Cleared</span>
-                  <span className="font-bold text-emerald-700 text-sm">{data?.summary?.clearedCount ?? 0} Rooms ({data?.summary?.clearedPercentage ?? 0}%)</span>
+                  <span className="text-[10px] text-emerald-700 block uppercase ui-text-meta">Dues Cleared</span>
+                  <span className="font-bold text-emerald-700 text-sm ui-weight-medium">{data?.summary?.clearedCount ?? 0} Rooms ({data?.summary?.clearedPercentage ?? 0}%)</span>
                 </div>
                 <div>
-                  <span className="text-[10px] text-rose-700 block uppercase">Pending Dues</span>
-                  <span className="font-bold text-rose-700 text-sm">{data?.summary?.dueCount ?? 0} Rooms ({formatINR(data?.summary?.totalDueRemaining ?? 0)})</span>
+                  <span className="text-[10px] text-rose-700 block uppercase ui-text-meta">Pending Dues</span>
+                  <span className="font-bold text-rose-700 text-sm ui-weight-medium">{data?.summary?.dueCount ?? 0} Rooms ({formatINR(data?.summary?.totalDueRemaining ?? 0)})</span>
                 </div>
                 <div>
-                  <span className="text-[10px] text-blue-700 block uppercase">Surplus Advance</span>
-                  <span className="font-bold text-blue-700 text-sm">{formatINR(data?.summary?.totalSurplusCredit ?? 0)}</span>
+                  <span className="text-[10px] text-blue-700 block uppercase ui-text-meta">Surplus Advance</span>
+                  <span className="font-bold text-blue-700 text-sm ui-weight-medium">{formatINR(data?.summary?.totalSurplusCredit ?? 0)}</span>
                 </div>
               </div>
 
-              <table className="w-full text-left text-xs border border-zinc-200">
+              <div className="ui-table-scroll"><table className="w-full text-left text-xs border border-zinc-200 ui-text-body ui-data-table">
                 <thead>
-                  <tr className="bg-zinc-100 border-b border-zinc-200 text-[10px] font-bold text-zinc-600 uppercase font-mono">
+                  <tr className="bg-zinc-100 border-b border-zinc-200 text-[10px] font-bold text-zinc-600 uppercase font-mono ui-text-meta ui-weight-medium ui-font-body">
                     <th className="p-2">Room</th>
                     <th className="p-2">Guest Name & Phone</th>
                     <th className="p-2">Personal Residential Address</th>
@@ -4145,16 +4068,16 @@ export default function ReportsPage() {
                     <th className="p-2 text-center">Status</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-zinc-200 font-mono text-[11px]">
+                <tbody className="divide-y divide-zinc-200 font-mono text-[11px] ui-font-body ui-text-meta">
                   {filteredInhouseRooms.map((r: any) => (
                     <tr key={`${r.stayId}-${r.roomNumber}`}>
-                      <td className="p-2 font-bold">Room {r.roomNumber}</td>
+                      <td className="p-2 font-bold ui-weight-medium">Room {r.roomNumber}</td>
                       <td className="p-2 font-sans font-medium">{r.guestName} ({r.phone})</td>
-                      <td className="p-2 font-sans text-[10.5px]">{r.residentialAddress}</td>
-                      <td className="p-2 font-sans text-[10.5px]">{r.companyName !== "—" ? r.companyName : "—"}</td>
+                      <td className="p-2 font-sans text-[10.5px] ui-text-meta">{r.residentialAddress}</td>
+                      <td className="p-2 font-sans text-[10.5px] ui-text-meta">{r.companyName !== "—" ? r.companyName : "—"}</td>
                       <td className="p-2 text-right">{formatINR(r.totalCharges)}</td>
                       <td className="p-2 text-right text-emerald-700">{formatINR(r.totalPaid)}</td>
-                      <td className={`p-2 text-right font-bold ${r.balanceDue > 0 ? "text-rose-700" : "text-emerald-700"}`}>
+                      <td className={`p-2 text-right font-bold  ui-weight-medium ${r.balanceDue > 0 ? "text-rose-700" : "text-emerald-700"}`}>
                         {r.balanceDue > 0 ? formatINR(r.balanceDue) : r.surplusCredit > 0 ? `+${formatINR(r.surplusCredit)}` : "₹0.00"}
                       </td>
                       <td className="p-2 text-center font-sans">
@@ -4163,16 +4086,16 @@ export default function ReportsPage() {
                     </tr>
                   ))}
                 </tbody>
-              </table>
+              </table></div>
 
-              <div className="pt-8 flex justify-between items-end text-[11px]">
+              <div className="pt-8 flex justify-between items-end text-[11px] ui-text-meta">
                 <div className="text-center">
                   <div className="w-40 border-b border-zinc-400 pb-6 text-zinc-400 italic">Front Desk Cashier</div>
-                  <span className="font-bold">Prepared By</span>
+                  <span className="font-bold ui-weight-medium">Prepared By</span>
                 </div>
                 <div className="text-center">
                   <div className="w-40 border-b border-zinc-400 pb-6 text-zinc-400 italic">Duty Manager / Auditor</div>
-                  <span className="font-bold">Audited & Approved By</span>
+                  <span className="font-bold ui-weight-medium">Audited & Approved By</span>
                 </div>
               </div>
             </div>

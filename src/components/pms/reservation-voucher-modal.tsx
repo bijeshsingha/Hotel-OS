@@ -16,6 +16,7 @@ import {
   ShieldCheck,
   UserPlus,
 } from "lucide-react";
+import { getReservationRateTerms } from "@/lib/domain/reservation-pricing";
 import { formatINR } from "@/lib/gst/calculator";
 import { getPropertyLogoUrl, getPropertyInitials } from "@/lib/domain/property-branding";
 
@@ -63,6 +64,7 @@ export function ReservationVoucherModal({
 
   // 2. Room & Occupancy
   const roomsList = Array.isArray(activeRes.rooms) ? activeRes.rooms : [];
+  const reservationRateTerms = getReservationRateTerms(roomsList[0]);
   const totalRooms = roomsList.length > 0 ? roomsList.length : (Number(activeRes.roomCount) || 1);
   const totalAdults = Number(activeRes.adults) || (roomsList.length > 0 ? roomsList[0]?.adults || 2 : 2);
   const totalChildren = Number(activeRes.children) || (roomsList.length > 0 ? roomsList[0]?.children || 0 : 0);
@@ -104,16 +106,16 @@ export function ReservationVoucherModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 animate-in fade-in">
-      <div className="w-full max-w-2xl bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4  ">
+      <div className="w-full max-w-2xl bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh] ui-radius-panel ui-dialog-surface ui-surface">
         
         {/* Top Control Bar (Hidden when printing) */}
         <div className="p-4 sm:p-5 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between bg-zinc-50/70 dark:bg-zinc-900/60 shrink-0 print:hidden">
           <div className="flex items-center gap-2">
-            <span className="text-xs font-mono font-bold px-2.5 py-1 rounded-lg bg-indigo-100 dark:bg-indigo-500/20 text-indigo-800 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-500/30">
+            <span className="text-xs font-mono font-bold px-2.5 py-1 rounded-lg bg-indigo-100 dark:bg-indigo-500/20 text-indigo-800 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-500/30 ui-text-body ui-font-body ui-weight-medium">
               {activeRes.confirmationNo || "RES-CONFIRMATION"}
             </span>
-            <span className="text-xs font-bold text-zinc-900 dark:text-white">
+            <span className="text-xs font-bold text-zinc-900 dark:text-white ui-text-body ui-weight-medium">
               Booking Confirmation Voucher
             </span>
           </div>
@@ -121,7 +123,7 @@ export function ReservationVoucherModal({
           <div className="flex items-center gap-2">
             <button
               onClick={handlePrint}
-              className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center gap-1.5 transition shadow-sm active:scale-95 cursor-pointer"
+              className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center gap-1.5 transition shadow-sm  cursor-pointer ui-radius-control ui-weight-medium ui-text-body ui-shadow-quiet ui-control"
             >
               <Printer className="h-3.5 w-3.5" />
               <span>Print Slip</span>
@@ -133,7 +135,7 @@ export function ReservationVoucherModal({
                   onClose();
                   onCheckInNow(reservation);
                 }}
-                className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1.5 transition shadow-sm active:scale-95 cursor-pointer"
+                className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1.5 transition shadow-sm  cursor-pointer ui-radius-control ui-weight-medium ui-text-body ui-shadow-quiet ui-control"
               >
                 <UserPlus className="h-3.5 w-3.5" />
                 <span>Check-In Now</span>
@@ -142,7 +144,7 @@ export function ReservationVoucherModal({
 
             <button
               onClick={onClose}
-              className="p-1.5 rounded-xl text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition cursor-pointer"
+              className="p-1.5 rounded-xl text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition cursor-pointer ui-radius-control ui-control"
             >
               <X className="h-4 w-4" />
             </button>
@@ -165,70 +167,70 @@ export function ReservationVoucherModal({
                   }}
                 />
               ) : (
-                <div className="h-11 w-11 sm:h-13 sm:w-13 rounded-lg border-2 border-zinc-900 flex flex-col items-center justify-center bg-zinc-50 text-zinc-900 shrink-0 select-none shadow-xs">
-                  <span className="font-serif font-black text-sm tracking-wider leading-none">
+                <div className="h-11 w-11 sm:h-13 sm:w-13 rounded-lg border-2 border-zinc-900 flex flex-col items-center justify-center bg-zinc-50 text-zinc-900 shrink-0 select-none shadow-xs ui-shadow-quiet">
+                  <span className="font-serif font-black text-sm tracking-wider leading-none ui-weight-medium">
                     {initials}
                   </span>
-                  <span className="text-[7px] font-sans font-bold tracking-widest uppercase opacity-75 mt-0.5">
+                  <span className="text-[7px] font-sans font-bold tracking-widest uppercase opacity-75 mt-0.5 ui-weight-medium">
                     HOTEL
                   </span>
                 </div>
               )}
               <div>
-                <h1 className="text-xl sm:text-2xl font-black tracking-tight text-zinc-950 uppercase">
+                <h1 className="text-xl sm:text-2xl font-black tracking-tight text-zinc-950 uppercase ui-weight-medium ui-page-title">
                   {hotelName}
                 </h1>
                 {activeProperty?.address && (
-                  <p className="text-[11px] text-zinc-600 font-medium">
+                  <p className="text-[11px] text-zinc-600 font-medium ui-text-meta">
                     {activeProperty.address}
                   </p>
                 )}
-                <p className="text-[11px] text-zinc-600 font-mono">
+                <p className="text-[11px] text-zinc-600 font-mono ui-text-meta ui-font-body">
                   Phone: {activeProperty?.phone || "N/A"} • GSTIN: <strong>{activeProperty?.gstin || "N/A"}</strong>
                 </p>
               </div>
             </div>
 
             <div className="text-right">
-              <div className="text-xs font-mono font-black uppercase text-indigo-700 bg-indigo-50 border border-indigo-200 px-2.5 py-1 rounded-md inline-block">
+              <div className="text-xs font-mono font-black uppercase text-indigo-700 bg-indigo-50 border border-indigo-200 px-2.5 py-1 rounded-md inline-block ui-text-body ui-font-body ui-weight-medium">
                 CONFIRMED RESERVATION
               </div>
-              <div className="text-xs font-mono font-bold text-zinc-900 mt-1">
+              <div className="text-xs font-mono font-bold text-zinc-900 mt-1 ui-text-body ui-font-body ui-weight-medium">
                 Ref: {reservation.confirmationNo}
               </div>
-              <div className="text-[10px] text-zinc-500 font-mono">
+              <div className="text-[10px] text-zinc-500 font-mono ui-text-meta ui-font-body">
                 Date: {new Date(reservation.createdAt || Date.now()).toLocaleDateString("en-IN")}
               </div>
             </div>
           </div>
 
           {/* Guest & Stay Details Grid */}
-          <div className="grid grid-cols-2 gap-4 text-xs">
+          <div className="grid grid-cols-2 gap-4 text-xs ui-text-body">
             {/* Primary Guest Box */}
             <div className="border border-zinc-300 rounded-xl p-3.5 space-y-1.5 bg-zinc-50/50">
-              <div className="font-mono text-[10px] font-bold text-zinc-500 uppercase tracking-wider">
+              <div className="font-mono text-[10px] font-bold text-zinc-500 uppercase tracking-wider ui-font-body ui-text-meta ui-weight-medium">
                 Primary Guest Information
               </div>
-              <div className="font-bold text-sm text-zinc-950 uppercase">{guestName}</div>
-              <div className="text-zinc-600 font-mono">Phone: {guestPhone}</div>
+              <div className="font-bold text-sm text-zinc-950 uppercase ui-weight-medium">{guestName}</div>
+              <div className="text-zinc-600 font-mono ui-font-body">Phone: {guestPhone}</div>
               {guestEmail && <div className="text-zinc-600">Email: {guestEmail}</div>}
               {guestCity && <div className="text-zinc-600 uppercase">City: {guestCity}{guestState ? `, ${guestState}` : ""}</div>}
-              {guestGstin && <div className="text-zinc-800 font-mono text-[11px] uppercase">GSTIN: <strong>{guestGstin}</strong></div>}
-              {companyOrAgency && <div className="text-indigo-700 font-medium text-[11px] uppercase">Org: {companyOrAgency}</div>}
+              {guestGstin && <div className="text-zinc-800 font-mono text-[11px] uppercase ui-font-body ui-text-meta">GSTIN: <strong>{guestGstin}</strong></div>}
+              {companyOrAgency && <div className="text-indigo-700 font-medium text-[11px] uppercase ui-text-meta">Org: {companyOrAgency}</div>}
             </div>
 
             {/* Stay & Room Details Box */}
             <div className="border border-zinc-300 rounded-xl p-3.5 space-y-1.5 bg-zinc-50/50">
-              <div className="font-mono text-[10px] font-bold text-zinc-500 uppercase tracking-wider">
+              <div className="font-mono text-[10px] font-bold text-zinc-500 uppercase tracking-wider ui-font-body ui-text-meta ui-weight-medium">
                 Stay & Booking Summary
               </div>
               <div className="flex justify-between">
                 <span className="text-zinc-500">Check-In Date:</span>
-                <strong className="font-mono">{checkInStr} (12:00 PM)</strong>
+                <strong className="font-mono ui-font-body">{checkInStr} (12:00 PM)</strong>
               </div>
               <div className="flex justify-between">
                 <span className="text-zinc-500">Check-Out Date:</span>
-                <strong className="font-mono">{checkOutStr} (11:00 AM)</strong>
+                <strong className="font-mono ui-font-body">{checkOutStr} (11:00 AM)</strong>
               </div>
               <div className="flex justify-between">
                 <span className="text-zinc-500">Room Category:</span>
@@ -236,40 +238,41 @@ export function ReservationVoucherModal({
               </div>
               <div className="flex justify-between">
                 <span className="text-zinc-500">Occupancy:</span>
-                <span className="font-mono font-bold text-zinc-900">{occupancyDisplay}</span>
+                <span className="font-mono font-bold text-zinc-900 ui-font-body ui-weight-medium">{occupancyDisplay}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-zinc-500">Booking Channel:</span>
-                <span className="font-mono font-bold text-zinc-800">{reservation.source || "DIRECT"}</span>
+                <span className="font-mono font-bold text-zinc-800 ui-font-body ui-weight-medium">{reservation.source || "DIRECT"}</span>
               </div>
             </div>
           </div>
 
           {/* Financial Breakdown Table */}
-          <div className="border border-zinc-300 rounded-xl overflow-hidden text-xs">
-            <div className="bg-zinc-100 px-4 py-2 font-mono font-bold text-zinc-700 uppercase tracking-wider text-[10.5px] border-b border-zinc-300">
+          <div className="border border-zinc-300 rounded-xl overflow-hidden text-xs ui-text-body">
+            <div className="bg-zinc-100 px-4 py-2 font-mono font-bold text-zinc-700 uppercase tracking-wider text-[10.5px] border-b border-zinc-300 ui-font-body ui-weight-medium ui-text-meta">
               Tariff & Payment Summary (GST Rule 46)
             </div>
             <div className="p-4 space-y-2">
+              {reservationRateTerms && <p className="text-xs text-zinc-600">Agreed room rate: {reservationRateTerms.isRateInclusive ? "GST included" : "GST added to the entered rate"}. Totals below include GST.</p>}
               <div className="flex justify-between text-zinc-600">
                 <span>Room Tariff Total ({totalRooms} {totalRooms > 1 ? "Rooms" : "Room"} - Inclusive of Applicable GST):</span>
-                <span className="font-mono font-bold text-zinc-950">{formatINR(totalAmount)}</span>
+                <span className="font-mono font-bold text-zinc-950 ui-font-body ui-weight-medium">{formatINR(totalAmount)}</span>
               </div>
               <div className="flex justify-between text-emerald-700 font-medium">
                 <span>Advance Booking Deposit Paid ({depositMethod}):</span>
-                <span className="font-mono font-bold text-emerald-700">- {formatINR(deposit)}</span>
+                <span className="font-mono font-bold text-emerald-700 ui-font-body ui-weight-medium">- {formatINR(deposit)}</span>
               </div>
               <div className="pt-2 border-t border-zinc-200 flex justify-between items-center text-sm">
-                <span className="font-black text-zinc-950 uppercase">Balance Payable on Check-In:</span>
-                <span className="font-mono font-black text-base text-indigo-700">{formatINR(balanceDue)}</span>
+                <span className="font-black text-zinc-950 uppercase ui-weight-medium">Balance Payable on Check-In:</span>
+                <span className="font-mono font-black text-base text-indigo-700 ui-font-body ui-weight-medium">{formatINR(balanceDue)}</span>
               </div>
             </div>
           </div>
 
           {/* Special Requests */}
           {reservation.notes && (
-            <div className="border border-amber-200 bg-amber-50/50 rounded-xl p-3 text-xs space-y-1 text-amber-900">
-              <div className="font-bold uppercase tracking-wider text-[10px] font-mono text-amber-800">
+            <div className="border border-amber-200 bg-amber-50/50 rounded-xl p-3 text-xs space-y-1 text-amber-900 ui-text-body">
+              <div className="font-bold uppercase tracking-wider text-[10px] font-mono text-amber-800 ui-weight-medium ui-text-meta ui-font-body">
                 Special Requests / Notes
               </div>
               <div>{reservation.notes}</div>
@@ -277,8 +280,8 @@ export function ReservationVoucherModal({
           )}
 
           {/* Terms & Conditions */}
-          <div className="text-[10px] text-zinc-500 space-y-1 border-t border-zinc-200 pt-3">
-            <div className="font-bold text-zinc-700 uppercase tracking-wider font-mono">
+          <div className="text-[10px] text-zinc-500 space-y-1 border-t border-zinc-200 pt-3 ui-text-meta">
+            <div className="font-bold text-zinc-700 uppercase tracking-wider font-mono ui-weight-medium ui-font-body">
               Hotel Check-In Policies & Instructions
             </div>
             <ul className="list-disc pl-4 space-y-0.5">
@@ -290,15 +293,15 @@ export function ReservationVoucherModal({
           </div>
 
           {/* Signatures */}
-          <div className="flex justify-between items-end pt-8 text-xs text-zinc-600">
+          <div className="flex justify-between items-end pt-8 text-xs text-zinc-600 ui-text-body">
             <div className="text-center">
               <div className="w-40 border-b border-zinc-400 pb-8" />
-              <span className="text-[10px] font-mono mt-1 block">Guest Signature</span>
+              <span className="text-[10px] font-mono mt-1 block ui-text-meta ui-font-body">Guest Signature</span>
             </div>
 
             <div className="text-center">
               <div className="w-40 border-b border-zinc-400 pb-8" />
-              <span className="text-[10px] font-mono mt-1 block">Authorized Hotel Signatory</span>
+              <span className="text-[10px] font-mono mt-1 block ui-text-meta ui-font-body">Authorized Hotel Signatory</span>
             </div>
           </div>
 

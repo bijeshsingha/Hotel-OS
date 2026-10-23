@@ -373,7 +373,7 @@ export default function AuditLogPage() {
   return (
     <div className="space-y-4 max-w-[1550px] mx-auto w-full text-zinc-900 dark:text-zinc-100 pb-16">
       {/* Top Banner Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 p-5 rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200/80 dark:border-zinc-800/80 shadow-xs print:hidden">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 p-5 rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200/80 dark:border-zinc-800/80 shadow-xs print:hidden ui-radius-panel ui-shadow-quiet ui-surface">
         <div>
           <div className="flex items-center gap-2.5">
             <div className="h-9 w-9 rounded-xl bg-zinc-100 dark:bg-zinc-800/80 border border-zinc-200/60 dark:border-zinc-700/60 flex items-center justify-center">
@@ -381,14 +381,14 @@ export default function AuditLogPage() {
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-base sm:text-lg font-bold text-zinc-900 dark:text-white tracking-tight">
+                <h1 className="text-base sm:text-lg font-bold text-zinc-900 dark:text-white tracking-tight ui-weight-medium ui-page-title">
                   Compliance & Operations Audit Trail
                 </h1>
-                <span className="rounded-md px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 uppercase tracking-wider">
+                <span className="rounded-md px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 uppercase tracking-wider ui-text-meta">
                   Live & Tamper-Evident
                 </span>
               </div>
-              <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+              <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5 ui-text-body">
                 Statutory audit register for financial inflows, room operations, discounts, vouchers & administrative actions
               </p>
             </div>
@@ -403,24 +403,24 @@ export default function AuditLogPage() {
               fetchAuditLogs();
             }}
             disabled={loading}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition shadow-2xs cursor-pointer disabled:opacity-50"
-            title="Refresh logs"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition shadow-2xs cursor-pointer disabled:opacity-50 ui-text-body ui-shadow-quiet ui-control"
+            title="Refresh logs" aria-label="Refresh logs"
           >
             <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
             Refresh
           </button>
           <button
             onClick={exportToCsv}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition shadow-2xs cursor-pointer"
-            title="Export filtered records to CSV"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition shadow-2xs cursor-pointer ui-text-body ui-shadow-quiet ui-control"
+            title="Export filtered records to CSV" aria-label="Export filtered records to CSV"
           >
             <Download className="h-3.5 w-3.5" />
             Export CSV
           </button>
           <button
             onClick={handlePrint}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition shadow-2xs cursor-pointer"
-            title="Print audit sheet"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition shadow-2xs cursor-pointer ui-text-body ui-shadow-quiet ui-control"
+            title="Print audit sheet" aria-label="Print audit sheet"
           >
             <Printer className="h-3.5 w-3.5" />
             Print Report
@@ -433,41 +433,41 @@ export default function AuditLogPage() {
         {/* 1. Total Audited Events */}
         <div
           onClick={() => setCategory("ALL")}
-          className={`p-4 rounded-xl border transition-all cursor-pointer select-none ${
+          className={`p-4 rounded-xl border transition-colors cursor-pointer select-none  ${
             category === "ALL"
-              ? "bg-zinc-100/90 dark:bg-zinc-800/90 border-zinc-900 dark:border-zinc-100 ring-2 ring-zinc-900/15 dark:ring-white/20 shadow-xs"
+              ? "bg-zinc-100/90 dark:bg-zinc-800/90 border-zinc-900 dark:border-zinc-100 ring-2 ring-zinc-900/15 dark:ring-white/20 shadow-xs ui-shadow-quiet"
               : "bg-white dark:bg-[#111114] border-zinc-200/80 dark:border-zinc-800/80 hover:border-zinc-300 dark:hover:border-zinc-700"
           }`}
         >
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-600 dark:text-zinc-400">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-600 dark:text-zinc-400 ui-text-meta ui-weight-medium">
               Total Audited Events
             </span>
             <FileText className="h-4 w-4 text-zinc-500 dark:text-zinc-400" />
           </div>
-          <div className="text-2xl font-black mt-2 font-mono text-zinc-900 dark:text-white">{stats.total}</div>
-          <div className="text-[11px] mt-1 text-zinc-500 dark:text-zinc-400 font-medium">Complete operational footprint</div>
+          <div className="text-2xl font-black mt-2 font-mono text-zinc-900 dark:text-white ui-weight-medium ui-font-body">{stats.total}</div>
+          <div className="text-[11px] mt-1 text-zinc-500 dark:text-zinc-400 font-medium ui-text-meta">Complete operational footprint</div>
         </div>
 
         {/* 2. Financial & Billing */}
         <div
           onClick={() => setCategory("FINANCIAL")}
-          className={`p-4 rounded-xl border transition-all cursor-pointer select-none ${
+          className={`p-4 rounded-xl border transition-colors cursor-pointer select-none  ${
             category === "FINANCIAL"
-              ? "bg-emerald-50 dark:bg-emerald-950/40 border-emerald-500 dark:border-emerald-500 ring-2 ring-emerald-500/25 shadow-xs"
+              ? "bg-emerald-50 dark:bg-emerald-950/40 border-emerald-500 dark:border-emerald-500 ring-2 ring-emerald-500/25 shadow-xs ui-shadow-quiet"
               : "bg-emerald-50/25 dark:bg-emerald-950/10 border-zinc-200/80 dark:border-zinc-800/80 hover:border-emerald-300 dark:hover:border-emerald-800"
           }`}
         >
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400 ui-text-meta ui-weight-medium">
               Financial & Billing
             </span>
             <CreditCard className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
           </div>
-          <div className="text-2xl font-black mt-2 font-mono text-zinc-900 dark:text-white">
+          <div className="text-2xl font-black mt-2 font-mono text-zinc-900 dark:text-white ui-weight-medium ui-font-body">
             {stats.financial}
           </div>
-          <div className="text-[11px] mt-1 text-emerald-700/80 dark:text-emerald-300/80 font-medium">
+          <div className="text-[11px] mt-1 text-emerald-700/80 dark:text-emerald-300/80 font-medium ui-text-meta">
             Payments, refunds, edits & discounts
           </div>
         </div>
@@ -475,22 +475,22 @@ export default function AuditLogPage() {
         {/* 3. Front Desk & Stays */}
         <div
           onClick={() => setCategory("FRONT_DESK")}
-          className={`p-4 rounded-xl border transition-all cursor-pointer select-none ${
+          className={`p-4 rounded-xl border transition-colors cursor-pointer select-none  ${
             category === "FRONT_DESK"
-              ? "bg-blue-50 dark:bg-blue-950/40 border-blue-500 dark:border-blue-500 ring-2 ring-blue-500/25 shadow-xs"
+              ? "bg-blue-50 dark:bg-blue-950/40 border-blue-500 dark:border-blue-500 ring-2 ring-blue-500/25 shadow-xs ui-shadow-quiet"
               : "bg-blue-50/25 dark:bg-blue-950/10 border-zinc-200/80 dark:border-zinc-800/80 hover:border-blue-300 dark:hover:border-blue-800"
           }`}
         >
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-blue-700 dark:text-blue-400">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-blue-700 dark:text-blue-400 ui-text-meta ui-weight-medium">
               Front Desk & Stays
             </span>
             <Building className="h-4 w-4 text-blue-600 dark:text-blue-400" />
           </div>
-          <div className="text-2xl font-black mt-2 font-mono text-zinc-900 dark:text-white">
+          <div className="text-2xl font-black mt-2 font-mono text-zinc-900 dark:text-white ui-weight-medium ui-font-body">
             {stats.frontDesk}
           </div>
-          <div className="text-[11px] mt-1 text-blue-700/80 dark:text-blue-300/80 font-medium">
+          <div className="text-[11px] mt-1 text-blue-700/80 dark:text-blue-300/80 font-medium ui-text-meta">
             Check-ins, check-outs, room moves
           </div>
         </div>
@@ -498,22 +498,22 @@ export default function AuditLogPage() {
         {/* 4. Admin & Governance */}
         <div
           onClick={() => setCategory("ADMIN")}
-          className={`p-4 rounded-xl border transition-all cursor-pointer select-none ${
+          className={`p-4 rounded-xl border transition-colors cursor-pointer select-none  ${
             category === "ADMIN"
-              ? "bg-purple-50 dark:bg-purple-950/40 border-purple-500 dark:border-purple-500 ring-2 ring-purple-500/25 shadow-xs"
+              ? "bg-purple-50 dark:bg-purple-950/40 border-purple-500 dark:border-purple-500 ring-2 ring-purple-500/25 shadow-xs ui-shadow-quiet"
               : "bg-purple-50/25 dark:bg-purple-950/10 border-zinc-200/80 dark:border-zinc-800/80 hover:border-purple-300 dark:hover:border-purple-800"
           }`}
         >
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-purple-700 dark:text-purple-400">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-purple-700 dark:text-purple-400 ui-text-meta ui-weight-medium">
               Admin & Governance
             </span>
             <Shield className="h-4 w-4 text-purple-600 dark:text-purple-400" />
           </div>
-          <div className="text-2xl font-black mt-2 font-mono text-zinc-900 dark:text-white">
+          <div className="text-2xl font-black mt-2 font-mono text-zinc-900 dark:text-white ui-weight-medium ui-font-body">
             {stats.admin}
           </div>
-          <div className="text-[11px] mt-1 text-purple-700/80 dark:text-purple-300/80 font-medium">
+          <div className="text-[11px] mt-1 text-purple-700/80 dark:text-purple-300/80 font-medium ui-text-meta">
             Master edits, GRC sync, security logins
           </div>
         </div>
@@ -536,15 +536,15 @@ export default function AuditLogPage() {
               setCategory(tab.id as AuditCategory);
               setActionFilter("ALL");
             }}
-            className={`px-3.5 py-1.5 rounded-xl text-xs font-medium whitespace-nowrap transition cursor-pointer flex items-center gap-2 ${
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-medium whitespace-nowrap transition cursor-pointer flex items-center gap-2  ui-text-body ${
               category === tab.id
-                ? "bg-zinc-900 text-white dark:bg-white dark:text-zinc-950 font-semibold shadow-xs"
+                ? "bg-zinc-900 text-white dark:bg-white dark:text-zinc-950 font-semibold shadow-xs ui-shadow-quiet"
                 : "bg-white dark:bg-[#111114] text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white border border-zinc-200/80 dark:border-zinc-800/80"
-            }`}
+            } ui-control`}
           >
             <span>{tab.label}</span>
             <span
-              className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${
+              className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono  ui-text-meta ui-font-body ${
                 category === tab.id
                   ? "bg-white/20 dark:bg-zinc-950/20 text-white dark:text-zinc-950"
                   : "bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400"
@@ -557,7 +557,7 @@ export default function AuditLogPage() {
       </div>
 
       {/* Filter & Search Bar */}
-      <div className="p-3 sm:p-4 rounded-xl bg-white dark:bg-[#111114] border border-zinc-200/80 dark:border-zinc-800/80 shadow-xs flex flex-col gap-3 print:hidden">
+      <div className="p-3 sm:p-4 rounded-xl bg-white dark:bg-[#111114] border border-zinc-200/80 dark:border-zinc-800/80 shadow-xs flex flex-col gap-3 print:hidden ui-shadow-quiet ui-surface">
         <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-2 flex-1">
             {/* Search Box */}
@@ -568,12 +568,12 @@ export default function AuditLogPage() {
                 placeholder="Search receipt #, room #, guest, actor, or reason..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="w-full pl-9 pr-8 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-none focus:border-emerald-500"
+                className="w-full pl-9 pr-8 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-none focus:border-emerald-500 ui-text-body ui-field" aria-label="Search receipt #, room #, guest, actor, or reason"
               />
               {search && (
                 <button
                   onClick={() => setSearch("")}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 ui-control"
                 >
                   <X className="h-3.5 w-3.5" />
                 </button>
@@ -586,7 +586,7 @@ export default function AuditLogPage() {
               <select
                 value={datePreset}
                 onChange={(e) => setDatePreset(e.target.value)}
-                className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 px-2.5 py-1.5 text-xs font-semibold text-zinc-800 dark:text-zinc-200 focus:outline-none focus:border-emerald-500 cursor-pointer"
+                className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 px-2.5 py-1.5 text-xs font-semibold text-zinc-800 dark:text-zinc-200 focus:outline-none focus:border-emerald-500 cursor-pointer ui-text-body ui-field"
               >
                 <option value="ALL_TIME">All Time (Master Audit)</option>
                 <option value="TODAY">Today ({activeProperty?.businessDate || "Live"})</option>
@@ -602,7 +602,7 @@ export default function AuditLogPage() {
               <select
                 value={actionFilter}
                 onChange={(e) => setActionFilter(e.target.value)}
-                className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 px-2.5 py-1.5 text-xs font-semibold text-zinc-800 dark:text-zinc-200 focus:outline-none focus:border-emerald-500 cursor-pointer max-w-[180px] truncate"
+                className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 px-2.5 py-1.5 text-xs font-semibold text-zinc-800 dark:text-zinc-200 focus:outline-none focus:border-emerald-500 cursor-pointer max-w-[180px] truncate ui-text-body ui-field"
               >
                 <option value="ALL">All Actions</option>
                 {distinctActions.map((act) => (
@@ -614,30 +614,30 @@ export default function AuditLogPage() {
             </div>
           </div>
 
-          <div className="text-xs font-mono text-zinc-500 dark:text-zinc-400 shrink-0 self-end lg:self-center">
+          <div className="text-xs font-mono text-zinc-500 dark:text-zinc-400 shrink-0 self-end lg:self-center ui-text-body ui-font-body">
             Showing <span className="font-semibold text-zinc-900 dark:text-white">{filteredLogs.length}</span> events
           </div>
         </div>
 
         {/* Custom Date Range Card (matching Revenue Ledger) */}
         {datePreset === "CUSTOM" && (
-          <div className="flex items-center gap-3 p-3 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs animate-in fade-in">
+          <div className="flex items-center gap-3 p-3 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs   ui-text-body">
             <div className="flex items-center gap-1.5">
-              <span className="text-zinc-500 font-mono text-[11px]">From:</span>
+              <span className="text-zinc-500 font-mono text-[11px] ui-font-body ui-text-meta">From:</span>
               <input
                 type="date"
                 value={customStartDate}
                 onChange={(e) => setCustomStartDate(e.target.value)}
-                className="rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-2 py-1 font-mono text-xs text-zinc-900 dark:text-zinc-100"
+                className="rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-2 py-1 font-mono text-xs text-zinc-900 dark:text-zinc-100 ui-font-body ui-text-body ui-field"
               />
             </div>
             <div className="flex items-center gap-1.5">
-              <span className="text-zinc-500 font-mono text-[11px]">To:</span>
+              <span className="text-zinc-500 font-mono text-[11px] ui-font-body ui-text-meta">To:</span>
               <input
                 type="date"
                 value={customEndDate}
                 onChange={(e) => setCustomEndDate(e.target.value)}
-                className="rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-2 py-1 font-mono text-xs text-zinc-900 dark:text-zinc-100"
+                className="rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-2 py-1 font-mono text-xs text-zinc-900 dark:text-zinc-100 ui-font-body ui-text-body ui-field"
               />
             </div>
             {(customStartDate || customEndDate) && (
@@ -646,7 +646,7 @@ export default function AuditLogPage() {
                   setCustomStartDate("");
                   setCustomEndDate("");
                 }}
-                className="text-[11px] text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 underline cursor-pointer"
+                className="text-[11px] text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 underline cursor-pointer ui-text-meta ui-control"
               >
                 Clear dates
               </button>
@@ -657,17 +657,17 @@ export default function AuditLogPage() {
 
       {/* Print-Only Header */}
       <div className="hidden print:block mb-4 p-4 border-b border-zinc-400">
-        <h1 className="text-xl font-bold">{activeProperty?.displayName || "Hotel"} - Official Audit Log Trail</h1>
-        <p className="text-xs text-zinc-600">
+        <h1 className="text-xl font-bold ui-weight-medium ui-page-title">{activeProperty?.displayName || "Hotel"} - Official Audit Log Trail</h1>
+        <p className="text-xs text-zinc-600 ui-text-body">
           GSTIN: {activeProperty?.gstin || "N/A"} | Date of Export: {new Date().toLocaleString("en-IN")} | Total Events: {filteredLogs.length}
         </p>
       </div>
 
       {/* Main Audit Trail Table */}
-      <div className="rounded-xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-[#111114] overflow-hidden shadow-xs">
+      <div className="rounded-xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-[#111114] overflow-hidden shadow-xs ui-shadow-quiet ui-surface">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs border-collapse">
-            <thead className="bg-zinc-50/90 dark:bg-zinc-900/90 text-zinc-500 dark:text-zinc-400 text-[10.5px] uppercase tracking-wider font-semibold border-b border-zinc-200 dark:border-zinc-800 sticky top-0 z-10 backdrop-blur-xs">
+          <table className="w-full text-left text-xs border-collapse ui-text-body ui-data-table">
+            <thead className="bg-zinc-50/90 dark:bg-zinc-900/90 text-zinc-500 dark:text-zinc-400 text-[10.5px] uppercase tracking-wider font-semibold border-b border-zinc-200 dark:border-zinc-800 sticky top-0 z-10 backdrop-blur-xs ui-text-meta">
               <tr>
                 <th className="px-4 py-3 font-semibold whitespace-nowrap">Timestamp</th>
                 <th className="px-4 py-3 font-semibold whitespace-nowrap">Actor / Staff</th>
@@ -690,14 +690,14 @@ export default function AuditLogPage() {
                   >
                     {/* Timestamp */}
                     <td className="px-4 py-3 whitespace-nowrap">
-                      <div className="font-mono text-zinc-900 dark:text-zinc-100 text-[11.5px] font-medium">
+                      <div className="font-mono text-zinc-900 dark:text-zinc-100 text-[11.5px] font-medium ui-font-body ui-text-meta">
                         {new Date(log.occurredAt).toLocaleDateString("en-IN", {
                           day: "2-digit",
                           month: "short",
                           year: "numeric",
                         })}
                       </div>
-                      <div className="font-mono text-[10px] text-zinc-400 dark:text-zinc-500 flex items-center gap-1">
+                      <div className="font-mono text-[10px] text-zinc-400 dark:text-zinc-500 flex items-center gap-1 ui-font-body ui-text-meta">
                         <Clock className="h-2.5 w-2.5" />
                         {new Date(log.occurredAt).toLocaleTimeString("en-IN", {
                           hour: "2-digit",
@@ -710,15 +710,15 @@ export default function AuditLogPage() {
                     {/* Actor */}
                     <td className="px-4 py-3 whitespace-nowrap">
                       <div className="flex items-center gap-2">
-                        <div className="h-6 w-6 rounded-full bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 flex items-center justify-center text-[10px] font-bold text-zinc-600 dark:text-zinc-300">
+                        <div className="h-6 w-6 rounded-full bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 flex items-center justify-center text-[10px] font-bold text-zinc-600 dark:text-zinc-300 ui-text-meta ui-weight-medium">
                           {(log.actorName || log.actorId || "S")[0].toUpperCase()}
                         </div>
                         <div>
-                          <div className="font-medium text-zinc-900 dark:text-zinc-100 text-xs">
+                          <div className="font-medium text-zinc-900 dark:text-zinc-100 text-xs ui-text-body">
                             {log.actorName || log.actorId || "System"}
                           </div>
                           {log.actorId && log.actorId !== log.actorName && (
-                            <div className="text-[10px] font-mono text-zinc-400">{log.actorId}</div>
+                            <div className="text-[10px] font-mono text-zinc-400 ui-text-meta ui-font-body">{log.actorId}</div>
                           )}
                         </div>
                       </div>
@@ -727,7 +727,7 @@ export default function AuditLogPage() {
                     {/* Action */}
                     <td className="px-4 py-3 whitespace-nowrap">
                       <span
-                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium border ${badge.bg}`}
+                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium border  ui-text-meta ${badge.bg}`}
                       >
                         {badge.icon}
                         <span className="truncate max-w-[140px]">{badge.label}</span>
@@ -736,19 +736,19 @@ export default function AuditLogPage() {
 
                     {/* Target */}
                     <td className="px-4 py-3 whitespace-nowrap">
-                      <div className="font-medium text-zinc-700 dark:text-zinc-300 text-xs">{log.targetType}</div>
-                      <div className="font-mono text-[10.5px] text-zinc-400 max-w-[120px] truncate" title={log.targetId}>
+                      <div className="font-medium text-zinc-700 dark:text-zinc-300 text-xs ui-text-body">{log.targetType}</div>
+                      <div className="font-mono text-[10.5px] text-zinc-400 max-w-[120px] truncate ui-font-body ui-text-meta" title={log.targetId}>
                         {log.targetId}
                       </div>
                     </td>
 
                     {/* Details / Summary */}
                     <td className="px-4 py-3 max-w-md">
-                      <div className="text-xs text-zinc-800 dark:text-zinc-200 font-medium truncate" title={summary}>
+                      <div className="text-xs text-zinc-800 dark:text-zinc-200 font-medium truncate ui-text-body" title={summary}>
                         {summary}
                       </div>
                       {log.reason && log.reason !== summary && (
-                        <div className="text-[10.5px] text-zinc-500 dark:text-zinc-400 truncate mt-0.5 italic">
+                        <div className="text-[10.5px] text-zinc-500 dark:text-zinc-400 truncate mt-0.5 italic ui-text-meta">
                           "{log.reason}"
                         </div>
                       )}
@@ -761,7 +761,7 @@ export default function AuditLogPage() {
                           e.stopPropagation();
                           setSelectedLog(log);
                         }}
-                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium bg-zinc-100 dark:bg-zinc-800/80 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition"
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium bg-zinc-100 dark:bg-zinc-800/80 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition ui-text-body ui-control"
                       >
                         <Eye className="h-3 w-3" />
                         Inspect
@@ -776,7 +776,7 @@ export default function AuditLogPage() {
                   <td colSpan={6} className="px-4 py-16 text-center text-zinc-400 dark:text-zinc-500">
                     <ScrollText className="h-8 w-8 mx-auto mb-2 opacity-40" />
                     <p className="text-sm font-medium">No audit events match your criteria</p>
-                    <p className="text-xs mt-1 text-zinc-400">Try resetting search filters or date range</p>
+                    <p className="text-xs mt-1 text-zinc-400 ui-text-body">Try resetting search filters or date range</p>
                   </td>
                 </tr>
               )}
@@ -787,8 +787,8 @@ export default function AuditLogPage() {
 
       {/* Audit Detail Inspector Slide-over / Modal */}
       {selectedLog && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-150">
-          <div className="bg-white dark:bg-[#141418] border border-zinc-200 dark:border-zinc-800 rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4   duration-150">
+          <div className="bg-white dark:bg-[#141418] border border-zinc-200 dark:border-zinc-800 rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden ui-radius-panel ui-dialog-surface ui-surface">
             {/* Modal Header */}
             <div className="p-4 sm:p-5 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between bg-zinc-50/50 dark:bg-zinc-900/30">
               <div className="flex items-center gap-3">
@@ -799,14 +799,14 @@ export default function AuditLogPage() {
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <h3 className="text-sm sm:text-base font-bold text-zinc-900 dark:text-white">
+                    <h3 className="text-sm sm:text-base font-bold text-zinc-900 dark:text-white ui-weight-medium">
                       {getActionBadge(selectedLog.action).label}
                     </h3>
-                    <span className="font-mono text-[10px] px-2 py-0.5 rounded bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 uppercase">
+                    <span className="font-mono text-[10px] px-2 py-0.5 rounded bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 uppercase ui-font-body ui-text-meta">
                       {selectedLog.action}
                     </span>
                   </div>
-                  <p className="text-xs text-zinc-500 mt-0.5">
+                  <p className="text-xs text-zinc-500 mt-0.5 ui-text-body">
                     Recorded {new Date(selectedLog.occurredAt).toLocaleString("en-IN")}
                   </p>
                 </div>
@@ -817,47 +817,47 @@ export default function AuditLogPage() {
                   setSelectedLog(null);
                   setRawJsonView(false);
                 }}
-                className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition"
+                className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition ui-control"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
 
             {/* Modal Body */}
-            <div className="p-5 overflow-y-auto space-y-4 text-xs">
+            <div className="p-5 overflow-y-auto space-y-4 text-xs ui-text-body">
               {/* Metadata Grid */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 p-3 rounded-xl bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200/70 dark:border-zinc-800/70">
                 <div>
-                  <div className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400">Actor / Staff</div>
+                  <div className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400 ui-text-meta">Actor / Staff</div>
                   <div className="font-medium text-zinc-900 dark:text-zinc-100 mt-0.5">
                     {selectedLog.actorName || "System"}
                   </div>
                   {selectedLog.actorId && (
-                    <div className="text-[10px] font-mono text-zinc-400">{selectedLog.actorId}</div>
+                    <div className="text-[10px] font-mono text-zinc-400 ui-text-meta ui-font-body">{selectedLog.actorId}</div>
                   )}
                 </div>
 
                 <div>
-                  <div className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400">Target Entity</div>
+                  <div className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400 ui-text-meta">Target Entity</div>
                   <div className="font-medium text-zinc-900 dark:text-zinc-100 mt-0.5">
                     {selectedLog.targetType}
                   </div>
-                  <div className="text-[10px] font-mono text-zinc-400 truncate" title={selectedLog.targetId}>
+                  <div className="text-[10px] font-mono text-zinc-400 truncate ui-text-meta ui-font-body" title={selectedLog.targetId}>
                     {selectedLog.targetId}
                   </div>
                 </div>
 
                 <div>
-                  <div className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400">Network Origin</div>
-                  <div className="font-mono text-zinc-900 dark:text-zinc-100 mt-0.5">
+                  <div className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400 ui-text-meta">Network Origin</div>
+                  <div className="font-mono text-zinc-900 dark:text-zinc-100 mt-0.5 ui-font-body">
                     {selectedLog.ipAddress || "Internal System"}
                   </div>
                 </div>
 
                 <div>
-                  <div className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400">Audit ID</div>
+                  <div className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400 ui-text-meta">Audit ID</div>
                   <div className="flex items-center gap-1 mt-0.5">
-                    <span className="font-mono text-[10px] text-zinc-500 truncate" title={selectedLog.id}>
+                    <span className="font-mono text-[10px] text-zinc-500 truncate ui-font-body ui-text-meta" title={selectedLog.id}>
                       {selectedLog.id.slice(-8)}
                     </span>
                     <button
@@ -866,7 +866,7 @@ export default function AuditLogPage() {
                         setCopiedId(true);
                         setTimeout(() => setCopiedId(false), 2000);
                       }}
-                      className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"
+                      className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 ui-control"
                     >
                       {copiedId ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3" />}
                     </button>
@@ -877,7 +877,7 @@ export default function AuditLogPage() {
               {/* Reason / Narration Callout */}
               {selectedLog.reason && (
                 <div className="p-3 rounded-xl bg-blue-50/60 dark:bg-blue-950/20 border border-blue-200/70 dark:border-blue-800/40 text-blue-900 dark:text-blue-200">
-                  <div className="text-[10.5px] font-semibold uppercase tracking-wider text-blue-600 dark:text-blue-400">
+                  <div className="text-[10.5px] font-semibold uppercase tracking-wider text-blue-600 dark:text-blue-400 ui-text-meta">
                     Official Audit Reason / Narration
                   </div>
                   <div className="mt-1 font-medium">{selectedLog.reason}</div>
@@ -887,30 +887,30 @@ export default function AuditLogPage() {
               {/* Before vs After Diff / State Viewer */}
               {selectedLog.beforeJson && selectedLog.afterJson ? (
                 <div className="space-y-2">
-                  <div className="text-[11px] font-semibold text-zinc-900 dark:text-white uppercase tracking-wider flex items-center justify-between">
+                  <div className="text-[11px] font-semibold text-zinc-900 dark:text-white uppercase tracking-wider flex items-center justify-between ui-text-meta">
                     <span>State Comparison (Before vs. After)</span>
-                    <span className="text-[10px] font-normal text-zinc-400">Field modifications tracked</span>
+                    <span className="text-[10px] font-normal text-zinc-400 ui-text-meta">Field modifications tracked</span>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {/* Before State */}
                     <div className="p-3.5 rounded-xl border border-rose-200 dark:border-rose-900/50 bg-rose-50/30 dark:bg-rose-950/10">
-                      <div className="text-[10px] font-semibold uppercase tracking-wider text-rose-600 dark:text-rose-400 mb-2 flex items-center gap-1.5">
+                      <div className="text-[10px] font-semibold uppercase tracking-wider text-rose-600 dark:text-rose-400 mb-2 flex items-center gap-1.5 ui-text-meta">
                         <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />
                         Previous Snapshot
                       </div>
-                      <pre className="text-[11px] font-mono text-zinc-800 dark:text-zinc-300 whitespace-pre-wrap overflow-x-auto">
+                      <pre className="text-[11px] font-mono text-zinc-800 dark:text-zinc-300 whitespace-pre-wrap overflow-x-auto ui-text-meta ui-font-body">
                         {JSON.stringify(JSON.parse(selectedLog.beforeJson), null, 2)}
                       </pre>
                     </div>
 
                     {/* After State */}
                     <div className="p-3.5 rounded-xl border border-emerald-200 dark:border-emerald-900/50 bg-emerald-50/30 dark:bg-emerald-950/10">
-                      <div className="text-[10px] font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 mb-2 flex items-center gap-1.5">
+                      <div className="text-[10px] font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 mb-2 flex items-center gap-1.5 ui-text-meta">
                         <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
                         Updated State
                       </div>
-                      <pre className="text-[11px] font-mono text-zinc-800 dark:text-zinc-300 whitespace-pre-wrap overflow-x-auto">
+                      <pre className="text-[11px] font-mono text-zinc-800 dark:text-zinc-300 whitespace-pre-wrap overflow-x-auto ui-text-meta ui-font-body">
                         {JSON.stringify(JSON.parse(selectedLog.afterJson), null, 2)}
                       </pre>
                     </div>
@@ -918,22 +918,22 @@ export default function AuditLogPage() {
                 </div>
               ) : selectedLog.afterJson ? (
                 <div className="space-y-2">
-                  <div className="text-[11px] font-semibold text-zinc-900 dark:text-white uppercase tracking-wider">
+                  <div className="text-[11px] font-semibold text-zinc-900 dark:text-white uppercase tracking-wider ui-text-meta">
                     Event Payload / Parameters
                   </div>
                   <div className="p-3.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/40">
-                    <pre className="text-[11px] font-mono text-zinc-800 dark:text-zinc-200 whitespace-pre-wrap overflow-x-auto">
+                    <pre className="text-[11px] font-mono text-zinc-800 dark:text-zinc-200 whitespace-pre-wrap overflow-x-auto ui-text-meta ui-font-body">
                       {JSON.stringify(JSON.parse(selectedLog.afterJson), null, 2)}
                     </pre>
                   </div>
                 </div>
               ) : selectedLog.beforeJson ? (
                 <div className="space-y-2">
-                  <div className="text-[11px] font-semibold text-zinc-900 dark:text-white uppercase tracking-wider">
+                  <div className="text-[11px] font-semibold text-zinc-900 dark:text-white uppercase tracking-wider ui-text-meta">
                     Deleted / Voided Record Snapshot
                   </div>
                   <div className="p-3.5 rounded-xl border border-rose-200 dark:border-rose-900/50 bg-rose-50/30 dark:bg-rose-950/10">
-                    <pre className="text-[11px] font-mono text-zinc-800 dark:text-zinc-300 whitespace-pre-wrap overflow-x-auto">
+                    <pre className="text-[11px] font-mono text-zinc-800 dark:text-zinc-300 whitespace-pre-wrap overflow-x-auto ui-text-meta ui-font-body">
                       {JSON.stringify(JSON.parse(selectedLog.beforeJson), null, 2)}
                     </pre>
                   </div>
@@ -944,17 +944,17 @@ export default function AuditLogPage() {
               <div className="pt-2 border-t border-zinc-200 dark:border-zinc-800">
                 <button
                   onClick={() => setRawJsonView(!rawJsonView)}
-                  className="text-xs font-semibold text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 flex items-center gap-1"
+                  className="text-xs font-semibold text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 flex items-center gap-1 ui-text-body ui-control"
                 >
                   <ChevronRight className={`h-3.5 w-3.5 transition-transform ${rawJsonView ? "rotate-90" : ""}`} />
-                  {rawJsonView ? "Hide Raw Database Record" : "View Raw Immutable Audit JSON"}
+                  {rawJsonView ? "Hide audit JSON" : "View audit JSON"}
                 </button>
 
                 {rawJsonView && (
-                  <div className="mt-2 p-3 rounded-xl bg-zinc-950 text-zinc-300 font-mono text-[10.5px] overflow-x-auto relative">
+                  <div className="mt-2 p-3 rounded-xl bg-zinc-950 text-zinc-300 font-mono text-[10.5px] overflow-x-auto relative ui-font-body ui-text-meta">
                     <button
                       onClick={() => navigator.clipboard.writeText(JSON.stringify(selectedLog, null, 2))}
-                      className="absolute right-2 top-2 px-2 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[10px] flex items-center gap-1"
+                      className="absolute right-2 top-2 px-2 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[10px] flex items-center gap-1 ui-text-meta ui-control"
                     >
                       <Copy className="h-3 w-3" />
                       Copy JSON
@@ -967,7 +967,7 @@ export default function AuditLogPage() {
 
             {/* Modal Footer */}
             <div className="p-4 border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/30 flex items-center justify-between">
-              <span className="text-[11px] text-zinc-500 font-mono">
+              <span className="text-[11px] text-zinc-500 font-mono ui-text-meta ui-font-body">
                 Property: {selectedLog.propertyId}
               </span>
               <button
@@ -975,7 +975,7 @@ export default function AuditLogPage() {
                   setSelectedLog(null);
                   setRawJsonView(false);
                 }}
-                className="px-4 py-1.5 rounded-lg text-xs font-semibold bg-zinc-900 text-white dark:bg-white dark:text-zinc-950 hover:opacity-90 transition cursor-pointer"
+                className="px-4 py-1.5 rounded-lg text-xs font-semibold bg-zinc-900 text-white dark:bg-white dark:text-zinc-950 hover:opacity-90 transition cursor-pointer ui-text-body ui-control"
               >
                 Close Inspector
               </button>

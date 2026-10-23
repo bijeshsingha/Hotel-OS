@@ -115,53 +115,37 @@ export function PmsFilters({
     <div className="space-y-4">
       {/* Primary Module Tabs: Large, legible navigation */}
       <div className="flex items-center justify-between gap-3 border-b border-zinc-200/80 dark:border-zinc-800 pb-2 overflow-x-auto">
-        <div className="flex items-center gap-2">
+        <div className="ui-segments">
           <button
             onClick={() => onTabChange("grid")}
-            className={`h-11 px-4.5 rounded-xl text-sm font-semibold transition cursor-pointer flex items-center gap-2 ${
-              activeTab === "grid"
-                ? "bg-zinc-950 text-white dark:bg-white dark:text-zinc-950 shadow-xs"
-                : "text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800/60"
-            }`}
+            className="ui-segment" aria-pressed={activeTab === "grid"}
           >
             <span>Room Rack</span>
-            <span className="text-xs opacity-75 font-mono">({totalFilteredCount})</span>
+            <span className="text-xs opacity-75 font-mono ui-text-body ui-font-body">({totalFilteredCount})</span>
           </button>
 
           <button
             onClick={() => onTabChange("inhouse")}
-            className={`h-11 px-4.5 rounded-xl text-sm font-semibold transition cursor-pointer flex items-center gap-2 ${
-              activeTab === "inhouse"
-                ? "bg-zinc-950 text-white dark:bg-white dark:text-zinc-950 shadow-xs"
-                : "text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800/60"
-            }`}
+            className="ui-segment" aria-pressed={activeTab === "inhouse"}
           >
             <span>In-House Guests</span>
-            <span className="text-xs opacity-75 font-mono">({inHouseCount})</span>
+            <span className="text-xs opacity-75 font-mono ui-text-body ui-font-body">({inHouseCount})</span>
           </button>
 
           <button
             onClick={() => onTabChange("registrations")}
-            className={`h-11 px-4.5 rounded-xl text-sm font-semibold transition cursor-pointer flex items-center gap-2 ${
-              activeTab === "registrations"
-                ? "bg-zinc-950 text-white dark:bg-white dark:text-zinc-950 shadow-xs"
-                : "text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800/60"
-            }`}
+            className="ui-segment" aria-pressed={activeTab === "registrations"}
           >
             <span>GRC Register</span>
-            <span className="text-xs opacity-75 font-mono">({registrationsCount})</span>
+            <span className="text-xs opacity-75 font-mono ui-text-body ui-font-body">({registrationsCount})</span>
           </button>
 
           <button
             onClick={() => onTabChange("reservations")}
-            className={`h-11 px-4.5 rounded-xl text-sm font-semibold transition cursor-pointer flex items-center gap-2 ${
-              activeTab === "reservations"
-                ? "bg-zinc-950 text-white dark:bg-white dark:text-zinc-950 shadow-xs"
-                : "text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800/60"
-            }`}
+            className="ui-segment" aria-pressed={activeTab === "reservations"}
           >
             <span>Reservations</span>
-            <span className="text-xs opacity-75 font-mono">({reservationsCount})</span>
+            <span className="text-xs opacity-75 font-mono ui-text-body ui-font-body">({reservationsCount})</span>
           </button>
         </div>
 
@@ -170,23 +154,15 @@ export function PmsFilters({
           <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-800/80 p-1 rounded-xl shrink-0">
             <button
               onClick={() => onViewModeChange("grid")}
-              className={`p-2 rounded-lg transition cursor-pointer ${
-                viewMode === "grid"
-                  ? "bg-white dark:bg-zinc-900 text-zinc-950 dark:text-white shadow-xs"
-                  : "text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
-              }`}
-              title="Grid View"
+              className="ui-segment"
+              title="Grid View" aria-label="Grid View" aria-pressed={viewMode === "grid"}
             >
               <LayoutGrid className="h-4 w-4" />
             </button>
             <button
               onClick={() => onViewModeChange("table")}
-              className={`p-2 rounded-lg transition cursor-pointer ${
-                viewMode === "table"
-                  ? "bg-white dark:bg-zinc-900 text-zinc-950 dark:text-white shadow-xs"
-                  : "text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
-              }`}
-              title="Table View"
+              className="ui-segment"
+              title="Table View" aria-label="Table View" aria-pressed={viewMode === "table"}
             >
               <List className="h-4 w-4" />
             </button>
@@ -198,7 +174,7 @@ export function PmsFilters({
       {activeTab === "grid" && (
         <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3">
           {/* Status Segmented Dock (Apple / Linear style) */}
-          <div className="flex items-center gap-1 p-1 bg-zinc-100/90 dark:bg-zinc-800/70 border border-zinc-200/80 dark:border-zinc-700/60 rounded-xl overflow-x-auto no-scrollbar shrink-0 shadow-2xs">
+          <div className="flex items-center gap-1 p-1 bg-zinc-100/90 dark:bg-zinc-800/70 border border-zinc-200/80 dark:border-zinc-700/60 rounded-xl overflow-x-auto no-scrollbar shrink-0 shadow-2xs ui-shadow-quiet">
             {STATUS_FILTER_ITEMS.map((item) => {
               const isActive = statusFilter === item.id;
               const count =
@@ -211,11 +187,11 @@ export function PmsFilters({
                   key={item.id}
                   type="button"
                   onClick={() => onStatusFilterChange(item.id)}
-                  className={`group h-9 px-3.5 rounded-lg whitespace-nowrap shrink-0 transition-all duration-150 cursor-pointer flex items-center gap-2 text-sm select-none ${
+                  className={`group h-9 px-3.5 rounded-lg whitespace-nowrap shrink-0 transition-colors duration-150 cursor-pointer flex items-center gap-2 text-sm select-none  ${
                     isActive
-                      ? `${item.activeBg} ${item.activeText} shadow-xs ring-1 ${item.activeRing}`
+                      ? `${item.activeBg} ${item.activeText} shadow-xs ring-1  ui-shadow-quiet ${item.activeRing}`
                       : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-950 dark:hover:text-zinc-100 hover:bg-white/60 dark:hover:bg-zinc-700/50 font-medium"
-                  }`}
+                  } ui-control`}
                 >
                   {item.dotColor && (
                     <span
@@ -229,9 +205,9 @@ export function PmsFilters({
                   <span>{item.label}</span>
                   {count !== undefined && (
                     <span
-                      className={`ml-0.5 px-1.5 py-0.5 rounded-md text-[11px] font-mono leading-none transition-colors ${
+                      className={`ml-0.5 px-1.5 py-0.5 rounded-md text-[11px] font-mono leading-none transition-colors  ui-text-meta ui-font-body ${
                         isActive
-                          ? "bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-bold"
+                          ? "bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-bold ui-weight-medium"
                           : "bg-zinc-200/70 dark:bg-zinc-700/60 text-zinc-500 dark:text-zinc-400 group-hover:bg-zinc-200 dark:group-hover:bg-zinc-700 font-medium"
                       }`}
                     >
@@ -252,12 +228,12 @@ export function PmsFilters({
                 value={searchQuery}
                 onChange={(e) => onSearchChange(e.target.value)}
                 placeholder="Search room # or guest..."
-                className="w-full h-9.5 pl-9.5 pr-8 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-sm text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:border-zinc-400 dark:focus:border-zinc-600 transition"
+                className="w-full h-9.5 pl-9.5 pr-8 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-sm text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:border-zinc-400 dark:focus:border-zinc-600 transition ui-radius-control ui-surface ui-field" aria-label="Search room # or guest"
               />
               {searchQuery && (
                 <button
                   onClick={() => onSearchChange("")}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 cursor-pointer"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 cursor-pointer ui-control"
                 >
                   <X className="h-4 w-4" />
                 </button>
@@ -268,8 +244,8 @@ export function PmsFilters({
               <select
                 value={floorFilter}
                 onChange={(e) => onFloorChange(e.target.value)}
-                className="h-9.5 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-sm text-zinc-700 dark:text-zinc-300 focus:outline-none font-medium cursor-pointer shrink-0 whitespace-nowrap"
-                title="Filter by Floor"
+                className="h-9.5 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-sm text-zinc-700 dark:text-zinc-300 focus:outline-none font-medium cursor-pointer shrink-0 whitespace-nowrap ui-radius-control ui-surface ui-field"
+                title="Filter by Floor" aria-label="Filter by Floor"
               >
                 <option value="ALL">All Floors</option>
                 {floors.map((f) => (
@@ -284,8 +260,8 @@ export function PmsFilters({
               <select
                 value={roomTypeFilter}
                 onChange={(e) => onRoomTypeChange(e.target.value)}
-                className="h-9.5 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-sm text-zinc-700 dark:text-zinc-300 focus:outline-none font-medium max-w-[160px] cursor-pointer shrink-0 whitespace-nowrap"
-                title="Filter by Room Category"
+                className="h-9.5 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-sm text-zinc-700 dark:text-zinc-300 focus:outline-none font-medium max-w-[160px] cursor-pointer shrink-0 whitespace-nowrap ui-radius-control ui-surface ui-field"
+                title="Filter by Room Category" aria-label="Filter by Room Category"
               >
                 <option value="ALL">All Categories</option>
                 {roomTypes.map((rt) => (
@@ -300,8 +276,8 @@ export function PmsFilters({
               <select
                 value={sortBy}
                 onChange={(e) => onSortByChange(e.target.value as any)}
-                className="h-9.5 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-sm text-zinc-700 dark:text-zinc-300 focus:outline-none font-medium cursor-pointer shrink-0 whitespace-nowrap"
-                title="Sort & Group Rooms"
+                className="h-9.5 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-sm text-zinc-700 dark:text-zinc-300 focus:outline-none font-medium cursor-pointer shrink-0 whitespace-nowrap ui-radius-control ui-surface ui-field"
+                title="Sort & Group Rooms" aria-label="Sort & Group Rooms"
               >
                 <option value="ROOM_NUMBER">Sort: Room #</option>
                 <option value="FLOOR">Sort: Floor</option>

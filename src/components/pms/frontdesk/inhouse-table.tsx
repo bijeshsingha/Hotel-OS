@@ -23,11 +23,11 @@ export function InHouseTable({
   const inHouseStays = stays.filter((s) => s.status === "IN_HOUSE");
 
   return (
-    <div className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-[#121215] overflow-hidden">
+    <div className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-[#121215] overflow-hidden ui-radius-panel ui-surface">
       <div className="p-4 sm:p-5 border-b border-zinc-200/80 dark:border-zinc-800 flex items-center justify-between">
         <div className="flex items-center gap-2.5">
           <Users className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-          <h2 className="text-base font-bold text-zinc-950 dark:text-white">
+          <h2 className="text-base font-bold text-zinc-950 dark:text-white ui-weight-medium ui-section-title">
             In-House Guest Directory
           </h2>
           <span className="text-sm text-zinc-400 font-normal">
@@ -37,8 +37,8 @@ export function InHouseTable({
       </div>
 
       <div className="overflow-x-auto">
-        <table className="w-full text-left text-sm whitespace-nowrap">
-          <thead className="bg-zinc-50/80 dark:bg-zinc-900/60 border-b border-zinc-200/80 dark:border-zinc-800 text-zinc-500 dark:text-zinc-400 font-semibold text-xs uppercase tracking-wider">
+        <table className="w-full text-left text-sm whitespace-nowrap ui-data-table">
+          <thead className="bg-zinc-50/80 dark:bg-zinc-900/60 border-b border-zinc-200/80 dark:border-zinc-800 text-zinc-500 dark:text-zinc-400 font-semibold text-xs uppercase tracking-wider ui-text-body">
             <tr>
               <th className="px-5 py-3.5">Room</th>
               <th className="px-5 py-3.5">Guest Name</th>
@@ -79,35 +79,35 @@ export function InHouseTable({
                   key={stay.id}
                   className="hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors"
                 >
-                  <td className="px-5 py-4 font-mono font-bold text-base text-zinc-950 dark:text-zinc-50">
+                  <td className="px-5 py-4 font-mono font-bold text-base text-zinc-950 dark:text-zinc-50 ui-font-body ui-weight-medium">
                     Room {roomNumber}
                   </td>
                   <td className="px-5 py-4 text-zinc-950 dark:text-zinc-50 font-semibold text-base">
                     {guestName}
                     {stay.primaryGuest?.companyName && (
-                      <span className="block text-xs font-normal text-zinc-400 mt-0.5">
+                      <span className="block text-xs font-normal text-zinc-400 mt-0.5 ui-text-body">
                         {stay.primaryGuest.companyName}
                       </span>
                     )}
                   </td>
-                  <td className="px-4 py-4 font-mono text-zinc-500 text-sm">{guestPhone}</td>
+                  <td className="px-4 py-4 font-mono text-zinc-500 text-sm ui-font-body">{guestPhone}</td>
                   <td className="px-4 py-4 text-zinc-600 dark:text-zinc-300 text-sm">
                     {stay.adults || 1} Pax
                   </td>
-                  <td className="px-4 py-4 font-mono text-zinc-500 text-sm">{arrival}</td>
-                  <td className="px-4 py-4 font-mono text-zinc-500 text-sm">
+                  <td className="px-4 py-4 font-mono text-zinc-500 text-sm ui-font-body">{arrival}</td>
+                  <td className="px-4 py-4 font-mono text-zinc-500 text-sm ui-font-body">
                     {departure}
                     {stay.isExtendedDeparture && (
-                      <span className="ml-2 px-1.5 py-0.5 rounded text-xs font-bold bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300">
+                      <span className="ml-2 px-1.5 py-0.5 rounded text-xs font-bold bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 ui-text-body ui-weight-medium">
                         Extended
                       </span>
                     )}
                   </td>
-                  <td className="px-4 py-4 font-mono text-sm tabular-nums">
+                  <td className="px-4 py-4 font-mono text-sm tabular-nums ui-font-body">
                     <span
                       className={
                         balance > 0.5
-                          ? "font-bold text-rose-600 dark:text-rose-400"
+                          ? "font-bold text-rose-600 dark:text-rose-400 ui-weight-medium"
                           : "text-emerald-600 dark:text-emerald-400 font-semibold"
                       }
                     >
@@ -117,23 +117,23 @@ export function InHouseTable({
                   <td className="px-5 py-4 text-right space-x-2">
                     <button
                       onClick={() => onOpenFolio(stay, room)}
-                      className="px-3.5 py-1.5 rounded-lg bg-zinc-950 hover:bg-zinc-800 dark:bg-white dark:hover:bg-zinc-100 text-white dark:text-zinc-950 font-semibold text-xs transition cursor-pointer inline-flex items-center gap-1.5 shadow-xs"
-                      title="Open Folio"
+                      className="px-3.5 py-1.5 rounded-lg bg-zinc-950 hover:bg-zinc-800 dark:bg-white dark:hover:bg-zinc-100 text-white dark:text-zinc-950 font-semibold text-xs transition cursor-pointer inline-flex items-center gap-1.5 shadow-xs ui-text-body ui-shadow-quiet ui-control"
+                      title="Open Folio" aria-label="Open Folio"
                     >
                       <Receipt className="h-3.5 w-3.5" />
                       <span>Folio</span>
                     </button>
                     <button
                       onClick={(e) => onOpenMoveModal(stay, room, e)}
-                      className="px-2.5 py-1.5 rounded-lg bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 text-xs font-semibold transition cursor-pointer"
-                      title="Move Room"
+                      className="px-2.5 py-1.5 rounded-lg bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 text-xs font-semibold transition cursor-pointer ui-text-body ui-control"
+                      title="Move Room" aria-label="Move Room"
                     >
                       <ArrowRightLeft className="h-3.5 w-3.5" />
                     </button>
                     <button
                       onClick={(e) => onDirectCheckout(stay.id, e)}
-                      className="px-2.5 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 text-xs font-semibold transition cursor-pointer"
-                      title="Checkout"
+                      className="px-2.5 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 text-xs font-semibold transition cursor-pointer ui-text-body ui-control"
+                      title="Checkout" aria-label="Checkout"
                     >
                       <LogOut className="h-3.5 w-3.5" />
                     </button>

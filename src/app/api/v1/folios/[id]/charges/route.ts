@@ -1,13 +1,31 @@
+import { authorizeRequest, getApiAccess } from "@/lib/auth/api-access";
 import { NextResponse } from "next/server";
+import { postManualKotBatch } from "@/lib/domain/manual-kot-service";
 import { postManualFolioCharge, deleteFolioCharge } from "@/lib/domain/folio-service";
 
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const access = await authorizeRequest(request);
+  if (access instanceof Response) return access;
+  request = access.request;
+
   try {
     const { id: folioId } = await params;
     const body = await request.json();
+    if (body.kots !== undefined) {
+      const context = getApiAccess(request);
+      const batch = await postManualKotBatch({
+        folioId,
+        folioWindowId: body.folioWindowId,
+        requestId: body.requestId,
+        kots: body.kots,
+        actorId: context.user.id,
+        actorName: context.user.name,
+      });
+      return NextResponse.json(batch);
+    }
     const { folioWindowId, chargeCode, description, amount, qty, isInclusive, sacHsn, customTaxRate, actorId } = body;
 
     const entry = await postManualFolioCharge({
@@ -33,6 +51,10 @@ export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const access = await authorizeRequest(request);
+  if (access instanceof Response) return access;
+  request = access.request;
+
   try {
     const { id: folioId } = await params;
     const { searchParams } = new URL(request.url);

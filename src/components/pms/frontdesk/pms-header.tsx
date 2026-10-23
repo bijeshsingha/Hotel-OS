@@ -29,12 +29,12 @@ export function PmsHeader({
   onAddRoom,
 }: PmsHeaderProps) {
   return (
-    <div className="space-y-6 pb-6 border-b border-zinc-200/80 dark:border-zinc-800">
+    <div className="space-y-6 pb-6 border-b border-zinc-200/80 dark:border-zinc-800 ui-pms-heading">
       {/* Top Bar: Title & Primary Front Office Actions */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="ui-pms-heading-top">
         <div>
           <div className="flex items-center gap-3 flex-wrap">
-            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-zinc-950 dark:text-zinc-50">
+            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-zinc-950 dark:text-zinc-50 ui-weight-medium ui-page-title">
               Front Desk
             </h1>
             {propertyName && (
@@ -43,21 +43,21 @@ export function PmsHeader({
               </span>
             )}
             {businessDate && (
-              <span className="text-xs font-mono font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-2.5 py-0.5 rounded-lg border border-emerald-200 dark:border-emerald-800/50">
+              <span className="text-xs font-mono font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-2.5 py-0.5 rounded-lg border border-emerald-200 dark:border-emerald-800/50 ui-text-body ui-font-body">
                 Audit Date: {businessDate}
               </span>
             )}
           </div>
           <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">
-            Real-time room rack, resident guest directory, and front office management
+            Rooms, bookings, and in-house guests.
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="ui-page-actions">
           {onAddRoom && (
             <button
               onClick={onAddRoom}
-              className="h-10 px-4 rounded-xl bg-purple-50 hover:bg-purple-100 dark:bg-purple-950/40 dark:hover:bg-purple-900/60 border border-purple-200/80 dark:border-purple-800/80 text-purple-700 dark:text-purple-300 text-sm font-semibold flex items-center gap-2 transition cursor-pointer"
+              className="ui-button ui-button-secondary"
             >
               <BedDouble className="h-4 w-4" />
               <span>Add Room to Guest</span>
@@ -66,7 +66,7 @@ export function PmsHeader({
 
           <button
             onClick={onNewReservation}
-            className="h-10 px-4 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 text-sm font-semibold flex items-center gap-2 transition cursor-pointer"
+            className="ui-button ui-button-secondary"
           >
             <Plus className="h-4 w-4" />
             <span>New Booking</span>
@@ -74,7 +74,7 @@ export function PmsHeader({
 
           <button
             onClick={onGrcCheckIn}
-            className="h-10 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold flex items-center gap-2 transition shadow-xs cursor-pointer"
+            className="ui-button ui-button-primary"
           >
             <UserPlus className="h-4 w-4" />
             <span>GRC Check-In</span>
@@ -83,13 +83,13 @@ export function PmsHeader({
       </div>
 
       {/* Operational Metrics: Open, unboxed layout with massive readable typography */}
-      <div className="flex flex-wrap items-center gap-6 sm:gap-12 pt-1">
+      <div className="ui-pms-metrics">
         <div>
-          <span className="text-xs font-bold uppercase tracking-wider text-zinc-400 block mb-1">
+          <span className="text-xs font-bold uppercase tracking-wider text-zinc-400 block mb-1 ui-text-body ui-weight-medium">
             Occupancy
           </span>
           <div className="flex items-baseline gap-2">
-            <span className="text-3xl sm:text-4xl font-black font-mono tracking-tight text-zinc-950 dark:text-zinc-50">
+            <span className="text-3xl sm:text-4xl font-black font-mono tracking-tight text-zinc-950 dark:text-zinc-50 ui-value-large ui-weight-medium ui-font-body ui-metric-value">
               {metrics.occPercent}%
             </span>
             <span className="text-sm font-medium text-zinc-400">
@@ -98,55 +98,55 @@ export function PmsHeader({
           </div>
         </div>
 
-        <div className="h-10 w-px bg-zinc-200/80 dark:bg-zinc-800 hidden sm:block" />
+        <div className="h-10 w-px bg-zinc-200/80 dark:bg-zinc-800 hidden sm:block ui-metric-divider" />
 
         <div>
           <div className="flex items-center gap-1.5 mb-1">
             <span className="h-2 w-2 rounded-full bg-emerald-500" />
-            <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">
+            <span className="text-xs font-bold uppercase tracking-wider text-zinc-400 ui-text-body ui-weight-medium">
               Vacant Ready
             </span>
           </div>
-          <div className="text-3xl sm:text-4xl font-black font-mono tracking-tight text-emerald-600 dark:text-emerald-400">
+          <div className="text-3xl sm:text-4xl font-black font-mono tracking-tight text-emerald-600 dark:text-emerald-400 ui-value-large ui-weight-medium ui-font-body ui-metric-value">
             {metrics.vacantClean}
           </div>
         </div>
 
-        <div className="h-10 w-px bg-zinc-200/80 dark:bg-zinc-800 hidden sm:block" />
+        <div className="h-10 w-px bg-zinc-200/80 dark:bg-zinc-800 hidden sm:block ui-metric-divider" />
 
         <div>
           <div className="flex items-center gap-1.5 mb-1">
             <span className="h-2 w-2 rounded-full bg-amber-500" />
-            <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">
+            <span className="text-xs font-bold uppercase tracking-wider text-zinc-400 ui-text-body ui-weight-medium">
               Turnover Dirty
             </span>
           </div>
-          <div className="text-3xl sm:text-4xl font-black font-mono tracking-tight text-amber-600 dark:text-amber-400">
+          <div className="text-3xl sm:text-4xl font-black font-mono tracking-tight text-amber-600 dark:text-amber-400 ui-value-large ui-weight-medium ui-font-body ui-metric-value">
             {metrics.vacantDirty}
           </div>
         </div>
 
-        <div className="h-10 w-px bg-zinc-200/80 dark:bg-zinc-800 hidden sm:block" />
+        <div className="h-10 w-px bg-zinc-200/80 dark:bg-zinc-800 hidden sm:block ui-metric-divider" />
 
         <div>
           <div className="flex items-center gap-1.5 mb-1">
             <span className="h-2 w-2 rounded-full bg-rose-500" />
-            <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">
+            <span className="text-xs font-bold uppercase tracking-wider text-zinc-400 ui-text-body ui-weight-medium">
               Out of Order
             </span>
           </div>
-          <div className="text-3xl sm:text-4xl font-black font-mono tracking-tight text-rose-600 dark:text-rose-400">
+          <div className="text-3xl sm:text-4xl font-black font-mono tracking-tight text-rose-600 dark:text-rose-400 ui-value-large ui-weight-medium ui-font-body ui-metric-value">
             {metrics.outOfOrder}
           </div>
         </div>
 
-        <div className="h-10 w-px bg-zinc-200/80 dark:bg-zinc-800 hidden sm:block" />
+        <div className="h-10 w-px bg-zinc-200/80 dark:bg-zinc-800 hidden sm:block ui-metric-divider" />
 
         <div>
-          <span className="text-xs font-bold uppercase tracking-wider text-zinc-400 block mb-1">
+          <span className="text-xs font-bold uppercase tracking-wider text-zinc-400 block mb-1 ui-text-body ui-weight-medium">
             In-House Guests
           </span>
-          <div className="text-3xl sm:text-4xl font-black font-mono tracking-tight text-zinc-950 dark:text-zinc-50">
+          <div className="text-3xl sm:text-4xl font-black font-mono tracking-tight text-zinc-950 dark:text-zinc-50 ui-value-large ui-weight-medium ui-font-body ui-metric-value">
             {metrics.totalPax} <span className="text-sm font-semibold font-sans text-zinc-400">Pax</span>
           </div>
         </div>

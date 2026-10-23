@@ -13,7 +13,7 @@ export class OnboardingService {
 
     const cleanCode = data.code.trim().toUpperCase();
     const existing = await prisma.property.findFirst({
-      where: { code: cleanCode }
+      where: { code: cleanCode, organizationId: data.organizationId }
     });
 
     if (existing) {
@@ -22,7 +22,7 @@ export class OnboardingService {
 
     // 2. Resolve or Create Master Organization
     let org = await prisma.organization.findFirst({
-      where: { status: "ACTIVE" }
+      where: { id: data.organizationId, status: "ACTIVE" }
     });
 
     if (!org) {

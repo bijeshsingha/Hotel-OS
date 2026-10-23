@@ -1,5 +1,7 @@
 "use client";
 
+import { reportCsv } from "@/lib/reports/report-export";
+
 import React, { useEffect, useState, useMemo } from "react";
 import { useHotel } from "@/lib/context/hotel-context";
 import { formatINR } from "@/lib/gst/calculator";
@@ -120,7 +122,11 @@ export default function CashierShiftPage() {
     reference: "",
     notes: "",
   });
-  const [configuredOwners, setConfiguredOwners] = useState<string[]>([]);
+  const [ownerOptions, setOwnerOptions] = useState<{ propertyId: string; names: string[] } | null>(null);
+  const configuredOwners = ownerOptions && ownerOptions.propertyId === activeProperty?.id ? ownerOptions.names : [];
+  const [ownersLoading, setOwnersLoading] = useState(false);
+  const [ownersLoadError, setOwnersLoadError] = useState<string | null>(null);
+  const [ownersRetry, setOwnersRetry] = useState(0);
   const [isCustomOwner, setIsCustomOwner] = useState(false);
   const [customOwnerName, setCustomOwnerName] = useState("");
   const [ownerPayoutSubmitting, setOwnerPayoutSubmitting] = useState(false);
@@ -131,21 +137,38 @@ export default function CashierShiftPage() {
   const [customStartDate, setCustomStartDate] = useState("");
   const [customEndDate, setCustomEndDate] = useState("");
 
-  // Sync configured owners from admin hotel master
+  // Reload the selected hotel's recipients whenever the payout form opens.
+  // A failed/denied request must never masquerade as an empty saved list.
   useEffect(() => {
-    if (!activeProperty?.id) return;
-    fetch(`/api/v1/admin/hotel?propertyId=${activeProperty.id}`)
-      .then((r) => r.json())
-      .then((d) => {
-        if (Array.isArray(d.owners)) {
-          setConfiguredOwners(d.owners);
-          if (d.owners.length > 0 && !ownerPayoutForm.ownerName) {
-            setOwnerPayoutForm((prev) => ({ ...prev, ownerName: d.owners[0] }));
-          }
+    if (!activeProperty?.id || !showAddOwnerPayoutModal) return;
+    const propertyId = activeProperty.id;
+    const controller = new AbortController();
+    let current = true;
+    const timer = setTimeout(() => controller.abort(), 15000);
+    setOwnersLoading(true);
+    setOwnersLoadError(null);
+    setIsCustomOwner(false);
+    setCustomOwnerName("");
+    setOwnerPayoutForm(prev => ({ ...prev, ownerName: "" }));
+    void (async () => {
+      try {
+        const response = await fetch(`/api/v1/reports/owner-payout-options?propertyId=${encodeURIComponent(propertyId)}`, { cache: "no-store", signal: controller.signal });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || "The saved owner list could not be loaded.");
+        if (result.propertyId !== propertyId || !Array.isArray(result.owners) || result.owners.some((name: unknown) => typeof name !== "string")) throw new Error("The saved owner list could not be verified.");
+        if (current) setOwnerOptions({ propertyId, names: result.owners });
+      } catch (error) {
+        if (current) {
+          setOwnerOptions(null);
+          setOwnersLoadError(controller.signal.aborted ? "Loading the owner list timed out. Please retry." : error instanceof Error ? error.message : "The saved owner list could not be loaded.");
         }
-      })
-      .catch(() => {});
-  }, [activeProperty?.id, refreshKey]);
+      } finally {
+        clearTimeout(timer);
+        if (current) setOwnersLoading(false);
+      }
+    })();
+    return () => { current = false; clearTimeout(timer); controller.abort(); };
+  }, [activeProperty?.id, refreshKey, showAddOwnerPayoutModal, ownersRetry]);
 
   // Initialize selectedDate
   useEffect(() => {
@@ -494,6 +517,14 @@ export default function CashierShiftPage() {
     setOwnerPayoutError(null);
     setOwnerPayoutSuccess(null);
 
+    if (!isCustomOwner && (ownersLoading || ownersLoadError || ownerOptions?.propertyId !== activeProperty?.id)) {
+      setOwnerPayoutError("Load the saved owner list before selecting a recipient, or explicitly enter a name manually.");
+      return;
+    }
+    if (!isCustomOwner && !configuredOwners.includes(ownerPayoutForm.ownerName)) {
+      setOwnerPayoutError("Please choose an owner / partner for the selected hotel.");
+      return;
+    }
     const finalOwnerName = isCustomOwner
       ? customOwnerName.trim()
       : (ownerPayoutForm.ownerName || customOwnerName).trim();
@@ -575,22 +606,21 @@ export default function CashierShiftPage() {
     ];
 
     const rows = filteredTransactions.map((tx: any) => [
-      `"${tx.recordId}"`,
-      `"${tx.date} ${tx.time}"`,
-      `"${tx.flow}"`,
-      `"${tx.type}"`,
-      `"${(tx.party || tx.payerName || tx.payeeName || "").replace(/"/g, '""')}"`,
-      `"${(tx.particulars || tx.description || "").replace(/"/g, '""')}"`,
-      `"${tx.method}"`,
-      `"${(tx.reference || "").replace(/"/g, '""')}"`,
+      tx.recordId,
+      `${tx.date} ${tx.time}`,
+      tx.flow,
+      tx.type,
+      (tx.party || tx.payerName || tx.payeeName || ""),
+      (tx.particulars || tx.description || ""),
+      tx.method,
+      (tx.reference || ""),
       tx.flow === "INFLOW" ? tx.amount : -tx.amount,
-      `"${tx.status || "CONFIRMED"}"`,
+      tx.status || "CONFIRMED",
     ]);
 
-    const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
-    const encodedUri = encodeURI(csvContent);
+    const url = URL.createObjectURL(new Blob([reportCsv(headers, rows)], { type: "text/csv;charset=utf-8;" }));
     const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
+    link.setAttribute("href", url);
     link.setAttribute(
       "download",
       `${activeProperty?.code || "HOTEL"}_Cashier_Shift_Ledger_${selectedDate || "today"}.csv`
@@ -598,6 +628,7 @@ export default function CashierShiftPage() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
 
   return (
@@ -605,15 +636,15 @@ export default function CashierShiftPage() {
       {/* Top Bar: Title & Primary Actions */}
       <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3.5 pb-3 print:hidden border-b border-zinc-200/60 dark:border-zinc-800/60">
         <div className="flex items-center gap-2.5 flex-wrap">
-          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-zinc-950 dark:text-zinc-50">
+          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-zinc-950 dark:text-zinc-50 ui-weight-medium ui-page-title">
             Shift Ledger
           </h1>
           {activeProperty?.displayName && (
-            <span className="text-xs font-semibold text-zinc-600 dark:text-zinc-300 bg-zinc-100 dark:bg-zinc-800/80 px-2.5 py-1 rounded-lg">
+            <span className="text-xs font-semibold text-zinc-600 dark:text-zinc-300 bg-zinc-100 dark:bg-zinc-800/80 px-2.5 py-1 rounded-lg ui-text-body">
               {activeProperty.displayName}
             </span>
           )}
-          <span className="text-xs font-mono font-medium text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 px-2.5 py-1 rounded-lg border border-emerald-200/80 dark:border-emerald-800/60">
+          <span className="text-xs font-mono font-medium text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 px-2.5 py-1 rounded-lg border border-emerald-200/80 dark:border-emerald-800/60 ui-text-body ui-font-body">
             {selectedDate || activeProperty?.businessDate || "Live"}
           </span>
         </div>
@@ -630,21 +661,21 @@ export default function CashierShiftPage() {
                 }));
                 setShowAddIncomeModal(true);
               }}
-              className="h-8.5 px-3 rounded-lg text-xs font-bold bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-100 dark:hover:bg-white text-white dark:text-zinc-900 shadow-xs transition flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0"
+              className="h-8.5 px-3 rounded-lg text-xs font-bold bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-100 dark:hover:bg-white text-white dark:text-zinc-900 shadow-xs transition flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0 ui-text-body ui-weight-medium ui-shadow-quiet ui-control ui-control-sized"
             >
               <Plus className="h-3.5 w-3.5" />
               <span>Income</span>
             </button>
             <button
               onClick={() => setShowAddExpenseModal(true)}
-              className="h-8.5 px-3 rounded-lg text-xs font-bold bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800/80 text-zinc-800 dark:text-zinc-200 border border-zinc-200/80 dark:border-zinc-700/60 shadow-2xs transition flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0"
+              className="h-8.5 px-3 rounded-lg text-xs font-bold bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800/80 text-zinc-800 dark:text-zinc-200 border border-zinc-200/80 dark:border-zinc-700/60 shadow-2xs transition flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0 ui-text-body ui-weight-medium ui-shadow-quiet ui-control ui-control-sized"
             >
               <Plus className="h-3.5 w-3.5" />
               <span>Expense</span>
             </button>
             <button
               onClick={() => setShowAddOwnerPayoutModal(true)}
-              className="h-8.5 px-3 rounded-lg text-xs font-semibold bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800/80 text-zinc-700 dark:text-zinc-300 border border-zinc-200/80 dark:border-zinc-700/60 shadow-2xs transition flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0"
+              className="h-8.5 px-3 rounded-lg text-xs font-semibold bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800/80 text-zinc-700 dark:text-zinc-300 border border-zinc-200/80 dark:border-zinc-700/60 shadow-2xs transition flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0 ui-text-body ui-shadow-quiet ui-control ui-control-sized"
             >
               <Building className="h-3.5 w-3.5 text-zinc-500" />
               <span>Payout</span>
@@ -655,24 +686,24 @@ export default function CashierShiftPage() {
           <div className="flex items-center gap-1">
             <button
               onClick={() => setShowPrintHandoverModal(true)}
-              className="h-8.5 px-3 rounded-xl text-xs font-semibold bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/80 text-zinc-700 dark:text-zinc-300 shadow-2xs transition cursor-pointer flex items-center gap-1.5 whitespace-nowrap shrink-0"
-              title="Print Shift Handover Sheet"
+              className="h-8.5 px-3 rounded-xl text-xs font-semibold bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/80 text-zinc-700 dark:text-zinc-300 shadow-2xs transition cursor-pointer flex items-center gap-1.5 whitespace-nowrap shrink-0 ui-radius-control ui-text-body ui-shadow-quiet ui-surface ui-control ui-control-sized"
+              title="Print Shift Handover Sheet" aria-label="Print Shift Handover Sheet"
             >
               <Printer className="h-3.5 w-3.5 text-zinc-500 dark:text-zinc-400" />
               <span>Handover</span>
             </button>
             <button
               onClick={() => setShowEmailModal(true)}
-              className="h-8.5 px-3 rounded-xl text-xs font-semibold bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/80 text-zinc-700 dark:text-zinc-300 shadow-2xs transition cursor-pointer flex items-center gap-1.5 whitespace-nowrap shrink-0"
-              title="Email Shift Report"
+              className="h-8.5 px-3 rounded-xl text-xs font-semibold bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/80 text-zinc-700 dark:text-zinc-300 shadow-2xs transition cursor-pointer flex items-center gap-1.5 whitespace-nowrap shrink-0 ui-radius-control ui-text-body ui-shadow-quiet ui-surface ui-control ui-control-sized"
+              title="Email Shift Report" aria-label="Email Shift Report"
             >
               <Mail className="h-3.5 w-3.5 text-zinc-500 dark:text-zinc-400" />
               <span>Email</span>
             </button>
             <button
               onClick={exportLedgerCSV}
-              className="h-8.5 px-3 rounded-xl text-xs font-semibold bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/80 text-zinc-700 dark:text-zinc-300 shadow-2xs transition cursor-pointer flex items-center gap-1.5 whitespace-nowrap shrink-0"
-              title="Export CSV"
+              className="h-8.5 px-3 rounded-xl text-xs font-semibold bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/80 text-zinc-700 dark:text-zinc-300 shadow-2xs transition cursor-pointer flex items-center gap-1.5 whitespace-nowrap shrink-0 ui-radius-control ui-text-body ui-shadow-quiet ui-surface ui-control ui-control-sized"
+              title="Export CSV" aria-label="Export CSV"
             >
               <Download className="h-3.5 w-3.5 text-zinc-500 dark:text-zinc-400" />
               <span>Export</span>
@@ -683,7 +714,7 @@ export default function CashierShiftPage() {
                 loadLedgerData();
               }}
               disabled={loading}
-              className="h-8.5 w-8.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-50 dark:hover:bg-zinc-800/80 shadow-2xs transition flex items-center justify-center cursor-pointer disabled:opacity-50 shrink-0"
+              className="h-8.5 w-8.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-50 dark:hover:bg-zinc-800/80 shadow-2xs transition flex items-center justify-center cursor-pointer disabled:opacity-50 shrink-0 ui-radius-control ui-shadow-quiet ui-surface ui-control ui-control-sized"
               title="Refresh"
               aria-label="Refresh"
             >
@@ -694,11 +725,11 @@ export default function CashierShiftPage() {
       </div>
 
       {/* Shift Date Filter Bar */}
-      <div className="p-2.5 sm:p-3 rounded-2xl bg-white dark:bg-[#121215] border border-zinc-200/80 dark:border-zinc-800 shadow-xs flex flex-col gap-2.5 print:hidden">
+      <div className="p-2.5 sm:p-3 rounded-2xl bg-white dark:bg-[#121215] border border-zinc-200/80 dark:border-zinc-800 shadow-xs flex flex-col gap-2.5 print:hidden ui-radius-panel ui-shadow-quiet ui-surface">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
           <div className="flex flex-wrap items-center gap-2">
             {/* Date Range Selector Dropdown */}
-            <div className="relative inline-flex items-center h-9 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 transition shadow-2xs">
+            <div className="relative inline-flex items-center h-9 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 transition shadow-2xs ui-shadow-quiet">
               <div className="pl-3 pr-2 pointer-events-none text-zinc-400 dark:text-zinc-500 flex items-center">
                 <Calendar className="h-4 w-4" />
               </div>
@@ -716,7 +747,7 @@ export default function CashierShiftPage() {
                     setSelectedDate(y.toISOString().split("T")[0]);
                   }
                 }}
-                className="h-full bg-transparent border-0 border-none outline-none ring-0 appearance-none font-semibold text-xs sm:text-sm text-zinc-900 dark:text-zinc-100 pl-0 pr-8 cursor-pointer focus:ring-0"
+                className="h-full bg-transparent border-0 border-none outline-none ring-0 appearance-none font-semibold text-xs sm:text-sm text-zinc-900 dark:text-zinc-100 pl-0 pr-8 cursor-pointer focus:ring-0 ui-text-body ui-field"
               >
                 <option value="TODAY">Today ({activeProperty?.businessDate || "Live"})</option>
                 <option value="YESTERDAY">Yesterday</option>
@@ -732,12 +763,12 @@ export default function CashierShiftPage() {
 
             {/* Quick Day Stepper */}
             {(datePreset === "TODAY" || datePreset === "YESTERDAY") && (
-              <div className="inline-flex items-center h-9 p-0.5 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-2xs">
+              <div className="inline-flex items-center h-9 p-0.5 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-2xs ui-shadow-quiet">
                 <button
                   type="button"
                   onClick={handlePrevDay}
-                  className="h-7.5 w-7.5 rounded-lg flex items-center justify-center text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white hover:bg-white dark:hover:bg-zinc-800 transition cursor-pointer"
-                  title="Previous Day"
+                  className="h-7.5 w-7.5 rounded-lg flex items-center justify-center text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white hover:bg-white dark:hover:bg-zinc-800 transition cursor-pointer ui-control"
+                  title="Previous Day" aria-label="Previous Day"
                 >
                   <ChevronLeft className="h-4 w-4" />
                 </button>
@@ -746,14 +777,14 @@ export default function CashierShiftPage() {
                     type="date"
                     value={selectedDate}
                     onChange={(e) => setSelectedDate(e.target.value)}
-                    className="h-7.5 bg-transparent border-0 border-none outline-none ring-0 text-xs sm:text-sm font-mono font-bold text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-0 cursor-pointer px-1"
+                    className="h-7.5 bg-transparent border-0 border-none outline-none ring-0 text-xs sm:text-sm font-mono font-bold text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-0 cursor-pointer px-1 ui-text-body ui-font-body ui-weight-medium ui-field"
                   />
                 </div>
                 <button
                   type="button"
                   onClick={handleNextDay}
-                  className="h-7.5 w-7.5 rounded-lg flex items-center justify-center text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white hover:bg-white dark:hover:bg-zinc-800 transition cursor-pointer"
-                  title="Next Day"
+                  className="h-7.5 w-7.5 rounded-lg flex items-center justify-center text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white hover:bg-white dark:hover:bg-zinc-800 transition cursor-pointer ui-control"
+                  title="Next Day" aria-label="Next Day"
                 >
                   <ChevronRight className="h-4 w-4" />
                 </button>
@@ -762,31 +793,31 @@ export default function CashierShiftPage() {
           </div>
 
           {/* Operating Window Note */}
-          <div className="flex items-center gap-1.5 text-xs font-mono text-zinc-400 dark:text-zinc-500 px-1">
-            <span className="inline-block h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+          <div className="flex items-center gap-1.5 text-xs font-mono text-zinc-400 dark:text-zinc-500 px-1 ui-text-body ui-font-body">
+            <span className="inline-block h-2 w-2 rounded-full bg-emerald-500 " />
             <span>24h Audit Cycle</span>
           </div>
         </div>
 
         {/* Custom Date Range Card */}
         {datePreset === "CUSTOM" && (
-          <div className="flex items-center gap-3 p-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 text-xs animate-in fade-in">
+          <div className="flex items-center gap-3 p-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 text-xs   ui-text-body">
             <div className="flex items-center gap-1.5">
-              <span className="text-zinc-500 font-mono text-xs">From:</span>
+              <span className="text-zinc-500 font-mono text-xs ui-font-body ui-text-body">From:</span>
               <input
                 type="date"
                 value={customStartDate}
                 onChange={(e) => setCustomStartDate(e.target.value)}
-                className="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-2.5 py-1.5 font-mono text-xs text-zinc-900 dark:text-zinc-100"
+                className="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-2.5 py-1.5 font-mono text-xs text-zinc-900 dark:text-zinc-100 ui-font-body ui-text-body ui-field"
               />
             </div>
             <div className="flex items-center gap-1.5">
-              <span className="text-zinc-500 font-mono text-xs">To:</span>
+              <span className="text-zinc-500 font-mono text-xs ui-font-body ui-text-body">To:</span>
               <input
                 type="date"
                 value={customEndDate}
                 onChange={(e) => setCustomEndDate(e.target.value)}
-                className="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-2.5 py-1.5 font-mono text-xs text-zinc-900 dark:text-zinc-100"
+                className="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-2.5 py-1.5 font-mono text-xs text-zinc-900 dark:text-zinc-100 ui-font-body ui-text-body ui-field"
               />
             </div>
             {(customStartDate || customEndDate) && (
@@ -797,7 +828,7 @@ export default function CashierShiftPage() {
                   setDatePreset("TODAY");
                   setSelectedDate(activeProperty?.businessDate || new Date().toISOString().split("T")[0]);
                 }}
-                className="text-xs text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 underline cursor-pointer ml-2"
+                className="text-xs text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 underline cursor-pointer ml-2 ui-text-body ui-control"
               >
                 Reset to Today
               </button>
@@ -811,20 +842,20 @@ export default function CashierShiftPage() {
         {/* Cash in Drawer Hero Card */}
         <div
           onClick={() => setOnlyCashDrawer(!onlyCashDrawer)}
-          className={`p-4 sm:p-5 rounded-2xl border transition-all cursor-pointer bg-white dark:bg-[#121215] shadow-xs ${
+          className={`p-4 sm:p-5 rounded-2xl border transition-colors cursor-pointer bg-white dark:bg-[#121215] shadow-xs  ui-radius-panel ui-shadow-quiet ui-surface ${
             onlyCashDrawer
               ? "border-blue-500 ring-2 ring-blue-500/20"
               : "border-zinc-200/80 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700"
           }`}
         >
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-zinc-500 dark:text-zinc-400">
+            <span className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 ui-text-body">
               Cash in Drawer
             </span>
             <Banknote className="h-4 w-4 text-zinc-400" />
           </div>
           <div
-            className={`text-2xl sm:text-3xl font-bold tracking-tight mt-2 tabular-nums ${
+            className={`text-2xl sm:text-3xl font-bold tracking-tight mt-2 tabular-nums  ui-weight-medium ${
               (data?.cashDrawer?.netCashHandover || 0) < 0
                 ? "text-rose-600 dark:text-rose-400"
                 : "text-zinc-950 dark:text-white"
@@ -832,13 +863,13 @@ export default function CashierShiftPage() {
           >
             {formatINR(data?.cashDrawer?.netCashHandover || 0)}
           </div>
-          <div className="text-xs mt-3 pt-2.5 border-t border-zinc-100 dark:border-zinc-800/80 space-y-1 font-mono text-zinc-500 dark:text-zinc-400">
+          <div className="text-xs mt-3 pt-2.5 border-t border-zinc-100 dark:border-zinc-800/80 space-y-1 font-mono text-zinc-500 dark:text-zinc-400 ui-text-body ui-font-body">
             <div className="flex items-center justify-between">
               <span>Float: <strong className="font-semibold text-zinc-800 dark:text-zinc-200">{formatINR(data?.cashDrawer?.openingBalance || 0)}</strong></span>
-              <span className="text-[11px] text-zinc-400">+{formatINR(data?.cashDrawer?.cashIn || 0)} · -{formatINR(data?.cashDrawer?.cashOut || 0)}</span>
+              <span className="text-[11px] text-zinc-400 ui-text-meta">+{formatINR(data?.cashDrawer?.cashIn || 0)} · -{formatINR(data?.cashDrawer?.cashOut || 0)}</span>
             </div>
             {onlyCashDrawer && (
-              <div className="text-[11px] text-blue-600 dark:text-blue-400 font-sans font-medium">Filtered by drawer (click to clear)</div>
+              <div className="text-[11px] text-blue-600 dark:text-blue-400 font-sans font-medium ui-text-meta">Filtered by drawer (click to clear)</div>
             )}
           </div>
         </div>
@@ -846,22 +877,22 @@ export default function CashierShiftPage() {
         {/* Total Inflows */}
         <div
           onClick={() => setFlowFilter(flowFilter === "INFLOW" ? "ALL" : "INFLOW")}
-          className={`p-4 sm:p-5 rounded-2xl border transition-all cursor-pointer bg-white dark:bg-[#121215] shadow-xs ${
+          className={`p-4 sm:p-5 rounded-2xl border transition-colors cursor-pointer bg-white dark:bg-[#121215] shadow-xs  ui-radius-panel ui-shadow-quiet ui-surface ${
             flowFilter === "INFLOW"
               ? "border-emerald-500 ring-2 ring-emerald-500/20"
               : "border-zinc-200/80 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700"
           }`}
         >
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-zinc-500 dark:text-zinc-400">
+            <span className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 ui-text-body">
               Total Inflow
             </span>
             <ArrowDownLeft className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
           </div>
-          <div className="text-2xl sm:text-3xl font-bold tracking-tight text-zinc-950 dark:text-white mt-2 tabular-nums">
+          <div className="text-2xl sm:text-3xl font-bold tracking-tight text-zinc-950 dark:text-white mt-2 tabular-nums ui-weight-medium">
             {formatINR(data?.totalCollections || 0)}
           </div>
-          <div className="text-xs text-zinc-500 dark:text-zinc-400 mt-3 pt-2.5 border-t border-zinc-100 dark:border-zinc-800/80">
+          <div className="text-xs text-zinc-500 dark:text-zinc-400 mt-3 pt-2.5 border-t border-zinc-100 dark:border-zinc-800/80 ui-text-body">
             {data?.collectionsCount || 0} receipts
           </div>
         </div>
@@ -872,25 +903,25 @@ export default function CashierShiftPage() {
             setCategoryFilter("ALL");
             setFlowFilter(flowFilter === "OUTFLOW" ? "ALL" : "OUTFLOW");
           }}
-          className={`p-4 sm:p-5 rounded-2xl border transition-all cursor-pointer bg-white dark:bg-[#121215] shadow-xs ${
+          className={`p-4 sm:p-5 rounded-2xl border transition-colors cursor-pointer bg-white dark:bg-[#121215] shadow-xs  ui-radius-panel ui-shadow-quiet ui-surface ${
             flowFilter === "OUTFLOW" && categoryFilter === "ALL"
               ? "border-rose-500 ring-2 ring-rose-500/20"
               : "border-zinc-200/80 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700"
           }`}
         >
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-zinc-500 dark:text-zinc-400">
+            <span className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 ui-text-body">
               Total Outflow
             </span>
             <ArrowUpRight className="h-4 w-4 text-rose-600 dark:text-rose-400" />
           </div>
-          <div className="text-2xl sm:text-3xl font-bold tracking-tight text-zinc-950 dark:text-white mt-2 tabular-nums">
+          <div className="text-2xl sm:text-3xl font-bold tracking-tight text-zinc-950 dark:text-white mt-2 tabular-nums ui-weight-medium">
             {formatINR(data?.totalExpenses || 0)}
           </div>
-          <div className="text-xs text-zinc-500 dark:text-zinc-400 mt-3 pt-2.5 border-t border-zinc-100 dark:border-zinc-800/80 flex items-center justify-between">
+          <div className="text-xs text-zinc-500 dark:text-zinc-400 mt-3 pt-2.5 border-t border-zinc-100 dark:border-zinc-800/80 flex items-center justify-between ui-text-body">
             <span>{data?.expensesCount || 0} vouchers</span>
             {ownerPayoutsSummary.total > 0 && (
-              <span className="text-purple-600 dark:text-purple-400 font-semibold font-mono">
+              <span className="text-purple-600 dark:text-purple-400 font-semibold font-mono ui-font-body">
                 Owner: {formatINR(ownerPayoutsSummary.total)}
               </span>
             )}
@@ -898,15 +929,15 @@ export default function CashierShiftPage() {
         </div>
 
         {/* Net Shift Cash Flow */}
-        <div className="p-4 sm:p-5 rounded-2xl border bg-white dark:bg-[#121215] border-zinc-200/80 dark:border-zinc-800 shadow-xs">
+        <div className="p-4 sm:p-5 rounded-2xl border bg-white dark:bg-[#121215] border-zinc-200/80 dark:border-zinc-800 shadow-xs ui-radius-panel ui-shadow-quiet ui-surface">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-zinc-500 dark:text-zinc-400">
+            <span className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 ui-text-body">
               Net Cash Flow
             </span>
             <DollarSign className="h-4 w-4 text-zinc-400" />
           </div>
           <div
-            className={`text-2xl sm:text-3xl font-bold tracking-tight mt-2 tabular-nums ${
+            className={`text-2xl sm:text-3xl font-bold tracking-tight mt-2 tabular-nums  ui-weight-medium ${
               (data?.netCashFlow || 0) >= 0
                 ? "text-emerald-600 dark:text-emerald-400"
                 : "text-rose-600 dark:text-rose-400"
@@ -914,7 +945,7 @@ export default function CashierShiftPage() {
           >
             {formatINR(data?.netCashFlow || 0)}
           </div>
-          <div className="text-xs text-zinc-500 dark:text-zinc-400 mt-3 pt-2.5 border-t border-zinc-100 dark:border-zinc-800/80">
+          <div className="text-xs text-zinc-500 dark:text-zinc-400 mt-3 pt-2.5 border-t border-zinc-100 dark:border-zinc-800/80 ui-text-body">
             Inflow − Outflow
           </div>
         </div>
@@ -922,33 +953,33 @@ export default function CashierShiftPage() {
 
       {/* Digital Payment Channel Breakdown */}
       {data?.collectionsByMethod && (
-        <div className="flex flex-wrap items-center gap-2 p-2.5 sm:p-3 rounded-2xl bg-white dark:bg-[#121215] border border-zinc-200/80 dark:border-zinc-800 shadow-xs print:hidden text-xs">
-          <div className="flex items-center gap-1.5 font-semibold text-zinc-400 dark:text-zinc-500 text-xs mr-1">
+        <div className="flex flex-wrap items-center gap-2 p-2.5 sm:p-3 rounded-2xl bg-white dark:bg-[#121215] border border-zinc-200/80 dark:border-zinc-800 shadow-xs print:hidden text-xs ui-radius-panel ui-shadow-quiet ui-text-body ui-surface">
+          <div className="flex items-center gap-1.5 font-semibold text-zinc-400 dark:text-zinc-500 text-xs mr-1 ui-text-body">
             <CreditCard className="h-3.5 w-3.5" />
             <span>Channels:</span>
           </div>
-          <span className="px-2.5 py-1 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 font-mono text-zinc-700 dark:text-zinc-300">
-            Cash <strong className="font-bold text-zinc-900 dark:text-white ml-1">{formatINR(data.collectionsByMethod.CASH || 0)}</strong>
+          <span className="px-2.5 py-1 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 font-mono text-zinc-700 dark:text-zinc-300 ui-font-body">
+            Cash <strong className="font-bold text-zinc-900 dark:text-white ml-1 ui-weight-medium">{formatINR(data.collectionsByMethod.CASH || 0)}</strong>
           </span>
-          <span className="px-2.5 py-1 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 font-mono text-zinc-700 dark:text-zinc-300">
-            UPI <strong className="font-bold text-zinc-900 dark:text-white ml-1">{formatINR(data.collectionsByMethod.UPI || 0)}</strong>
+          <span className="px-2.5 py-1 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 font-mono text-zinc-700 dark:text-zinc-300 ui-font-body">
+            UPI <strong className="font-bold text-zinc-900 dark:text-white ml-1 ui-weight-medium">{formatINR(data.collectionsByMethod.UPI || 0)}</strong>
           </span>
-          <span className="px-2.5 py-1 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 font-mono text-zinc-700 dark:text-zinc-300">
-            Card <strong className="font-bold text-zinc-900 dark:text-white ml-1">{formatINR(data.collectionsByMethod.CARD || 0)}</strong>
+          <span className="px-2.5 py-1 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 font-mono text-zinc-700 dark:text-zinc-300 ui-font-body">
+            Card <strong className="font-bold text-zinc-900 dark:text-white ml-1 ui-weight-medium">{formatINR(data.collectionsByMethod.CARD || 0)}</strong>
           </span>
-          <span className="px-2.5 py-1 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 font-mono text-zinc-700 dark:text-zinc-300">
-            Bank <strong className="font-bold text-zinc-900 dark:text-white ml-1">{formatINR(data.collectionsByMethod.BANK_TRANSFER || 0)}</strong>
+          <span className="px-2.5 py-1 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 font-mono text-zinc-700 dark:text-zinc-300 ui-font-body">
+            Bank <strong className="font-bold text-zinc-900 dark:text-white ml-1 ui-weight-medium">{formatINR(data.collectionsByMethod.BANK_TRANSFER || 0)}</strong>
           </span>
           {data.collectionsByMethod.DIRECT_BILL > 0 && (
-            <span className="px-2.5 py-1 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 font-mono text-zinc-700 dark:text-zinc-300">
-              BTC <strong className="font-bold text-zinc-900 dark:text-white ml-1">{formatINR(data.collectionsByMethod.DIRECT_BILL)}</strong>
+            <span className="px-2.5 py-1 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 font-mono text-zinc-700 dark:text-zinc-300 ui-font-body">
+              BTC <strong className="font-bold text-zinc-900 dark:text-white ml-1 ui-weight-medium">{formatINR(data.collectionsByMethod.DIRECT_BILL)}</strong>
             </span>
           )}
         </div>
       )}
 
       {/* Filter & Search Bar */}
-      <div className="p-2.5 sm:p-3 rounded-2xl bg-white dark:bg-[#121215] border border-zinc-200/80 dark:border-zinc-800 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-2.5 print:hidden">
+      <div className="p-2.5 sm:p-3 rounded-2xl bg-white dark:bg-[#121215] border border-zinc-200/80 dark:border-zinc-800 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-2.5 print:hidden ui-radius-panel ui-shadow-quiet ui-surface">
         <div className="flex flex-wrap items-center gap-2 flex-1">
           {/* Search Box */}
           <div className="relative flex-1 min-w-[220px] max-w-md">
@@ -958,12 +989,12 @@ export default function CashierShiftPage() {
               placeholder="Search transactions, guests, vouchers..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="h-9 w-full rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 pl-9 pr-8 text-xs sm:text-sm text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:outline-none focus:border-zinc-400 dark:focus:border-zinc-600 transition-all"
+              className="h-9 w-full rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 pl-9 pr-8 text-xs sm:text-sm text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:outline-none focus:border-zinc-400 dark:focus:border-zinc-600 transition-colors ui-radius-control ui-text-body ui-field" aria-label="Search transactions, guests, vouchers"
             />
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery("")}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 cursor-pointer"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 cursor-pointer ui-control"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -971,7 +1002,7 @@ export default function CashierShiftPage() {
           </div>
 
           {/* Flow Filter Segmented Control */}
-          <div className="inline-flex items-center h-9 p-0.5 rounded-xl bg-zinc-100 dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 text-xs font-semibold shadow-2xs">
+          <div className="inline-flex items-center h-9 p-0.5 rounded-xl bg-zinc-100 dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 text-xs font-semibold shadow-2xs ui-text-body ui-shadow-quiet">
             <button
               onClick={() => {
                 setFlowFilter("ALL");
@@ -980,9 +1011,9 @@ export default function CashierShiftPage() {
               }}
               className={`h-7.5 px-3 rounded-lg flex items-center transition cursor-pointer whitespace-nowrap shrink-0 ${
                 flowFilter === "ALL" && categoryFilter === "ALL" && !onlyCashDrawer
-                  ? "bg-white dark:bg-zinc-800 text-zinc-950 dark:text-white font-bold shadow-xs"
+                  ? "bg-white dark:bg-zinc-800 text-zinc-950 dark:text-white font-bold shadow-xs ui-weight-medium ui-shadow-quiet"
                   : "text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white"
-              }`}
+              } ui-control`}
             >
               All
             </button>
@@ -994,9 +1025,9 @@ export default function CashierShiftPage() {
               }}
               className={`h-7.5 px-3 rounded-lg flex items-center transition cursor-pointer whitespace-nowrap shrink-0 ${
                 flowFilter === "INFLOW"
-                  ? "bg-white dark:bg-zinc-800 text-emerald-600 dark:text-emerald-400 font-bold shadow-xs"
+                  ? "bg-white dark:bg-zinc-800 text-emerald-600 dark:text-emerald-400 font-bold shadow-xs ui-weight-medium ui-shadow-quiet"
                   : "text-zinc-500 hover:text-emerald-600 dark:text-zinc-400 dark:hover:text-emerald-400"
-              }`}
+              } ui-control`}
             >
               Inflows
             </button>
@@ -1008,9 +1039,9 @@ export default function CashierShiftPage() {
               }}
               className={`h-7.5 px-3 rounded-lg flex items-center transition cursor-pointer whitespace-nowrap shrink-0 ${
                 flowFilter === "OUTFLOW" && categoryFilter !== "OWNER_PAYOUT"
-                  ? "bg-white dark:bg-zinc-800 text-rose-600 dark:text-rose-400 font-bold shadow-xs"
+                  ? "bg-white dark:bg-zinc-800 text-rose-600 dark:text-rose-400 font-bold shadow-xs ui-weight-medium ui-shadow-quiet"
                   : "text-zinc-500 hover:text-rose-600 dark:text-zinc-400 dark:hover:text-rose-400"
-              }`}
+              } ui-control`}
             >
               Outflows
             </button>
@@ -1022,9 +1053,9 @@ export default function CashierShiftPage() {
               }}
               className={`h-7.5 px-3 rounded-lg flex items-center gap-1.5 transition cursor-pointer whitespace-nowrap shrink-0 ${
                 categoryFilter === "OWNER_PAYOUT"
-                  ? "bg-white dark:bg-zinc-800 text-purple-600 dark:text-purple-400 font-bold shadow-xs"
+                  ? "bg-white dark:bg-zinc-800 text-purple-600 dark:text-purple-400 font-bold shadow-xs ui-weight-medium ui-shadow-quiet"
                   : "text-zinc-500 hover:text-purple-600 dark:text-zinc-400 dark:hover:text-purple-400"
-              }`}
+              } ui-control`}
             >
               <Building className="h-3.5 w-3.5" />
               <span>Payouts</span>
@@ -1032,14 +1063,14 @@ export default function CashierShiftPage() {
           </div>
 
           {/* Payment Method Dropdown */}
-          <div className="relative inline-flex items-center h-9 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 transition shadow-2xs">
+          <div className="relative inline-flex items-center h-9 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 transition shadow-2xs ui-shadow-quiet">
             <div className="pl-3 pr-2 pointer-events-none text-zinc-400 dark:text-zinc-500 flex items-center">
               <Filter className="h-3.5 w-3.5" />
             </div>
             <select
               value={methodFilter}
               onChange={(e) => setMethodFilter(e.target.value)}
-              className="h-full bg-transparent border-0 border-none outline-none ring-0 appearance-none text-xs sm:text-sm font-semibold text-zinc-900 dark:text-zinc-100 pl-0 pr-8 cursor-pointer focus:ring-0"
+              className="h-full bg-transparent border-0 border-none outline-none ring-0 appearance-none text-xs sm:text-sm font-semibold text-zinc-900 dark:text-zinc-100 pl-0 pr-8 cursor-pointer focus:ring-0 ui-text-body ui-field"
             >
               <option value="ALL">All Methods</option>
               <option value="CASH">Cash</option>
@@ -1055,25 +1086,25 @@ export default function CashierShiftPage() {
           </div>
         </div>
 
-        <div className="text-xs font-mono text-zinc-500 dark:text-zinc-400 shrink-0">
-          <span className="font-bold text-zinc-900 dark:text-white">{filteredTransactions.length}</span> entries
+        <div className="text-xs font-mono text-zinc-500 dark:text-zinc-400 shrink-0 ui-text-body ui-font-body">
+          <span className="font-bold text-zinc-900 dark:text-white ui-weight-medium">{filteredTransactions.length}</span> entries
         </div>
       </div>
 
       {/* Main Ledger Entries Table */}
-      <div className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-[#121215] overflow-hidden shadow-xs">
+      <div className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-[#121215] overflow-hidden shadow-xs ui-radius-panel ui-shadow-quiet ui-surface">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs sm:text-sm border-collapse">
-            <thead className="bg-zinc-50/80 dark:bg-zinc-900/60 text-zinc-500 dark:text-zinc-400 text-xs uppercase tracking-wider font-semibold border-b border-zinc-200/80 dark:border-zinc-800 sticky top-0 z-10 backdrop-blur-xs">
+          <table className="w-full text-left text-xs sm:text-sm border-collapse ui-text-body ui-data-table">
+            <thead className="bg-zinc-50/80 dark:bg-zinc-900/60 text-zinc-500 dark:text-zinc-400 text-xs uppercase tracking-wider font-semibold border-b border-zinc-200/80 dark:border-zinc-800 sticky top-0 z-10 backdrop-blur-xs ui-text-body">
               <tr>
-                <th className="px-4 py-3.5 font-bold whitespace-nowrap">Voucher / Receipt</th>
-                <th className="px-4 py-3.5 font-bold whitespace-nowrap">Time</th>
-                <th className="px-4 py-3.5 font-bold whitespace-nowrap">Type & Flow</th>
-                <th className="px-4 py-3.5 font-bold whitespace-nowrap">Party / Payee / Guest</th>
-                <th className="px-4 py-3.5 font-bold whitespace-nowrap">Particulars & Category</th>
-                <th className="px-4 py-3.5 font-bold whitespace-nowrap">Method</th>
-                <th className="px-4 py-3.5 font-bold whitespace-nowrap text-right">Amount (INR)</th>
-                <th className="px-4 py-3.5 font-bold whitespace-nowrap text-right print:hidden">Action</th>
+                <th className="px-4 py-3.5 font-bold whitespace-nowrap ui-weight-medium">Voucher / Receipt</th>
+                <th className="px-4 py-3.5 font-bold whitespace-nowrap ui-weight-medium">Time</th>
+                <th className="px-4 py-3.5 font-bold whitespace-nowrap ui-weight-medium">Type & Flow</th>
+                <th className="px-4 py-3.5 font-bold whitespace-nowrap ui-weight-medium">Party / Payee / Guest</th>
+                <th className="px-4 py-3.5 font-bold whitespace-nowrap ui-weight-medium">Particulars & Category</th>
+                <th className="px-4 py-3.5 font-bold whitespace-nowrap ui-weight-medium">Method</th>
+                <th className="px-4 py-3.5 font-bold whitespace-nowrap text-right ui-weight-medium">Amount (INR)</th>
+                <th className="px-4 py-3.5 font-bold whitespace-nowrap text-right print:hidden ui-weight-medium">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/60 text-zinc-800 dark:text-zinc-200">
@@ -1088,26 +1119,26 @@ export default function CashierShiftPage() {
                   >
                     {/* Record / Voucher */}
                     <td className="px-4 py-3.5 whitespace-nowrap">
-                      <div className="font-mono font-bold text-zinc-900 dark:text-zinc-100 text-xs sm:text-sm">
+                      <div className="font-mono font-bold text-zinc-900 dark:text-zinc-100 text-xs sm:text-sm ui-font-body ui-weight-medium ui-text-body">
                         {tx.recordId}
                       </div>
                     </td>
 
                     {/* Time */}
-                    <td className="px-4 py-3.5 font-mono text-zinc-500 dark:text-zinc-400 whitespace-nowrap text-xs">
+                    <td className="px-4 py-3.5 font-mono text-zinc-500 dark:text-zinc-400 whitespace-nowrap text-xs ui-font-body ui-text-body">
                       {tx.time}
                     </td>
 
                     {/* Type & Flow Badge */}
                     <td className="px-4 py-3.5 whitespace-nowrap">
                       {tx.category === "OWNER_PAYOUT" ? (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border-purple-200/80 dark:border-purple-800/60">
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border-purple-200/80 dark:border-purple-800/60 ui-text-body">
                           <Building className="h-3 w-3 text-purple-600 dark:text-purple-400" />
                           <span>OWNER PAYOUT</span>
                         </span>
                       ) : (
                         <span
-                          className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold border ${
+                          className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold border  ui-text-body ${
                             isInflow
                               ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200/80 dark:border-emerald-800/60"
                               : "bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border-rose-200/80 dark:border-rose-800/60"
@@ -1130,27 +1161,28 @@ export default function CashierShiftPage() {
 
                     {/* Party / Payee / Guest */}
                     <td className="px-4 py-3.5 whitespace-nowrap">
-                      <div className="font-bold text-zinc-900 dark:text-zinc-100 text-xs sm:text-sm flex items-center gap-1.5">
+                      <div className="font-bold text-zinc-900 dark:text-zinc-100 text-xs sm:text-sm flex items-center gap-1.5 ui-weight-medium ui-text-body">
                         <span>{tx.party || tx.payerName || tx.payeeName || "Direct Guest"}</span>
                         {tx.grcNo && (
-                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 ui-text-meta ui-font-body ui-weight-medium">
                             GRC #{tx.grcNo}
                           </span>
                         )}
                       </div>
                       {tx.companyName && (
-                        <div className="text-xs text-zinc-500 dark:text-zinc-400">
+                        <div className="text-xs text-zinc-500 dark:text-zinc-400 ui-text-body">
                           {tx.companyName}
                         </div>
                       )}
                       <div className="flex items-center gap-2 mt-0.5">
-                        {tx.roomNumber && (
-                          <span className="text-xs font-mono font-medium text-blue-600 dark:text-blue-400">
+                        {tx.roomNumber && tx.roomNumber !== "—" && tx.roomNumber !== "-" && (
+                          <span className="text-xs font-mono font-medium text-blue-600 dark:text-blue-400 ui-text-body ui-font-body">
                             Room {tx.roomNumber}
                           </span>
                         )}
+                        {tx.reservationNo && <span className="text-xs font-medium text-zinc-600 dark:text-zinc-300">{tx.reservationNo}</span>}
                         {tx.stayDates && (
-                          <span className="text-[11px] font-mono text-zinc-400">
+                          <span className="text-[11px] font-mono text-zinc-400 ui-text-meta ui-font-body">
                             ({tx.stayDates})
                           </span>
                         )}
@@ -1159,15 +1191,15 @@ export default function CashierShiftPage() {
 
                     {/* Particulars & Category */}
                     <td className="px-4 py-3.5 max-w-sm">
-                      <div className="text-xs sm:text-sm text-zinc-800 dark:text-zinc-200 font-medium truncate" title={tx.particulars || tx.description}>
+                      <div className="text-xs sm:text-sm text-zinc-800 dark:text-zinc-200 font-medium truncate ui-text-body" title={tx.particulars || tx.description}>
                         {tx.particulars || tx.description || "General entry"}
                       </div>
-                      <div className="text-xs text-zinc-400 flex items-center gap-2 mt-0.5">
-                        <span className={`uppercase tracking-wider font-semibold text-xs ${tx.category === "OWNER_PAYOUT" ? "text-purple-600 dark:text-purple-400 font-bold" : ""}`}>
+                      <div className="text-xs text-zinc-400 flex items-center gap-2 mt-0.5 ui-text-body">
+                        <span className={`uppercase tracking-wider font-semibold text-xs  ui-text-body ${tx.category === "OWNER_PAYOUT" ? "text-purple-600 dark:text-purple-400 font-bold ui-weight-medium" : ""}`}>
                           {tx.category === "OWNER_PAYOUT" ? "OWNER DRAWING / PAYOUT" : (tx.sourceLabel || tx.category?.replace(/_/g, " ") || "TRANSACTION")}
                         </span>
                         {tx.kotNo && (
-                          <span className="font-mono font-bold text-amber-600 dark:text-amber-400">
+                          <span className="font-mono font-bold text-amber-600 dark:text-amber-400 ui-font-body ui-weight-medium">
                             {tx.kotNo}
                           </span>
                         )}
@@ -1176,13 +1208,13 @@ export default function CashierShiftPage() {
 
                     {/* Payment Method Badge */}
                     <td className="px-4 py-3.5 whitespace-nowrap">
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-mono font-medium bg-zinc-100 dark:bg-zinc-800 border border-zinc-200/80 dark:border-zinc-700/80 text-zinc-700 dark:text-zinc-300">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-mono font-medium bg-zinc-100 dark:bg-zinc-800 border border-zinc-200/80 dark:border-zinc-700/80 text-zinc-700 dark:text-zinc-300 ui-text-body ui-font-body">
                         {tx.method}
                       </span>
                     </td>
 
                     {/* Amount */}
-                    <td className="px-4 py-3.5 text-right font-mono font-black text-xs sm:text-sm whitespace-nowrap">
+                    <td className="px-4 py-3.5 text-right font-mono font-black text-xs sm:text-sm whitespace-nowrap ui-font-body ui-weight-medium ui-text-body">
                       <span className={isInflow ? "text-emerald-700 dark:text-emerald-400" : tx.category === "OWNER_PAYOUT" ? "text-purple-700 dark:text-purple-400" : "text-rose-700 dark:text-rose-400"}>
                         {isInflow ? "+" : "-"}{formatINR(tx.amount)}
                       </span>
@@ -1195,7 +1227,7 @@ export default function CashierShiftPage() {
                           e.stopPropagation();
                           setSelectedTx(tx);
                         }}
-                        className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-semibold bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 transition cursor-pointer"
+                        className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-semibold bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 transition cursor-pointer ui-radius-control ui-text-body ui-control"
                       >
                         <Eye className="h-3.5 w-3.5" />
                         <span>Details</span>
@@ -1210,7 +1242,7 @@ export default function CashierShiftPage() {
                   <td colSpan={8} className="px-4 py-16 text-center text-zinc-400 dark:text-zinc-500">
                     <Wallet className="h-8 w-8 mx-auto mb-2 opacity-40" />
                     <p className="text-sm font-medium">No transactions recorded for this date & filter</p>
-                    <p className="text-xs mt-1 text-zinc-400">
+                    <p className="text-xs mt-1 text-zinc-400 ui-text-body">
                       Use the "+ Record Income" or "+ Record Expense" buttons above to post ledger entries
                     </p>
                   </td>
@@ -1223,8 +1255,8 @@ export default function CashierShiftPage() {
 
       {/* Transaction Detail Inspector Modal */}
       {selectedTx && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-150">
-          <div className="bg-white dark:bg-[#141418] border border-zinc-200 dark:border-zinc-800 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4   duration-150">
+          <div className="bg-white dark:bg-[#141418] border border-zinc-200 dark:border-zinc-800 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden ui-radius-panel ui-dialog-surface ui-surface">
             <div className="p-4 sm:p-5 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between bg-zinc-50/50 dark:bg-zinc-900/30">
               <div className="flex items-center gap-2.5">
                 <div
@@ -1245,10 +1277,10 @@ export default function CashierShiftPage() {
                   )}
                 </div>
                 <div>
-                  <h3 className="text-sm sm:text-base font-bold text-zinc-900 dark:text-white">
+                  <h3 className="text-sm sm:text-base font-bold text-zinc-900 dark:text-white ui-weight-medium">
                     {selectedTx.recordId}
                   </h3>
-                  <p className="text-xs text-zinc-500">
+                  <p className="text-xs text-zinc-500 ui-text-body">
                     {selectedTx.date} at {selectedTx.time}
                   </p>
                 </div>
@@ -1256,18 +1288,18 @@ export default function CashierShiftPage() {
 
               <button
                 onClick={() => setSelectedTx(null)}
-                className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition cursor-pointer"
+                className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition cursor-pointer ui-control"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
 
-            <div className="p-5 space-y-4 text-xs">
+            <div className="p-5 space-y-4 text-xs ui-text-body">
               <div className="flex items-center justify-between p-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200/70 dark:border-zinc-800/70">
                 <div>
-                  <div className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400">Total Amount</div>
+                  <div className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400 ui-text-meta">Total Amount</div>
                   <div
-                    className={`text-xl font-mono font-black mt-0.5 ${
+                    className={`text-xl font-mono font-black mt-0.5  ui-font-body ui-weight-medium ${
                       selectedTx.flow === "INFLOW"
                         ? "text-emerald-700 dark:text-emerald-400"
                         : selectedTx.category === "OWNER_PAYOUT"
@@ -1279,8 +1311,8 @@ export default function CashierShiftPage() {
                   </div>
                 </div>
                 <div className="text-right">
-                  <div className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400">Payment Mode</div>
-                  <span className="inline-block mt-0.5 px-2.5 py-0.5 rounded text-xs font-mono font-bold bg-zinc-200 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200">
+                  <div className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400 ui-text-meta">Payment Mode</div>
+                  <span className="inline-block mt-0.5 px-2.5 py-0.5 rounded text-xs font-mono font-bold bg-zinc-200 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 ui-text-body ui-font-body ui-weight-medium">
                     {selectedTx.method}
                   </span>
                 </div>
@@ -1297,21 +1329,27 @@ export default function CashierShiftPage() {
                 {selectedTx.grcNo && (
                   <div className="flex justify-between py-1.5 border-b border-zinc-100 dark:border-zinc-800">
                     <span className="text-zinc-500">Physical GRC #:</span>
-                    <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">GRC #{selectedTx.grcNo}</span>
+                    <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400 ui-font-body ui-weight-medium">GRC #{selectedTx.grcNo}</span>
                   </div>
                 )}
 
                 {selectedTx.payerPhone && (
                   <div className="flex justify-between py-1.5 border-b border-zinc-100 dark:border-zinc-800">
                     <span className="text-zinc-500">Guest / Contact Phone:</span>
-                    <span className="font-mono text-zinc-900 dark:text-white">{selectedTx.payerPhone}</span>
+                    <span className="font-mono text-zinc-900 dark:text-white ui-font-body">{selectedTx.payerPhone}</span>
                   </div>
                 )}
 
+                {selectedTx.reservationNo && (
+                  <div className="flex justify-between py-1.5 border-b border-zinc-100 dark:border-zinc-800">
+                    <span className="text-zinc-500">Reservation:</span>
+                    <span className="font-mono text-zinc-900 dark:text-white">{selectedTx.reservationNo}</span>
+                  </div>
+                )}
                 {selectedTx.stayDates && (
                   <div className="flex justify-between py-1.5 border-b border-zinc-100 dark:border-zinc-800">
                     <span className="text-zinc-500">Stay Period:</span>
-                    <span className="font-mono text-zinc-800 dark:text-zinc-200">{selectedTx.stayDates}</span>
+                    <span className="font-mono text-zinc-800 dark:text-zinc-200 ui-font-body">{selectedTx.stayDates}</span>
                   </div>
                 )}
 
@@ -1325,21 +1363,21 @@ export default function CashierShiftPage() {
                 {selectedTx.gstin && (
                   <div className="flex justify-between py-1.5 border-b border-zinc-100 dark:border-zinc-800">
                     <span className="text-zinc-500">GSTIN:</span>
-                    <span className="font-mono text-zinc-900 dark:text-white">{selectedTx.gstin}</span>
+                    <span className="font-mono text-zinc-900 dark:text-white ui-font-body">{selectedTx.gstin}</span>
                   </div>
                 )}
 
                 {selectedTx.roomNumber && (
                   <div className="flex justify-between py-1.5 border-b border-zinc-100 dark:border-zinc-800">
                     <span className="text-zinc-500">Room Number:</span>
-                    <span className="font-mono font-bold text-blue-600 dark:text-blue-400">Room {selectedTx.roomNumber}</span>
+                    <span className="font-mono font-bold text-blue-600 dark:text-blue-400 ui-font-body ui-weight-medium">Room {selectedTx.roomNumber}</span>
                   </div>
                 )}
 
                 {selectedTx.kotNo && (
                   <div className="flex justify-between py-1.5 border-b border-zinc-100 dark:border-zinc-800">
                     <span className="text-zinc-500">Kitchen Slip #:</span>
-                    <span className="font-mono font-bold text-amber-600 dark:text-amber-400">{selectedTx.kotNo}</span>
+                    <span className="font-mono font-bold text-amber-600 dark:text-amber-400 ui-font-body ui-weight-medium">{selectedTx.kotNo}</span>
                   </div>
                 )}
 
@@ -1353,7 +1391,7 @@ export default function CashierShiftPage() {
                 {selectedTx.reference && selectedTx.reference !== "—" && (
                   <div className="flex justify-between py-1.5 border-b border-zinc-100 dark:border-zinc-800">
                     <span className="text-zinc-500">Reference / UTR:</span>
-                    <span className="font-mono text-zinc-800 dark:text-zinc-200">{selectedTx.reference}</span>
+                    <span className="font-mono text-zinc-800 dark:text-zinc-200 ui-font-body">{selectedTx.reference}</span>
                   </div>
                 )}
 
@@ -1369,7 +1407,7 @@ export default function CashierShiftPage() {
             <div className="p-4 border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/30 flex justify-end">
               <button
                 onClick={() => setSelectedTx(null)}
-                className="px-4 py-2 rounded-xl text-xs font-semibold bg-zinc-900 text-white dark:bg-white dark:text-zinc-950 hover:opacity-90 transition cursor-pointer"
+                className="px-4 py-2 rounded-xl text-xs font-semibold bg-zinc-900 text-white dark:bg-white dark:text-zinc-950 hover:opacity-90 transition cursor-pointer ui-radius-control ui-text-body ui-control"
               >
                 Close Details
               </button>
@@ -1380,31 +1418,31 @@ export default function CashierShiftPage() {
 
       {/* Record Direct Income Modal */}
       {showAddIncomeModal && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-150">
-          <div className="bg-white dark:bg-[#141418] border border-zinc-200 dark:border-zinc-800 rounded-2xl w-full max-w-xl max-h-[92vh] flex flex-col shadow-2xl overflow-hidden">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4   duration-150">
+          <div className="bg-white dark:bg-[#141418] border border-zinc-200 dark:border-zinc-800 rounded-2xl w-full max-w-xl max-h-[92vh] flex flex-col shadow-2xl overflow-hidden ui-radius-panel ui-dialog-surface ui-surface">
             <div className="p-4 sm:p-5 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between bg-zinc-50/50 dark:bg-zinc-900/30">
               <div className="flex items-center gap-2.5">
                 <div className="p-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 text-emerald-600 dark:text-emerald-400">
                   <Banknote className="h-5 w-5" />
                 </div>
                 <div>
-                  <h3 className="text-sm sm:text-base font-bold text-zinc-900 dark:text-white">
+                  <h3 className="text-sm sm:text-base font-bold text-zinc-900 dark:text-white ui-weight-medium">
                     Record Direct Income / Collection
                   </h3>
-                  <p className="text-xs text-zinc-500 mt-0.5">
+                  <p className="text-xs text-zinc-500 mt-0.5 ui-text-body">
                     Past Room Income, Banquet Advances, Bar Food Bills &amp; Walk-in Dining
                   </p>
                 </div>
               </div>
               <button
                 onClick={() => setShowAddIncomeModal(false)}
-                className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"
+                className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 ui-control"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
 
-            <form onSubmit={handleIncomeSubmit} className="p-5 overflow-y-auto space-y-4 text-xs">
+            <form onSubmit={handleIncomeSubmit} className="p-5 overflow-y-auto space-y-4 text-xs ui-text-body">
               {incomeError && (
                 <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-300 dark:border-rose-800 text-rose-800 dark:text-rose-300 flex items-center gap-2 font-medium">
                   <AlertCircle className="h-4 w-4 shrink-0" />
@@ -1421,13 +1459,13 @@ export default function CashierShiftPage() {
 
               {/* Revenue Channel Selector */}
               <div>
-                <label className="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-1.5">
+                <label className="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-1.5 ui-text-meta ui-label">
                   Collection Channel / Category *
                 </label>
                 <select
                   value={incomeForm.category}
                   onChange={(e) => setIncomeForm({ ...incomeForm, category: e.target.value })}
-                  className="w-full h-9 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 text-xs font-semibold text-zinc-900 dark:text-zinc-100 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+                  className="w-full h-9 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 text-xs font-semibold text-zinc-900 dark:text-zinc-100 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 ui-radius-control ui-text-body ui-surface ui-field" aria-label="Collection Channel / Category"
                 >
                   <option value="PAST_ROOM_SETTLEMENT">Past Room Income / Settlement (Physical GRC)</option>
                   <option value="BAR_FOOD_BILL">Bar Food Bill (Kitchen Food Orders Only)</option>
@@ -1437,13 +1475,13 @@ export default function CashierShiftPage() {
                 </select>
 
                 {incomeForm.category === "PAST_ROOM_SETTLEMENT" && (
-                  <p className="text-[11px] text-emerald-600 dark:text-emerald-400 mt-1 font-medium flex items-center gap-1">
+                  <p className="text-[11px] text-emerald-600 dark:text-emerald-400 mt-1 font-medium flex items-center gap-1 ui-text-meta">
                     <CheckCircle2 className="h-3 w-3 shrink-0" />
                     For historical stays, past checkouts, or bookings settled against physical GRC register.
                   </p>
                 )}
                 {incomeForm.category === "BAR_FOOD_BILL" && (
-                  <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-1 font-medium flex items-center gap-1">
+                  <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-1 font-medium flex items-center gap-1 ui-text-meta">
                     <AlertCircle className="h-3 w-3 shrink-0" />
                     Bar liquor is untracked. Only record food orders served to the bar counter.
                   </p>
@@ -1454,17 +1492,17 @@ export default function CashierShiftPage() {
               {incomeForm.category === "PAST_ROOM_SETTLEMENT" && (
                 <div className="p-3.5 rounded-xl bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800/60 space-y-3">
                   <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-bold text-emerald-900 dark:text-emerald-300 uppercase tracking-wider">
+                    <span className="text-[11px] font-bold text-emerald-900 dark:text-emerald-300 uppercase tracking-wider ui-text-meta ui-weight-medium">
                       Physical GRC &amp; Guest Details
                     </span>
-                    <span className="text-[10.5px] text-emerald-700 dark:text-emerald-400 font-medium">
+                    <span className="text-[10.5px] text-emerald-700 dark:text-emerald-400 font-medium ui-text-meta">
                       Historical Stay
                     </span>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-[10.5px] font-semibold text-emerald-900 dark:text-emerald-300 uppercase mb-1">
+                      <label className="block text-[10.5px] font-semibold text-emerald-900 dark:text-emerald-300 uppercase mb-1 ui-text-meta ui-label">
                         Physical GRC Number *
                       </label>
                       <input
@@ -1473,11 +1511,11 @@ export default function CashierShiftPage() {
                         value={incomeForm.grcNo}
                         onChange={(e) => setIncomeForm({ ...incomeForm, grcNo: e.target.value })}
                         required
-                        className="w-full h-8.5 rounded-lg border border-emerald-300 dark:border-emerald-700 bg-white dark:bg-zinc-900 px-3 text-xs font-mono font-bold text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400"
+                        className="w-full h-8.5 rounded-lg border border-emerald-300 dark:border-emerald-700 bg-white dark:bg-zinc-900 px-3 text-xs font-mono font-bold text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 ui-text-body ui-font-body ui-weight-medium ui-field" aria-label="Physical GRC Number"
                       />
                     </div>
                     <div>
-                      <label className="block text-[10.5px] font-semibold text-emerald-900 dark:text-emerald-300 uppercase mb-1">
+                      <label className="block text-[10.5px] font-semibold text-emerald-900 dark:text-emerald-300 uppercase mb-1 ui-text-meta ui-label">
                         Room Number (Optional)
                       </label>
                       <input
@@ -1485,14 +1523,14 @@ export default function CashierShiftPage() {
                         placeholder="e.g. 104, 201"
                         value={incomeForm.roomNumber}
                         onChange={(e) => setIncomeForm({ ...incomeForm, roomNumber: e.target.value })}
-                        className="w-full h-8.5 rounded-lg border border-emerald-300 dark:border-emerald-700 bg-white dark:bg-zinc-900 px-3 text-xs font-mono text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400"
+                        className="w-full h-8.5 rounded-lg border border-emerald-300 dark:border-emerald-700 bg-white dark:bg-zinc-900 px-3 text-xs font-mono text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 ui-text-body ui-font-body ui-field" aria-label="Room Number (Optional)"
                       />
                     </div>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-[10.5px] font-semibold text-emerald-900 dark:text-emerald-300 uppercase mb-1">
+                      <label className="block text-[10.5px] font-semibold text-emerald-900 dark:text-emerald-300 uppercase mb-1 ui-text-meta ui-label">
                         Guest Full Name *
                       </label>
                       <input
@@ -1501,11 +1539,11 @@ export default function CashierShiftPage() {
                         value={incomeForm.payerName}
                         onChange={(e) => setIncomeForm({ ...incomeForm, payerName: e.target.value })}
                         required
-                        className="w-full h-8.5 rounded-lg border border-emerald-300 dark:border-emerald-700 bg-white dark:bg-zinc-900 px-3 text-xs text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400"
+                        className="w-full h-8.5 rounded-lg border border-emerald-300 dark:border-emerald-700 bg-white dark:bg-zinc-900 px-3 text-xs text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 ui-text-body ui-field" aria-label="Guest Full Name"
                       />
                     </div>
                     <div>
-                      <label className="block text-[10.5px] font-semibold text-emerald-900 dark:text-emerald-300 uppercase mb-1">
+                      <label className="block text-[10.5px] font-semibold text-emerald-900 dark:text-emerald-300 uppercase mb-1 ui-text-meta ui-label">
                         Guest Mobile Phone (Optional)
                       </label>
                       <input
@@ -1513,14 +1551,14 @@ export default function CashierShiftPage() {
                         placeholder="e.g. 9876543210"
                         value={incomeForm.payerPhone}
                         onChange={(e) => setIncomeForm({ ...incomeForm, payerPhone: e.target.value })}
-                        className="w-full h-8.5 rounded-lg border border-emerald-300 dark:border-emerald-700 bg-white dark:bg-zinc-900 px-3 text-xs font-mono text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400"
+                        className="w-full h-8.5 rounded-lg border border-emerald-300 dark:border-emerald-700 bg-white dark:bg-zinc-900 px-3 text-xs font-mono text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 ui-text-body ui-font-body ui-field" aria-label="Guest Mobile Phone (Optional)"
                       />
                     </div>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-[10.5px] font-semibold text-emerald-900 dark:text-emerald-300 uppercase mb-1">
+                      <label className="block text-[10.5px] font-semibold text-emerald-900 dark:text-emerald-300 uppercase mb-1 ui-text-meta ui-label">
                         Stay Check-In Date (Optional)
                       </label>
                       <input
@@ -1533,11 +1571,11 @@ export default function CashierShiftPage() {
                             return { ...prev, checkInDate: val, stayDates: newDates };
                           });
                         }}
-                        className="w-full h-8.5 rounded-lg border border-emerald-300 dark:border-emerald-700 bg-white dark:bg-zinc-900 px-3 text-xs font-mono text-zinc-900 dark:text-zinc-100"
+                        className="w-full h-8.5 rounded-lg border border-emerald-300 dark:border-emerald-700 bg-white dark:bg-zinc-900 px-3 text-xs font-mono text-zinc-900 dark:text-zinc-100 ui-text-body ui-font-body ui-field" aria-label="Stay Check-In Date (Optional)"
                       />
                     </div>
                     <div>
-                      <label className="block text-[10.5px] font-semibold text-emerald-900 dark:text-emerald-300 uppercase mb-1">
+                      <label className="block text-[10.5px] font-semibold text-emerald-900 dark:text-emerald-300 uppercase mb-1 ui-text-meta ui-label">
                         Stay Check-Out Date (Optional)
                       </label>
                       <input
@@ -1551,7 +1589,7 @@ export default function CashierShiftPage() {
                             return { ...prev, checkOutDate: val, stayDates: newDates };
                           });
                         }}
-                        className="w-full h-8.5 rounded-lg border border-emerald-300 dark:border-emerald-700 bg-white dark:bg-zinc-900 px-3 text-xs font-mono text-zinc-900 dark:text-zinc-100"
+                        className="w-full h-8.5 rounded-lg border border-emerald-300 dark:border-emerald-700 bg-white dark:bg-zinc-900 px-3 text-xs font-mono text-zinc-900 dark:text-zinc-100 ui-text-body ui-font-body ui-field" aria-label="Stay Check-Out Date (Optional)"
                       />
                     </div>
                   </div>
@@ -1561,7 +1599,7 @@ export default function CashierShiftPage() {
               {/* Receipt Date, Amount and Payment Method */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
-                  <label className="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-1">
+                  <label className="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-1 ui-text-meta ui-label">
                     Receipt Date *
                   </label>
                   <input
@@ -1569,12 +1607,12 @@ export default function CashierShiftPage() {
                     value={incomeForm.receiptDate || selectedDate || activeProperty?.businessDate || ""}
                     onChange={(e) => setIncomeForm({ ...incomeForm, receiptDate: e.target.value })}
                     required
-                    className="w-full h-9 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 text-xs font-mono font-medium text-zinc-900 dark:text-zinc-100"
+                    className="w-full h-9 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 text-xs font-mono font-medium text-zinc-900 dark:text-zinc-100 ui-radius-control ui-text-body ui-font-body ui-surface ui-field" aria-label="Receipt Date"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-1">
+                  <label className="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-1 ui-text-meta ui-label">
                     Amount Collected (INR) *
                   </label>
                   <input
@@ -1584,18 +1622,18 @@ export default function CashierShiftPage() {
                     value={incomeForm.amount}
                     onChange={(e) => setIncomeForm({ ...incomeForm, amount: e.target.value })}
                     required
-                    className="w-full h-9 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 text-xs font-bold font-mono text-zinc-900 dark:text-zinc-100"
+                    className="w-full h-9 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 text-xs font-bold font-mono text-zinc-900 dark:text-zinc-100 ui-radius-control ui-text-body ui-weight-medium ui-font-body ui-surface ui-field" aria-label="Amount Collected (INR)"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-1">
+                  <label className="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-1 ui-text-meta ui-label">
                     Payment Method *
                   </label>
                   <select
                     value={incomeForm.paymentMethod}
                     onChange={(e) => setIncomeForm({ ...incomeForm, paymentMethod: e.target.value })}
-                    className="w-full h-9 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 text-xs font-semibold text-zinc-900 dark:text-zinc-100"
+                    className="w-full h-9 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 text-xs font-semibold text-zinc-900 dark:text-zinc-100 ui-radius-control ui-text-body ui-surface ui-field" aria-label="Payment Method"
                   >
                     <option value="CASH">Cash (Drawer Till)</option>
                     <option value="UPI">UPI / QR Code</option>
@@ -1610,7 +1648,7 @@ export default function CashierShiftPage() {
               {incomeForm.category !== "BANQUET_EVENT_ADVANCE" && incomeForm.category !== "PAST_ROOM_SETTLEMENT" && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-1">
+                    <label className="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-1 ui-text-meta ui-label">
                       KOT / Kitchen Slip # (Optional)
                     </label>
                     <input
@@ -1618,11 +1656,11 @@ export default function CashierShiftPage() {
                       placeholder="e.g. KOT-104, KOT-882"
                       value={incomeForm.kotNo}
                       onChange={(e) => setIncomeForm({ ...incomeForm, kotNo: e.target.value })}
-                      className="w-full h-9 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 text-xs font-mono"
+                      className="w-full h-9 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 text-xs font-mono ui-radius-control ui-text-body ui-font-body ui-surface ui-field" aria-label="KOT / Kitchen Slip # (Optional)"
                     />
                   </div>
                   <div>
-                    <label className="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-1">
+                    <label className="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-1 ui-text-meta ui-label">
                       Guest / Customer Name (Optional)
                     </label>
                     <input
@@ -1630,7 +1668,7 @@ export default function CashierShiftPage() {
                       placeholder="e.g. Table 4 / Mr. Sharma"
                       value={incomeForm.payerName}
                       onChange={(e) => setIncomeForm({ ...incomeForm, payerName: e.target.value })}
-                      className="w-full h-9 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 text-xs"
+                      className="w-full h-9 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 text-xs ui-radius-control ui-text-body ui-surface ui-field" aria-label="Guest / Customer Name (Optional)"
                     />
                   </div>
                 </div>
@@ -1639,13 +1677,13 @@ export default function CashierShiftPage() {
               {/* Mandatory Guest info & Corporate options for Banquet Advances */}
               {incomeForm.category === "BANQUET_EVENT_ADVANCE" && (
                 <div className="p-3.5 rounded-xl bg-purple-50/50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-800/60 space-y-3">
-                  <div className="text-[11px] font-bold text-purple-900 dark:text-purple-300 uppercase tracking-wider">
+                  <div className="text-[11px] font-bold text-purple-900 dark:text-purple-300 uppercase tracking-wider ui-text-meta ui-weight-medium">
                     Banquet Client & Event Specification
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-[10.5px] font-semibold text-purple-900 dark:text-purple-300 uppercase mb-1">
+                      <label className="block text-[10.5px] font-semibold text-purple-900 dark:text-purple-300 uppercase mb-1 ui-text-meta ui-label">
                         Client / Host Name *
                       </label>
                       <input
@@ -1654,11 +1692,11 @@ export default function CashierShiftPage() {
                         value={incomeForm.payerName}
                         onChange={(e) => setIncomeForm({ ...incomeForm, payerName: e.target.value })}
                         required
-                        className="w-full h-8.5 rounded-lg border border-purple-300 dark:border-purple-700 bg-white dark:bg-zinc-900 px-3 text-xs"
+                        className="w-full h-8.5 rounded-lg border border-purple-300 dark:border-purple-700 bg-white dark:bg-zinc-900 px-3 text-xs ui-text-body ui-field" aria-label="Client / Host Name"
                       />
                     </div>
                     <div>
-                      <label className="block text-[10.5px] font-semibold text-purple-900 dark:text-purple-300 uppercase mb-1">
+                      <label className="block text-[10.5px] font-semibold text-purple-900 dark:text-purple-300 uppercase mb-1 ui-text-meta ui-label">
                         Mobile Phone Number *
                       </label>
                       <input
@@ -1667,14 +1705,14 @@ export default function CashierShiftPage() {
                         value={incomeForm.payerPhone}
                         onChange={(e) => setIncomeForm({ ...incomeForm, payerPhone: e.target.value })}
                         required
-                        className="w-full h-8.5 rounded-lg border border-purple-300 dark:border-purple-700 bg-white dark:bg-zinc-900 px-3 text-xs font-mono"
+                        className="w-full h-8.5 rounded-lg border border-purple-300 dark:border-purple-700 bg-white dark:bg-zinc-900 px-3 text-xs font-mono ui-text-body ui-font-body ui-field" aria-label="Mobile Phone Number"
                       />
                     </div>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-[10.5px] font-semibold text-purple-900 dark:text-purple-300 uppercase mb-1">
+                      <label className="block text-[10.5px] font-semibold text-purple-900 dark:text-purple-300 uppercase mb-1 ui-text-meta ui-label">
                         Company Name (Optional)
                       </label>
                       <input
@@ -1682,11 +1720,11 @@ export default function CashierShiftPage() {
                         placeholder="e.g. Northeast Infotech Corp"
                         value={incomeForm.companyName}
                         onChange={(e) => setIncomeForm({ ...incomeForm, companyName: e.target.value })}
-                        className="w-full h-8.5 rounded-lg border border-purple-300 dark:border-purple-700 bg-white dark:bg-zinc-900 px-3 text-xs"
+                        className="w-full h-8.5 rounded-lg border border-purple-300 dark:border-purple-700 bg-white dark:bg-zinc-900 px-3 text-xs ui-text-body ui-field" aria-label="Company Name (Optional)"
                       />
                     </div>
                     <div>
-                      <label className="block text-[10.5px] font-semibold text-purple-900 dark:text-purple-300 uppercase mb-1">
+                      <label className="block text-[10.5px] font-semibold text-purple-900 dark:text-purple-300 uppercase mb-1 ui-text-meta ui-label">
                         Company GSTIN (Optional)
                       </label>
                       <input
@@ -1694,7 +1732,7 @@ export default function CashierShiftPage() {
                         placeholder="e.g. 18AAAAA0000A1Z5"
                         value={incomeForm.gstin}
                         onChange={(e) => setIncomeForm({ ...incomeForm, gstin: e.target.value.toUpperCase() })}
-                        className="w-full h-8.5 rounded-lg border border-purple-300 dark:border-purple-700 bg-white dark:bg-zinc-900 px-3 text-xs font-mono uppercase"
+                        className="w-full h-8.5 rounded-lg border border-purple-300 dark:border-purple-700 bg-white dark:bg-zinc-900 px-3 text-xs font-mono uppercase ui-text-body ui-font-body ui-field" aria-label="Company GSTIN (Optional)"
                       />
                     </div>
                   </div>
@@ -1703,7 +1741,7 @@ export default function CashierShiftPage() {
 
               {/* Reference */}
               <div>
-                <label className="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-1">
+                <label className="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-1 ui-text-meta ui-label">
                   Reference / Narration (Optional)
                 </label>
                 <input
@@ -1715,7 +1753,7 @@ export default function CashierShiftPage() {
                   }
                   value={incomeForm.reference}
                   onChange={(e) => setIncomeForm({ ...incomeForm, reference: e.target.value })}
-                  className="w-full h-9 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 text-xs"
+                  className="w-full h-9 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 text-xs ui-radius-control ui-text-body ui-surface ui-field" aria-label="Reference / Narration (Optional)"
                 />
               </div>
 
@@ -1723,14 +1761,14 @@ export default function CashierShiftPage() {
                 <button
                   type="button"
                   onClick={() => setShowAddIncomeModal(false)}
-                  className="px-4 py-2 rounded-xl text-xs font-semibold text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition"
+                  className="px-4 py-2 rounded-xl text-xs font-semibold text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition ui-radius-control ui-text-body ui-control"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={incomeSubmitting}
-                  className="px-5 py-2 rounded-xl text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white transition disabled:opacity-50"
+                  className="px-5 py-2 rounded-xl text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white transition disabled:opacity-50 ui-radius-control ui-text-body ui-control"
                 >
                   {incomeSubmitting ? "Recording..." : "Record Collection"}
                 </button>
@@ -1742,31 +1780,31 @@ export default function CashierShiftPage() {
 
       {/* Record Expense Modal */}
       {showAddExpenseModal && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-150">
-          <div className="bg-white dark:bg-[#141418] border border-zinc-200 dark:border-zinc-800 rounded-2xl w-full max-w-xl max-h-[92vh] flex flex-col shadow-2xl overflow-hidden">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4   duration-150">
+          <div className="bg-white dark:bg-[#141418] border border-zinc-200 dark:border-zinc-800 rounded-2xl w-full max-w-xl max-h-[92vh] flex flex-col shadow-2xl overflow-hidden ui-radius-panel ui-dialog-surface ui-surface">
             <div className="p-4 sm:p-5 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between bg-zinc-50/50 dark:bg-zinc-900/30">
               <div className="flex items-center gap-2.5">
                 <div className="p-2 rounded-xl bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-800 text-rose-600 dark:text-rose-400">
                   <DollarSign className="h-5 w-5" />
                 </div>
                 <div>
-                  <h3 className="text-sm sm:text-base font-bold text-zinc-900 dark:text-white">
+                  <h3 className="text-sm sm:text-base font-bold text-zinc-900 dark:text-white ui-weight-medium">
                     Record Petty Cash Voucher / Expense
                   </h3>
-                  <p className="text-xs text-zinc-500 mt-0.5">
+                  <p className="text-xs text-zinc-500 mt-0.5 ui-text-body">
                     Disbursements for kitchen purchases, driver commissions, maintenance & staff advances
                   </p>
                 </div>
               </div>
               <button
                 onClick={() => setShowAddExpenseModal(false)}
-                className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"
+                className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 ui-control"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
 
-            <form onSubmit={handleExpenseSubmit} className="p-5 overflow-y-auto space-y-4 text-xs">
+            <form onSubmit={handleExpenseSubmit} className="p-5 overflow-y-auto space-y-4 text-xs ui-text-body">
               {expenseError && (
                 <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-300 dark:border-rose-800 text-rose-800 dark:text-rose-300 flex items-center gap-2 font-medium">
                   <AlertCircle className="h-4 w-4 shrink-0" />
@@ -1783,13 +1821,13 @@ export default function CashierShiftPage() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-1">
+                  <label className="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-1 ui-text-meta ui-label">
                     Expense Category *
                   </label>
                   <select
                     value={expenseForm.category}
                     onChange={(e) => setExpenseForm({ ...expenseForm, category: e.target.value })}
-                    className="w-full h-9 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 text-xs font-semibold text-zinc-900 dark:text-zinc-100"
+                    className="w-full h-9 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 text-xs font-semibold text-zinc-900 dark:text-zinc-100 ui-radius-control ui-text-body ui-surface ui-field" aria-label="Expense Category"
                   >
                     <option value="DRIVER_COMMISSION">Driver Commission</option>
                     <option value="OWNER_PAYOUT">👑 Owner Payout / Drawing</option>
@@ -1804,7 +1842,7 @@ export default function CashierShiftPage() {
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-1">
+                  <label className="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-1 ui-text-meta ui-label">
                     Payee / Vendor / Staff Name *
                   </label>
                   <input
@@ -1813,14 +1851,14 @@ export default function CashierShiftPage() {
                     value={expenseForm.payeeName}
                     onChange={(e) => setExpenseForm({ ...expenseForm, payeeName: e.target.value })}
                     required
-                    className="w-full h-9 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 text-xs"
+                    className="w-full h-9 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 text-xs ui-radius-control ui-text-body ui-surface ui-field" aria-label="Payee / Vendor / Staff Name"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-1">
+                  <label className="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-1 ui-text-meta ui-label">
                     Amount Paid Out (INR) *
                   </label>
                   <input
@@ -1830,18 +1868,18 @@ export default function CashierShiftPage() {
                     value={expenseForm.amount}
                     onChange={(e) => setExpenseForm({ ...expenseForm, amount: e.target.value })}
                     required
-                    className="w-full h-9 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 text-xs font-bold font-mono text-zinc-900 dark:text-zinc-100"
+                    className="w-full h-9 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 text-xs font-bold font-mono text-zinc-900 dark:text-zinc-100 ui-radius-control ui-text-body ui-weight-medium ui-font-body ui-surface ui-field" aria-label="Amount Paid Out (INR)"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-1">
+                  <label className="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-1 ui-text-meta ui-label">
                     Disbursement Method *
                   </label>
                   <select
                     value={expenseForm.paymentMethod}
                     onChange={(e) => setExpenseForm({ ...expenseForm, paymentMethod: e.target.value })}
-                    className="w-full h-9 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 text-xs font-semibold text-zinc-900 dark:text-zinc-100"
+                    className="w-full h-9 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 text-xs font-semibold text-zinc-900 dark:text-zinc-100 ui-radius-control ui-text-body ui-surface ui-field" aria-label="Disbursement Method"
                   >
                     <option value="CASH">Cash (From Drawer Till)</option>
                     <option value="UPI">UPI / QR Transfer</option>
@@ -1852,7 +1890,7 @@ export default function CashierShiftPage() {
               </div>
 
               <div>
-                <label className="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-1">
+                <label className="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-1 ui-text-meta ui-label">
                   Narration / Description
                 </label>
                 <input
@@ -1860,12 +1898,12 @@ export default function CashierShiftPage() {
                   placeholder="e.g. Morning milk & paneer supply for kitchen"
                   value={expenseForm.description}
                   onChange={(e) => setExpenseForm({ ...expenseForm, description: e.target.value })}
-                  className="w-full h-9 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 text-xs"
+                  className="w-full h-9 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 text-xs ui-radius-control ui-text-body ui-surface ui-field" aria-label="Narration / Description"
                 />
               </div>
 
               <div>
-                <label className="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-1">
+                <label className="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-1 ui-text-meta ui-label">
                   Bill / Voucher / Invoice Ref (Optional)
                 </label>
                 <input
@@ -1873,7 +1911,7 @@ export default function CashierShiftPage() {
                   placeholder="e.g. Bill #5120 / Slip"
                   value={expenseForm.reference}
                   onChange={(e) => setExpenseForm({ ...expenseForm, reference: e.target.value })}
-                  className="w-full h-9 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 text-xs"
+                  className="w-full h-9 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 text-xs ui-radius-control ui-text-body ui-surface ui-field" aria-label="Bill / Voucher / Invoice Ref (Optional)"
                 />
               </div>
 
@@ -1881,14 +1919,14 @@ export default function CashierShiftPage() {
                 <button
                   type="button"
                   onClick={() => setShowAddExpenseModal(false)}
-                  className="px-4 py-2 rounded-xl text-xs font-semibold text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition"
+                  className="px-4 py-2 rounded-xl text-xs font-semibold text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition ui-radius-control ui-text-body ui-control"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={expenseSubmitting}
-                  className="px-5 py-2 rounded-xl text-xs font-semibold bg-rose-600 hover:bg-rose-500 text-white transition disabled:opacity-50"
+                  className="px-5 py-2 rounded-xl text-xs font-semibold bg-rose-600 hover:bg-rose-500 text-white transition disabled:opacity-50 ui-radius-control ui-text-body ui-control"
                 >
                   {expenseSubmitting ? "Disbursing..." : "Disburse & Record Voucher"}
                 </button>
@@ -1900,8 +1938,8 @@ export default function CashierShiftPage() {
 
       {/* Record Owner Payout Modal */}
       {showAddOwnerPayoutModal && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-150">
-          <div className="bg-white dark:bg-[#141418] border border-zinc-200 dark:border-zinc-800 rounded-2xl w-full max-w-xl max-h-[92vh] flex flex-col shadow-2xl overflow-hidden">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4   duration-150">
+          <div className="bg-white dark:bg-[#141418] border border-zinc-200 dark:border-zinc-800 rounded-2xl w-full max-w-xl max-h-[92vh] flex flex-col shadow-2xl overflow-hidden ui-radius-panel ui-dialog-surface ui-surface">
             <div className="p-4 sm:p-5 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between bg-purple-50/50 dark:bg-purple-950/20">
               <div className="flex items-center gap-2.5">
                 <div className="p-2 rounded-xl bg-purple-100 dark:bg-purple-950/60 border border-purple-200 dark:border-purple-800 text-purple-700 dark:text-purple-300">
@@ -1909,27 +1947,27 @@ export default function CashierShiftPage() {
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <h3 className="text-sm sm:text-base font-bold text-zinc-900 dark:text-white">
+                    <h3 className="text-sm sm:text-base font-bold text-zinc-900 dark:text-white ui-weight-medium">
                       Owner Payout / Cash Drawing
                     </h3>
-                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-100 dark:bg-purple-900/60 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 uppercase tracking-wider">
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-100 dark:bg-purple-900/60 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 uppercase tracking-wider ui-text-meta ui-weight-medium">
                       Ownership
                     </span>
                   </div>
-                  <p className="text-xs text-zinc-500 mt-0.5">
+                  <p className="text-xs text-zinc-500 mt-0.5 ui-text-body">
                     Disburse drawings, interim profit settlements or withdrawals to hotel ownership
                   </p>
                 </div>
               </div>
               <button
                 onClick={() => setShowAddOwnerPayoutModal(false)}
-                className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 transition cursor-pointer"
+                className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 transition cursor-pointer ui-control"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
 
-            <form onSubmit={handleOwnerPayoutSubmit} className="p-5 overflow-y-auto space-y-4 text-xs">
+            <form onSubmit={handleOwnerPayoutSubmit} className="p-5 overflow-y-auto space-y-4 text-xs ui-text-body">
               {ownerPayoutError && (
                 <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-300 dark:border-rose-800 text-rose-800 dark:text-rose-300 flex items-center gap-2 font-medium">
                   <AlertCircle className="h-4 w-4 shrink-0" />
@@ -1947,16 +1985,16 @@ export default function CashierShiftPage() {
               {/* Cash Drawer Position Realtime Monitor */}
               {ownerPayoutForm.paymentMethod === "CASH" && (
                 <div className="p-3 rounded-xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 space-y-2">
-                  <div className="flex items-center justify-between text-[11px]">
+                  <div className="flex items-center justify-between text-[11px] ui-text-meta">
                     <span className="text-zinc-500">Current Cash in Drawer Till:</span>
-                    <span className="font-mono font-bold text-zinc-900 dark:text-white">
+                    <span className="font-mono font-bold text-zinc-900 dark:text-white ui-font-body ui-weight-medium">
                       {formatINR(data?.cashDrawer?.netCashHandover || 0)}
                     </span>
                   </div>
-                  <div className="flex items-center justify-between text-[11px]">
+                  <div className="flex items-center justify-between text-[11px] ui-text-meta">
                     <span className="text-zinc-500">Remaining After This Payout:</span>
                     <span
-                      className={`font-mono font-bold ${
+                      className={`font-mono font-bold  ui-font-body ui-weight-medium ${
                         (data?.cashDrawer?.netCashHandover || 0) - (Number(ownerPayoutForm.amount) || 0) >= 0
                           ? "text-emerald-600 dark:text-emerald-400"
                           : "text-rose-600 dark:text-rose-400"
@@ -1966,7 +2004,7 @@ export default function CashierShiftPage() {
                     </span>
                   </div>
                   {Number(ownerPayoutForm.amount) > (data?.cashDrawer?.netCashHandover || 0) && (
-                    <div className="text-[10.5px] text-rose-600 dark:text-rose-400 font-medium flex items-center gap-1.5 pt-1 border-t border-rose-200/50 dark:border-rose-900/50">
+                    <div className="text-[10.5px] text-rose-600 dark:text-rose-400 font-medium flex items-center gap-1.5 pt-1 border-t border-rose-200/50 dark:border-rose-900/50 ui-text-meta">
                       <AlertCircle className="h-3.5 w-3.5 shrink-0" />
                       <span>Warning: Withdrawal amount exceeds current drawer cash position!</span>
                     </div>
@@ -1976,83 +2014,49 @@ export default function CashierShiftPage() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-1">
+                  <label className="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-1 ui-text-meta ui-label">
                     Owner / Partner / Entity Name *
                   </label>
-                  {configuredOwners.length > 0 && !isCustomOwner ? (
-                    <div className="space-y-1">
+                  <p className="text-xs text-zinc-500 mb-2">Owners / partners for <strong className="font-medium text-zinc-700 dark:text-zinc-200">{activeProperty?.displayName}</strong></p>
+                  {!isCustomOwner ? (
+                    <div className="space-y-2">
                       <select
+                        id="owner-payout-recipient"
+                        aria-label="Owner / Partner / Entity Name"
                         value={ownerPayoutForm.ownerName}
-                        onChange={(e) => {
-                          if (e.target.value === "__CUSTOM__") {
-                            setIsCustomOwner(true);
-                            setCustomOwnerName("");
-                          } else {
-                            setOwnerPayoutForm({ ...ownerPayoutForm, ownerName: e.target.value });
-                          }
+                        disabled={ownersLoading || !!ownersLoadError}
+                        onChange={e => {
+                          if (e.target.value === "__CUSTOM__") { setIsCustomOwner(true); setCustomOwnerName(""); }
+                          else setOwnerPayoutForm(prev => ({ ...prev, ownerName: e.target.value }));
                         }}
                         required
-                        className="w-full h-9 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 text-xs font-semibold text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 cursor-pointer"
+                        className="w-full h-10 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 text-sm text-zinc-900 dark:text-zinc-100 disabled:opacity-60 ui-field"
                       >
-                        <option value="">-- Select Registered Owner --</option>
-                        {configuredOwners.map((owner, idx) => (
-                          <option key={idx} value={owner}>
-                            {owner}
-                          </option>
-                        ))}
-                        <option value="__CUSTOM__">+ Other / Enter Custom Name...</option>
+                        <option value="">{ownersLoading ? "Loading saved owners…" : ownersLoadError ? "Owner list unavailable" : configuredOwners.length ? "Select an owner / partner" : "No owners saved for this hotel"}</option>
+                        {configuredOwners.map(owner => <option key={owner} value={owner}>{owner}</option>)}
+                        <option value="__CUSTOM__">Other — enter a name manually</option>
                       </select>
-                      <div className="text-[10px] text-zinc-500 dark:text-zinc-400">
-                        Configured in Admin &gt; Hotel &amp; Property
-                      </div>
+                      {!ownersLoading && !ownersLoadError && configuredOwners.length === 0 && <p className="text-xs text-zinc-600 dark:text-zinc-400">Owner lists are saved separately for each hotel. Add owners for this hotel in Admin → Hotel &amp; Property, or switch to the hotel where you saved them.</p>}
                     </div>
                   ) : (
-                    <div className="space-y-1">
-                      <div className="relative">
-                        <input
-                          type="text"
-                          placeholder="e.g. Bijesh Singha (Owner) / Managing Partner"
-                          value={isCustomOwner ? customOwnerName : ownerPayoutForm.ownerName}
-                          onChange={(e) => {
-                            if (isCustomOwner) {
-                              setCustomOwnerName(e.target.value);
-                            } else {
-                              setOwnerPayoutForm({ ...ownerPayoutForm, ownerName: e.target.value });
-                            }
-                          }}
-                          required
-                          className="w-full h-9 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 text-xs text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
-                        />
-                        {isCustomOwner && configuredOwners.length > 0 && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setIsCustomOwner(false);
-                              setOwnerPayoutForm({ ...ownerPayoutForm, ownerName: configuredOwners[0] });
-                            }}
-                            className="absolute right-2 top-2 text-[10px] text-purple-600 hover:text-purple-700 dark:text-purple-400 font-semibold cursor-pointer underline"
-                          >
-                            Select from list
-                          </button>
-                        )}
-                      </div>
-                      {configuredOwners.length === 0 && (
-                        <div className="text-[10px] text-zinc-500 dark:text-zinc-400">
-                          Tip: Add owners in Admin Portal &gt; Hotel &amp; Property to display them in this dropdown.
-                        </div>
-                      )}
+                    <div className="space-y-2">
+                      <input id="owner-payout-recipient" aria-label="Owner / Partner / Entity Name" type="text" required value={customOwnerName} onChange={e => setCustomOwnerName(e.target.value)} placeholder="Enter the recipient's full name" className="w-full h-10 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 text-sm ui-field" />
+                      <button type="button" onClick={() => { setIsCustomOwner(false); setCustomOwnerName(""); setOwnerPayoutForm(prev => ({ ...prev, ownerName: "" })); }} className="text-xs font-medium text-purple-700 underline dark:text-purple-300">Choose from saved owners</button>
                     </div>
                   )}
+                  {ownersLoading && <p role="status" className="mt-2 text-xs text-zinc-500">Loading the saved list for this hotel…</p>}
+                  {ownersLoadError && <div role="alert" className="mt-2 space-y-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-950"><p>{ownersLoadError}</p><div className="flex gap-3"><button type="button" onClick={() => setOwnersRetry(value => value + 1)} className="font-semibold underline">Retry owner list</button><button type="button" onClick={() => { setIsCustomOwner(true); setCustomOwnerName(""); }} className="underline">Enter a name manually</button></div></div>}
+
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-1">
+                  <label className="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-1 ui-text-meta ui-label">
                     Disbursement Method *
                   </label>
                   <select
                     value={ownerPayoutForm.paymentMethod}
                     onChange={(e) => setOwnerPayoutForm({ ...ownerPayoutForm, paymentMethod: e.target.value })}
-                    className="w-full h-9 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 text-xs font-semibold text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
+                    className="w-full h-9 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 text-xs font-semibold text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 ui-radius-control ui-text-body ui-surface ui-field" aria-label="Disbursement Method"
                   >
                     <option value="CASH">Cash (From Drawer Till)</option>
                     <option value="UPI">UPI / QR Transfer</option>
@@ -2064,7 +2068,7 @@ export default function CashierShiftPage() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-1">
+                  <label className="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-1 ui-text-meta ui-label">
                     Payout Amount (INR) *
                   </label>
                   <input
@@ -2074,12 +2078,12 @@ export default function CashierShiftPage() {
                     value={ownerPayoutForm.amount}
                     onChange={(e) => setOwnerPayoutForm({ ...ownerPayoutForm, amount: e.target.value })}
                     required
-                    className="w-full h-9 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 text-xs font-bold font-mono text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
+                    className="w-full h-9 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 text-xs font-bold font-mono text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 ui-radius-control ui-text-body ui-weight-medium ui-font-body ui-surface ui-field" aria-label="Payout Amount (INR)"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-1">
+                  <label className="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-1 ui-text-meta ui-label">
                     Receipt / Voucher / Slip Ref (Optional)
                   </label>
                   <input
@@ -2087,13 +2091,13 @@ export default function CashierShiftPage() {
                     placeholder="e.g. Slip #OP-01 / UTR / Acknowledgment"
                     value={ownerPayoutForm.reference}
                     onChange={(e) => setOwnerPayoutForm({ ...ownerPayoutForm, reference: e.target.value })}
-                    className="w-full h-9 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 text-xs text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
+                    className="w-full h-9 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 text-xs text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 ui-radius-control ui-text-body ui-surface ui-field" aria-label="Receipt / Voucher / Slip Ref (Optional)"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-1">
+                <label className="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-1 ui-text-meta ui-label">
                   Narration / Purpose of Drawing
                 </label>
                 <input
@@ -2101,12 +2105,12 @@ export default function CashierShiftPage() {
                   placeholder="e.g. Weekly owner cash drawing / Partner profit distribution"
                   value={ownerPayoutForm.description}
                   onChange={(e) => setOwnerPayoutForm({ ...ownerPayoutForm, description: e.target.value })}
-                  className="w-full h-9 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 text-xs text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
+                  className="w-full h-9 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 text-xs text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 ui-radius-control ui-text-body ui-surface ui-field" aria-label="Narration / Purpose of Drawing"
                 />
               </div>
 
               <div>
-                <label className="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-1">
+                <label className="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-1 ui-text-meta ui-label">
                   Additional Notes (Private / Internal)
                 </label>
                 <textarea
@@ -2114,7 +2118,7 @@ export default function CashierShiftPage() {
                   placeholder="e.g. Collected personally by owner / Received via GPay to personal account"
                   value={ownerPayoutForm.notes}
                   onChange={(e) => setOwnerPayoutForm({ ...ownerPayoutForm, notes: e.target.value })}
-                  className="w-full rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 p-3 text-xs text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 resize-none"
+                  className="w-full rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 p-3 text-xs text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 resize-none ui-radius-control ui-text-body ui-surface ui-field" aria-label="Additional Notes (Private / Internal)"
                 />
               </div>
 
@@ -2122,14 +2126,14 @@ export default function CashierShiftPage() {
                 <button
                   type="button"
                   onClick={() => setShowAddOwnerPayoutModal(false)}
-                  className="px-4 py-2 rounded-xl text-xs font-semibold text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition cursor-pointer"
+                  className="px-4 py-2 rounded-xl text-xs font-semibold text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition cursor-pointer ui-radius-control ui-text-body ui-control"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  disabled={ownerPayoutSubmitting}
-                  className="px-5 py-2 rounded-xl text-xs font-semibold bg-purple-600 hover:bg-purple-500 text-white transition disabled:opacity-50 cursor-pointer shadow-xs"
+                  disabled={ownerPayoutSubmitting || (!isCustomOwner && (ownersLoading || !!ownersLoadError || !ownerPayoutForm.ownerName))}
+                  className="px-5 py-2 rounded-xl text-xs font-semibold bg-purple-600 hover:bg-purple-500 text-white transition disabled:opacity-50 cursor-pointer shadow-xs ui-radius-control ui-text-body ui-shadow-quiet ui-control"
                 >
                   {ownerPayoutSubmitting ? "Recording Payout..." : "Record Owner Payout"}
                 </button>
@@ -2141,31 +2145,31 @@ export default function CashierShiftPage() {
 
       {/* Formal Shift Handover Printable Sheet Modal */}
       {showPrintHandoverModal && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in">
-          <div className="bg-white text-zinc-900 rounded-2xl w-full max-w-2xl max-h-[92vh] flex flex-col shadow-2xl overflow-hidden">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4  ">
+          <div className="bg-white text-zinc-900 rounded-2xl w-full max-w-2xl max-h-[92vh] flex flex-col shadow-2xl overflow-hidden ui-radius-panel ui-dialog-surface">
             <div className="p-4 border-b border-zinc-200 flex items-center justify-between print:hidden">
-              <h3 className="font-bold text-sm text-zinc-900">Official Shift Handover Sheet Preview</h3>
+              <h3 className="font-bold text-sm text-zinc-900 ui-weight-medium">Official Shift Handover Sheet Preview</h3>
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => window.print()}
-                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-blue-600 text-white hover:bg-blue-500"
+                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-blue-600 text-white hover:bg-blue-500 ui-text-body ui-control"
                 >
                   <Printer className="h-3.5 w-3.5" /> Print Sheet
                 </button>
-                <button onClick={() => setShowPrintHandoverModal(false)} className="p-1.5 text-zinc-400 hover:text-zinc-600">
+                <button onClick={() => setShowPrintHandoverModal(false)} className="p-1.5 text-zinc-400 hover:text-zinc-600 ui-control">
                   <X className="h-4 w-4" />
                 </button>
               </div>
             </div>
 
-            <div className="p-6 overflow-y-auto space-y-4 text-xs font-sans">
+            <div className="p-6 overflow-y-auto space-y-4 text-xs font-sans ui-text-body">
               {/* Formal Header */}
               <div className="text-center border-b pb-4">
-                <h2 className="text-base font-bold uppercase tracking-wider">{activeProperty?.displayName || "Hotel"}</h2>
-                <p className="text-[11px] text-zinc-500">
+                <h2 className="text-base font-bold uppercase tracking-wider ui-weight-medium ui-section-title">{activeProperty?.displayName || "Hotel"}</h2>
+                <p className="text-[11px] text-zinc-500 ui-text-meta">
                   Official Front Desk Cashier Shift Handover & Reconciliation Register
                 </p>
-                <p className="text-[10px] font-mono mt-1 text-zinc-600">
+                <p className="text-[10px] font-mono mt-1 text-zinc-600 ui-text-meta ui-font-body">
                   Business Date: {selectedDate} | Shift Audit Cutoff: 12:00 AM Midnight | Printed: {new Date().toLocaleString("en-IN")}
                 </p>
               </div>
@@ -2173,36 +2177,36 @@ export default function CashierShiftPage() {
               {/* Summary Totals Grid */}
               <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-center p-3 bg-zinc-50 rounded-xl border">
                 <div>
-                  <div className="text-[10px] uppercase text-zinc-500 font-semibold">Total Collections</div>
-                  <div className="font-mono font-bold text-emerald-700 text-sm">{formatINR(data?.totalCollections || 0)}</div>
+                  <div className="text-[10px] uppercase text-zinc-500 font-semibold ui-text-meta">Total Collections</div>
+                  <div className="font-mono font-bold text-emerald-700 text-sm ui-font-body ui-weight-medium">{formatINR(data?.totalCollections || 0)}</div>
                 </div>
                 <div>
-                  <div className="text-[10px] uppercase text-zinc-500 font-semibold">Operating Expenses</div>
-                  <div className="font-mono font-bold text-rose-700 text-sm">{formatINR((data?.totalExpenses || 0) - ownerPayoutsSummary.total)}</div>
+                  <div className="text-[10px] uppercase text-zinc-500 font-semibold ui-text-meta">Operating Expenses</div>
+                  <div className="font-mono font-bold text-rose-700 text-sm ui-font-body ui-weight-medium">{formatINR((data?.totalExpenses || 0) - ownerPayoutsSummary.total)}</div>
                 </div>
                 <div>
-                  <div className="text-[10px] uppercase text-purple-700 font-semibold">👑 Owner Drawings</div>
-                  <div className="font-mono font-bold text-purple-700 text-sm">{formatINR(ownerPayoutsSummary.total)}</div>
+                  <div className="text-[10px] uppercase text-purple-700 font-semibold ui-text-meta">👑 Owner Drawings</div>
+                  <div className="font-mono font-bold text-purple-700 text-sm ui-font-body ui-weight-medium">{formatINR(ownerPayoutsSummary.total)}</div>
                 </div>
                 <div>
-                  <div className="text-[10px] uppercase text-zinc-500 font-semibold">Net Shift Flow</div>
-                  <div className="font-mono font-bold text-zinc-900 text-sm">{formatINR(data?.netCashFlow || 0)}</div>
+                  <div className="text-[10px] uppercase text-zinc-500 font-semibold ui-text-meta">Net Shift Flow</div>
+                  <div className="font-mono font-bold text-zinc-900 text-sm ui-font-body ui-weight-medium">{formatINR(data?.netCashFlow || 0)}</div>
                 </div>
                 <div className="bg-emerald-100/60 rounded-lg p-1 col-span-2 sm:col-span-1">
-                  <div className="text-[10px] uppercase text-emerald-800 font-bold">System Cash Handover</div>
-                  <div className="font-mono font-black text-emerald-900 text-sm">{formatINR(data?.cashDrawer?.netCashHandover || 0)}</div>
+                  <div className="text-[10px] uppercase text-emerald-800 font-bold ui-text-meta ui-weight-medium">System Cash Handover</div>
+                  <div className="font-mono font-black text-emerald-900 text-sm ui-font-body ui-weight-medium">{formatINR(data?.cashDrawer?.netCashHandover || 0)}</div>
                 </div>
               </div>
 
               {/* Physical Cash Denomination Reconciliation Table */}
               <div>
-                <h4 className="text-[11px] font-bold uppercase tracking-wider text-zinc-700 mb-2">
+                <h4 className="text-[11px] font-bold uppercase tracking-wider text-zinc-700 mb-2 ui-text-meta ui-weight-medium">
                   Physical Cash Drawer Denomination Count
                 </h4>
                 <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
                   {[500, 200, 100, 50, 20, 10].map((d) => (
                     <div key={d} className="p-2 border rounded-lg bg-zinc-50 text-center">
-                      <div className="text-[10px] font-bold text-zinc-600 font-mono">₹{d}</div>
+                      <div className="text-[10px] font-bold text-zinc-600 font-mono ui-text-meta ui-weight-medium ui-font-body">₹{d}</div>
                       <input
                         type="number"
                         min="0"
@@ -2211,24 +2215,24 @@ export default function CashierShiftPage() {
                         onChange={(e) =>
                           setDenominations({ ...denominations, [d]: Math.max(0, parseInt(e.target.value) || 0) })
                         }
-                        className="w-full text-center h-7 text-xs font-mono font-bold border rounded mt-1 bg-white"
+                        className="w-full text-center h-7 text-xs font-mono font-bold border rounded mt-1 bg-white ui-text-body ui-font-body ui-weight-medium ui-field"
                       />
-                      <div className="text-[9.5px] font-mono text-zinc-500 mt-1">
+                      <div className="text-[9.5px] font-mono text-zinc-500 mt-1 ui-text-meta ui-font-body">
                         = {formatINR((denominations[d] || 0) * d)}
                       </div>
                     </div>
                   ))}
                 </div>
 
-                <div className="flex items-center justify-between p-3 mt-2 rounded-lg bg-zinc-100 font-mono">
-                  <span className="font-semibold text-xs">Total Physical Cash Counted:</span>
-                  <span className="font-black text-sm text-zinc-900">{formatINR(totalPhysicalCashCounted)}</span>
+                <div className="flex items-center justify-between p-3 mt-2 rounded-lg bg-zinc-100 font-mono ui-font-body">
+                  <span className="font-semibold text-xs ui-text-body">Total Physical Cash Counted:</span>
+                  <span className="font-black text-sm text-zinc-900 ui-weight-medium">{formatINR(totalPhysicalCashCounted)}</span>
                 </div>
 
-                <div className="flex items-center justify-between px-3 py-1.5 text-[11px] font-mono">
+                <div className="flex items-center justify-between px-3 py-1.5 text-[11px] font-mono ui-text-meta ui-font-body">
                   <span className="text-zinc-500">Cash Drawer Variance (Physical vs System):</span>
                   <span
-                    className={`font-bold ${
+                    className={`font-bold  ui-weight-medium ${
                       cashDrawerVariance === 0
                         ? "text-emerald-700"
                         : cashDrawerVariance > 0
@@ -2246,16 +2250,16 @@ export default function CashierShiftPage() {
               {/* Formal Sign-off Lines */}
               <div className="grid grid-cols-3 gap-6 pt-10 border-t text-center">
                 <div className="border-t border-zinc-400 pt-1">
-                  <div className="text-[10px] font-semibold uppercase text-zinc-500">Outgoing Cashier</div>
-                  <div className="text-xs font-bold text-zinc-800 mt-0.5">Signature & Date</div>
+                  <div className="text-[10px] font-semibold uppercase text-zinc-500 ui-text-meta">Outgoing Cashier</div>
+                  <div className="text-xs font-bold text-zinc-800 mt-0.5 ui-text-body ui-weight-medium">Signature & Date</div>
                 </div>
                 <div className="border-t border-zinc-400 pt-1">
-                  <div className="text-[10px] font-semibold uppercase text-zinc-500">Incoming Cashier</div>
-                  <div className="text-xs font-bold text-zinc-800 mt-0.5">Signature & Date</div>
+                  <div className="text-[10px] font-semibold uppercase text-zinc-500 ui-text-meta">Incoming Cashier</div>
+                  <div className="text-xs font-bold text-zinc-800 mt-0.5 ui-text-body ui-weight-medium">Signature & Date</div>
                 </div>
                 <div className="border-t border-zinc-400 pt-1">
-                  <div className="text-[10px] font-semibold uppercase text-zinc-500">Duty Manager / Auditor</div>
-                  <div className="text-xs font-bold text-zinc-800 mt-0.5">Approved & Sealed</div>
+                  <div className="text-[10px] font-semibold uppercase text-zinc-500 ui-text-meta">Duty Manager / Auditor</div>
+                  <div className="text-xs font-bold text-zinc-800 mt-0.5 ui-text-body ui-weight-medium">Approved & Sealed</div>
                 </div>
               </div>
             </div>

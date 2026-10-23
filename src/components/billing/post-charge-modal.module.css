@@ -1,0 +1,46 @@
+.overlay { position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; padding: 20px; background: rgb(10 17 28 / 65%); }
+.dialog { width: 100%; max-width: 620px; max-height: calc(100dvh - 40px); overflow-y: auto; border: 1px solid var(--border); border-radius: 12px; background: var(--card); color: var(--foreground); box-shadow: var(--ui-shadow); }
+.header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 22px 24px 18px; border-bottom: 1px solid var(--border); }
+.header h2 { font-size: 18px; font-weight: 600; line-height: 1.5; letter-spacing: -.02em; margin: 0; }
+.header p { margin-top: 5px; font-size: 13px; color: var(--muted-foreground); }
+.iconButton { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; min-height: 40px; min-width: 40px; border: 1px solid transparent; border-radius: 8px; color: var(--muted-foreground); cursor: pointer; }
+.iconButton:hover:not(:disabled) { background: var(--muted); color: var(--foreground); }
+.form { padding: 22px 24px 0; display: flex; flex-direction: column; gap: 20px; }
+.field { min-width: 0; }
+.field label, .rowLabel { display: block; color: var(--foreground); font-size: 13px; font-weight: 500; margin-bottom: 7px; }
+.field input, .field select { width: 100%; height: 44px; padding: 10px 12px; font-size: 14px; border: 1px solid var(--border); border-radius: 8px; background: var(--card); color: var(--foreground); line-height: 1.5; }
+.field input:focus, .field select:focus { border-color: var(--ring); outline: 2px solid var(--ring); outline-offset: 2px; box-shadow: none; }
+.field input::placeholder { color: var(--muted-foreground); opacity: .85; }
+.selectWrap, .money { position: relative; }
+.field .categorySelect { appearance: none; -webkit-appearance: none; height: 46px; padding-right: 44px; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+.categorySelect option { background: var(--card); color: var(--foreground); font-size: 14px; }
+.selectWrap > svg { position: absolute; right: 14px; top: 14px; color: var(--muted-foreground); pointer-events: none; }
+.hint { margin-top: 7px; color: var(--muted-foreground); font-size: 12px; line-height: 1.7; }
+.sectionHeading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.sectionHeading h3 { margin: 0; font-size: 14px; font-weight: 600; }
+.taxBadge { color: var(--ui-selected-text); background: var(--ui-selected); font-size: 11px; padding: 3px 7px; border-radius: 5px; white-space: nowrap; }
+.rows { display: flex; flex-direction: column; gap: 12px; }
+.row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(110px, .65fr) 40px; gap: 12px; padding: 16px; border: 1px solid var(--border); border-radius: 10px; background: var(--ui-subtle); }
+.rowTitle { grid-column: 1 / -1; margin: 0; font-size: 12px; font-weight: 600; color: var(--muted-foreground); }
+.remove { align-self: end; margin-bottom: 2px; }
+.rowDetails { grid-column: 1 / -1; }
+.money > span { position: absolute; left: 12px; top: 11px; color: var(--muted-foreground); font-size: 14px; }
+.field .money input { padding-left: 29px; font-variant-numeric: tabular-nums; }
+.add { align-self: flex-start; display: inline-flex; align-items: center; gap: 7px; min-height: 40px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--card); color: var(--foreground); font-size: 13px; font-weight: 500; cursor: pointer; }
+.add:hover:not(:disabled) { background: var(--muted); }
+.totals { display: flex; flex-direction: column; gap: 8px; padding: 16px; border: 1px solid var(--border); border-radius: 10px; background: var(--ui-subtle); }
+.totalRow { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; font-size: 13px; color: var(--muted-foreground); }
+.totalRow span:last-child { color: var(--foreground); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.grandTotal { border-top: 1px solid var(--border); padding-top: 12px; margin-top: 4px; color: var(--foreground); font-weight: 600; }
+.grandTotal span:last-child { font-size: 20px; }
+.message { display: flex; align-items: flex-start; gap: 8px; padding: 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 13px; line-height: 1.6; }
+.message svg { flex-shrink: 0; margin-top: 2px; }
+.error { background: #fff0f2; color: #a3283e; border-color: #e7b1bd; }
+.success { background: #edf8f1; color: #23673e; border-color: #b6d9c4; }
+:global(.dark) .error { background: #432832; color: #f4c0ca; border-color: #854757; }
+:global(.dark) .success { background: #203a2b; color: #b9e2c7; border-color: #426a50; }
+.footer { position: sticky; bottom: 0; display: flex; align-items: center; justify-content: flex-end; gap: 10px; padding: 18px 0 20px; border-top: 1px solid var(--border); background: var(--card); }
+.dialog :is(button, input, select):focus-visible { outline: 2px solid var(--ring); outline-offset: 3px; }
+.dialog :is(button, input, select):disabled { opacity: .55; cursor: not-allowed; }
+@media (max-width: 600px) { .overlay { padding: 12px; } .dialog { max-height: calc(100dvh - 24px); } .header { padding: 18px 16px 16px; } .form { padding: 18px 16px 0; } .row { padding: 12px; gap: 10px; grid-template-columns: minmax(0, 1fr) minmax(95px, .7fr) 36px; } .field input, .field select, .field .categorySelect { font-size: 16px; } .sectionHeading { align-items: flex-start; } .taxBadge { font-size: 10px; } .footer { padding-bottom: 16px; } .footer button { min-height: 44px; } }
+@media (max-width: 370px) { .row { grid-template-columns: minmax(0, 1fr) 40px; } .row > .field { grid-column: 1; } .remove { grid-column: 2; grid-row: 2 / 4; align-self: center; } .taxBadge { white-space: normal; text-align: right; } }

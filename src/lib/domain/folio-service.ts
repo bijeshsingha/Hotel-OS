@@ -4,6 +4,7 @@ import { getNextDocumentNumber } from "../sequence/generator";
 import { logAuditEvent } from "./audit-service";
 import { saveOutstandingRecord, markOutstandingSettled } from "./outstanding-ledger-service";
 import { archivePaymentSnapshot } from "./payment-archive-service";
+import { calculate24HrBillableDays, calculateDynamicDepartureDate } from "./stay-calculator";
 
 export async function postManualFolioCharge({
   folioId,
@@ -1348,8 +1349,6 @@ export async function checkoutAndIssueInvoice({
   return { success: true, invoice, balance, outstandingAmount: balance > 1.0 ? balance : 0 };
 }
 
-import { calculate24HrBillableDays, calculateDynamicDepartureDate } from "./pms-service";
-
 /**
  * Automatically evaluates 24-hour cycles and posts the next night's room charge
  * once the stay crosses the 24-hour mark (or 12 PM standard checkout for Early Bird),
@@ -1562,17 +1561,26 @@ export async function sync24HourFolioCharges({
     }
 
     // 1. Synchronize any existing room tariff charges for this specific room if the rate was adjusted
-    // Only synchronize entries for the current room, preserving historical charges from predecessor rooms!
+    // Only synchronize entries for the current room, preserving historical charges from predecessor rooms,
+    // UNLESS this entry is the most recent active cycle that was transferred into the current room!
+    const sortedRoomEntries = [...roomEntries].sort(
+      (a: any, b: any) => new Date(a.createdAt || a.serviceDate).getTime() - new Date(b.createdAt || b.serviceDate).getTime()
+    );
+    const latestCycleEntry = sortedRoomEntries[sortedRoomEntries.length - 1];
+
     for (const entry of roomEntries) {
       const isForCurrentRoom = roomNo ? new RegExp(`\\bRoom\\s*#?\\s*${roomNo}\\b`, "i").test(entry.description || "") : true;
-      if (!isForCurrentRoom) continue;
+      const isLatestTransferredCycle = entry.id === latestCycleEntry?.id && predecessorRooms.length > 0;
+      if (!isForCurrentRoom && !isLatestTransferredCycle) continue;
 
       const isEntryComp = roomBasePrice === 0 || isComp;
       const isPriceMismatched = isEntryComp
         ? entry.totalAmount !== 0 || entry.unitAmount !== 0
         : Math.abs(entry.unitAmount - roomBasePrice) > 0.01;
 
-      if (isPriceMismatched) {
+      const needsRoomUpdate = isLatestTransferredCycle && roomNo && !new RegExp(`\\bRoom\\s*#?\\s*${roomNo}\\b`, "i").test(entry.description || "");
+
+      if (isPriceMismatched || needsRoomUpdate) {
         const gst = isEntryComp
           ? { taxableAmount: 0, taxAmount: 0, totalAmount: 0, components: [] }
           : calculateGST({
@@ -1583,9 +1591,23 @@ export async function sync24HourFolioCharges({
               customTaxRate: 5,
             });
 
+        let updatedDesc = entry.description;
+        if (needsRoomUpdate && roomNo) {
+          for (const pred of predecessorRooms) {
+            if (updatedDesc?.includes(pred)) {
+              updatedDesc = updatedDesc.replace(new RegExp(`\\b(?:Room|Rm)?\\s*#?\\s*${pred}\\b`, "i"), `Room ${roomNo}`);
+              break;
+            }
+          }
+          if (!updatedDesc?.includes(roomNo)) {
+            updatedDesc = `Room Tariff - Room ${roomNo}`;
+          }
+        }
+
         await prisma.folioEntry.update({
           where: { id: entry.id },
           data: {
+            description: updatedDesc,
             unitAmount: roomBasePrice,
             taxableAmount: gst.taxableAmount,
             taxComponentsJson: JSON.stringify(gst.components),

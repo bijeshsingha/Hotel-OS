@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { Calendar, Search, ArrowDownRight, Tag } from "lucide-react";
-import { FutureBookingAdvance } from "@/lib/domain/executive-report-service";
+import type { FutureBookingAdvance } from "@/lib/domain/executive-report-service";
 import { formatINR } from "@/lib/gst/calculator";
 
 interface ExecutiveAdvancesTableProps {
@@ -29,32 +29,32 @@ export const ExecutiveAdvancesTable: React.FC<ExecutiveAdvancesTableProps> = ({
   const totalFiltered = filtered.reduce((sum, item) => sum + item.amountReceived, 0);
 
   return (
-    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg overflow-hidden shadow-xs">
+    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg overflow-hidden shadow-xs ui-shadow-quiet">
       <div className="p-4 sm:p-5 border-b border-slate-200 dark:border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
-            <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
+            <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 ui-weight-medium">
               Future Booking Advances
             </h3>
-            <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-blue-100 text-blue-800 dark:bg-blue-900/60 dark:text-blue-200">
+            <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-blue-100 text-blue-800 dark:bg-blue-900/60 dark:text-blue-200 ui-text-meta ui-weight-medium">
               {items.length} Deposits
             </span>
           </div>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 ui-text-body">
             Pre-payments received during this period for reservations checking in on future dates
           </p>
         </div>
 
-        <div className="flex items-center gap-4 bg-slate-50 dark:bg-slate-800/40 p-2.5 rounded-lg border border-slate-200/60 dark:border-slate-700/60 text-xs">
+        <div className="flex items-center gap-4 bg-slate-50 dark:bg-slate-800/40 p-2.5 rounded-lg border border-slate-200/60 dark:border-slate-700/60 text-xs ui-text-body">
           <div>
-            <span className="text-slate-500 block text-[11px]">Received in Period</span>
-            <strong className="text-blue-600 dark:text-blue-400 font-bold text-sm">
+            <span className="text-slate-500 block text-[11px] ui-text-meta">Received in Period</span>
+            <strong className="text-blue-600 dark:text-blue-400 font-bold text-sm ui-weight-medium">
               {formatINR(receivedInPeriod)}
             </strong>
           </div>
           <div className="h-6 w-px bg-slate-200 dark:bg-slate-700" />
           <div>
-            <span className="text-slate-500 block text-[11px]">Total Unapplied Held</span>
+            <span className="text-slate-500 block text-[11px] ui-text-meta">Total Unapplied Held</span>
             <strong className="text-slate-800 dark:text-slate-200 font-semibold text-sm">
               {formatINR(totalUnappliedHeld)}
             </strong>
@@ -70,21 +70,21 @@ export const ExecutiveAdvancesTable: React.FC<ExecutiveAdvancesTableProps> = ({
             placeholder="Search booking or guest..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-8 pr-3 py-1 text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none"
+            className="w-full pl-8 pr-3 py-1 text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none ui-text-body ui-field" aria-label="Search booking or guest"
           />
         </div>
-        <div className="text-xs text-slate-500 font-medium">
+        <div className="text-xs text-slate-500 font-medium ui-text-body">
           Showing {filtered.length} of {items.length} advances
         </div>
       </div>
 
       <div className="overflow-x-auto">
         {filtered.length === 0 ? (
-          <div className="p-8 text-center text-xs text-slate-500">
+          <div className="p-8 text-center text-xs text-slate-500 ui-text-body">
             No future booking advances logged during this selected period.
           </div>
         ) : (
-          <table className="w-full text-left text-xs border-collapse">
+          <div className="ui-table-scroll"><table className="w-full text-left text-xs border-collapse ui-text-body ui-data-table">
             <thead className="bg-slate-50 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-700">
               <tr>
                 <th className="px-3 py-2.5 font-semibold text-slate-600 dark:text-slate-300">
@@ -119,13 +119,13 @@ export const ExecutiveAdvancesTable: React.FC<ExecutiveAdvancesTableProps> = ({
                   key={item.id}
                   className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors"
                 >
-                  <td className="px-3 py-2 font-mono text-[11px] text-slate-600 dark:text-slate-400">
+                  <td className="px-3 py-2 font-mono text-[11px] text-slate-600 dark:text-slate-400 ui-font-body ui-text-meta">
                     {item.receiptNo}
                   </td>
                   <td className="px-3 py-2 font-semibold text-slate-900 dark:text-slate-100">
                     {item.guestName}
                   </td>
-                  <td className="px-3 py-2 font-mono text-[11px] text-slate-700 dark:text-slate-300">
+                  <td className="px-3 py-2 font-mono text-[11px] text-slate-700 dark:text-slate-300 ui-font-body ui-text-meta">
                     {item.bookingRef}
                   </td>
                   <td className="px-3 py-2 text-slate-500">{item.receiptDate}</td>
@@ -136,17 +136,17 @@ export const ExecutiveAdvancesTable: React.FC<ExecutiveAdvancesTableProps> = ({
                     {item.paymentMethod}
                   </td>
                   <td className="px-3 py-2">
-                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 ui-text-meta">
                       {item.bookingStatus}
                     </span>
                   </td>
-                  <td className="px-3 py-2 font-bold text-slate-900 dark:text-slate-100 text-right">
+                  <td className="px-3 py-2 font-bold text-slate-900 dark:text-slate-100 text-right ui-weight-medium">
                     {formatINR(item.amountReceived)}
                   </td>
                 </tr>
               ))}
             </tbody>
-            <tfoot className="bg-slate-50 dark:bg-slate-800/80 border-t border-slate-200 dark:border-slate-700 font-bold">
+            <tfoot className="bg-slate-50 dark:bg-slate-800/80 border-t border-slate-200 dark:border-slate-700 font-bold ui-weight-medium">
               <tr>
                 <td colSpan={7} className="px-3 py-2 text-slate-700 dark:text-slate-300">
                   Total Filtered Advances ({filtered.length} deposits)
@@ -156,7 +156,7 @@ export const ExecutiveAdvancesTable: React.FC<ExecutiveAdvancesTableProps> = ({
                 </td>
               </tr>
             </tfoot>
-          </table>
+          </table></div>
         )}
       </div>
     </div>

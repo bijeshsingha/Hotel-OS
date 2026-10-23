@@ -1,3 +1,8 @@
+import { reservationReceiptContext } from "@/lib/domain/reservation-receipt-context";
+import { getStandalonePosReportEntries } from "@/lib/domain/report-pos-revenue";
+import { reportDateOf, validateReportRange } from "@/lib/reports/report-dates";
+import { nextReportRoomAssignment, allocateReportAmounts, summarizeReportLedger, revenueDepartment, recordedTax } from "@/lib/reports/report-ledger";
+import { authorizeRequest, getApiAccess } from "@/lib/auth/api-access";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { getMidnightDayBoundaries } from "@/lib/domain/daily-report-service";
@@ -7,6 +12,10 @@ import { resolveSelectedProperty } from "@/lib/config/property-config";
 import { getComprehensiveHotelReport } from "@/lib/domain/comprehensive-report-service";
 
 export async function GET(request: Request) {
+  const access = await authorizeRequest(request);
+  if (access instanceof Response) return access;
+  request = access.request;
+
   try {
     const { searchParams } = new URL(request.url);
     const requestedPropId = searchParams.get("propertyId");
@@ -14,6 +23,11 @@ export async function GET(request: Request) {
     const date = searchParams.get("date") || undefined;
     const startDate = searchParams.get("startDate") || undefined;
     const endDate = searchParams.get("endDate") || undefined;
+    if (date) validateReportRange(date);
+    if (startDate || endDate) {
+      if (!startDate || !endDate) throw new RangeError("Choose both a start date and an end date.");
+      validateReportRange(startDate, endDate);
+    }
 
     // Resolve property from request or fallback to .env configuration (SELECTED_HOTEL_ID / SELECTED_HOTEL_CODE)
     const targetProperty = await resolveSelectedProperty(requestedPropId);
@@ -34,14 +48,14 @@ export async function GET(request: Request) {
     // Compute 12 AM to 12 AM Midnight Date Range Boundaries
     let dateFilter: { gte: Date; lte: Date } | undefined = undefined;
     if (date) {
-      const bounds = getMidnightDayBoundaries(date);
+      const bounds = getMidnightDayBoundaries(date, targetProperty.timezone);
       dateFilter = {
         gte: bounds.localStart < bounds.startUtc ? bounds.localStart : bounds.startUtc,
         lte: bounds.localEnd > bounds.endUtc ? bounds.localEnd : bounds.endUtc,
       };
     } else if (startDate && endDate) {
-      const s = getMidnightDayBoundaries(startDate);
-      const e = getMidnightDayBoundaries(endDate);
+      const s = getMidnightDayBoundaries(startDate, targetProperty.timezone);
+      const e = getMidnightDayBoundaries(endDate, targetProperty.timezone);
       dateFilter = {
         gte: s.localStart < s.startUtc ? s.localStart : s.startUtc,
         lte: e.localEnd > e.endUtc ? e.localEnd : e.endUtc,
@@ -60,10 +74,10 @@ export async function GET(request: Request) {
       if (date) {
         expenseWhere.OR = [
           { businessDate: date },
-          { paidAt: dateFilter },
+          { businessDate: "", paidAt: dateFilter },
         ];
       } else if (dateFilter) {
-        expenseWhere.paidAt = dateFilter;
+        expenseWhere.businessDate = { gte: startDate, lte: endDate };
       }
 
 
@@ -94,10 +108,12 @@ export async function GET(request: Request) {
         }),
       ]);
 
+      const reservationContext = await reservationReceiptContext(payments);
       const formattedCollections = payments.map((p) => {
-        let payerName = "Guest Payer";
-        let roomNumber = "—";
-        let stayId = p.folio?.stayId || "—";
+        const booking = reservationContext.get(p.id);
+        let payerName = booking?.guestName || "Guest Payer";
+        let roomNumber = booking?.roomNumbers || "—";
+        let stayId = p.folio?.stayId || booking?.stayId || "—";
         let incomeCategory = "";
         let incomeCategoryLabel = "";
         let snapshot: any = {};
@@ -194,18 +210,20 @@ export async function GET(request: Request) {
           sourceLabel,
           collectionType: sourceLabel,
           payerName,
-          companyName: snapshot.companyName || null,
-          gstin: snapshot.gstin || null,
+          reservationNo: booking?.reservationNo || snapshot.reservationNo || null,
+          reservationId: p.reservationId,
+          companyName: snapshot.companyName || booking?.companyName || null,
+          gstin: snapshot.gstin || booking?.gstin || null,
           kotNo: snapshot.kotNo || null,
           grcNo: snapshot.grcNo || null,
-          payerPhone: snapshot.phone || null,
+          payerPhone: snapshot.phone || booking?.phone || p.folio?.stay?.primaryGuest?.phone || null,
           stayDates:
-            snapshot.stayDates ||
+            snapshot.stayDates || (booking ? `${booking.arrivalDate} to ${booking.departureDate}` : null) ||
             (snapshot.checkInDate && snapshot.checkOutDate
               ? `${snapshot.checkInDate} to ${snapshot.checkOutDate}`
               : snapshot.checkInDate || snapshot.checkOutDate || null),
-          checkInDate: snapshot.checkInDate || null,
-          checkOutDate: snapshot.checkOutDate || null,
+          checkInDate: snapshot.checkInDate || booking?.arrivalDate || null,
+          checkOutDate: snapshot.checkOutDate || booking?.departureDate || null,
           roomNumber: snapshot.roomNumber || roomNumber,
           stayId,
           folioId: p.folioId || "—",
@@ -394,6 +412,7 @@ export async function GET(request: Request) {
               flow: "INFLOW",
               party: c.companyName ? `${c.payerName} (${c.companyName})` : c.payerName,
               particulars:
+                c.reservationNo && c.sourceCategory === "ADVANCE_DEPOSIT" ? `Reservation ${c.reservationNo} advance${c.roomNumber && c.roomNumber !== "—" ? ` · Room ${c.roomNumber}` : ""}` :
                 c.roomNumber && c.roomNumber !== "—"
                   ? `Room ${c.roomNumber} (${c.sourceLabel})`
                   : `${c.sourceLabel}${kotFormatted ? ` [${kotFormatted}]` : ""}${c.gstin ? ` [GST: ${c.gstin}]` : ""}${c.reference && c.reference !== "—" && !c.reference.includes(c.sourceLabel) ? ` - ${c.reference}` : ""}`,
@@ -451,7 +470,7 @@ export async function GET(request: Request) {
 
     // 3. REVENUE & GST JOURNAL
     if (reportType === "REVENUE") {
-      const entryWhere: any = { propertyId, status: "POSTED", type: "CHARGE" };
+      const entryWhere: any = { propertyId, status: "POSTED", type: { in: ["CHARGE", "ADJUSTMENT"] } };
 
       const [entries, property] = await Promise.all([
         prisma.folioEntry.findMany({
@@ -500,7 +519,8 @@ export async function GET(request: Request) {
         "28%": 0,
       };
 
-      const formattedRows = entries.map((e) => {
+      const standalonePos = await getStandalonePosReportEntries(propertyId, targetProperty.timezone);
+      const formattedRows = [...entries, ...standalonePos].map((e) => {
         let cgstAmount = 0;
         let sgstAmount = 0;
         let igstAmount = 0;
@@ -520,9 +540,7 @@ export async function GET(request: Request) {
           } catch {}
         }
 
-        const calculatedTax =
-          cgstAmount + sgstAmount + igstAmount ||
-          Math.max(0, e.totalAmount - (e.taxableAmount || 0));
+        const calculatedTax = recordedTax(e).tax;
 
         if (effectiveTaxRate === 0 && e.taxableAmount > 0 && calculatedTax > 0) {
           effectiveTaxRate = Math.round((calculatedTax / e.taxableAmount) * 100);
@@ -590,8 +608,8 @@ export async function GET(request: Request) {
           companyName: primaryGuest?.companyName || null,
           gstin: primaryGuest?.gstin || null,
           roomNumber,
-          qty: e.qty || 1,
-          unitAmount: e.unitAmount || e.totalAmount,
+          qty: e.qty ?? 1,
+          unitAmount: e.unitAmount ?? e.totalAmount,
           taxableAmount: Math.round((e.taxableAmount || 0) * 100) / 100,
           cgstAmount: Math.round(cgstAmount * 100) / 100,
           sgstAmount: Math.round(sgstAmount * 100) / 100,
@@ -603,7 +621,7 @@ export async function GET(request: Request) {
         };
       });
 
-      const totalTax = totalCgst + totalSgst + totalIgst;
+      const totalTax = formattedRows.reduce((sum, row) => sum + row.taxAmount, 0);
 
       return NextResponse.json({
         reportType,
@@ -632,12 +650,12 @@ export async function GET(request: Request) {
 
     // 4. KITCHEN ORDERS & F&B COLLECTIONS REPORT
     if (reportType === "FNB" || reportType === "KITCHEN_ORDERS") {
-      const orderWhere: any = { propertyId };
+      const orderWhere: any = { propertyId, status: { notIn: ["VOIDED", "CANCELLED"] } };
       if (dateFilter) {
         orderWhere.createdAt = dateFilter;
       }
 
-      const [orders, directPayments, property] = await Promise.all([
+      const [orders, directPayments, property, manualEntries] = await Promise.all([
         prisma.order.findMany({
           where: orderWhere,
           include: {
@@ -649,8 +667,10 @@ export async function GET(request: Request) {
                 roomAssignments: { include: { room: true } },
               },
             },
-            items: true,
+            items: { where: { status: { not: "CANCELLED" } } },
+            bills: { where: { status: { not: "VOIDED" } }, orderBy: { createdAt: "desc" } },
             kots: {
+              where: { status: { not: "CANCELLED" } },
               include: {
                 station: true,
                 lines: true,
@@ -664,6 +684,7 @@ export async function GET(request: Request) {
             propertyId,
             status: "SUCCEEDED",
             folioId: null,
+            orderId: null,
             ...(dateFilter ? { receivedAt: dateFilter } : {}),
           },
           orderBy: { receivedAt: "desc" },
@@ -671,6 +692,11 @@ export async function GET(request: Request) {
         prisma.property.findUnique({
           where: { id: propertyId },
           select: { displayName: true, code: true, gstin: true, stateCode: true },
+        }),
+        prisma.folioEntry.findMany({
+          where: { propertyId, status: "POSTED", type: "CHARGE", sourceType: "MANUAL_CHARGE", chargeCode: { in: ["RESTAURANT_FOOD", "FOOD", "ROOM_SERVICE", "DINNER", "BREAKFAST"] }, ...(date ? { serviceDate: date } : startDate && endDate ? { serviceDate: { gte: startDate, lte: endDate } } : {}) },
+          include: { folio: { include: { stay: { include: { primaryGuest: true, roomAssignments: { include: { room: true }, orderBy: { startsAt: "desc" } } } } } } },
+          orderBy: { postedAt: "desc" },
         }),
       ]);
 
@@ -689,13 +715,21 @@ export async function GET(request: Request) {
         TAKEAWAY: { count: 0, amount: 0 },
       };
 
-      const rows = orders.map((o) => {
-        const subtotal = o.items.reduce((sum, i) => sum + (i.total || i.unitPrice * i.qty), 0);
-        const gst = calculateGST({
+      const rows: any[] = orders.map((o) => {
+        const subtotal = o.items.reduce((sum, i) => sum + (i.total ?? i.unitPrice * i.qty), 0);
+        const estimate = calculateGST({
           grossOrBaseAmount: subtotal,
           sacHsn: "996331",
           supplierStateCode: property?.stateCode || "18",
         });
+
+        const bill = o.bills[0];
+        const gst = bill ? {
+          totalAmount: bill.totalAmount, taxableAmount: bill.totalAmount - bill.taxTotal, taxAmount: bill.taxTotal,
+          // POS invoices in this flow use local CGST/SGST; bill taxTotal is authoritative.
+          components: { cgstAmount: Math.round(bill.taxTotal * 50) / 100, sgstAmount: Math.round((bill.taxTotal - Math.round(bill.taxTotal * 50) / 100) * 100) / 100 },
+        } : estimate;
+        const taxStatus = bill ? "Recorded POS bill" : "Unbilled estimate";
 
         const orderItemCount = o.items.reduce((sum, i) => sum + i.qty, 0);
         totalItemsPrepared += orderItemCount;
@@ -733,21 +767,20 @@ export async function GET(request: Request) {
 
         // Settlement Status
         let settlementType: "POSTED_TO_ROOM" | "DIRECT_PAID" | "UNSETTLED" = "UNSETTLED";
-        if (o.stayId || o.status === "POSTED_TO_ROOM" || destinationCategory === "ROOM_SERVICE") {
+        if (o.status === "POSTED_TO_ROOM" || bill?.status === "POSTED_TO_ROOM") {
           settlementType = "POSTED_TO_ROOM";
           folioPostedAmount += gst.totalAmount;
-        } else if (o.status === "PAID" || o.status === "BILLED") {
+        } else if (o.status === "PAID" || bill?.status === "PAID") {
           settlementType = "DIRECT_PAID";
           directSettledAmount += gst.totalAmount;
         } else {
           settlementType = "UNSETTLED";
-          directSettledAmount += gst.totalAmount;
         }
 
         destinationsBreakdown[destinationCategory].count += 1;
         destinationsBreakdown[destinationCategory].amount += gst.totalAmount;
 
-        const kotNumbers = o.kots.map((k) => k.kotNo).join(", ") || `KOT-${o.orderNo.replace("ORD-", "")}`;
+        const kotNumbers = o.kots.map((k) => k.kotNo).join(", ") || "";
         const itemsSummary = o.items.map((i) => `${i.nameSnapshot} (×${i.qty})`).join(", ");
 
         return {
@@ -774,16 +807,18 @@ export async function GET(request: Request) {
           })),
           itemsSummary,
           subtotal,
+          taxStatus,
           taxableAmount: gst.taxableAmount,
           cgst: gst.components.cgstAmount,
           sgst: gst.components.sgstAmount,
+          igst: 0,
           totalTax: gst.taxAmount,
           totalAmount: gst.totalAmount,
           settlementType,
           status: o.status,
           createdAt: o.createdAt.toISOString(),
-          timeFormatted: new Date(o.createdAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }),
-          dateFormatted: new Date(o.createdAt).toISOString().split("T")[0],
+          timeFormatted: new Date(o.createdAt).toLocaleTimeString("en-GB", { timeZone: targetProperty.timezone, hour: "2-digit", minute: "2-digit" }),
+          dateFormatted: reportDateOf(o.createdAt, targetProperty.timezone),
         };
       });
 
@@ -812,8 +847,8 @@ export async function GET(request: Request) {
           if (!isFnbRelated) return null;
 
           const amount = p.amount;
-          const taxable = Math.round((amount / 1.05) * 100) / 100;
-          const tax = Math.round((amount - taxable) * 100) / 100;
+          const taxable = null;
+          const tax = null;
 
           return {
             id: p.id,
@@ -837,38 +872,48 @@ export async function GET(request: Request) {
             amount,
             taxableAmount: taxable,
             taxAmount: tax,
+            taxStatus: "Tax not recorded on receipt",
             method: p.method,
             reference: p.reference || "—",
             notes: snapshot.notes || null,
             receivedAt: p.receivedAt.toISOString(),
-            dateFormatted: p.receivedAt.toISOString().split("T")[0],
-            timeFormatted: p.receivedAt.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }),
+            dateFormatted: reportDateOf(p.receivedAt, targetProperty.timezone),
+            timeFormatted: p.receivedAt.toLocaleTimeString("en-GB", { timeZone: targetProperty.timezone, hour: "2-digit", minute: "2-digit" }),
           };
         })
         .filter(Boolean);
 
+      // Include manual KOT postings and standalone receipts in the very same rows exported by the page.
+      for (const entry of manualEntries) {
+        const tax = recordedTax(entry);
+        const stay = entry.folio.stay;
+        const roomNo = entry.description.match(/\b(?:Room|Rm)\s*#?\s*([\w-]+)/i)?.[1] || stay?.roomAssignments.find(a => !a.endsAt)?.room.number || "—";
+        rows.push({ id: entry.id, orderNo: "Manual KOT", kotNumbers: entry.description.match(/KOT\s*#?\s*([^:]+)/i)?.[1]?.trim() || "", kotsCount: 1, destinationCategory: "ROOM_SERVICE", destinationLabel: `Room ${roomNo}`, roomNo, guestName: stay?.primaryGuest.name || "Guest", itemsSummary: entry.description, itemCount: entry.qty, taxableAmount: tax.base, cgst: tax.cgst, sgst: tax.sgst, igst: tax.igst, totalTax: tax.tax, totalAmount: tax.gross, taxStatus: "Recorded folio charge", settlementType: "POSTED_TO_ROOM", status: "POSTED", createdAt: entry.postedAt.toISOString(), dateFormatted: entry.serviceDate, timeFormatted: entry.postedAt.toLocaleTimeString("en-GB", { timeZone: targetProperty.timezone, hour: "2-digit", minute: "2-digit" }) });
+      }
+      for (const receipt of directFnbCollections as any[]) {
+        rows.push({ id: receipt.id, orderNo: receipt.receiptNo, kotNumbers: receipt.kotNo || "", kotsCount: 0, destinationCategory: receipt.category.startsWith("BAR") ? "BAR_LOUNGE" : "TAKEAWAY", destinationLabel: receipt.categoryLabel, roomNo: "—", guestName: receipt.payerName, itemsSummary: receipt.notes || receipt.reference, itemCount: 0, taxableAmount: null, cgst: null, sgst: null, igst: null, totalTax: null, totalAmount: receipt.amount, taxStatus: receipt.taxStatus, settlementType: "DIRECT_PAID", status: receipt.category === "BANQUET_EVENT_ADVANCE" ? "ADVANCE_RECEIVED" : "PAID", createdAt: receipt.receivedAt, dateFormatted: receipt.dateFormatted, timeFormatted: receipt.timeFormatted });
+      }
+      const settled = rows.filter(row => row.settlementType !== "UNSETTLED");
+      const totals = {
+        grossCollection: settled.reduce((sum, row) => sum + row.totalAmount, 0),
+        taxableSales: settled.reduce((sum, row) => sum + (row.taxableAmount ?? 0), 0),
+        gstCollected: settled.reduce((sum, row) => sum + (row.totalTax ?? 0), 0),
+        folioPostedAmount: settled.filter(row => row.settlementType === "POSTED_TO_ROOM").reduce((sum, row) => sum + row.totalAmount, 0),
+        directSettledAmount: settled.filter(row => row.settlementType === "DIRECT_PAID").reduce((sum, row) => sum + row.totalAmount, 0),
+      };
       const directFnbTotal = directFnbCollections.reduce((sum: number, d: any) => sum + d.amount, 0);
-      const directFnbTaxable = directFnbCollections.reduce((sum: number, d: any) => sum + d.taxableAmount, 0);
-      const directFnbTax = directFnbCollections.reduce((sum: number, d: any) => sum + d.taxAmount, 0);
-
-      const combinedGross = totalGross + directFnbTotal;
-      const combinedTaxable = totalTaxable + directFnbTaxable;
-      const combinedGst = totalGst + directFnbTax;
-      const combinedDirectSettled = directSettledAmount + directFnbTotal;
 
       return NextResponse.json({
         reportType: "FNB",
         dayCycle: "12:00 AM – 12:00 AM Midnight",
         generatedAt: new Date().toISOString(),
         summary: {
-          totalOrdersCount: orders.length,
-          totalKotsFired: totalKotsCount,
-          totalItemsPrepared,
-          grossCollection: combinedGross,
-          taxableSales: combinedTaxable,
-          gstCollected: combinedGst,
-          folioPostedAmount,
-          directSettledAmount: combinedDirectSettled,
+          totalOrdersCount: rows.length,
+          totalKotsFired: rows.reduce((sum, row) => sum + row.kotsCount, 0),
+          totalItemsPrepared: rows.reduce((sum, row) => sum + row.itemCount, 0),
+          ...totals,
+          unverifiedTaxAmount: settled.filter(row => row.totalTax == null).reduce((sum, row) => sum + row.totalAmount, 0),
+          openOrderValue: rows.filter(row => row.settlementType === "UNSETTLED").reduce((sum, row) => sum + row.totalAmount, 0),
           directFnbTotal,
           destinationsBreakdown,
         },
@@ -924,12 +969,7 @@ export async function GET(request: Request) {
         const assignments = stay.roomAssignments;
 
         for (const endedAssign of assignments.filter((a) => a.endsAt)) {
-          const succeedingAssign = assignments.find(
-            (a) =>
-              a.id !== endedAssign.id &&
-              a.roomId !== endedAssign.roomId &&
-              new Date(a.startsAt).getTime() >= new Date(endedAssign.startsAt).getTime() + 10000
-          );
+          const succeedingAssign = nextReportRoomAssignment(endedAssign, assignments);
 
           if (succeedingAssign) {
             const transferTime = endedAssign.endsAt;
@@ -945,8 +985,7 @@ export async function GET(request: Request) {
 
             let agreedRate = 0;
             if (succeedingAssign.moveReason?.includes("AGREED_RATE:")) {
-              const parts = succeedingAssign.moveReason.split(":");
-              agreedRate = Number(parts[1]) || 0;
+              agreedRate = Number(succeedingAssign.moveReason.match(/AGREED_RATE:(\d+(?:\.\d+)?)/)?.[1]) || 0;
             }
 
             rawTransfers.push({
@@ -960,7 +999,7 @@ export async function GET(request: Request) {
               transferDate: transferTime?.toISOString(),
               formattedDate: transferTime
                 ? new Date(transferTime).toLocaleString("en-IN", {
-                    timeZone: "Asia/Kolkata",
+                    timeZone: targetProperty.timezone,
                     dateStyle: "medium",
                     timeStyle: "short",
                   })
@@ -1044,64 +1083,20 @@ export async function GET(request: Request) {
       const bills = stays.map((stay) => {
         const grc = grcMap.get(stay.id);
         const folio = stay.folio;
-        const entries = folio?.entries || [];
+        const entries = (folio?.entries || []).filter(e => e.status === "POSTED" && ["CHARGE", "ADJUSTMENT"].includes(e.type));
         const payments = folio?.payments || [];
 
-        const roomTariff = entries
-          .filter((e) => (e.chargeCode === "ROOM_TARIFF" || e.chargeCode === "STAY_EXTENSION") && e.type === "CHARGE")
-          .reduce((sum, e) => sum + e.totalAmount, 0);
-
-        const extraPax = entries
-          .filter((e) => e.chargeCode === "EXTRA_PAX" && e.type === "CHARGE")
-          .reduce((sum, e) => sum + e.totalAmount, 0);
-
-        const fnbCharges = entries
-          .filter(
-            (e) =>
-              ["FOOD", "RESTAURANT", "ROOM_SERVICE", "DINNER", "BREAKFAST"].some(
-                (k) =>
-                  e.chargeCode.includes(k) ||
-                  e.description.toLowerCase().includes("dinner") ||
-                  e.description.toLowerCase().includes("food")
-              ) && e.type === "CHARGE"
-          )
-          .reduce((sum, e) => sum + e.totalAmount, 0);
-
-        const otherCharges = entries
-          .filter(
-            (e) =>
-              e.chargeCode !== "ROOM_TARIFF" &&
-              e.chargeCode !== "STAY_EXTENSION" &&
-              e.chargeCode !== "EXTRA_PAX" &&
-              !["FOOD", "RESTAURANT", "ROOM_SERVICE", "DINNER", "BREAKFAST"].some(
-                (k) =>
-                  e.chargeCode.includes(k) ||
-                  e.description.toLowerCase().includes("dinner") ||
-                  e.description.toLowerCase().includes("food")
-              ) &&
-              e.type === "CHARGE"
-          )
-          .reduce((sum, e) => sum + e.totalAmount, 0);
-
-        const taxableAmount = entries
-          .filter((e) => e.type === "CHARGE")
-          .reduce((sum, e) => sum + (e.taxableAmount || 0), 0);
-
-        let totalCgst = 0;
-        let totalSgst = 0;
-        for (const e of entries.filter((x) => x.type === "CHARGE")) {
-          if (e.taxComponentsJson) {
-            try {
-              const comp = JSON.parse(e.taxComponentsJson);
-              totalCgst += Number(comp.cgstAmount || 0);
-              totalSgst += Number(comp.sgstAmount || 0);
-            } catch {}
-          }
-        }
-
-        const grossTotal = entries
-          .filter((e) => e.type === "CHARGE")
-          .reduce((sum, e) => sum + e.totalAmount, 0);
+        const ledger = summarizeReportLedger(entries);
+        const sum = (predicate: (e: typeof entries[number]) => boolean) => entries.filter(predicate).reduce((total, e) => total + e.totalAmount, 0);
+        const roomTariff = sum(e => revenueDepartment(e) === "room" && !["EXTRA_PAX", "EXTRA_BED"].includes(e.chargeCode));
+        const extraPax = sum(e => ["EXTRA_PAX", "EXTRA_BED"].includes(e.chargeCode));
+        const fnbCharges = sum(e => revenueDepartment(e) === "food");
+        const otherCharges = sum(e => revenueDepartment(e) === "other");
+        const taxableAmount = ledger.total.base;
+        const totalCgst = ledger.total.cgst;
+        const totalSgst = ledger.total.sgst;
+        const totalIgst = ledger.total.igst;
+        const grossTotal = ledger.total.gross;
 
         const totalPaid = payments
           .filter((p) => p.status === "SUCCEEDED")
@@ -1153,7 +1148,7 @@ export async function GET(request: Request) {
           )
         );
 
-        const methods = Array.from(new Set(payments.map((p) => p.method).filter(Boolean)));
+        const methods = Array.from(new Set(payments.filter(p => p.status === "SUCCEEDED").map((p) => p.method).filter(Boolean)));
         const methodDisplay =
           methods.length === 0
             ? "UNPAID"
@@ -1161,15 +1156,11 @@ export async function GET(request: Request) {
             ? methods[0]
             : `SPLIT (${methods.join(", ")})`;
 
-        const invoices = folio?.windows?.flatMap((w) => w.invoices || []) || [];
+        const invoices = (folio?.windows?.flatMap(w => w.invoices || []) || []).filter(invoice => ["ISSUED", "CREDITED"].includes(invoice.status)).sort((a, b) => b.issuedAt.getTime() - a.issuedAt.getTime());
         const primaryInvoice = invoices[0] || null;
-        const stayDate = stay.arrivalAt || new Date();
-        const sYear = new Date(stayDate).getFullYear();
-        const sMonth = new Date(stayDate).getMonth();
-        const sFy = `${String(sMonth >= 3 ? sYear : sYear - 1).slice(-2)}${String((sMonth >= 3 ? sYear : sYear - 1) + 1).slice(-2)}`;
-        const invoiceNo = primaryInvoice?.invoiceNo || `INV-${sFy}-${stay.id.slice(-4).toUpperCase()}`;
+        const invoiceNo = primaryInvoice?.invoiceNo || "Not invoiced";
 
-        const balance = Math.round((folio?.balance ?? (grossTotal - totalPaid)) * 100) / 100;
+        const balance = Math.round((grossTotal - totalPaid) * 100) / 100;
         const isOutstanding = balance > 0.5;
         const settlementStatus =
           isOutstanding
@@ -1203,14 +1194,15 @@ export async function GET(request: Request) {
           taxableAmount: Math.round(taxableAmount * 100) / 100,
           totalCgst: Math.round(totalCgst * 100) / 100,
           totalSgst: Math.round(totalSgst * 100) / 100,
-          totalTax: Math.round((totalCgst + totalSgst) * 100) / 100,
+          totalIgst: Math.round(totalIgst * 100) / 100,
+          totalTax: ledger.total.tax,
           grossTotal,
           totalPaid,
           balance,
           isOutstanding,
           settlementStatus,
           paymentMethod: methodDisplay,
-          paymentsList: payments.map((p) => ({
+          paymentsList: payments.filter(p => p.status === "SUCCEEDED").map((p) => ({
             method: p.method,
             amount: p.amount,
             receiptNo: p.receiptNo,
@@ -1259,7 +1251,7 @@ export async function GET(request: Request) {
         stayWhere.arrivalAt = { lte: dateFilter.lte };
         stayWhere.OR = [
           { actualDepartureAt: null },
-          { actualDepartureAt: { gte: dateFilter.gte } },
+          { actualDepartureAt: { gt: dateFilter.lte } },
         ];
       }
 
@@ -1274,10 +1266,10 @@ export async function GET(request: Request) {
             include: {
               windows: {
                 include: {
-                  entries: { where: { status: "POSTED" } },
+                  entries: { where: { status: "POSTED", type: { in: ["CHARGE", "ADJUSTMENT"] }, ...(dateFilter ? { serviceDate: { lte: date || endDate } } : {}) } },
                 },
               },
-              payments: { where: { status: "SUCCEEDED" } },
+              payments: { where: { status: "SUCCEEDED", ...(dateFilter ? { receivedAt: { lte: dateFilter.lte } } : {}) } },
             },
           },
         },
@@ -1295,50 +1287,28 @@ export async function GET(request: Request) {
 
       for (const stay of stays) {
         const assignments = stay.roomAssignments || [];
-        const activeAssignments = assignments.filter((a) => !a.endsAt || (dateFilter && (!stay.actualDepartureAt || new Date(stay.actualDepartureAt) >= dateFilter.gte)));
-        const targetAssignments = activeAssignments.length > 0 ? activeAssignments : [assignments[0]];
-
-        const allEntries = stay.folio?.windows?.flatMap((w) => w.entries) || [];
+        const asOf = dateFilter?.lte || new Date();
+        const activeAssignments = assignments.filter(a => a.startsAt <= asOf && (!a.endsAt || a.endsAt > asOf));
+        const targetAssignments = activeAssignments.length ? activeAssignments : [undefined];
+        const allEntries = stay.folio?.windows?.flatMap(w => w.entries) || [];
         const allPayments = stay.folio?.payments || [];
-        const totalCharges = allEntries.reduce((s, e) => s + e.totalAmount, 0);
-        const totalPayments = allPayments.reduce((s, p) => s + p.amount, 0);
-
-        const allRoomNumbers = targetAssignments.map((a) => a?.room?.number || "Unassigned");
+        const allRoomNumbers = targetAssignments.map(a => a?.room?.number || "Unassigned");
         const isMultiRoom = allRoomNumbers.length > 1;
-
-        for (const assignment of targetAssignments) {
+        const chargesByRoom = allocateReportAmounts(allRoomNumbers, allEntries.map(e => ({ amount: e.totalAmount, text: e.description })));
+        const paymentsByRoom = allocateReportAmounts(allRoomNumbers, allPayments.map(p => ({ amount: p.amount, text: `${p.reference || ""} ${p.payerSnapshot || ""}` })));
+        for (const [index, assignment] of targetAssignments.entries()) {
           const roomNo = assignment?.room?.number || "Unassigned";
           const roomTypeName = assignment?.room?.roomType?.name || "Standard";
-
-          // If multi-room, isolate room charges
-          const roomEntries = isMultiRoom
-            ? allEntries.filter((e) => isEntryForRoom(e, roomNo, allRoomNumbers))
-            : allEntries;
-          const roomCharges = roomEntries.length > 0 ? roomEntries.reduce((s, e) => s + e.totalAmount, 0) : (isMultiRoom ? totalCharges / targetAssignments.length : totalCharges);
-
-          // Room payments
-          let roomPaid = 0;
-          if (isMultiRoom) {
-            allPayments.forEach((p) => {
-              const text = `${p.reference || ""} ${p.payerSnapshot || ""}`;
-              if (new RegExp(`\\b(?:Room|Rm)\\s*#?\\s*${roomNo}\\b`, "i").test(text)) {
-                roomPaid += p.amount;
-              }
-            });
-            if (roomPaid === 0 && allPayments.length > 0) {
-              roomPaid = totalPayments / targetAssignments.length;
-            }
-          } else {
-            roomPaid = totalPayments;
-          }
+          const roomCharges = chargesByRoom[index];
+          const roomPaid = paymentsByRoom[index];
 
           const roomBalance = Math.round((roomCharges - roomPaid) * 100) / 100;
           let status: "CLEARED" | "DUE_REMAINING" | "SURPLUS_CREDIT" = "CLEARED";
-          if (roomBalance > 1.0) {
+          if (roomBalance > 0.005) {
             status = "DUE_REMAINING";
             dueCount++;
             totalDueSum += roomBalance;
-          } else if (roomBalance < -1.0) {
+          } else if (roomBalance < -0.005) {
             status = "SURPLUS_CREDIT";
             surplusCount++;
             totalSurplusSum += Math.abs(roomBalance);
@@ -1355,7 +1325,7 @@ export async function GET(request: Request) {
           if ((stay.primaryGuest as any).addressJson) {
             try {
               const parsedAddr = JSON.parse((stay.primaryGuest as any).addressJson);
-              addressStr = [parsedAddr.street, parsedAddr.city, parsedAddr.state, parsedAddr.postalCode, parsedAddr.country]
+              addressStr = [parsedAddr.streetAddress || parsedAddr.street, parsedAddr.city, parsedAddr.state, parsedAddr.pinZipCode || parsedAddr.postalCode, parsedAddr.country]
                 .filter(Boolean)
                 .join(", ");
             } catch {}
@@ -1372,6 +1342,11 @@ export async function GET(request: Request) {
             residentialAddress: addressStr,
             companyName: stay.primaryGuest.companyName || "",
             gstin: stay.primaryGuest.gstin || "",
+            checkIn: reportDateOf(stay.arrivalAt, targetProperty.timezone),
+            expectedDeparture: reportDateOf(stay.expectedDepartureAt, targetProperty.timezone),
+            rateHandling: "Recorded folio charges",
+            surplusCredit: Math.max(0, -roomBalance),
+            totalPaid: Math.round(roomPaid * 100) / 100,
             arrivalDate: stay.arrivalAt.toISOString(),
             expectedDepartureDate: stay.expectedDepartureAt.toISOString(),
             actualDepartureDate: stay.actualDepartureAt?.toISOString() || null,
@@ -1392,9 +1367,14 @@ export async function GET(request: Request) {
       return NextResponse.json({
         reportType: "INHOUSE_GUEST_OUTSTANDING",
         property,
+        asOfDate: date || endDate || property?.businessDate,
+        rooms: guestRows,
         filterDate: date || property?.businessDate || new Date().toISOString().split("T")[0],
         summary: {
           totalOccupied,
+          totalOccupiedRooms: totalOccupied,
+          totalDueRemaining: Math.round(totalDueSum * 100) / 100,
+          totalSurplusCredit: Math.round(totalSurplusSum * 100) / 100,
           clearedCount,
           clearedPercentage,
           dueCount,
@@ -1410,6 +1390,6 @@ export async function GET(request: Request) {
 
     return NextResponse.json({ error: "Invalid report type" }, { status: 400 });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: error.message }, { status: error instanceof RangeError ? 400 : 500 });
   }
 }

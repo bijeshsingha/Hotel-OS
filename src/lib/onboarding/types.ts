@@ -3,6 +3,7 @@
  */
 
 export interface OnboardingPropertyData {
+  organizationId?: string;
   // 1. Identity & Legal
   displayName: string;       // e.g. "Hotel Ambarish Grand Residency"
   legalName: string;         // e.g. "AMBARISH RESIDENCY"

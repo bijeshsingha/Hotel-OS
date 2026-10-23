@@ -72,7 +72,7 @@ const ADMIN_SECTIONS = [
 ];
 
 export default function AdminPortalPage() {
-  const { activeProperty, refreshData, refreshKey, user } = useHotel();
+  const { activeProperty, refreshData, refreshKey, user, activeRole } = useHotel();
 
   const isSuperAdmin =
     user?.activeRole === "ORG_OWNER" ||
@@ -103,8 +103,8 @@ export default function AdminPortalPage() {
 
   // Check existing session & URL tab query
   useEffect(() => {
-    const token = sessionStorage.getItem("hotelos_admin_token");
-    if (token) {
+    sessionStorage.removeItem("hotelos_admin_token");
+    if (user && (activeRole === "ORG_OWNER" || activeRole === "ADMIN_GM")) {
       setIsAuthenticated(true);
     }
     if (typeof window !== "undefined") {
@@ -118,7 +118,7 @@ export default function AdminPortalPage() {
         setActiveTab(tabParam as any);
       }
     }
-  }, []);
+  }, [user, activeRole]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -135,7 +135,7 @@ export default function AdminPortalPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Invalid credentials");
 
-      sessionStorage.setItem("hotelos_admin_token", data.token);
+      // Privileged APIs verify the signed-in session on every request.
       setIsAuthenticated(true);
       showToast("Master Admin unlocked successfully!");
     } catch (err: any) {
@@ -981,23 +981,23 @@ export default function AdminPortalPage() {
   if (!isSuperAdmin) {
     return (
       <div className="min-h-[70vh] flex flex-col items-center justify-center p-6 text-center">
-        <div className="w-full max-w-md rounded-3xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 p-8 shadow-xl space-y-4">
-          <div className="h-14 w-14 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400 flex items-center justify-center mx-auto">
+        <div className="w-full max-w-md rounded-3xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 p-8 shadow-xl space-y-4 ui-radius-panel ui-surface">
+          <div className="h-14 w-14 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400 flex items-center justify-center mx-auto ui-radius-panel">
             <Lock className="h-7 w-7" />
           </div>
           <div className="space-y-1">
-            <h2 className="text-lg font-bold text-zinc-900 dark:text-white">Super Admin Access Required</h2>
-            <p className="text-xs text-zinc-500 dark:text-zinc-400">
+            <h2 className="text-lg font-bold text-zinc-900 dark:text-white ui-weight-medium ui-section-title">Super Admin Access Required</h2>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400 ui-text-body">
               The Master Admin Suite is strictly restricted to Organization Owners & Super Administrators.
             </p>
           </div>
-          <div className="p-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs font-mono text-zinc-600 dark:text-zinc-400">
-            Active Account: <span className="font-bold text-zinc-900 dark:text-white">@{user?.username || "staff"}</span> ({user?.activeRole || "STAFF"})
+          <div className="p-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs font-mono text-zinc-600 dark:text-zinc-400 ui-text-body ui-font-body">
+            Active Account: <span className="font-bold text-zinc-900 dark:text-white ui-weight-medium">@{user?.username || "staff"}</span> ({user?.activeRole || "STAFF"})
           </div>
           <div className="pt-2">
             <Link
               href="/pms"
-              className="inline-flex items-center justify-center w-full px-4 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 dark:bg-white dark:hover:bg-zinc-200 text-white dark:text-zinc-950 font-bold text-xs transition"
+              className="inline-flex items-center justify-center w-full px-4 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 dark:bg-white dark:hover:bg-zinc-200 text-white dark:text-zinc-950 font-bold text-xs transition ui-weight-medium ui-text-body"
             >
               Return to Front Desk
             </Link>
@@ -1013,22 +1013,22 @@ export default function AdminPortalPage() {
   if (!isAuthenticated) {
     return (
       <div className="min-h-[85vh] flex items-center justify-center p-4">
-        <div className="w-full max-w-md bg-white dark:bg-[#111114] border border-zinc-200/80 dark:border-zinc-800/80 rounded-3xl p-6 sm:p-8 shadow-xl space-y-6">
+        <div className="w-full max-w-md bg-white dark:bg-[#111114] border border-zinc-200/80 dark:border-zinc-800/80 rounded-3xl p-6 sm:p-8 shadow-xl space-y-6 ui-radius-panel ui-surface">
           
           <div className="text-center space-y-2">
-            <div className="h-14 w-14 rounded-2xl bg-blue-50 dark:bg-blue-600/10 border border-blue-200/80 dark:border-blue-500/20 text-blue-600 dark:text-blue-400 flex items-center justify-center mx-auto shadow-xs">
+            <div className="h-14 w-14 rounded-2xl bg-blue-50 dark:bg-blue-600/10 border border-blue-200/80 dark:border-blue-500/20 text-blue-600 dark:text-blue-400 flex items-center justify-center mx-auto shadow-xs ui-radius-panel ui-shadow-quiet">
               <Shield className="h-7 w-7" />
             </div>
-            <h1 className="text-xl font-black text-zinc-900 dark:text-white tracking-tight">
+            <h1 className="text-xl font-black text-zinc-900 dark:text-white tracking-tight ui-weight-medium ui-page-title">
               Master Admin Portal
             </h1>
-            <p className="text-xs text-zinc-500 dark:text-zinc-400 font-medium">
+            <p className="text-xs text-zinc-500 dark:text-zinc-400 font-medium ui-text-body">
               Administrative credentials required to edit hotel database, GRC details, rates, and inventory.
             </p>
           </div>
 
           {authError && (
-            <div className="p-3.5 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/60 text-rose-800 dark:text-rose-300 text-xs font-bold flex items-center gap-2">
+            <div className="p-3.5 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/60 text-rose-800 dark:text-rose-300 text-xs font-bold flex items-center gap-2 ui-text-body ui-weight-medium">
               <AlertTriangle className="h-4 w-4 shrink-0 text-rose-600" />
               <span>{authError}</span>
             </div>
@@ -1036,7 +1036,7 @@ export default function AdminPortalPage() {
 
           <form onSubmit={handleLogin} className="space-y-4">
             <div className="space-y-1.5">
-              <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+              <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 ui-text-body ui-label">
                 Admin Username
               </label>
               <input
@@ -1044,13 +1044,13 @@ export default function AdminPortalPage() {
                 required
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                className="w-full h-11 px-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-base sm:text-xs text-zinc-900 dark:text-white font-mono font-bold focus:border-blue-600 focus:outline-none transition"
-                placeholder="admin"
+                className="w-full h-11 px-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-base sm:text-xs text-zinc-900 dark:text-white font-mono font-bold focus:border-blue-600 focus:outline-none transition ui-radius-control ui-font-body ui-weight-medium ui-field"
+                placeholder="admin" aria-label="Admin Username"
               />
             </div>
 
             <div className="space-y-1.5">
-              <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+              <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 ui-text-body ui-label">
                 Master Password
               </label>
               <div className="relative">
@@ -1059,21 +1059,21 @@ export default function AdminPortalPage() {
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full h-11 px-3.5 pr-10 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-base sm:text-xs text-zinc-900 dark:text-white font-mono font-bold focus:border-blue-600 focus:outline-none transition"
-                  placeholder="Enter admin password..."
+                  className="w-full h-11 px-3.5 pr-10 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-base sm:text-xs text-zinc-900 dark:text-white font-mono font-bold focus:border-blue-600 focus:outline-none transition ui-radius-control ui-font-body ui-weight-medium ui-field"
+                  placeholder="Enter admin password..." aria-label="Master Password"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-3 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 cursor-pointer"
+                  className="absolute right-3 top-3 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 cursor-pointer ui-control"
                 >
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
               </div>
             </div>
 
-            <div className="p-3 rounded-xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200/80 dark:border-zinc-800 text-[11px] text-zinc-500 font-mono space-y-1">
-              <div className="font-bold text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
+            <div className="p-3 rounded-xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200/80 dark:border-zinc-800 text-[11px] text-zinc-500 font-mono space-y-1 ui-text-meta ui-font-body">
+              <div className="font-bold text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5 ui-weight-medium">
                 <KeyRound className="h-3.5 w-3.5 text-blue-600" />
                 <span>Default Admin Login:</span>
               </div>
@@ -1084,7 +1084,7 @@ export default function AdminPortalPage() {
             <button
               type="submit"
               disabled={authLoading}
-              className="w-full h-11 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center justify-center gap-2 transition shadow-xs active:scale-98 cursor-pointer disabled:opacity-50"
+              className="w-full h-11 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center justify-center gap-2 transition shadow-xs  cursor-pointer disabled:opacity-50 ui-radius-control ui-weight-medium ui-text-body ui-shadow-quiet ui-control ui-control-sized"
             >
               {authLoading ? (
                 <>
@@ -1109,23 +1109,23 @@ export default function AdminPortalPage() {
   if (!isSuperAdmin) {
     return (
       <div className="min-h-[70vh] flex flex-col items-center justify-center p-6 text-center">
-        <div className="w-full max-w-md rounded-3xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 p-8 shadow-xl space-y-4">
-          <div className="h-14 w-14 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400 flex items-center justify-center mx-auto">
+        <div className="w-full max-w-md rounded-3xl bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 p-8 shadow-xl space-y-4 ui-radius-panel ui-surface">
+          <div className="h-14 w-14 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400 flex items-center justify-center mx-auto ui-radius-panel">
             <Lock className="h-7 w-7" />
           </div>
           <div className="space-y-1">
-            <h2 className="text-lg font-bold text-zinc-900 dark:text-white">Super Admin Access Required</h2>
-            <p className="text-xs text-zinc-500 dark:text-zinc-400">
+            <h2 className="text-lg font-bold text-zinc-900 dark:text-white ui-weight-medium ui-section-title">Super Admin Access Required</h2>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400 ui-text-body">
               The Master Database & Admin Suite is restricted to Organization Owners & Super Administrators.
             </p>
           </div>
-          <div className="p-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs font-mono text-zinc-600 dark:text-zinc-400">
-            Active User: <span className="font-bold text-zinc-900 dark:text-white">@{user?.username || "staff"}</span> ({user?.activeRole || "STAFF"})
+          <div className="p-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs font-mono text-zinc-600 dark:text-zinc-400 ui-text-body ui-font-body">
+            Active User: <span className="font-bold text-zinc-900 dark:text-white ui-weight-medium">@{user?.username || "staff"}</span> ({user?.activeRole || "STAFF"})
           </div>
           <div className="pt-2">
             <a
               href="/pms"
-              className="inline-flex items-center justify-center w-full px-4 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 dark:bg-white dark:hover:bg-zinc-200 text-white dark:text-zinc-950 font-bold text-xs transition"
+              className="inline-flex items-center justify-center w-full px-4 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 dark:bg-white dark:hover:bg-zinc-200 text-white dark:text-zinc-950 font-bold text-xs transition ui-weight-medium ui-text-body"
             >
               Return to Front Desk
             </a>
@@ -1144,7 +1144,7 @@ export default function AdminPortalPage() {
       {/* Toast Notification */}
       {toastMessage && (
         <div
-          className={`fixed bottom-6 right-6 z-50 px-4 py-3 rounded-2xl shadow-2xl font-bold text-xs flex items-center gap-2 animate-in slide-in-from-bottom duration-200 ${
+          className={`fixed bottom-6 right-6 z-50 px-4 py-3 rounded-2xl shadow-2xl font-bold text-xs flex items-center gap-2  slide-in-from-bottom duration-200  ui-radius-panel ui-dialog-surface ui-weight-medium ui-text-body ${
             toastMessage.type === "success"
               ? "bg-emerald-600 text-white shadow-emerald-600/30"
               : "bg-rose-600 text-white shadow-rose-600/30"
@@ -1160,21 +1160,21 @@ export default function AdminPortalPage() {
       )}
 
       {/* 1. TOP EXECUTIVE PAGE HEADER */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 sm:p-5 rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200/80 dark:border-zinc-800/80 shadow-xs">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 sm:p-5 rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200/80 dark:border-zinc-800/80 shadow-xs ui-radius-panel ui-shadow-quiet ui-surface">
         <div>
-          <div className="text-[11px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider mb-0.5">
+          <div className="text-[11px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider mb-0.5 ui-text-meta ui-weight-medium">
             Master admin / {ADMIN_SECTIONS.find((s) => s.id === activeTab)?.label || "Hotel & property"}
           </div>
           <div className="flex items-center gap-2.5 flex-wrap">
-            <h1 className="text-xl sm:text-2xl font-black text-zinc-900 dark:text-white tracking-tight">
+            <h1 className="text-xl sm:text-2xl font-black text-zinc-900 dark:text-white tracking-tight ui-weight-medium ui-page-title">
               Master Database & Admin Suite
             </h1>
-            <span className="inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60 font-mono">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 inline-block animate-pulse" />
+            <span className="inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60 font-mono ui-text-meta ui-weight-medium ui-font-body">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 inline-block " />
               Database connected
             </span>
           </div>
-          <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 font-medium">
+          <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 font-medium ui-text-body">
             Manage property identity, tax records, operating defaults and system data.
           </p>
         </div>
@@ -1184,7 +1184,7 @@ export default function AdminPortalPage() {
           <button
             type="button"
             onClick={handleLogout}
-            className="h-10 px-3.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 font-semibold text-xs flex items-center gap-2 transition cursor-pointer border border-zinc-200/80 dark:border-zinc-700"
+            className="h-10 px-3.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 font-semibold text-xs flex items-center gap-2 transition cursor-pointer border border-zinc-200/80 dark:border-zinc-700 ui-radius-control ui-text-body ui-control ui-control-sized"
           >
             <Lock className="h-4 w-4 text-zinc-500" />
             <span>Lock admin</span>
@@ -1195,7 +1195,7 @@ export default function AdminPortalPage() {
       {/* 2. ADMIN TOP NAVIGATION BAR */}
       <div className="w-full">
         {/* Mobile View (< 640px): 7 numbered compact pill buttons */}
-        <div className="sm:hidden grid grid-cols-7 gap-1 p-1 rounded-2xl bg-zinc-100 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 text-xs font-bold shadow-xs">
+        <div className="sm:hidden grid grid-cols-7 gap-1 p-1 rounded-2xl bg-zinc-100 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 text-xs font-bold shadow-xs ui-radius-panel ui-text-body ui-weight-medium ui-shadow-quiet">
           {ADMIN_SECTIONS.map((sec, idx) => (
             <button
               key={sec.id}
@@ -1203,19 +1203,19 @@ export default function AdminPortalPage() {
               onClick={() => setActiveTab(sec.id)}
               className={`py-2 px-0.5 rounded-xl text-center transition flex flex-col items-center justify-center gap-0.5 min-h-[44px] cursor-pointer ${
                 activeTab === sec.id
-                  ? "bg-white dark:bg-[#18181b] text-blue-600 dark:text-blue-400 shadow-xs font-black border border-zinc-200 dark:border-zinc-700"
+                  ? "bg-white dark:bg-[#18181b] text-blue-600 dark:text-blue-400 shadow-xs font-black border border-zinc-200 dark:border-zinc-700 ui-shadow-quiet ui-weight-medium"
                   : "text-zinc-500 hover:text-zinc-900 dark:hover:text-white"
-              }`}
-              title={sec.label}
+              } ui-control`}
+              title={sec.label} aria-label={sec.label}
             >
-              <span className="text-[12px] font-black">{idx + 1}</span>
-              <span className="text-[9px] truncate max-w-full font-medium">{sec.shortLabel}</span>
+              <span className="text-[12px] font-black ui-weight-medium">{idx + 1}</span>
+              <span className="text-[9px] truncate max-w-full font-medium ui-text-meta">{sec.shortLabel}</span>
             </button>
           ))}
         </div>
 
         {/* Desktop & Tablet View (>= 640px): 7-Column Responsive Navigation Pill Strip */}
-        <div className="hidden sm:grid sm:grid-cols-7 gap-1 p-1 rounded-2xl bg-zinc-100 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 text-xs font-bold shadow-xs">
+        <div className="hidden sm:grid sm:grid-cols-7 gap-1 p-1 rounded-2xl bg-zinc-100 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 text-xs font-bold shadow-xs ui-radius-panel ui-text-body ui-weight-medium ui-shadow-quiet">
           {ADMIN_SECTIONS.map((sec, idx) => {
             const Icon = sec.icon;
             const isSelected = activeTab === sec.id;
@@ -1224,12 +1224,12 @@ export default function AdminPortalPage() {
                 key={sec.id}
                 type="button"
                 onClick={() => setActiveTab(sec.id)}
-                className={`h-10 px-2 rounded-xl transition flex items-center justify-center gap-2 cursor-pointer font-bold truncate ${
+                className={`h-10 px-2 rounded-xl transition flex items-center justify-center gap-2 cursor-pointer font-bold truncate  ui-weight-medium ${
                   isSelected
-                    ? "bg-white dark:bg-[#18181b] text-blue-600 dark:text-blue-400 shadow-xs border border-zinc-200/90 dark:border-zinc-700 font-extrabold"
+                    ? "bg-white dark:bg-[#18181b] text-blue-600 dark:text-blue-400 shadow-xs border border-zinc-200/90 dark:border-zinc-700 font-extrabold ui-shadow-quiet ui-weight-medium"
                     : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-white/50 dark:hover:bg-zinc-800/50 font-semibold"
-                }`}
-                title={sec.label}
+                } ui-control`}
+                title={sec.label} aria-label={sec.label}
               >
                 <Icon className={`h-3.5 w-3.5 shrink-0 ${isSelected ? "text-blue-600 dark:text-blue-400" : "text-zinc-400 dark:text-zinc-500"}`} />
                 <span className="truncate">
@@ -1249,20 +1249,20 @@ export default function AdminPortalPage() {
               TAB CONTENT 1: HOTEL & PROPERTY CONFIGURATION FORM
           ==================================================== */}
           {activeTab === "HOTEL" && (
-            <div className="bg-white dark:bg-[#111114] border border-zinc-200/80 dark:border-zinc-800/80 rounded-2xl p-5 sm:p-6 space-y-6 shadow-xs">
+            <div className="bg-white dark:bg-[#111114] border border-zinc-200/80 dark:border-zinc-800/80 rounded-2xl p-5 sm:p-6 space-y-6 shadow-xs ui-radius-panel ui-shadow-quiet ui-surface">
               
               <div className="border-b border-zinc-200/80 dark:border-zinc-800 pb-4">
-                <h2 className="text-base font-bold text-zinc-900 dark:text-white flex items-center gap-2">
+                <h2 className="text-base font-bold text-zinc-900 dark:text-white flex items-center gap-2 ui-weight-medium ui-section-title">
                   <Building2 className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                   <span>Hotel & Property Master Configuration</span>
                 </h2>
-                <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+                <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5 ui-text-body">
                   Official property identity, legal entity name, GSTIN Rule 46 records, and business cycle defaults.
                 </p>
               </div>
 
               {hotelLoading ? (
-                <div className="py-16 text-center font-mono text-xs text-zinc-400 flex items-center justify-center gap-2">
+                <div className="py-16 text-center font-mono text-xs text-zinc-400 flex items-center justify-center gap-2 ui-font-body ui-text-body">
                   <RefreshCw className="h-4 w-4 animate-spin text-blue-600" />
                   <span>Loading hotel configuration...</span>
                 </div>
@@ -1273,7 +1273,7 @@ export default function AdminPortalPage() {
                   <div className="space-y-3">
                     <div className="flex items-center gap-2">
                       <span className="h-2 w-2 rounded-full bg-blue-600" />
-                      <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300 ui-text-body ui-weight-medium">
                         1. Identity & Tax
                       </h3>
                     </div>
@@ -1281,7 +1281,7 @@ export default function AdminPortalPage() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                       {/* Display / Marketing Name */}
                       <div className="space-y-1.5">
-                        <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                        <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 ui-text-body ui-label">
                           Display / Marketing Name <span className="text-rose-500">*</span>
                         </label>
                         <input
@@ -1289,14 +1289,14 @@ export default function AdminPortalPage() {
                           required
                           value={hotelForm.displayName}
                           onChange={(e) => setHotelForm({ ...hotelForm, displayName: e.target.value })}
-                          className="w-full h-11 px-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-base sm:text-xs font-bold text-zinc-900 dark:text-white focus:border-blue-600 focus:outline-none transition"
-                          placeholder="e.g. Hotel Ambarish Grand Residency"
+                          className="w-full h-11 px-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-base sm:text-xs font-bold text-zinc-900 dark:text-white focus:border-blue-600 focus:outline-none transition ui-radius-control ui-weight-medium ui-field"
+                          placeholder="e.g. Hotel Ambarish Grand Residency" aria-label="Display / Marketing Name"
                         />
                       </div>
 
                       {/* Legal / Invoicing Business Name */}
                       <div className="space-y-1.5">
-                        <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                        <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 ui-text-body ui-label">
                           Legal / Invoicing Business Name <span className="text-rose-500">*</span>
                         </label>
                         <input
@@ -1304,28 +1304,28 @@ export default function AdminPortalPage() {
                           required
                           value={hotelForm.legalName}
                           onChange={(e) => setHotelForm({ ...hotelForm, legalName: e.target.value })}
-                          className="w-full h-11 px-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-base sm:text-xs font-bold text-zinc-900 dark:text-white focus:border-blue-600 focus:outline-none transition"
-                          placeholder="e.g. AMBARISH RESIDENCY"
+                          className="w-full h-11 px-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-base sm:text-xs font-bold text-zinc-900 dark:text-white focus:border-blue-600 focus:outline-none transition ui-radius-control ui-weight-medium ui-field"
+                          placeholder="e.g. AMBARISH RESIDENCY" aria-label="Legal / Invoicing Business Name"
                         />
                       </div>
 
                       {/* Property Short Code */}
                       <div className="space-y-1.5">
-                        <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                        <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 ui-text-body ui-label">
                           Property Short Code
                         </label>
                         <input
                           type="text"
                           value={hotelForm.code}
                           onChange={(e) => setHotelForm({ ...hotelForm, code: e.target.value.toUpperCase() })}
-                          className="w-full h-11 px-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-base sm:text-xs font-mono font-bold text-zinc-900 dark:text-white focus:border-blue-600 focus:outline-none transition"
-                          placeholder="GUW-01"
+                          className="w-full h-11 px-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-base sm:text-xs font-mono font-bold text-zinc-900 dark:text-white focus:border-blue-600 focus:outline-none transition ui-radius-control ui-font-body ui-weight-medium ui-field"
+                          placeholder="GUW-01" aria-label="Property Short Code"
                         />
                       </div>
 
                       {/* Hotel GSTIN Number */}
                       <div className="space-y-1.5">
-                        <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                        <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 ui-text-body ui-label">
                           Hotel GSTIN Number (15-Digit) <span className="text-rose-500">*</span>
                         </label>
                         <input
@@ -1333,14 +1333,14 @@ export default function AdminPortalPage() {
                           required
                           value={hotelForm.gstin}
                           onChange={(e) => setHotelForm({ ...hotelForm, gstin: e.target.value.toUpperCase() })}
-                          className="w-full h-11 px-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-base sm:text-xs font-mono font-bold text-blue-700 dark:text-blue-400 focus:border-blue-600 focus:outline-none transition"
-                          placeholder="18AACCB2447F1ZX"
+                          className="w-full h-11 px-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-base sm:text-xs font-mono font-bold text-blue-700 dark:text-blue-400 focus:border-blue-600 focus:outline-none transition ui-radius-control ui-font-body ui-weight-medium ui-field"
+                          placeholder="18AACCB2447F1ZX" aria-label="Hotel GSTIN Number (15-Digit)"
                         />
                       </div>
 
                       {/* State Code (GST) */}
                       <div className="space-y-1.5">
-                        <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                        <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 ui-text-body ui-label">
                           State Code (GST) <span className="text-rose-500">*</span>
                         </label>
                         <input
@@ -1348,22 +1348,22 @@ export default function AdminPortalPage() {
                           required
                           value={hotelForm.stateCode}
                           onChange={(e) => setHotelForm({ ...hotelForm, stateCode: e.target.value })}
-                          className="w-full h-11 px-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-base sm:text-xs font-mono font-bold text-zinc-900 dark:text-white focus:border-blue-600 focus:outline-none transition"
-                          placeholder="18 (Assam)"
+                          className="w-full h-11 px-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-base sm:text-xs font-mono font-bold text-zinc-900 dark:text-white focus:border-blue-600 focus:outline-none transition ui-radius-control ui-font-body ui-weight-medium ui-field"
+                          placeholder="18 (Assam)" aria-label="State Code (GST)"
                         />
                       </div>
 
                       {/* Organization PAN */}
                       <div className="space-y-1.5">
-                        <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                        <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 ui-text-body ui-label">
                           Organization PAN
                         </label>
                         <input
                           type="text"
                           value={hotelForm.orgPan}
                           onChange={(e) => setHotelForm({ ...hotelForm, orgPan: e.target.value.toUpperCase() })}
-                          className="w-full h-11 px-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-base sm:text-xs font-mono font-bold text-zinc-900 dark:text-white focus:border-blue-600 focus:outline-none transition"
-                          placeholder="AACCB2447F"
+                          className="w-full h-11 px-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-base sm:text-xs font-mono font-bold text-zinc-900 dark:text-white focus:border-blue-600 focus:outline-none transition ui-radius-control ui-font-body ui-weight-medium ui-field"
+                          placeholder="AACCB2447F" aria-label="Organization PAN"
                         />
                       </div>
                     </div>
@@ -1373,7 +1373,7 @@ export default function AdminPortalPage() {
                   <div className="space-y-3 pt-2">
                     <div className="flex items-center gap-2">
                       <span className="h-2 w-2 rounded-full bg-blue-600" />
-                      <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300 ui-text-body ui-weight-medium">
                         2. Contact & Invoice Details
                       </h3>
                     </div>
@@ -1381,43 +1381,43 @@ export default function AdminPortalPage() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       {/* Official Contact Phone */}
                       <div className="space-y-1.5">
-                        <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                        <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 ui-text-body ui-label">
                           Official Contact Phone
                         </label>
                         <input
                           type="text"
                           value={hotelForm.phone}
                           onChange={(e) => setHotelForm({ ...hotelForm, phone: e.target.value })}
-                          className="w-full h-11 px-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-base sm:text-xs font-mono text-zinc-900 dark:text-white focus:border-blue-600 focus:outline-none transition"
-                          placeholder="+91 361 254 0001"
+                          className="w-full h-11 px-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-base sm:text-xs font-mono text-zinc-900 dark:text-white focus:border-blue-600 focus:outline-none transition ui-radius-control ui-font-body ui-field"
+                          placeholder="+91 361 254 0001" aria-label="Official Contact Phone"
                         />
                       </div>
 
                       {/* Official Email */}
                       <div className="space-y-1.5">
-                        <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                        <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 ui-text-body ui-label">
                           Official Email
                         </label>
                         <input
                           type="email"
                           value={hotelForm.email}
                           onChange={(e) => setHotelForm({ ...hotelForm, email: e.target.value })}
-                          className="w-full h-11 px-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-base sm:text-xs font-mono text-zinc-900 dark:text-white focus:border-blue-600 focus:outline-none transition"
-                          placeholder="reservations@hotelambarish.com"
+                          className="w-full h-11 px-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-base sm:text-xs font-mono text-zinc-900 dark:text-white focus:border-blue-600 focus:outline-none transition ui-radius-control ui-font-body ui-field"
+                          placeholder="reservations@hotelambarish.com" aria-label="Official Email"
                         />
                       </div>
 
                       {/* Full Address */}
                       <div className="space-y-1.5 sm:col-span-2">
-                        <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                        <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 ui-text-body ui-label">
                           Full Address Printed on Tax Invoices
                         </label>
                         <textarea
                           rows={2}
                           value={hotelForm.address}
                           onChange={(e) => setHotelForm({ ...hotelForm, address: e.target.value })}
-                          className="w-full p-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-base sm:text-xs text-zinc-900 dark:text-white focus:border-blue-600 focus:outline-none transition resize-none"
-                          placeholder="Paltan Bazaar, Station Road, Guwahati - 781008, Assam"
+                          className="w-full p-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-base sm:text-xs text-zinc-900 dark:text-white focus:border-blue-600 focus:outline-none transition resize-none ui-radius-control ui-field"
+                          placeholder="Paltan Bazaar, Station Road, Guwahati - 781008, Assam" aria-label="Full Address Printed on Tax Invoices"
                         />
                       </div>
                     </div>
@@ -1427,7 +1427,7 @@ export default function AdminPortalPage() {
                   <div className="space-y-3 pt-2">
                     <div className="flex items-center gap-2">
                       <span className="h-2 w-2 rounded-full bg-blue-600" />
-                      <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300 ui-text-body ui-weight-medium">
                         3. Operating Defaults
                       </h3>
                     </div>
@@ -1435,53 +1435,53 @@ export default function AdminPortalPage() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 p-4 rounded-xl bg-zinc-50/80 dark:bg-zinc-900/40 border border-zinc-200/60 dark:border-zinc-800/60">
                       {/* Active Business Date */}
                       <div className="space-y-1.5">
-                        <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                        <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 ui-text-body ui-label">
                           Active Business Date
                         </label>
                         <input
                           type="date"
                           value={hotelForm.businessDate}
                           onChange={(e) => setHotelForm({ ...hotelForm, businessDate: e.target.value })}
-                          className="w-full h-11 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-base sm:text-xs font-mono font-bold text-zinc-900 dark:text-white focus:border-blue-600 focus:outline-none transition"
+                          className="w-full h-11 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-base sm:text-xs font-mono font-bold text-zinc-900 dark:text-white focus:border-blue-600 focus:outline-none transition ui-radius-control ui-font-body ui-weight-medium ui-surface ui-field" aria-label="Active Business Date"
                         />
                       </div>
 
                       {/* Check-In Time */}
                       <div className="space-y-1.5">
-                        <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                        <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 ui-text-body ui-label">
                           Default Check-In Time
                         </label>
                         <input
                           type="time"
                           value={hotelForm.checkinTime}
                           onChange={(e) => setHotelForm({ ...hotelForm, checkinTime: e.target.value })}
-                          className="w-full h-11 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-base sm:text-xs font-mono font-bold text-zinc-900 dark:text-white focus:border-blue-600 focus:outline-none transition"
+                          className="w-full h-11 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-base sm:text-xs font-mono font-bold text-zinc-900 dark:text-white focus:border-blue-600 focus:outline-none transition ui-radius-control ui-font-body ui-weight-medium ui-surface ui-field" aria-label="Default Check-In Time"
                         />
                       </div>
 
                       {/* Checkout Time */}
                       <div className="space-y-1.5">
-                        <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                        <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 ui-text-body ui-label">
                           Default Checkout Time
                         </label>
                         <input
                           type="time"
                           value={hotelForm.checkoutTime}
                           onChange={(e) => setHotelForm({ ...hotelForm, checkoutTime: e.target.value })}
-                          className="w-full h-11 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-base sm:text-xs font-mono font-bold text-zinc-900 dark:text-white focus:border-blue-600 focus:outline-none transition"
+                          className="w-full h-11 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-base sm:text-xs font-mono font-bold text-zinc-900 dark:text-white focus:border-blue-600 focus:outline-none transition ui-radius-control ui-font-body ui-weight-medium ui-surface ui-field" aria-label="Default Checkout Time"
                         />
                       </div>
 
                       {/* Night Audit Cutoff */}
                       <div className="space-y-1.5">
-                        <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                        <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 ui-text-body ui-label">
                           Night Audit Cutoff
                         </label>
                         <input
                           type="time"
                           value={hotelForm.auditCutoff}
                           onChange={(e) => setHotelForm({ ...hotelForm, auditCutoff: e.target.value })}
-                          className="w-full h-11 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-base sm:text-xs font-mono font-bold text-zinc-900 dark:text-white focus:border-blue-600 focus:outline-none transition"
+                          className="w-full h-11 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-base sm:text-xs font-mono font-bold text-zinc-900 dark:text-white focus:border-blue-600 focus:outline-none transition ui-radius-control ui-font-body ui-weight-medium ui-surface ui-field" aria-label="Night Audit Cutoff"
                         />
                       </div>
                     </div>
@@ -1492,24 +1492,24 @@ export default function AdminPortalPage() {
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <span className="h-2 w-2 rounded-full bg-emerald-600" />
-                        <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">
+                        <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300 ui-text-body ui-weight-medium">
                           4. Physical GRC Book & Sequence Sync
                         </h3>
                       </div>
-                      <span className="text-[11px] font-mono text-emerald-600 dark:text-emerald-400 font-semibold bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded-md border border-emerald-200 dark:border-emerald-800">
+                      <span className="text-[11px] font-mono text-emerald-600 dark:text-emerald-400 font-semibold bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded-md border border-emerald-200 dark:border-emerald-800 ui-text-meta ui-font-body">
                         Active Front Desk Sync
                       </span>
                     </div>
 
                     <div className="p-4 rounded-xl bg-emerald-50/30 dark:bg-emerald-950/20 border border-emerald-200/60 dark:border-emerald-900/40 space-y-3">
-                      <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed">
+                      <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed ui-text-body">
                         Connect digital check-in registrations directly with your physical GRC book in place at the front desk. Setting the starting number will ensure the next guest checked in receives this sequential number.
                       </p>
 
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-1">
                         {/* Starting GRC Number */}
                         <div className="space-y-1.5">
-                          <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                          <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 ui-text-body ui-label">
                             Starting GRC Sequence Number <span className="text-rose-500">*</span>
                           </label>
                           <input
@@ -1526,15 +1526,15 @@ export default function AdminPortalPage() {
                                 grcPreview: `${pref}${String(numVal).padStart(4, "0")}`,
                               });
                             }}
-                            className="w-full h-11 px-3.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-base sm:text-xs font-mono font-bold text-zinc-900 dark:text-white focus:border-emerald-600 focus:outline-none transition"
-                            placeholder="e.g. 501"
+                            className="w-full h-11 px-3.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-base sm:text-xs font-mono font-bold text-zinc-900 dark:text-white focus:border-emerald-600 focus:outline-none transition ui-radius-control ui-font-body ui-weight-medium ui-surface ui-field"
+                            placeholder="e.g. 501" aria-label="Starting GRC Sequence Number"
                           />
-                          <p className="text-[11px] text-zinc-500">Number matching your current physical GRC slip</p>
+                          <p className="text-[11px] text-zinc-500 ui-text-meta">Number matching your current physical GRC slip</p>
                         </div>
 
                         {/* GRC Prefix */}
                         <div className="space-y-1.5">
-                          <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                          <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 ui-text-body ui-label">
                             GRC Document Prefix
                           </label>
                           <input
@@ -1549,26 +1549,26 @@ export default function AdminPortalPage() {
                                 grcPreview: `${pref}${String(numVal).padStart(4, "0")}`,
                               });
                             }}
-                            className="w-full h-11 px-3.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-base sm:text-xs font-mono font-bold text-zinc-900 dark:text-white focus:border-emerald-600 focus:outline-none transition"
-                            placeholder="GRC-2627-"
+                            className="w-full h-11 px-3.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-base sm:text-xs font-mono font-bold text-zinc-900 dark:text-white focus:border-emerald-600 focus:outline-none transition ui-radius-control ui-font-body ui-weight-medium ui-surface ui-field"
+                            placeholder="GRC-2627-" aria-label="GRC Document Prefix"
                           />
-                          <p className="text-[11px] text-zinc-500">Document series prefix (e.g. GRC-2627- or GRC-)</p>
+                          <p className="text-[11px] text-zinc-500 ui-text-meta">Document series prefix (e.g. GRC-2627- or GRC-)</p>
                         </div>
 
                         {/* Live Preview */}
                         <div className="space-y-1.5">
-                          <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                          <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 ui-text-body ui-label">
                             Next Generated GRC Preview
                           </label>
                           <div className="h-11 px-3.5 rounded-xl bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 flex items-center justify-between">
-                            <span className="font-mono font-black text-emerald-700 dark:text-emerald-400 text-sm">
+                            <span className="font-mono font-black text-emerald-700 dark:text-emerald-400 text-sm ui-font-body ui-weight-medium">
                               {hotelForm.grcPreview || `${hotelForm.grcPrefix || "GRC-2627-"}${String(parseInt(hotelForm.startingGrcNumber, 10) || 1).padStart(4, "0")}`}
                             </span>
-                            <span className="text-[10px] uppercase font-bold text-zinc-400 bg-white dark:bg-zinc-900 px-2 py-0.5 rounded border border-zinc-200 dark:border-zinc-800">
+                            <span className="text-[10px] uppercase font-bold text-zinc-400 bg-white dark:bg-zinc-900 px-2 py-0.5 rounded border border-zinc-200 dark:border-zinc-800 ui-text-meta ui-weight-medium">
                               Next In Line
                             </span>
                           </div>
-                          <p className="text-[11px] text-zinc-500">Assigned upon next Front Desk guest check-in</p>
+                          <p className="text-[11px] text-zinc-500 ui-text-meta">Assigned upon next Front Desk guest check-in</p>
                         </div>
                       </div>
                     </div>
@@ -1579,28 +1579,28 @@ export default function AdminPortalPage() {
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <span className="h-2 w-2 rounded-full bg-emerald-600" />
-                        <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">
+                        <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300 ui-text-body ui-weight-medium">
                           5. Opening Cash Balance (Starting Drawer Float)
                         </h3>
                       </div>
-                      <span className="text-[11px] font-mono text-emerald-600 dark:text-emerald-400 font-semibold bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded-md border border-emerald-200 dark:border-emerald-800">
+                      <span className="text-[11px] font-mono text-emerald-600 dark:text-emerald-400 font-semibold bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded-md border border-emerald-200 dark:border-emerald-800 ui-text-meta ui-font-body">
                         Mid-Operation Transition
                       </span>
                     </div>
 
                     <div className="p-4 rounded-xl bg-emerald-50/20 dark:bg-emerald-950/10 border border-emerald-200/60 dark:border-emerald-900/40 space-y-4">
-                      <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed">
+                      <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed ui-text-body">
                         When adopting Hotel OS mid-operation or taking over an existing property, enter the initial physical cash in the front desk till. This amount establishes the base opening drawer float for Cashier Shifts, Daily Manager Audits, and cash reconciliation.
                       </p>
 
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         {/* Opening Cash Float */}
                         <div className="space-y-1.5">
-                          <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                          <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 ui-text-body ui-label">
                             Opening Cash Float (₹) <span className="text-rose-500">*</span>
                           </label>
                           <div className="relative">
-                            <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-bold text-zinc-400">
+                            <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-bold text-zinc-400 ui-weight-medium">
                               ₹
                             </span>
                             <input
@@ -1609,37 +1609,37 @@ export default function AdminPortalPage() {
                               step="any"
                               value={hotelForm.openingCashBalance}
                               onChange={(e) => setHotelForm({ ...hotelForm, openingCashBalance: e.target.value })}
-                              className="w-full h-11 pl-8 pr-3.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-base sm:text-xs font-mono font-bold text-emerald-700 dark:text-emerald-400 focus:border-emerald-600 focus:outline-none transition"
-                              placeholder="0.00"
+                              className="w-full h-11 pl-8 pr-3.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-base sm:text-xs font-mono font-bold text-emerald-700 dark:text-emerald-400 focus:border-emerald-600 focus:outline-none transition ui-radius-control ui-font-body ui-weight-medium ui-surface ui-field"
+                              placeholder="0.00" aria-label="Opening Cash Float (₹)"
                             />
                           </div>
-                          <p className="text-[11px] text-zinc-500">
+                          <p className="text-[11px] text-zinc-500 ui-text-meta">
                             Physical cash counted in the drawer at the start of digital operations.
                           </p>
                         </div>
 
                         {/* Audit Trail Narration / Reason */}
                         <div className="space-y-1.5">
-                          <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                          <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 ui-text-body ui-label">
                             Audit Trail Narration / Handover Reason
                           </label>
                           <input
                             type="text"
                             value={hotelForm.openingBalanceReason}
                             onChange={(e) => setHotelForm({ ...hotelForm, openingBalanceReason: e.target.value })}
-                            className="w-full h-11 px-3.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-base sm:text-xs font-medium text-zinc-900 dark:text-white focus:border-emerald-600 focus:outline-none transition"
-                            placeholder="e.g. Initial till physical count upon going live"
+                            className="w-full h-11 px-3.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-base sm:text-xs font-medium text-zinc-900 dark:text-white focus:border-emerald-600 focus:outline-none transition ui-radius-control ui-surface ui-field"
+                            placeholder="e.g. Initial till physical count upon going live" aria-label="Audit Trail Narration / Handover Reason"
                           />
-                          <p className="text-[11px] text-zinc-500">
+                          <p className="text-[11px] text-zinc-500 ui-text-meta">
                             Permanent note attached to the audit trail log for accounting compliance.
                           </p>
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-2 p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-800 dark:text-emerald-300">
+                      <div className="flex items-center gap-2 p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-800 dark:text-emerald-300 ui-text-body">
                         <Coins className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
                         <span>
-                          Every change to this opening float is recorded in the immutable System Audit Trail with timestamp, prior balance, new balance, and reason.
+                          Opening float changes are recorded in the audit trail with the time, previous balance, new balance, and reason.
                         </span>
                       </div>
                     </div>
@@ -1650,18 +1650,18 @@ export default function AdminPortalPage() {
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <span className="h-2 w-2 rounded-full bg-purple-600" />
-                        <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">
+                        <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300 ui-text-body ui-weight-medium">
                           6. Hotel Owners & Equity Partners
                         </h3>
                       </div>
-                      <span className="text-[11px] font-mono text-purple-600 dark:text-purple-400 font-semibold bg-purple-50 dark:bg-purple-950/60 px-2 py-0.5 rounded-md border border-purple-200 dark:border-purple-800">
+                      <span className="text-[11px] font-mono text-purple-600 dark:text-purple-400 font-semibold bg-purple-50 dark:bg-purple-950/60 px-2 py-0.5 rounded-md border border-purple-200 dark:border-purple-800 ui-text-meta ui-font-body">
                         Cashier Shift Payout Dropdown
                       </span>
                     </div>
 
                     <div className="p-4 rounded-xl bg-purple-50/20 dark:bg-purple-950/10 border border-purple-200/60 dark:border-purple-900/40 space-y-4">
-                      <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed">
-                        Configure the legal owners and managing partners who are authorized to withdraw cash profit drawings from the till. These names will populate the <strong className="text-zinc-900 dark:text-white">Owner Payout</strong> dropdown in Cashier Shift and Expense vouchers.
+                      <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed ui-text-body">
+                        Configure the legal owners and managing partners for <strong>{activeProperty?.displayName || "the selected hotel"}</strong>. Owner lists are saved separately for each hotel. These names will populate this hotel’s <strong className="text-zinc-900 dark:text-white">Owner Payout</strong> dropdown in Cashier Shift and Expense vouchers.
                       </p>
 
                       {/* Add Owner Input */}
@@ -1684,7 +1684,7 @@ export default function AdminPortalPage() {
                             }
                           }}
                           placeholder="Enter owner / partner full name (e.g. Ambarish Sharma)"
-                          className="flex-1 h-11 px-3.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-base sm:text-xs font-medium text-zinc-900 dark:text-white focus:border-purple-600 focus:outline-none transition"
+                          className="flex-1 h-11 px-3.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-base sm:text-xs font-medium text-zinc-900 dark:text-white focus:border-purple-600 focus:outline-none transition ui-radius-control ui-surface ui-field" aria-label="Enter owner / partner full name (e.g. Ambarish Sharma)"
                         />
                         <button
                           type="button"
@@ -1698,7 +1698,7 @@ export default function AdminPortalPage() {
                               setNewOwnerName("");
                             }
                           }}
-                          className="h-11 px-4 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition shadow-xs cursor-pointer active:scale-98 shrink-0"
+                          className="h-11 px-4 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition shadow-xs cursor-pointer  shrink-0 ui-radius-control ui-weight-medium ui-text-body ui-shadow-quiet ui-control ui-control-sized"
                         >
                           <Plus className="h-4 w-4" />
                           <span>Add Owner</span>
@@ -1707,11 +1707,11 @@ export default function AdminPortalPage() {
 
                       {/* Current Owners Badges */}
                       <div className="space-y-1.5">
-                        <label className="block text-[11px] font-semibold text-zinc-500 uppercase tracking-wider">
+                        <label className="block text-[11px] font-semibold text-zinc-500 uppercase tracking-wider ui-text-meta ui-label">
                           Current Registered Owners ({hotelForm.owners.length})
                         </label>
                         {hotelForm.owners.length === 0 ? (
-                          <div className="p-3 rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 text-xs text-zinc-400 dark:text-zinc-500 font-medium">
+                          <div className="p-3 rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 text-xs text-zinc-400 dark:text-zinc-500 font-medium ui-text-body">
                             No property owners configured yet. Add names above to display them in the cashier payout modal.
                           </div>
                         ) : (
@@ -1719,10 +1719,10 @@ export default function AdminPortalPage() {
                             {hotelForm.owners.map((owner, idx) => (
                               <div
                                 key={idx}
-                                className="inline-flex items-center gap-2 pl-3 pr-2 py-1.5 rounded-xl bg-white dark:bg-zinc-900 border border-purple-200 dark:border-purple-800 shadow-xs"
+                                className="inline-flex items-center gap-2 pl-3 pr-2 py-1.5 rounded-xl bg-white dark:bg-zinc-900 border border-purple-200 dark:border-purple-800 shadow-xs ui-shadow-quiet ui-surface"
                               >
                                 <span className="h-2 w-2 rounded-full bg-purple-600" />
-                                <span className="text-xs font-bold text-zinc-900 dark:text-white">
+                                <span className="text-xs font-bold text-zinc-900 dark:text-white ui-text-body ui-weight-medium">
                                   {owner}
                                 </span>
                                 <button
@@ -1733,8 +1733,8 @@ export default function AdminPortalPage() {
                                       owners: hotelForm.owners.filter((_, i) => i !== idx),
                                     });
                                   }}
-                                  className="h-5 w-5 rounded-md text-zinc-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 flex items-center justify-center transition cursor-pointer"
-                                  title={`Remove ${owner}`}
+                                  className="h-5 w-5 rounded-md text-zinc-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 flex items-center justify-center transition cursor-pointer ui-control"
+                                  title={`Remove ${owner}`} aria-label={`Remove ${owner}`}
                                 >
                                   <X className="h-3 w-3" />
                                 </button>
@@ -1748,13 +1748,13 @@ export default function AdminPortalPage() {
 
                   {/* SAVE ACTION BAR */}
                   <div className="pt-4 border-t border-zinc-200/80 dark:border-zinc-800 flex flex-col sm:flex-row items-center justify-between gap-3">
-                    <div className="text-xs text-zinc-500 dark:text-zinc-400 font-medium text-center sm:text-left">
+                    <div className="text-xs text-zinc-500 dark:text-zinc-400 font-medium text-center sm:text-left ui-text-body">
                       All property & tax fields are saved directly to the database.
                     </div>
                     <button
                       type="submit"
                       disabled={hotelSaving}
-                      className="h-11 px-6 w-full sm:w-auto rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center justify-center gap-2 transition shadow-xs active:scale-98 cursor-pointer disabled:opacity-50"
+                      className="h-11 px-6 w-full sm:w-auto rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center justify-center gap-2 transition shadow-xs  cursor-pointer disabled:opacity-50 ui-radius-control ui-weight-medium ui-text-body ui-shadow-quiet ui-control ui-control-sized"
                     >
                       {hotelSaving ? (
                         <>
@@ -1785,28 +1785,28 @@ export default function AdminPortalPage() {
         <div className="space-y-4">
           {!editingGrc ? (
             <>
-              <div className="p-5 rounded-3xl bg-white dark:bg-[#111114] border border-zinc-200/90 dark:border-zinc-800 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 shadow-xs">
+              <div className="p-5 rounded-3xl bg-white dark:bg-[#111114] border border-zinc-200/90 dark:border-zinc-800 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 shadow-xs ui-radius-panel ui-shadow-quiet ui-surface">
               <div className="space-y-2">
                 <div className="flex items-center gap-3 flex-wrap">
-                  <h2 className="text-base font-extrabold text-zinc-900 dark:text-white flex items-center gap-2">
+                  <h2 className="text-base font-extrabold text-zinc-900 dark:text-white flex items-center gap-2 ui-weight-medium ui-section-title">
                     <FileText className="h-5 w-5 text-blue-600" />
                     <span>GRC & Guest Registration Records Editor</span>
                   </h2>
                 </div>
 
                 {/* Sub-Filters: All, Live In-House, Checked-Out Archive, File Backup */}
-                <div className="inline-flex rounded-xl bg-zinc-100 dark:bg-zinc-800/80 p-1 border border-zinc-200 dark:border-zinc-700 text-xs font-bold gap-1 flex-wrap">
+                <div className="inline-flex rounded-xl bg-zinc-100 dark:bg-zinc-800/80 p-1 border border-zinc-200 dark:border-zinc-700 text-xs font-bold gap-1 flex-wrap ui-text-body ui-weight-medium">
                   <button
                     type="button"
                     onClick={() => { setGrcViewMode("ACTIVE"); setGrcStatusFilter("ALL"); }}
                     className={`px-3 py-1.5 rounded-lg transition cursor-pointer flex items-center gap-1.5 ${
                       grcViewMode === "ACTIVE" && grcStatusFilter === "ALL"
-                        ? "bg-white dark:bg-zinc-900 text-blue-600 dark:text-blue-400 shadow-xs font-black"
+                        ? "bg-white dark:bg-zinc-900 text-blue-600 dark:text-blue-400 shadow-xs font-black ui-shadow-quiet ui-weight-medium"
                         : "text-zinc-500 hover:text-zinc-900 dark:hover:text-white"
-                    }`}
+                    } ui-control`}
                   >
                     <span>📋 All Records</span>
-                    <span className="px-1.5 py-0.2 rounded-md bg-zinc-200 dark:bg-zinc-700 text-[10px]">{grcList.length}</span>
+                    <span className="px-1.5 py-0.2 rounded-md bg-zinc-200 dark:bg-zinc-700 text-[10px] ui-text-meta">{grcList.length}</span>
                   </button>
 
                   <button
@@ -1814,13 +1814,13 @@ export default function AdminPortalPage() {
                     onClick={() => { setGrcViewMode("ACTIVE"); setGrcStatusFilter("IN_HOUSE"); }}
                     className={`px-3 py-1.5 rounded-lg transition cursor-pointer flex items-center gap-1.5 ${
                       grcViewMode === "ACTIVE" && grcStatusFilter === "IN_HOUSE"
-                        ? "bg-white dark:bg-zinc-900 text-emerald-600 dark:text-emerald-400 shadow-xs font-black"
+                        ? "bg-white dark:bg-zinc-900 text-emerald-600 dark:text-emerald-400 shadow-xs font-black ui-shadow-quiet ui-weight-medium"
                         : "text-zinc-500 hover:text-zinc-900 dark:hover:text-white"
-                    }`}
+                    } ui-control`}
                   >
-                    <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                    <span className="h-2 w-2 rounded-full bg-emerald-500 " />
                     <span>In-House Active</span>
-                    <span className="px-1.5 py-0.2 rounded-md bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 text-[10px] font-mono font-bold">{inHouseGrcCount}</span>
+                    <span className="px-1.5 py-0.2 rounded-md bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 text-[10px] font-mono font-bold ui-text-meta ui-font-body ui-weight-medium">{inHouseGrcCount}</span>
                   </button>
 
                   <button
@@ -1828,12 +1828,12 @@ export default function AdminPortalPage() {
                     onClick={() => { setGrcViewMode("ACTIVE"); setGrcStatusFilter("CHECKED_OUT"); }}
                     className={`px-3 py-1.5 rounded-lg transition cursor-pointer flex items-center gap-1.5 ${
                       grcViewMode === "ACTIVE" && grcStatusFilter === "CHECKED_OUT"
-                        ? "bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white shadow-xs font-black"
+                        ? "bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white shadow-xs font-black ui-shadow-quiet ui-weight-medium"
                         : "text-zinc-500 hover:text-zinc-900 dark:hover:text-white"
-                    }`}
+                    } ui-control`}
                   >
                     <span>📁 Checked-Out History</span>
-                    <span className="px-1.5 py-0.2 rounded-md bg-zinc-200 dark:bg-zinc-700 text-[10px] font-mono">{checkedOutGrcCount}</span>
+                    <span className="px-1.5 py-0.2 rounded-md bg-zinc-200 dark:bg-zinc-700 text-[10px] font-mono ui-text-meta ui-font-body">{checkedOutGrcCount}</span>
                   </button>
 
                   <button
@@ -1841,19 +1841,19 @@ export default function AdminPortalPage() {
                     onClick={() => { setGrcViewMode("ARCHIVED"); }}
                     className={`px-3 py-1.5 rounded-lg transition cursor-pointer flex items-center gap-1.5 ${
                       grcViewMode === "ARCHIVED"
-                        ? "bg-white dark:bg-zinc-900 text-purple-600 dark:text-purple-400 shadow-xs font-black"
+                        ? "bg-white dark:bg-zinc-900 text-purple-600 dark:text-purple-400 shadow-xs font-black ui-shadow-quiet ui-weight-medium"
                         : "text-zinc-500 hover:text-zinc-900 dark:hover:text-white"
-                    }`}
+                    } ui-control`}
                   >
                     <Database className="h-3.5 w-3.5 text-purple-500" />
                     <span>Permanent Backup Archive</span>
                   </button>
                 </div>
 
-                <p className="text-xs text-zinc-500">
+                <p className="text-xs text-zinc-500 ui-text-body">
                   {grcViewMode === "ACTIVE"
                     ? "Live operational records. Edits automatically synchronize across Guest CRM, Stays, and Folios."
-                    : "Immutable historical backups preserved in /prisma/backups/grc_archives. Deleted GRCs remain permanently safe here."}
+                    : "Historical GRC backups are stored in /prisma/backups/grc_archives."}
                 </p>
               </div>
 
@@ -1865,16 +1865,16 @@ export default function AdminPortalPage() {
                   placeholder="Search GRC No, Name, Mobile, Room..."
                   value={grcSearch}
                   onChange={(e) => setGrcSearch(e.target.value)}
-                  className="w-full h-9 pl-9 pr-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-xs text-zinc-900 dark:text-white placeholder-zinc-400 focus:border-blue-600 focus:outline-none"
+                  className="w-full h-9 pl-9 pr-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-xs text-zinc-900 dark:text-white placeholder-zinc-400 focus:border-blue-600 focus:outline-none ui-radius-control ui-text-body ui-field" aria-label="Search GRC No, Name, Mobile, Room"
                 />
               </div>
             </div>
 
             {/* GRC Table */}
-            <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#111114] overflow-hidden shadow-xs">
+            <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#111114] overflow-hidden shadow-xs ui-shadow-quiet ui-surface">
               <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse text-xs">
-                  <thead className="bg-zinc-50/90 dark:bg-zinc-900/90 text-zinc-500 dark:text-zinc-400 text-[11px] uppercase tracking-wider font-semibold border-b border-zinc-200 dark:border-zinc-800 sticky top-0 z-10 backdrop-blur-xs">
+                <table className="w-full text-left border-collapse text-xs ui-text-body ui-data-table">
+                  <thead className="bg-zinc-50/90 dark:bg-zinc-900/90 text-zinc-500 dark:text-zinc-400 text-[11px] uppercase tracking-wider font-semibold border-b border-zinc-200 dark:border-zinc-800 sticky top-0 z-10 backdrop-blur-xs ui-text-meta">
                     <tr>
                       <th className="px-4 py-3 font-semibold whitespace-nowrap">GRC No.</th>
                       <th className="px-4 py-3 font-semibold whitespace-nowrap">Primary Guest</th>
@@ -1889,13 +1889,13 @@ export default function AdminPortalPage() {
                   <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/60">
                     {grcLoading ? (
                       <tr>
-                        <td colSpan={8} className="py-12 text-center text-zinc-400 font-mono">
+                        <td colSpan={8} className="py-12 text-center text-zinc-400 font-mono ui-font-body">
                           Loading {grcViewMode === "ARCHIVED" ? "archive backup records" : "GRC records"}...
                         </td>
                       </tr>
                     ) : displayedGrcList.length === 0 ? (
                       <tr>
-                        <td colSpan={8} className="py-12 text-center text-zinc-400 font-mono">
+                        <td colSpan={8} className="py-12 text-center text-zinc-400 font-mono ui-font-body">
                           No {grcViewMode === "ARCHIVED" ? "archived backup" : "GRC"} records found.
                         </td>
                       </tr>
@@ -1906,18 +1906,18 @@ export default function AdminPortalPage() {
 
                         return (
                           <tr key={data.id || data.registrationNo || Math.random()} className="hover:bg-zinc-50/60 dark:hover:bg-zinc-800/40 transition">
-                            <td className="py-3 px-4 font-mono font-black text-blue-700 dark:text-blue-400">
+                            <td className="py-3 px-4 font-mono font-black text-blue-700 dark:text-blue-400 ui-font-body ui-weight-medium">
                               {data.registrationNo}
                             </td>
                             <td className="py-3 px-3">
-                              <div className="font-extrabold text-zinc-900 dark:text-white">
+                              <div className="font-extrabold text-zinc-900 dark:text-white ui-weight-medium">
                                 {data.fullName}
                               </div>
-                              <div className="text-[10px] text-zinc-400 font-mono">
+                              <div className="text-[10px] text-zinc-400 font-mono ui-text-meta ui-font-body">
                                 {data.gender || "Male"} • Age: {data.age || "—"} • {data.nationality || "Indian"}
                               </div>
                             </td>
-                            <td className="py-3 px-3 font-mono text-[11px]">
+                            <td className="py-3 px-3 font-mono text-[11px] ui-font-body ui-text-meta">
                               {(() => {
                                 const assignedRoomList = (data.assignedRooms && Array.isArray(data.assignedRooms) && data.assignedRooms.length > 0)
                                   ? data.assignedRooms
@@ -1931,22 +1931,22 @@ export default function AdminPortalPage() {
 
                                 return (
                                   <>
-                                    <div className="font-bold text-zinc-800 dark:text-zinc-200 flex items-center gap-1.5 flex-wrap">
+                                    <div className="font-bold text-zinc-800 dark:text-zinc-200 flex items-center gap-1.5 flex-wrap ui-weight-medium">
                                       <span>{displayRoomsStr.startsWith("Room") ? displayRoomsStr : `Room ${displayRoomsStr}`}</span>
                                       {totalRoomCount > 1 && (
-                                        <span className="px-1.5 py-0.2 rounded bg-blue-100 dark:bg-blue-900/60 text-blue-800 dark:text-blue-200 text-[9.5px] font-bold">
+                                        <span className="px-1.5 py-0.2 rounded bg-blue-100 dark:bg-blue-900/60 text-blue-800 dark:text-blue-200 text-[9.5px] font-bold ui-text-meta ui-weight-medium">
                                           {totalRoomCount} Rooms
                                         </span>
                                       )}
                                     </div>
-                                    <div className="text-[10px] text-zinc-400">
+                                    <div className="text-[10px] text-zinc-400 ui-text-meta">
                                       In: {data.arrivalDateTime?.slice(0, 16) || "—"} | Out: {data.expectedDepartureDate || "—"}
                                     </div>
                                   </>
                                 );
                               })()}
                             </td>
-                            <td className="py-3 px-3 font-mono text-[11px]">
+                            <td className="py-3 px-3 font-mono text-[11px] ui-font-body ui-text-meta">
                               {(() => {
                                 const assignedRoomList = (data.assignedRooms && Array.isArray(data.assignedRooms) && data.assignedRooms.length > 0)
                                   ? data.assignedRooms
@@ -1966,26 +1966,26 @@ export default function AdminPortalPage() {
 
                                 return (
                                   <>
-                                    <div className="font-bold text-zinc-900 dark:text-white">
+                                    <div className="font-bold text-zinc-900 dark:text-white ui-weight-medium">
                                       {isGroupAllComp || (totalRoomCount <= 1 && data.agreedRoomTariff === 0) ? (
-                                        <span className="text-emerald-600 font-bold">🎁 Complimentary (₹0)</span>
+                                        <span className="text-emerald-600 font-bold ui-weight-medium">🎁 Complimentary (₹0)</span>
                                       ) : isPrimaryOnlyComp ? (
                                         <div>
-                                          <span className="text-blue-600 dark:text-blue-400 font-bold">₹{groupTotalTariff.toLocaleString()}/nt</span>
-                                          <span className="text-[9.5px] text-emerald-600 dark:text-emerald-400 ml-1 font-semibold">(Primary Comp)</span>
+                                          <span className="text-blue-600 dark:text-blue-400 font-bold ui-weight-medium">₹{groupTotalTariff.toLocaleString()}/nt</span>
+                                          <span className="text-[9.5px] text-emerald-600 dark:text-emerald-400 ml-1 font-semibold ui-text-meta">(Primary Comp)</span>
                                         </div>
                                       ) : totalRoomCount > 1 ? (
                                         <div>
-                                          <span className="font-bold">₹{groupTotalTariff.toLocaleString()}/nt</span>
-                                          <span className="text-[9.5px] text-zinc-500 font-normal ml-1">({totalRoomCount} Rms)</span>
+                                          <span className="font-bold ui-weight-medium">₹{groupTotalTariff.toLocaleString()}/nt</span>
+                                          <span className="text-[9.5px] text-zinc-500 font-normal ml-1 ui-text-meta">({totalRoomCount} Rms)</span>
                                         </div>
                                       ) : (
                                         `₹${(data.agreedRoomTariff ?? 3200).toLocaleString()}/nt`
                                       )}
                                     </div>
-                                    <div className="text-[10px]">
+                                    <div className="text-[10px] ui-text-meta">
                                       {Number(data.depositAmount || 0) > 0 ? (
-                                        <span className="text-emerald-700 dark:text-emerald-400 font-bold">
+                                        <span className="text-emerald-700 dark:text-emerald-400 font-bold ui-weight-medium">
                                           Adv: ₹{Number(data.depositAmount).toLocaleString()} ({data.advancePaymentMethod || "UPI"})
                                         </span>
                                       ) : (
@@ -1996,22 +1996,22 @@ export default function AdminPortalPage() {
                                 );
                               })()}
                             </td>
-                            <td className="py-3 px-3 font-mono text-[11px]">
+                            <td className="py-3 px-3 font-mono text-[11px] ui-font-body ui-text-meta">
                               <div>{data.mobilePhone}</div>
-                              <div className="text-[10px] text-zinc-400">
+                              <div className="text-[10px] text-zinc-400 ui-text-meta">
                                 {data.idDocumentType || "ID"}: {data.idDocumentNumber || "—"}
                               </div>
                             </td>
-                            <td className="py-3 px-3 text-[11px]">
-                              <div className="font-bold">{data.city || "Guwahati"}</div>
-                              <div className="text-[10px] text-zinc-400 truncate max-w-[150px]">
+                            <td className="py-3 px-3 text-[11px] ui-text-meta">
+                              <div className="font-bold ui-weight-medium">{data.city || "Guwahati"}</div>
+                              <div className="text-[10px] text-zinc-400 truncate max-w-[150px] ui-text-meta">
                                 {data.streetAddress || "—"}
                               </div>
                             </td>
                             <td className="py-3 px-3">
                               {isArchivedMode ? (
                                 <span
-                                  className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold ${
+                                  className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold  ui-text-meta ui-font-body ui-weight-medium ${
                                     g.latestAction === "DELETED"
                                       ? "bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300"
                                       : "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300"
@@ -2020,17 +2020,17 @@ export default function AdminPortalPage() {
                                   {g.latestAction || "ARCHIVED"}
                                 </span>
                               ) : data.status === "CHECKED_IN" ? (
-                                <span className="px-2.5 py-1 rounded-full text-[10px] font-mono font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700/60 inline-flex items-center gap-1.5 shadow-xs">
-                                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                <span className="px-2.5 py-1 rounded-full text-[10px] font-mono font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700/60 inline-flex items-center gap-1.5 shadow-xs ui-text-meta ui-font-body ui-weight-medium ui-shadow-quiet">
+                                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 " />
                                   <span>IN_HOUSE</span>
                                 </span>
                               ) : data.status === "CHECKED_OUT" ? (
-                                <span className="px-2.5 py-1 rounded-full text-[10px] font-mono font-bold bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700 inline-flex items-center gap-1.5">
+                                <span className="px-2.5 py-1 rounded-full text-[10px] font-mono font-bold bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700 inline-flex items-center gap-1.5 ui-text-meta ui-font-body ui-weight-medium">
                                   <span className="h-1.5 w-1.5 rounded-full bg-zinc-400" />
                                   <span>CHECKED_OUT</span>
                                 </span>
                               ) : (
-                                <span className="px-2.5 py-1 rounded-full text-[10px] font-mono font-bold bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-300 dark:border-amber-700/60 inline-flex items-center gap-1.5">
+                                <span className="px-2.5 py-1 rounded-full text-[10px] font-mono font-bold bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-300 dark:border-amber-700/60 inline-flex items-center gap-1.5 ui-text-meta ui-font-body ui-weight-medium">
                                   <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
                                   <span>{data.status || "PENDING"}</span>
                                 </span>
@@ -2041,8 +2041,8 @@ export default function AdminPortalPage() {
                                 <button
                                   type="button"
                                   onClick={() => setSelectedArchiveSnapshot(data)}
-                                  className="px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-600 text-emerald-700 hover:text-white dark:bg-emerald-950/60 dark:hover:bg-emerald-600 dark:text-emerald-300 font-bold text-[11px] transition cursor-pointer inline-flex items-center gap-1"
-                                  title="View permanent backup snapshot"
+                                  className="px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-600 text-emerald-700 hover:text-white dark:bg-emerald-950/60 dark:hover:bg-emerald-600 dark:text-emerald-300 font-bold text-[11px] transition cursor-pointer inline-flex items-center gap-1 ui-weight-medium ui-text-meta ui-control"
+                                  title="View permanent backup snapshot" aria-label="View permanent backup snapshot"
                                 >
                                   <Eye className="h-3.5 w-3.5" />
                                   <span>Inspect Backup</span>
@@ -2052,16 +2052,16 @@ export default function AdminPortalPage() {
                                   <button
                                     type="button"
                                     onClick={() => handleOpenGrcEdit(data)}
-                                    className="p-1.5 rounded-lg bg-blue-50 hover:bg-blue-600 text-blue-700 hover:text-white dark:bg-blue-950/60 dark:hover:bg-blue-600 dark:text-blue-300 transition cursor-pointer"
-                                    title="Edit GRC record & synchronize everywhere"
+                                    className="p-1.5 rounded-lg bg-blue-50 hover:bg-blue-600 text-blue-700 hover:text-white dark:bg-blue-950/60 dark:hover:bg-blue-600 dark:text-blue-300 transition cursor-pointer ui-control"
+                                    title="Edit GRC record & synchronize everywhere" aria-label="Edit GRC record & synchronize everywhere"
                                   >
                                     <Edit3 className="h-3.5 w-3.5" />
                                   </button>
                                   <button
                                     type="button"
                                     onClick={() => deleteGrc(data.id, data.registrationNo)}
-                                    className="p-1.5 rounded-lg bg-rose-50 hover:bg-rose-600 text-rose-700 hover:text-white dark:bg-rose-950/60 dark:hover:bg-rose-600 dark:text-rose-300 transition cursor-pointer"
-                                    title="Delete active GRC (preserved in archive)"
+                                    className="p-1.5 rounded-lg bg-rose-50 hover:bg-rose-600 text-rose-700 hover:text-white dark:bg-rose-950/60 dark:hover:bg-rose-600 dark:text-rose-300 transition cursor-pointer ui-control"
+                                    title="Delete active GRC (preserved in archive)" aria-label="Delete active GRC (preserved in archive)"
                                   >
                                     <Trash2 className="h-3.5 w-3.5" />
                                   </button>
@@ -2159,32 +2159,32 @@ export default function AdminPortalPage() {
             const totalDailyTariffCombined = primaryRate + additionalDailyTariff + extraPaxTotalRate;
 
             return (
-              <form onSubmit={saveGrcEdit} className="w-full space-y-6 animate-in fade-in">
+              <form onSubmit={saveGrcEdit} className="w-full space-y-6  ">
                 
                 {/* 1. TOP WORKSPACE HEADER CARD (WITH BREADCRUMB & SAVE/CANCEL ACTIONS) */}
-                <div className="p-4 sm:p-5 rounded-2xl sm:rounded-3xl bg-white dark:bg-[#111114] border border-zinc-200/90 dark:border-zinc-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xs">
+                <div className="p-4 sm:p-5 rounded-2xl sm:rounded-3xl bg-white dark:bg-[#111114] border border-zinc-200/90 dark:border-zinc-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xs ui-radius-panel ui-shadow-quiet ui-surface">
                   <div className="flex items-center gap-3 min-w-0">
                     <button
                       type="button"
                       onClick={() => setEditingGrc(null)}
-                      className="p-2.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-200 transition cursor-pointer shrink-0 shadow-2xs"
-                      title="Back to GRC Directory (Esc)"
+                      className="p-2.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-200 transition cursor-pointer shrink-0 shadow-2xs ui-radius-control ui-shadow-quiet ui-control"
+                      title="Back to GRC Directory (Esc)" aria-label="Back to GRC Directory (Esc)"
                     >
                       <ArrowLeft className="h-5 w-5" />
                     </button>
-                    <div className="h-10 w-10 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold shrink-0 shadow-sm">
+                    <div className="h-10 w-10 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold shrink-0 shadow-sm ui-weight-medium ui-shadow-quiet">
                       <UserPlus className="h-5 w-5" />
                     </div>
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <h2 className="text-base sm:text-lg font-black text-zinc-900 dark:text-white tracking-tight">
+                        <h2 className="text-base sm:text-lg font-black text-zinc-900 dark:text-white tracking-tight ui-weight-medium ui-section-title">
                           Guest Registration Card (GRC) Editor
                         </h2>
-                        <span className="px-2.5 py-0.5 rounded-md bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800/60 text-blue-700 dark:text-blue-300 font-mono font-bold text-xs">
+                        <span className="px-2.5 py-0.5 rounded-md bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800/60 text-blue-700 dark:text-blue-300 font-mono font-bold text-xs ui-font-body ui-weight-medium ui-text-body">
                           {editingGrc.registrationNo}
                         </span>
                         <span
-                          className={`px-2.5 py-0.5 rounded-md text-xs font-bold ${
+                          className={`px-2.5 py-0.5 rounded-md text-xs font-bold  ui-text-body ui-weight-medium ${
                             editingGrc.status === "CHECKED_IN"
                               ? "bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800/60"
                               : "bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800/60"
@@ -2192,33 +2192,33 @@ export default function AdminPortalPage() {
                         >
                           {editingGrc.status}
                         </span>
-                        <span className="hidden sm:inline-flex px-2 py-0.5 rounded-md bg-zinc-100 dark:bg-zinc-800/80 text-zinc-700 dark:text-zinc-300 font-mono text-xs font-bold">
+                        <span className="hidden sm:inline-flex px-2 py-0.5 rounded-md bg-zinc-100 dark:bg-zinc-800/80 text-zinc-700 dark:text-zinc-300 font-mono text-xs font-bold ui-font-body ui-text-body ui-weight-medium">
                           Room {editingGrc.preAssignedRoom || "Unassigned"}
                           {(editingGrc.additionalRoomIds || []).length > 0 &&
                             ` + ${(editingGrc.additionalRoomIds || []).length} more`}
                         </span>
                       </div>
-                      <p className="text-xs text-zinc-500 dark:text-zinc-400 font-mono truncate">
+                      <p className="text-xs text-zinc-500 dark:text-zinc-400 font-mono truncate ui-text-body ui-font-body">
                         {hotelForm.displayName || activeProperty?.displayName || "Hotel"} ({hotelForm.code || activeProperty?.code || ""}) • {editingGrc.fullName || "Guest Profile"}
                       </p>
                     </div>
                   </div>
 
                   <div className="flex items-center gap-2.5 shrink-0 self-end sm:self-center">
-                    <span className="hidden md:inline-flex items-center px-2.5 py-1 text-[11px] font-mono font-medium text-zinc-500 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-800 rounded-md border border-zinc-200 dark:border-zinc-700">
+                    <span className="hidden md:inline-flex items-center px-2.5 py-1 text-[11px] font-mono font-medium text-zinc-500 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-800 rounded-md border border-zinc-200 dark:border-zinc-700 ui-text-meta ui-font-body">
                       Esc to Close
                     </span>
                     <button
                       type="button"
                       onClick={() => setEditingGrc(null)}
-                      className="px-3.5 py-2 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 text-xs font-bold transition cursor-pointer"
+                      className="px-3.5 py-2 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 text-xs font-bold transition cursor-pointer ui-radius-control ui-text-body ui-weight-medium ui-control"
                     >
                       Cancel
                     </button>
                     <button
                       type="submit"
                       disabled={grcSaving}
-                      className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 font-bold text-white text-xs transition shadow-sm flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
+                      className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 font-bold text-white text-xs transition shadow-sm flex items-center gap-1.5 disabled:opacity-50 cursor-pointer ui-radius-control ui-weight-medium ui-text-body ui-shadow-quiet ui-control"
                     >
                       {grcSaving ? (
                         <>
@@ -2244,17 +2244,17 @@ export default function AdminPortalPage() {
                       <div className="lg:col-span-7 xl:col-span-7 space-y-6">
                         
                         {/* CARD 1: STAY SCHEDULE & ROOM INVENTORY ALLOCATION */}
-                        <div className="rounded-2xl border border-zinc-200/90 dark:border-zinc-800 bg-white dark:bg-[#121215] p-5 lg:p-6 shadow-xs space-y-5">
+                        <div className="rounded-2xl border border-zinc-200/90 dark:border-zinc-800 bg-white dark:bg-[#121215] p-5 lg:p-6 shadow-xs space-y-5 ui-radius-panel ui-shadow-quiet ui-surface">
                           <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 pb-3 flex-wrap gap-2">
                             <div className="flex items-center gap-2.5">
                               <div className="p-1.5 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800/60">
                                 <Building2 className="h-4 w-4" />
                               </div>
-                              <span className="font-bold text-zinc-900 dark:text-white uppercase tracking-wider text-xs">
+                              <span className="font-bold text-zinc-900 dark:text-white uppercase tracking-wider text-xs ui-weight-medium ui-text-body">
                                 1. Room Assignment & Stay Schedule
                               </span>
                             </div>
-                            <span className="text-[11px] font-mono text-blue-700 dark:text-blue-300 font-bold bg-blue-50 dark:bg-blue-950/60 px-2.5 py-1 rounded-md border border-blue-200 dark:border-blue-800/60">
+                            <span className="text-[11px] font-mono text-blue-700 dark:text-blue-300 font-bold bg-blue-50 dark:bg-blue-950/60 px-2.5 py-1 rounded-md border border-blue-200 dark:border-blue-800/60 ui-text-meta ui-font-body ui-weight-medium">
                               {totalRoomsCount} {totalRoomsCount === 1 ? "Room" : "Rooms"} Assigned
                             </span>
                           </div>
@@ -2262,7 +2262,7 @@ export default function AdminPortalPage() {
                           {/* Row 1: Stay Dates & Timings (4-column grid) */}
                           <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
                             <div className="space-y-1 sm:col-span-1">
-                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">
+                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap ui-text-meta ui-label">
                                 Primary Room *
                               </label>
                               <select
@@ -2273,7 +2273,7 @@ export default function AdminPortalPage() {
                                   )?.number || editingGrc.preAssignedRoom || ""
                                 }
                                 onChange={(e) => setEditingGrc({ ...editingGrc, preAssignedRoom: e.target.value })}
-                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs font-mono font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs font-mono font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors ui-text-body ui-font-body ui-weight-medium ui-field" aria-label="Primary Room"
                               >
                                 <option value="">-- Choose Room --</option>
                                 {roomsList.map((r) => {
@@ -2288,35 +2288,35 @@ export default function AdminPortalPage() {
                             </div>
 
                             <div className="space-y-1 sm:col-span-1">
-                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap flex items-center justify-between">
+                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap flex items-center justify-between ui-text-meta ui-label">
                                 <span>Check-In Date *</span>
-                                <span className="text-[10px] text-blue-600 dark:text-blue-400 font-mono font-bold">Editable</span>
+                                <span className="text-[10px] text-blue-600 dark:text-blue-400 font-mono font-bold ui-text-meta ui-font-body ui-weight-medium">Editable</span>
                               </label>
                               <input
                                 type="date"
                                 required
                                 value={editingGrc.arrivalDate || ""}
                                 onChange={(e) => setEditingGrc({ ...editingGrc, arrivalDate: e.target.value })}
-                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer"
+                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors cursor-pointer ui-font-body ui-text-body ui-weight-medium ui-field"
                               />
                             </div>
 
                             <div className="space-y-1 sm:col-span-1">
-                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap flex items-center justify-between">
+                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap flex items-center justify-between ui-text-meta ui-label">
                                 <span>Check-In Time *</span>
-                                <span className="text-[10px] text-blue-600 dark:text-blue-400 font-mono font-bold">Editable</span>
+                                <span className="text-[10px] text-blue-600 dark:text-blue-400 font-mono font-bold ui-text-meta ui-font-body ui-weight-medium">Editable</span>
                               </label>
                               <input
                                 type="time"
                                 required
                                 value={editingGrc.arrivalTime || "14:00"}
                                 onChange={(e) => setEditingGrc({ ...editingGrc, arrivalTime: e.target.value })}
-                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer"
+                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors cursor-pointer ui-font-body ui-text-body ui-weight-medium ui-field"
                               />
                             </div>
 
                             <div className="space-y-1 sm:col-span-1">
-                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">
+                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap ui-text-meta ui-label">
                                 Expected Departure *
                               </label>
                               <input
@@ -2324,18 +2324,18 @@ export default function AdminPortalPage() {
                                 required
                                 value={editingGrc.expectedDepartureDate || ""}
                                 onChange={(e) => setEditingGrc({ ...editingGrc, expectedDepartureDate: e.target.value })}
-                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer"
+                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors cursor-pointer ui-font-body ui-text-body ui-field" aria-label="Expected Departure"
                               />
                             </div>
 
                             <div className="space-y-1 sm:col-span-2">
-                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">
+                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap ui-text-meta ui-label">
                                 Checkout Billing Cycle *
                               </label>
                               <select
                                 value={editingGrc.checkoutType || "FIXED_TIME"}
                                 onChange={(e: any) => setEditingGrc({ ...editingGrc, checkoutType: e.target.value })}
-                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer"
+                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors cursor-pointer ui-text-body ui-field" aria-label="Checkout Billing Cycle"
                               >
                                 <option value="FIXED_TIME">Standard 11:00 AM / 12:00 PM (Default)</option>
                                 <option value="24_HOURS">24-Hour Cycle from Check-In</option>
@@ -2343,13 +2343,13 @@ export default function AdminPortalPage() {
                             </div>
 
                             <div className="space-y-1 sm:col-span-2">
-                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">
+                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap ui-text-meta ui-label">
                                 Grace Period Window *
                               </label>
                               <select
                                 value={editingGrc.gracePeriodMinutes || "0"}
                                 onChange={(e: any) => setEditingGrc({ ...editingGrc, gracePeriodMinutes: e.target.value })}
-                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer"
+                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors cursor-pointer ui-text-body ui-field" aria-label="Grace Period Window"
                               >
                                 <option value="0">0 Hours / None</option>
                                 <option value="60">1 Hour Grace</option>
@@ -2367,10 +2367,10 @@ export default function AdminPortalPage() {
                           {/* Row 2: Allocated Rooms Deck & Extra Pax Steppers */}
                           <div className="space-y-3 border-t border-zinc-200 dark:border-zinc-800 pt-4">
                             <div className="flex items-center justify-between">
-                              <label className="block font-bold text-zinc-800 dark:text-zinc-200 uppercase text-xs">
+                              <label className="block font-bold text-zinc-800 dark:text-zinc-200 uppercase text-xs ui-weight-medium ui-text-body ui-label">
                                 Allocated Rooms & Tariff Rates ({totalRoomsCount} Rooms)
                               </label>
-                              <span className="text-[11px] font-mono text-zinc-500">
+                              <span className="text-[11px] font-mono text-zinc-500 ui-text-meta ui-font-body">
                                 Configure rates & extra pax per room
                               </span>
                             </div>
@@ -2386,24 +2386,24 @@ export default function AdminPortalPage() {
                                   <div className="p-3.5 rounded-xl bg-blue-50/60 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800/40 space-y-3">
                                     <div className="flex items-center justify-between gap-2 flex-wrap">
                                       <div className="flex items-center gap-2">
-                                        <span className="px-2.5 py-1 rounded-lg bg-blue-600 text-white font-bold font-mono text-xs shadow-xs">
+                                        <span className="px-2.5 py-1 rounded-lg bg-blue-600 text-white font-bold font-mono text-xs shadow-xs ui-weight-medium ui-font-body ui-text-body ui-shadow-quiet">
                                           Room {primaryRoomNumber}
                                         </span>
-                                        <span className="px-2 py-0.5 rounded-md bg-blue-100 dark:bg-blue-900/60 text-blue-800 dark:text-blue-200 text-[10px] font-bold uppercase tracking-wider">
+                                        <span className="px-2 py-0.5 rounded-md bg-blue-100 dark:bg-blue-900/60 text-blue-800 dark:text-blue-200 text-[10px] font-bold uppercase tracking-wider ui-text-meta ui-weight-medium">
                                           Primary Room
                                         </span>
-                                        <span className="text-xs text-zinc-800 dark:text-zinc-200 font-semibold truncate">
+                                        <span className="text-xs text-zinc-800 dark:text-zinc-200 font-semibold truncate ui-text-body">
                                           {primaryRoomType}
                                         </span>
-                                        <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-zinc-200/80 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 font-medium">
+                                        <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-zinc-200/80 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 font-medium ui-text-meta ui-font-body">
                                           Base: {primaryCapacity} Pax
                                         </span>
                                       </div>
 
                                       <div className="flex items-center gap-2">
-                                        <label className="text-[11px] font-bold text-zinc-600 dark:text-zinc-400 uppercase">Rate:</label>
+                                        <label className="text-[11px] font-bold text-zinc-600 dark:text-zinc-400 uppercase ui-text-meta ui-weight-medium ui-label">Rate:</label>
                                         <div className="relative flex items-center">
-                                          <span className="absolute left-2.5 text-xs text-zinc-400 font-bold font-mono">₹</span>
+                                          <span className="absolute left-2.5 text-xs text-zinc-400 font-bold font-mono ui-text-body ui-weight-medium ui-font-body">₹</span>
                                           <input
                                             type="number"
                                             placeholder={editingGrc.isComplimentary ? "0 (Free)" : "Rate"}
@@ -2421,7 +2421,7 @@ export default function AdminPortalPage() {
                                                 },
                                               }));
                                             }}
-                                            className="w-28 h-8 pl-6 pr-2 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-blue-700 dark:text-blue-400 font-mono text-xs font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                                            className="w-28 h-8 pl-6 pr-2 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-blue-700 dark:text-blue-400 font-mono text-xs font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors ui-font-body ui-text-body ui-weight-medium ui-field" aria-label="Rate:"
                                           />
                                         </div>
                                       </div>
@@ -2430,10 +2430,10 @@ export default function AdminPortalPage() {
                                     {/* Primary Room Extra Pax Stepper */}
                                     <div className="flex items-center justify-between border-t border-blue-200/60 dark:border-blue-900/40 pt-2.5 flex-wrap gap-2">
                                       <div className="flex items-center gap-2">
-                                        <span className="text-xs font-bold text-zinc-700 dark:text-zinc-300">
+                                        <span className="text-xs font-bold text-zinc-700 dark:text-zinc-300 ui-text-body ui-weight-medium">
                                           Extra Pax for Room {primaryRoomNumber}
                                         </span>
-                                        <span className="text-[11px] font-mono font-semibold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/60 px-2 py-0.5 rounded-md border border-blue-200 dark:border-blue-800/60">
+                                        <span className="text-[11px] font-mono font-semibold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/60 px-2 py-0.5 rounded-md border border-blue-200 dark:border-blue-800/60 ui-text-meta ui-font-body">
                                           ₹{primaryExtraPaxRate}/Pax
                                         </span>
                                       </div>
@@ -2453,8 +2453,8 @@ export default function AdminPortalPage() {
                                                 },
                                               }));
                                             }}
-                                            className="h-6 w-6 rounded-md bg-white dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-700 active:scale-90 text-zinc-700 dark:text-zinc-200 flex items-center justify-center transition shadow-xs cursor-pointer"
-                                            title="Decrease Extra Pax"
+                                            className="h-6 w-6 rounded-md bg-white dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-700  text-zinc-700 dark:text-zinc-200 flex items-center justify-center transition shadow-xs cursor-pointer ui-shadow-quiet ui-control"
+                                            title="Decrease Extra Pax" aria-label="Decrease Extra Pax"
                                           >
                                             <Minus className="h-3 w-3 stroke-[2.5]" />
                                           </button>
@@ -2475,8 +2475,8 @@ export default function AdminPortalPage() {
                                                 },
                                               }));
                                             }}
-                                            className="w-10 h-6 text-center font-mono font-bold text-xs text-zinc-900 dark:text-white bg-transparent focus:outline-none focus:bg-white dark:focus:bg-zinc-900 rounded"
-                                            title="Type Extra Pax count"
+                                            className="w-10 h-6 text-center font-mono font-bold text-xs text-zinc-900 dark:text-white bg-transparent focus:outline-none focus:bg-white dark:focus:bg-zinc-900 rounded ui-font-body ui-weight-medium ui-text-body ui-field"
+                                            title="Type Extra Pax count" aria-label="Type Extra Pax count"
                                           />
                                           <button
                                             type="button"
@@ -2492,18 +2492,18 @@ export default function AdminPortalPage() {
                                                 },
                                               }));
                                             }}
-                                            className="h-6 w-6 rounded-md bg-white dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-700 active:scale-90 text-zinc-700 dark:text-zinc-200 flex items-center justify-center transition shadow-xs cursor-pointer"
-                                            title="Increase Extra Pax"
+                                            className="h-6 w-6 rounded-md bg-white dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-700  text-zinc-700 dark:text-zinc-200 flex items-center justify-center transition shadow-xs cursor-pointer ui-shadow-quiet ui-control"
+                                            title="Increase Extra Pax" aria-label="Increase Extra Pax"
                                           >
                                             <Plus className="h-3 w-3 stroke-[2.5]" />
                                           </button>
                                         </div>
                                         {primaryExtraPax > 0 ? (
-                                          <span className="text-[11px] font-mono font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/60 px-2 py-0.5 rounded-md border border-amber-200 dark:border-amber-800/60">
+                                          <span className="text-[11px] font-mono font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/60 px-2 py-0.5 rounded-md border border-amber-200 dark:border-amber-800/60 ui-text-meta ui-font-body ui-weight-medium">
                                             +₹{formatINR(primaryExtraPax * primaryExtraPaxRate)}/nt
                                           </span>
                                         ) : (
-                                          <span className="text-[10px] font-mono text-zinc-400 dark:text-zinc-500 pr-1">₹0</span>
+                                          <span className="text-[10px] font-mono text-zinc-400 dark:text-zinc-500 pr-1 ui-text-meta ui-font-body">₹0</span>
                                         )}
                                       </div>
                                     </div>
@@ -2526,21 +2526,21 @@ export default function AdminPortalPage() {
                                   >
                                     <div className="flex items-center justify-between gap-2 flex-wrap">
                                       <div className="flex items-center gap-2">
-                                        <span className="px-2.5 py-1 rounded-lg bg-blue-100 dark:bg-blue-500/20 text-blue-800 dark:text-blue-300 font-bold font-mono text-xs border border-blue-200 dark:border-blue-500/30">
+                                        <span className="px-2.5 py-1 rounded-lg bg-blue-100 dark:bg-blue-500/20 text-blue-800 dark:text-blue-300 font-bold font-mono text-xs border border-blue-200 dark:border-blue-500/30 ui-weight-medium ui-font-body ui-text-body">
                                           Room {r?.number || id}
                                         </span>
-                                        <span className="text-xs text-zinc-800 dark:text-zinc-200 font-semibold truncate">
+                                        <span className="text-xs text-zinc-800 dark:text-zinc-200 font-semibold truncate ui-text-body">
                                           {r?.roomType?.name || r?.name || "Standard Room"}
                                         </span>
-                                        <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-zinc-200/80 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 font-medium">
+                                        <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-zinc-200/80 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 font-medium ui-text-meta ui-font-body">
                                           Base: {rCapacity} Pax
                                         </span>
                                       </div>
 
                                       <div className="flex items-center gap-2">
-                                        <label className="text-[11px] font-bold text-zinc-600 dark:text-zinc-400 uppercase">Rate:</label>
+                                        <label className="text-[11px] font-bold text-zinc-600 dark:text-zinc-400 uppercase ui-text-meta ui-weight-medium ui-label">Rate:</label>
                                         <div className="relative flex items-center">
-                                          <span className="absolute left-2.5 text-xs text-zinc-400 font-bold font-mono">₹</span>
+                                          <span className="absolute left-2.5 text-xs text-zinc-400 font-bold font-mono ui-text-body ui-weight-medium ui-font-body">₹</span>
                                           <input
                                             type="number"
                                             placeholder="Rate"
@@ -2556,7 +2556,7 @@ export default function AdminPortalPage() {
                                                 },
                                               }));
                                             }}
-                                            className="w-28 h-8 pl-6 pr-2 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-blue-700 dark:text-blue-400 font-mono text-xs font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                                            className="w-28 h-8 pl-6 pr-2 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-blue-700 dark:text-blue-400 font-mono text-xs font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors ui-font-body ui-text-body ui-weight-medium ui-field" aria-label="Rate:"
                                           />
                                         </div>
 
@@ -2568,8 +2568,8 @@ export default function AdminPortalPage() {
                                               additionalRoomIds: (prev.additionalRoomIds || []).filter((x: string) => x !== id),
                                             }));
                                           }}
-                                          className="h-8 w-8 rounded-lg text-rose-500 hover:bg-rose-100 dark:hover:bg-rose-950/50 flex items-center justify-center transition cursor-pointer"
-                                          title="Remove this room"
+                                          className="h-8 w-8 rounded-lg text-rose-500 hover:bg-rose-100 dark:hover:bg-rose-950/50 flex items-center justify-center transition cursor-pointer ui-control ui-control-sized"
+                                          title="Remove this room" aria-label="Remove this room"
                                         >
                                           <X className="h-4 w-4" />
                                         </button>
@@ -2579,10 +2579,10 @@ export default function AdminPortalPage() {
                                     {/* Additional Room Extra Pax Stepper */}
                                     <div className="flex items-center justify-between border-t border-blue-200/60 dark:border-blue-900/40 pt-2.5 flex-wrap gap-2">
                                       <div className="flex items-center gap-2">
-                                        <span className="text-xs font-bold text-zinc-700 dark:text-zinc-300">
+                                        <span className="text-xs font-bold text-zinc-700 dark:text-zinc-300 ui-text-body ui-weight-medium">
                                           Extra Pax for Room {r?.number || id}
                                         </span>
-                                        <span className="text-[11px] font-mono font-semibold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/60 px-2 py-0.5 rounded-md border border-blue-200 dark:border-blue-800/60">
+                                        <span className="text-[11px] font-mono font-semibold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/60 px-2 py-0.5 rounded-md border border-blue-200 dark:border-blue-800/60 ui-text-meta ui-font-body">
                                           ₹{roomExtraPaxRate}/Pax
                                         </span>
                                       </div>
@@ -2602,8 +2602,8 @@ export default function AdminPortalPage() {
                                                 },
                                               }));
                                             }}
-                                            className="h-6 w-6 rounded-md bg-white dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-700 active:scale-90 text-zinc-700 dark:text-zinc-200 flex items-center justify-center transition shadow-xs cursor-pointer"
-                                            title="Decrease Extra Pax"
+                                            className="h-6 w-6 rounded-md bg-white dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-700  text-zinc-700 dark:text-zinc-200 flex items-center justify-center transition shadow-xs cursor-pointer ui-shadow-quiet ui-control"
+                                            title="Decrease Extra Pax" aria-label="Decrease Extra Pax"
                                           >
                                             <Minus className="h-3 w-3 stroke-[2.5]" />
                                           </button>
@@ -2623,8 +2623,8 @@ export default function AdminPortalPage() {
                                                 },
                                               }));
                                             }}
-                                            className="w-10 h-6 text-center font-mono font-bold text-xs text-zinc-900 dark:text-white bg-transparent focus:outline-none focus:bg-white dark:focus:bg-zinc-900 rounded"
-                                            title="Type Extra Pax count"
+                                            className="w-10 h-6 text-center font-mono font-bold text-xs text-zinc-900 dark:text-white bg-transparent focus:outline-none focus:bg-white dark:focus:bg-zinc-900 rounded ui-font-body ui-weight-medium ui-text-body ui-field"
+                                            title="Type Extra Pax count" aria-label="Type Extra Pax count"
                                           />
                                           <button
                                             type="button"
@@ -2640,18 +2640,18 @@ export default function AdminPortalPage() {
                                                 },
                                               }));
                                             }}
-                                            className="h-6 w-6 rounded-md bg-white dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-700 active:scale-90 text-zinc-700 dark:text-zinc-200 flex items-center justify-center transition shadow-xs cursor-pointer"
-                                            title="Increase Extra Pax"
+                                            className="h-6 w-6 rounded-md bg-white dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-700  text-zinc-700 dark:text-zinc-200 flex items-center justify-center transition shadow-xs cursor-pointer ui-shadow-quiet ui-control"
+                                            title="Increase Extra Pax" aria-label="Increase Extra Pax"
                                           >
                                             <Plus className="h-3 w-3 stroke-[2.5]" />
                                           </button>
                                         </div>
                                         {roomPaxCount > 0 ? (
-                                          <span className="text-[11px] font-mono font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/60 px-2 py-0.5 rounded-md border border-amber-200 dark:border-amber-800/60">
+                                          <span className="text-[11px] font-mono font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/60 px-2 py-0.5 rounded-md border border-amber-200 dark:border-amber-800/60 ui-text-meta ui-font-body ui-weight-medium">
                                             +₹{formatINR(roomPaxCount * roomExtraPaxRate)}/nt
                                           </span>
                                         ) : (
-                                          <span className="text-[10px] font-mono text-zinc-400 dark:text-zinc-500 pr-1">₹0</span>
+                                          <span className="text-[10px] font-mono text-zinc-400 dark:text-zinc-500 pr-1 ui-text-meta ui-font-body">₹0</span>
                                         )}
                                       </div>
                                     </div>
@@ -2685,7 +2685,7 @@ export default function AdminPortalPage() {
                                     }));
                                   }
                                 }}
-                                className="flex-1 h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs font-mono focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer"
+                                className="flex-1 h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs font-mono focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors cursor-pointer ui-text-body ui-font-body ui-field"
                               >
                                 <option value="">+ Add Additional Vacant Room to Booking</option>
                                 {roomsList
@@ -2711,9 +2711,9 @@ export default function AdminPortalPage() {
                                   id="adminGroupBilling"
                                   checked={editingGrc.groupBilling !== false}
                                   onChange={(e) => setEditingGrc({ ...editingGrc, groupBilling: e.target.checked })}
-                                  className="w-4 h-4 rounded bg-white dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700 text-blue-600 focus:ring-blue-500/50 cursor-pointer"
+                                  className="w-4 h-4 rounded bg-white dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700 text-blue-600 focus:ring-blue-500/50 cursor-pointer ui-field" aria-label="Consolidate Bill (Create a single Master Folio for all rooms)"
                                 />
-                                <label htmlFor="adminGroupBilling" className="text-xs font-bold text-blue-800 dark:text-blue-300 cursor-pointer">
+                                <label htmlFor="adminGroupBilling" className="text-xs font-bold text-blue-800 dark:text-blue-300 cursor-pointer ui-text-body ui-weight-medium ui-label">
                                   Consolidate Bill (Create a single Master Folio for all {totalRoomsCount} rooms)
                                 </label>
                               </div>
@@ -2723,11 +2723,11 @@ export default function AdminPortalPage() {
                           {/* Row 3: Meal Plan & Pax Headcount */}
                           <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 pt-2 border-t border-zinc-200 dark:border-zinc-800">
                             <div className="space-y-1">
-                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">Meal Plan</label>
+                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap ui-text-meta ui-label">Meal Plan</label>
                               <select
                                 value={editingGrc.mealPlan || "EP"}
                                 onChange={(e) => setEditingGrc({ ...editingGrc, mealPlan: e.target.value })}
-                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors ui-text-body ui-field" aria-label="Meal Plan"
                               >
                                 <option value="EP">EP (Room Only)</option>
                                 <option value="CP">CP (Breakfast)</option>
@@ -2737,7 +2737,7 @@ export default function AdminPortalPage() {
                             </div>
 
                             <div className="space-y-1">
-                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">Total Adults *</label>
+                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap ui-text-meta ui-label">Total Adults *</label>
                               <input
                                 type="number"
                                 required
@@ -2745,50 +2745,50 @@ export default function AdminPortalPage() {
                                 placeholder="e.g. 2"
                                 value={editingGrc.adults || "2"}
                                 onChange={(e) => setEditingGrc({ ...editingGrc, adults: e.target.value })}
-                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-bold"
+                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors font-bold ui-font-body ui-text-body ui-weight-medium ui-field" aria-label="Total Adults"
                               />
                             </div>
 
                             <div className="space-y-1">
-                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">Male Pax</label>
+                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap ui-text-meta ui-label">Male Pax</label>
                               <input
                                 type="number"
                                 placeholder="e.g. 1"
                                 min="0"
                                 value={editingGrc.paxM || ""}
                                 onChange={(e) => setEditingGrc({ ...editingGrc, paxM: e.target.value })}
-                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors ui-font-body ui-text-body ui-field" aria-label="Male Pax"
                               />
                             </div>
 
                             <div className="space-y-1">
-                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">Female Pax</label>
+                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap ui-text-meta ui-label">Female Pax</label>
                               <input
                                 type="number"
                                 placeholder="e.g. 1"
                                 min="0"
                                 value={editingGrc.paxF || ""}
                                 onChange={(e) => setEditingGrc({ ...editingGrc, paxF: e.target.value })}
-                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors ui-font-body ui-text-body ui-field" aria-label="Female Pax"
                               />
                             </div>
 
                             <div className="space-y-1">
-                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">Children</label>
+                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap ui-text-meta ui-label">Children</label>
                               <input
                                 type="number"
                                 placeholder="e.g. 0"
                                 min="0"
                                 value={editingGrc.children || "0"}
                                 onChange={(e) => setEditingGrc({ ...editingGrc, children: e.target.value })}
-                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors ui-font-body ui-text-body ui-field" aria-label="Children"
                               />
                             </div>
                           </div>
 
                           {/* Row 4: Live Capacity Verification Banner */}
                           <div
-                            className={`rounded-xl p-3.5 border transition-all ${
+                            className={`rounded-xl p-3.5 border transition-colors  ${
                               isBeyondMax
                                 ? "bg-rose-50 dark:bg-rose-950/50 border-rose-300 dark:border-rose-600 text-rose-800 dark:text-rose-200"
                                 : isOverCapacity
@@ -2803,8 +2803,8 @@ export default function AdminPortalPage() {
                                 <span className="text-base">
                                   {isBeyondMax ? "⛔" : isOverCapacity ? "⚠️" : hasGuestsEntered ? "✅" : "👥"}
                                 </span>
-                                <div className="text-xs">
-                                  <span className="font-bold">
+                                <div className="text-xs ui-text-body">
+                                  <span className="font-bold ui-weight-medium">
                                     {isBeyondMax
                                       ? "Room Capacity Exceeded!"
                                       : isOverCapacity
@@ -2813,7 +2813,7 @@ export default function AdminPortalPage() {
                                       ? "Capacity Verification Passed"
                                       : "Accommodation Capacity Math"}
                                   </span>
-                                  <p className="text-[11px] opacity-90 mt-0.5">
+                                  <p className="text-[11px] opacity-90 mt-0.5 ui-text-meta">
                                     {isBeyondMax
                                       ? `${totalGuests} Guests entered, but physical capacity limit across ${totalRoomsCount} rooms is max ${absoluteMaxRoomCapacity} Pax.`
                                       : isOverCapacity
@@ -2825,7 +2825,7 @@ export default function AdminPortalPage() {
                                 </div>
                               </div>
 
-                              <div className="flex items-center gap-2 font-mono text-xs font-bold shrink-0 self-end sm:self-auto">
+                              <div className="flex items-center gap-2 font-mono text-xs font-bold shrink-0 self-end sm:self-auto ui-font-body ui-text-body ui-weight-medium">
                                 <span className="px-2.5 py-1 rounded-lg border bg-zinc-200/80 dark:bg-black/40 border-zinc-300 dark:border-white/10 text-zinc-900 dark:text-white">
                                   Pax: {totalGuests || "N/A"} / {totalCapacity} (Max {absoluteMaxRoomCapacity})
                                 </span>
@@ -2835,13 +2835,13 @@ export default function AdminPortalPage() {
                         </div>
 
                         {/* CARD 2: PRIMARY GUEST DOSSIER */}
-                        <div className="rounded-2xl border border-zinc-200/90 dark:border-zinc-800 bg-white dark:bg-[#121215] p-5 lg:p-6 shadow-xs space-y-5">
+                        <div className="rounded-2xl border border-zinc-200/90 dark:border-zinc-800 bg-white dark:bg-[#121215] p-5 lg:p-6 shadow-xs space-y-5 ui-radius-panel ui-shadow-quiet ui-surface">
                           <div className="border-b border-zinc-200 dark:border-zinc-800 pb-3 flex items-center justify-between">
                             <div className="flex items-center gap-2.5">
                               <div className="p-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60">
                                 <Users className="h-4 w-4" />
                               </div>
-                              <span className="font-bold text-zinc-900 dark:text-white uppercase tracking-wider text-xs">
+                              <span className="font-bold text-zinc-900 dark:text-white uppercase tracking-wider text-xs ui-weight-medium ui-text-body">
                                 2. Primary Guest Profile (From Physical GRC Card)
                               </span>
                             </div>
@@ -2849,23 +2849,23 @@ export default function AdminPortalPage() {
 
                           <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
                             <div className="space-y-1">
-                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">Mobile Phone *</label>
+                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap ui-text-meta ui-label">Mobile Phone *</label>
                               <input
                                 type="tel"
                                 required
                                 placeholder="e.g. 9864341211"
                                 value={editingGrc.mobilePhone || ""}
                                 onChange={(e) => setEditingGrc({ ...editingGrc, mobilePhone: e.target.value })}
-                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors ui-font-body ui-text-body ui-weight-medium ui-field" aria-label="Mobile Phone"
                               />
                             </div>
 
                             <div className="space-y-1">
-                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">Title</label>
+                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap ui-text-meta ui-label">Title</label>
                               <select
                                 value={editingGrc.title || "Mr."}
                                 onChange={(e) => setEditingGrc({ ...editingGrc, title: e.target.value })}
-                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors ui-text-body ui-field" aria-label="Title"
                               >
                                 <option value="Mr.">Mr.</option>
                                 <option value="Mrs.">Mrs.</option>
@@ -2876,41 +2876,41 @@ export default function AdminPortalPage() {
                             </div>
 
                             <div className="space-y-1 sm:col-span-2">
-                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">Guest Full Name *</label>
+                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap ui-text-meta ui-label">Guest Full Name *</label>
                               <input
                                 type="text"
                                 required
                                 placeholder="e.g. Suman Roy, Vikash Kumar"
                                 value={editingGrc.fullName || ""}
                                 onChange={(e) => setEditingGrc({ ...editingGrc, fullName: e.target.value.toUpperCase() })}
-                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-bold text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-bold text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors ui-weight-medium ui-text-body ui-field" aria-label="Guest Full Name"
                               />
                             </div>
 
                             <div className="space-y-1 sm:col-span-2">
-                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">Father / Spouse Name</label>
+                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap ui-text-meta ui-label">Father / Spouse Name</label>
                               <input
                                 type="text"
                                 placeholder="S/O, D/O, W/O"
                                 value={editingGrc.fatherSpouseName || ""}
                                 onChange={(e) => setEditingGrc({ ...editingGrc, fatherSpouseName: e.target.value.toUpperCase() })}
-                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors ui-text-body ui-field" aria-label="Father / Spouse Name"
                               />
                             </div>
 
                             <div className="space-y-1 sm:col-span-2">
-                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">Alternate Phone</label>
+                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap ui-text-meta ui-label">Alternate Phone</label>
                               <input
                                 type="tel"
                                 placeholder="Optional phone"
                                 value={editingGrc.alternatePhone || ""}
                                 onChange={(e) => setEditingGrc({ ...editingGrc, alternatePhone: e.target.value })}
-                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors ui-font-body ui-text-body ui-field" aria-label="Alternate Phone"
                               />
                             </div>
 
                             <div className="space-y-1">
-                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">Age (Years) *</label>
+                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap ui-text-meta ui-label">Age (Years) *</label>
                               <input
                                 type="number"
                                 min="1"
@@ -2918,16 +2918,16 @@ export default function AdminPortalPage() {
                                 placeholder="Age"
                                 value={editingGrc.age || ""}
                                 onChange={(e) => setEditingGrc({ ...editingGrc, age: e.target.value })}
-                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors ui-font-body ui-text-body ui-field" aria-label="Age (Years)"
                               />
                             </div>
 
                             <div className="space-y-1">
-                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">Gender *</label>
+                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap ui-text-meta ui-label">Gender *</label>
                               <select
                                 value={editingGrc.gender || "Male"}
                                 onChange={(e) => setEditingGrc({ ...editingGrc, gender: e.target.value })}
-                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors ui-text-body ui-field" aria-label="Gender"
                               >
                                 <option value="Male">Male</option>
                                 <option value="Female">Female</option>
@@ -2936,7 +2936,7 @@ export default function AdminPortalPage() {
                             </div>
 
                             <div className="space-y-1">
-                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">Nationality *</label>
+                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap ui-text-meta ui-label">Nationality *</label>
                               <select
                                 required
                                 value={editingGrc.nationality || "Indian"}
@@ -2949,7 +2949,7 @@ export default function AdminPortalPage() {
                                     idDocumentType: val === "Indian" ? "AADHAAR" : "PASSPORT",
                                   });
                                 }}
-                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors ui-text-body ui-field" aria-label="Nationality"
                               >
                                 <option value="Indian">Indian</option>
                                 <option value="Foreign">Foreign</option>
@@ -2957,46 +2957,46 @@ export default function AdminPortalPage() {
                             </div>
 
                             <div className="space-y-1 sm:col-span-2">
-                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">Email Address</label>
+                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap ui-text-meta ui-label">Email Address</label>
                               <input
                                 type="email"
                                 placeholder="guest@example.com"
                                 value={editingGrc.email || ""}
                                 onChange={(e) => setEditingGrc({ ...editingGrc, email: e.target.value })}
-                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors ui-text-body ui-field" aria-label="Email Address"
                               />
                             </div>
 
                             <div className="space-y-1">
-                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">Profession / Occupation</label>
+                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap ui-text-meta ui-label">Profession / Occupation</label>
                               <input
                                 type="text"
                                 placeholder="e.g. Business Executive"
                                 value={editingGrc.profession || ""}
                                 onChange={(e) => setEditingGrc({ ...editingGrc, profession: e.target.value })}
-                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors ui-text-body ui-field" aria-label="Profession / Occupation"
                               />
                             </div>
                           </div>
 
                           {/* MANDATORY FOREIGN NATIONAL SECTION (FORM C) */}
                           {editingGrc.nationality === "Foreign" && (
-                            <div className="rounded-xl border border-blue-200 dark:border-blue-500/30 bg-blue-50/80 dark:bg-blue-950/20 p-4 space-y-3.5 animate-in fade-in">
+                            <div className="rounded-xl border border-blue-200 dark:border-blue-500/30 bg-blue-50/80 dark:bg-blue-950/20 p-4 space-y-3.5  ">
                               <div className="flex items-center justify-between border-b border-blue-200 dark:border-blue-900/50 pb-2">
                                 <div className="flex items-center gap-2">
                                   <Globe className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                                  <span className="font-bold text-zinc-900 dark:text-white uppercase tracking-wider text-xs">
+                                  <span className="font-bold text-zinc-900 dark:text-white uppercase tracking-wider text-xs ui-weight-medium ui-text-body">
                                     Foreign National Form C Details (Mandatory)
                                   </span>
                                 </div>
-                                <span className="text-[10px] font-mono text-blue-800 dark:text-blue-300 bg-blue-100 dark:bg-blue-500/20 border border-blue-300 dark:border-blue-500/30 px-2 py-0.5 rounded font-bold">
+                                <span className="text-[10px] font-mono text-blue-800 dark:text-blue-300 bg-blue-100 dark:bg-blue-500/20 border border-blue-300 dark:border-blue-500/30 px-2 py-0.5 rounded font-bold ui-text-meta ui-font-body ui-weight-medium">
                                   Govt Form C Compliance
                                 </span>
                               </div>
 
                               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
                                 <div className="space-y-1">
-                                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">
+                                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap ui-text-meta ui-label">
                                     Country of Citizenship *
                                   </label>
                                   <input
@@ -3012,12 +3012,12 @@ export default function AdminPortalPage() {
                                         foreignDetails: { ...(editingGrc.foreignDetails || {}), countryOfCitizenship: val },
                                       });
                                     }}
-                                    className="w-full h-10 px-3 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                                    className="w-full h-10 px-3 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors ui-text-body ui-field" aria-label="Country of Citizenship"
                                   />
                                 </div>
 
                                 <div className="space-y-1">
-                                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">
+                                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap ui-text-meta ui-label">
                                     Passport Number *
                                   </label>
                                   <input
@@ -3031,12 +3031,12 @@ export default function AdminPortalPage() {
                                         foreignDetails: { ...(editingGrc.foreignDetails || {}), passportNo: e.target.value },
                                       })
                                     }
-                                    className="w-full h-10 px-3 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono font-bold text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                                    className="w-full h-10 px-3 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono font-bold text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors ui-font-body ui-weight-medium ui-text-body ui-field" aria-label="Passport Number"
                                   />
                                 </div>
 
                                 <div className="space-y-1">
-                                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">
+                                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap ui-text-meta ui-label">
                                     Passport Issue Place & Date *
                                   </label>
                                   <input
@@ -3050,12 +3050,12 @@ export default function AdminPortalPage() {
                                         foreignDetails: { ...(editingGrc.foreignDetails || {}), datePlaceOfIssue: e.target.value },
                                       })
                                     }
-                                    className="w-full h-10 px-3 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                                    className="w-full h-10 px-3 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors ui-text-body ui-field" aria-label="Passport Issue Place & Date"
                                   />
                                 </div>
 
                                 <div className="space-y-1">
-                                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">
+                                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap ui-text-meta ui-label">
                                     Visa / Permit Number *
                                   </label>
                                   <input
@@ -3069,12 +3069,12 @@ export default function AdminPortalPage() {
                                         foreignDetails: { ...(editingGrc.foreignDetails || {}), restrictedPermitNo: e.target.value },
                                       })
                                     }
-                                    className="w-full h-10 px-3 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                                    className="w-full h-10 px-3 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors ui-font-body ui-text-body ui-field" aria-label="Visa / Permit Number"
                                   />
                                 </div>
 
                                 <div className="space-y-1">
-                                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">
+                                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap ui-text-meta ui-label">
                                     Date of Arrival in India *
                                   </label>
                                   <input
@@ -3087,12 +3087,12 @@ export default function AdminPortalPage() {
                                         foreignDetails: { ...(editingGrc.foreignDetails || {}), dateOfArrivalInIndia: e.target.value },
                                       })
                                     }
-                                    className="w-full h-10 px-3 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer"
+                                    className="w-full h-10 px-3 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors cursor-pointer ui-font-body ui-text-body ui-field" aria-label="Date of Arrival in India"
                                   />
                                 </div>
 
                                 <div className="space-y-1">
-                                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">
+                                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap ui-text-meta ui-label">
                                     Port / City of Entry in India
                                   </label>
                                   <input
@@ -3105,12 +3105,12 @@ export default function AdminPortalPage() {
                                         foreignDetails: { ...(editingGrc.foreignDetails || {}), portOfEntry: e.target.value },
                                       })
                                     }
-                                    className="w-full h-10 px-3 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                                    className="w-full h-10 px-3 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors ui-text-body ui-field" aria-label="Port / City of Entry in India"
                                   />
                                 </div>
 
                                 <div className="space-y-1 sm:col-span-3">
-                                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">
+                                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap ui-text-meta ui-label">
                                     Next Destination in India / Abroad
                                   </label>
                                   <input
@@ -3123,7 +3123,7 @@ export default function AdminPortalPage() {
                                         foreignDetails: { ...(editingGrc.foreignDetails || {}), nextDestination: e.target.value },
                                       })
                                     }
-                                    className="w-full h-10 px-3 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                                    className="w-full h-10 px-3 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors ui-text-body ui-field" aria-label="Next Destination in India / Abroad"
                                   />
                                 </div>
                               </div>
@@ -3132,80 +3132,80 @@ export default function AdminPortalPage() {
                         </div>
 
                         {/* CARD 3: RESIDENTIAL ADDRESS */}
-                        <div className="rounded-2xl border border-zinc-200/90 dark:border-zinc-800 bg-white dark:bg-[#121215] p-5 lg:p-6 shadow-xs space-y-4">
+                        <div className="rounded-2xl border border-zinc-200/90 dark:border-zinc-800 bg-white dark:bg-[#121215] p-5 lg:p-6 shadow-xs space-y-4 ui-radius-panel ui-shadow-quiet ui-surface">
                           <div className="border-b border-zinc-200 dark:border-zinc-800 pb-3 flex items-center gap-2.5">
                             <div className="p-1.5 rounded-lg bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800/60">
                               <MapPin className="h-4 w-4" />
                             </div>
-                            <span className="font-bold text-zinc-900 dark:text-white uppercase tracking-wider text-xs">
+                            <span className="font-bold text-zinc-900 dark:text-white uppercase tracking-wider text-xs ui-weight-medium ui-text-body">
                               3. Permanent Residential Address
                             </span>
                           </div>
 
                           <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
                             <div className="space-y-1 sm:col-span-2">
-                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">Street / House Address</label>
+                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap ui-text-meta ui-label">Street / House Address</label>
                               <input
                                 type="text"
                                 placeholder="Flat / Building / Road / Locality"
                                 value={editingGrc.streetAddress || ""}
                                 onChange={(e) => setEditingGrc({ ...editingGrc, streetAddress: e.target.value.toUpperCase() })}
-                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors ui-text-body ui-field" aria-label="Street / House Address"
                               />
                             </div>
 
                             <div className="space-y-1">
-                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">Police Station</label>
+                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap ui-text-meta ui-label">Police Station</label>
                               <input
                                 type="text"
                                 placeholder="Local P.S."
                                 value={editingGrc.policeStation || ""}
                                 onChange={(e) => setEditingGrc({ ...editingGrc, policeStation: e.target.value.toUpperCase() })}
-                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors ui-text-body ui-field" aria-label="Police Station"
                               />
                             </div>
 
                             <div className="space-y-1">
-                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">City</label>
+                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap ui-text-meta ui-label">City</label>
                               <input
                                 type="text"
                                 placeholder="e.g. Guwahati / Kolkata"
                                 value={editingGrc.city || ""}
                                 onChange={(e) => setEditingGrc({ ...editingGrc, city: e.target.value.toUpperCase() })}
-                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors ui-text-body ui-field" aria-label="City"
                               />
                             </div>
 
                             <div className="space-y-1">
-                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">State</label>
+                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap ui-text-meta ui-label">State</label>
                               <input
                                 type="text"
                                 placeholder="e.g. Assam"
                                 value={editingGrc.state || ""}
                                 onChange={(e) => setEditingGrc({ ...editingGrc, state: e.target.value.toUpperCase() })}
-                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors ui-text-body ui-field" aria-label="State"
                               />
                             </div>
 
                             <div className="space-y-1">
-                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">PIN / Zip Code</label>
+                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap ui-text-meta ui-label">PIN / Zip Code</label>
                               <input
                                 type="text"
                                 placeholder="e.g. 781008"
                                 value={editingGrc.pinZipCode || ""}
                                 onChange={(e) => setEditingGrc({ ...editingGrc, pinZipCode: e.target.value })}
-                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors ui-font-body ui-text-body ui-field" aria-label="PIN / Zip Code"
                               />
                             </div>
 
                             <div className="space-y-1 sm:col-span-2">
-                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">Country</label>
+                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap ui-text-meta ui-label">Country</label>
                               <input
                                 type="text"
                                 placeholder="e.g. India"
                                 value={editingGrc.country || "India"}
                                 onChange={(e) => setEditingGrc({ ...editingGrc, country: e.target.value })}
-                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors ui-text-body ui-field" aria-label="Country"
                               />
                             </div>
                           </div>
@@ -3218,19 +3218,19 @@ export default function AdminPortalPage() {
                       <div className="lg:col-span-5 xl:col-span-5 space-y-6">
                         
                         {/* CARD 4: BILLING, TARIFF & ADVANCE DEPOSIT */}
-                        <div className="rounded-2xl border border-zinc-200/90 dark:border-zinc-800 bg-white dark:bg-[#121215] p-5 lg:p-6 shadow-xs space-y-4">
+                        <div className="rounded-2xl border border-zinc-200/90 dark:border-zinc-800 bg-white dark:bg-[#121215] p-5 lg:p-6 shadow-xs space-y-4 ui-radius-panel ui-shadow-quiet ui-surface">
                           <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 pb-3">
                             <div className="flex items-center gap-2.5">
                               <div className="p-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60">
                                 <CreditCard className="h-4 w-4" />
                               </div>
-                              <span className="font-bold text-zinc-900 dark:text-white uppercase tracking-wider text-xs">
+                              <span className="font-bold text-zinc-900 dark:text-white uppercase tracking-wider text-xs ui-weight-medium ui-text-body">
                                 4. Room Tariff & Advance Deposit
                               </span>
                             </div>
 
                             {/* Complimentary Switch */}
-                            <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-emerald-800 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 px-2.5 py-1 rounded-lg border border-emerald-200 dark:border-emerald-800">
+                            <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-emerald-800 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 px-2.5 py-1 rounded-lg border border-emerald-200 dark:border-emerald-800 ui-text-body ui-weight-medium ui-label">
                               <input
                                 type="checkbox"
                                 checked={editingGrc.isComplimentary || editingGrc.agreedRoomTariff === 0}
@@ -3248,7 +3248,7 @@ export default function AdminPortalPage() {
                                     },
                                   }));
                                 }}
-                                className="w-4 h-4 rounded text-emerald-600 cursor-pointer"
+                                className="w-4 h-4 rounded text-emerald-600 cursor-pointer ui-field"
                               />
                               <span>Complimentary Room</span>
                             </label>
@@ -3256,13 +3256,13 @@ export default function AdminPortalPage() {
 
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
                             <div className="space-y-1">
-                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">
+                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap ui-text-meta ui-label">
                                 {editingGrc.additionalRoomIds?.length > 0
                                   ? `Room ${editingGrc.preAssignedRoom || "Primary"} Rate`
                                   : "Agreed Room Rate"}
                               </label>
                               <div className="relative flex items-center">
-                                <span className="absolute left-3 text-zinc-400 font-bold font-mono text-xs">₹</span>
+                                <span className="absolute left-3 text-zinc-400 font-bold font-mono text-xs ui-weight-medium ui-font-body ui-text-body">₹</span>
                                 <input
                                   type="number"
                                   placeholder={editingGrc.isComplimentary ? "0 (Free)" : "Rate"}
@@ -3282,36 +3282,36 @@ export default function AdminPortalPage() {
                                       },
                                     }));
                                   }}
-                                  className="w-full h-10 pl-7 pr-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-blue-700 dark:text-blue-400 font-mono font-bold text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all disabled:opacity-60"
+                                  className="w-full h-10 pl-7 pr-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-blue-700 dark:text-blue-400 font-mono font-bold text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors disabled:opacity-60 ui-font-body ui-weight-medium ui-field"
                                 />
                               </div>
                             </div>
 
                             {/* GST Inclusive Toggle */}
                             <div className="space-y-1">
-                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">
+                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap ui-text-meta ui-label">
                                 GST Treatment
                               </label>
                               <div className="flex items-center bg-zinc-100 dark:bg-zinc-800 p-0.5 rounded-lg border border-zinc-200 dark:border-zinc-700 h-10">
                                 <button
                                   type="button"
                                   onClick={() => setEditingGrc({ ...editingGrc, isRateInclusive: true })}
-                                  className={`flex-1 h-full rounded-md text-xs font-bold transition flex items-center justify-center gap-1 cursor-pointer ${
+                                  className={`flex-1 h-full rounded-md text-xs font-bold transition flex items-center justify-center gap-1 cursor-pointer  ui-text-body ui-weight-medium ${
                                     editingGrc.isRateInclusive !== false
-                                      ? "bg-white dark:bg-zinc-900 text-blue-700 dark:text-blue-400 shadow-xs border border-zinc-200 dark:border-zinc-700"
+                                      ? "bg-white dark:bg-zinc-900 text-blue-700 dark:text-blue-400 shadow-xs border border-zinc-200 dark:border-zinc-700 ui-shadow-quiet"
                                       : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900"
-                                  }`}
+                                  } ui-control`}
                                 >
                                   <span>Incl. GST</span>
                                 </button>
                                 <button
                                   type="button"
                                   onClick={() => setEditingGrc({ ...editingGrc, isRateInclusive: false })}
-                                  className={`flex-1 h-full rounded-md text-xs font-bold transition flex items-center justify-center gap-1 cursor-pointer ${
+                                  className={`flex-1 h-full rounded-md text-xs font-bold transition flex items-center justify-center gap-1 cursor-pointer  ui-text-body ui-weight-medium ${
                                     editingGrc.isRateInclusive === false
-                                      ? "bg-white dark:bg-zinc-900 text-amber-700 dark:text-amber-400 shadow-xs border border-zinc-200 dark:border-zinc-700"
+                                      ? "bg-white dark:bg-zinc-900 text-amber-700 dark:text-amber-400 shadow-xs border border-zinc-200 dark:border-zinc-700 ui-shadow-quiet"
                                       : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900"
-                                  }`}
+                                  } ui-control`}
                                 >
                                   <span>+Tax Extra</span>
                                 </button>
@@ -3319,11 +3319,11 @@ export default function AdminPortalPage() {
                             </div>
 
                             <div className="space-y-1">
-                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">
+                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap ui-text-meta ui-label">
                                 Advance Deposit
                               </label>
                               <div className="relative flex items-center">
-                                <span className="absolute left-3 text-emerald-500 font-bold font-mono text-xs">₹</span>
+                                <span className="absolute left-3 text-emerald-500 font-bold font-mono text-xs ui-weight-medium ui-font-body ui-text-body">₹</span>
                                 <input
                                   type="number"
                                   placeholder="0"
@@ -3336,19 +3336,19 @@ export default function AdminPortalPage() {
                                       advancePaymentMethod: val > 0 ? (editingGrc.advancePaymentMethod || "UPI") : "",
                                     });
                                   }}
-                                  className="w-full h-10 pl-7 pr-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-emerald-700 dark:text-emerald-400 font-mono font-bold text-sm focus:border-emerald-500 focus:outline-none"
+                                  className="w-full h-10 pl-7 pr-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-emerald-700 dark:text-emerald-400 font-mono font-bold text-sm focus:border-emerald-500 focus:outline-none ui-font-body ui-weight-medium ui-field" aria-label="Advance Deposit"
                                 />
                               </div>
                             </div>
 
                             <div className="space-y-1">
-                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">
+                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap ui-text-meta ui-label">
                                 Payment Mode
                               </label>
                               <select
                                 value={editingGrc.advancePaymentMethod || "UPI"}
                                 onChange={(e) => setEditingGrc({ ...editingGrc, advancePaymentMethod: e.target.value })}
-                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-bold text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-bold text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors ui-weight-medium ui-text-body ui-field" aria-label="Payment Mode"
                               >
                                 <option value="UPI">UPI / QR Code</option>
                                 <option value="CASH">Cash Drawer</option>
@@ -3360,7 +3360,7 @@ export default function AdminPortalPage() {
                             </div>
 
                             <div className="space-y-1 sm:col-span-2">
-                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">
+                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap ui-text-meta ui-label">
                                 Transaction / UTR / PO Reference
                               </label>
                               <input
@@ -3368,7 +3368,7 @@ export default function AdminPortalPage() {
                                 placeholder="e.g. UTR/98127391 or PO-2026"
                                 value={editingGrc.transactionRef || ""}
                                 onChange={(e) => setEditingGrc({ ...editingGrc, transactionRef: e.target.value.toUpperCase() })}
-                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors ui-font-body ui-text-body ui-field" aria-label="Transaction / UTR / PO Reference"
                               />
                             </div>
                           </div>
@@ -3377,21 +3377,21 @@ export default function AdminPortalPage() {
                           {(editingGrc.additionalRoomIds || []).length > 0 && (
                             <div className="p-3.5 rounded-xl bg-blue-50/70 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800/50 space-y-2.5">
                               <div className="flex items-center justify-between flex-wrap gap-2">
-                                <span className="font-bold text-xs text-blue-900 dark:text-blue-200 uppercase tracking-wide flex items-center gap-1.5">
+                                <span className="font-bold text-xs text-blue-900 dark:text-blue-200 uppercase tracking-wide flex items-center gap-1.5 ui-weight-medium ui-text-body">
                                   <Building2 className="h-3.5 w-3.5 text-blue-600" />
                                   Group Tariff Breakdown ({totalRoomsCount} Rooms)
                                 </span>
-                                <span className="px-2.5 py-1 rounded-lg bg-blue-600 text-white font-mono font-black text-xs shadow-xs">
+                                <span className="px-2.5 py-1 rounded-lg bg-blue-600 text-white font-mono font-black text-xs shadow-xs ui-font-body ui-weight-medium ui-text-body ui-shadow-quiet">
                                   Combined: ₹{totalDailyTariffCombined}/Night
                                 </span>
                               </div>
 
                               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                 <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-white dark:bg-zinc-900 border border-blue-100 dark:border-blue-900/60">
-                                  <span className="font-mono font-bold text-xs text-zinc-900 dark:text-white">
+                                  <span className="font-mono font-bold text-xs text-zinc-900 dark:text-white ui-font-body ui-weight-medium ui-text-body">
                                     Room {editingGrc.preAssignedRoom || "Primary"} (Main)
                                   </span>
-                                  <span className="font-mono font-black text-xs text-blue-600 dark:text-blue-400">
+                                  <span className="font-mono font-black text-xs text-blue-600 dark:text-blue-400 ui-font-body ui-weight-medium ui-text-body">
                                     ₹{primaryRate}
                                   </span>
                                 </div>
@@ -3401,10 +3401,10 @@ export default function AdminPortalPage() {
                                   const rRate = Number(editingGrc.roomRates?.[rid] ?? (rObj?.roomType?.basePrice || 3200));
                                   return (
                                     <div key={rid} className="flex items-center justify-between px-3 py-2 rounded-lg bg-white dark:bg-zinc-900 border border-blue-100 dark:border-blue-900/60">
-                                      <span className="font-mono font-bold text-xs text-zinc-900 dark:text-white truncate">
+                                      <span className="font-mono font-bold text-xs text-zinc-900 dark:text-white truncate ui-font-body ui-weight-medium ui-text-body">
                                         Room {rObj?.number || rid}
                                       </span>
-                                      <span className="font-mono font-black text-xs text-blue-600 dark:text-blue-400">
+                                      <span className="font-mono font-black text-xs text-blue-600 dark:text-blue-400 ui-font-body ui-weight-medium ui-text-body">
                                         ₹{isNaN(rRate) ? 0 : rRate}
                                       </span>
                                     </div>
@@ -3415,7 +3415,7 @@ export default function AdminPortalPage() {
                           )}
 
                           {editingGrc.advancePaymentMethod === "DIRECT_BILL" && (
-                            <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-700/60 text-xs text-amber-900 dark:text-amber-200 flex items-center gap-2">
+                            <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-700/60 text-xs text-amber-900 dark:text-amber-200 flex items-center gap-2 ui-text-body">
                               <Building2 className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
                               <span>
                                 Billing will be posted to Company Ledger:{" "}
@@ -3427,45 +3427,45 @@ export default function AdminPortalPage() {
                         </div>
 
                         {/* CARD 5: TRAVEL DETAILS & ID VERIFICATION */}
-                        <div className="rounded-2xl border border-zinc-200/90 dark:border-zinc-800 bg-white dark:bg-[#121215] p-5 lg:p-6 shadow-xs space-y-4">
+                        <div className="rounded-2xl border border-zinc-200/90 dark:border-zinc-800 bg-white dark:bg-[#121215] p-5 lg:p-6 shadow-xs space-y-4 ui-radius-panel ui-shadow-quiet ui-surface">
                           <div className="border-b border-zinc-200 dark:border-zinc-800 pb-3 flex items-center gap-2.5">
                             <div className="p-1.5 rounded-lg bg-cyan-50 dark:bg-cyan-950/60 text-cyan-600 dark:text-cyan-400 border border-cyan-200 dark:border-cyan-800/60">
                               <Compass className="h-4 w-4" />
                             </div>
-                            <span className="font-bold text-zinc-900 dark:text-white uppercase tracking-wider text-xs">
+                            <span className="font-bold text-zinc-900 dark:text-white uppercase tracking-wider text-xs ui-weight-medium ui-text-body">
                               5. Travel Details, ID Proof & Corporate Master
                             </span>
                           </div>
 
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
                             <div className="space-y-1">
-                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">Arrived From</label>
+                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap ui-text-meta ui-label">Arrived From</label>
                               <input
                                 type="text"
                                 placeholder="e.g. Kolkata, Delhi"
                                 value={editingGrc.arrivedFrom || ""}
                                 onChange={(e) => setEditingGrc({ ...editingGrc, arrivedFrom: e.target.value.toUpperCase() })}
-                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors ui-text-body ui-field" aria-label="Arrived From"
                               />
                             </div>
 
                             <div className="space-y-1">
-                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">Going To</label>
+                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap ui-text-meta ui-label">Going To</label>
                               <input
                                 type="text"
                                 placeholder="e.g. Shillong, Home"
                                 value={editingGrc.goingTo || ""}
                                 onChange={(e) => setEditingGrc({ ...editingGrc, goingTo: e.target.value.toUpperCase() })}
-                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors ui-text-body ui-field" aria-label="Going To"
                               />
                             </div>
 
                             <div className="space-y-1">
-                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">Purpose of Visit</label>
+                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap ui-text-meta ui-label">Purpose of Visit</label>
                               <select
                                 value={editingGrc.purposeOfVisit || "Tourism / Holiday"}
                                 onChange={(e) => setEditingGrc({ ...editingGrc, purposeOfVisit: e.target.value })}
-                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer font-medium"
+                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors cursor-pointer font-medium ui-text-body ui-field" aria-label="Purpose of Visit"
                               >
                                 {PURPOSE_OF_VISIT_OPTIONS.map((opt) => (
                                   <option key={opt.id} value={opt.label}>
@@ -3476,22 +3476,22 @@ export default function AdminPortalPage() {
                             </div>
 
                             <div className="space-y-1">
-                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">Vehicle Number</label>
+                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap ui-text-meta ui-label">Vehicle Number</label>
                               <input
                                 type="text"
                                 placeholder="e.g. AS 01 EX 1234"
                                 value={editingGrc.vehicleNumber || ""}
                                 onChange={(e) => setEditingGrc({ ...editingGrc, vehicleNumber: e.target.value.toUpperCase() })}
-                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors ui-font-body ui-text-body ui-field" aria-label="Vehicle Number"
                               />
                             </div>
 
                             <div className="space-y-1">
-                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">ID Document Type</label>
+                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap ui-text-meta ui-label">ID Document Type</label>
                               <select
                                 value={editingGrc.idDocumentType || "AADHAAR"}
                                 onChange={(e) => setEditingGrc({ ...editingGrc, idDocumentType: e.target.value })}
-                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer"
+                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors cursor-pointer ui-text-body ui-field" aria-label="ID Document Type"
                               >
                                 {ID_PROOF_TYPES.map((id) => (
                                   <option key={id.id} value={id.id}>
@@ -3502,20 +3502,20 @@ export default function AdminPortalPage() {
                             </div>
 
                             <div className="space-y-1">
-                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">ID Number / Last 4</label>
+                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap ui-text-meta ui-label">ID Number / Last 4</label>
                               <input
                                 type="text"
                                 placeholder="e.g. 4521 or full ID"
                                 value={editingGrc.idDocumentNumber || ""}
                                 onChange={(e) => setEditingGrc({ ...editingGrc, idDocumentNumber: e.target.value.toUpperCase() })}
-                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors ui-font-body ui-text-body ui-field" aria-label="ID Number / Last 4"
                               />
                             </div>
 
                             <div className="space-y-1 sm:col-span-2">
-                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap flex items-center justify-between">
+                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap flex items-center justify-between ui-text-meta ui-label">
                                 <span>Company / Travel Agent Master</span>
-                                <span className="text-[10px] text-blue-600 dark:text-blue-400 font-mono font-bold">24+ Directory</span>
+                                <span className="text-[10px] text-blue-600 dark:text-blue-400 font-mono font-bold ui-text-meta ui-font-body ui-weight-medium">24+ Directory</span>
                               </label>
                               <CompanySelector
                                 value={editingGrc.companyName || ""}
@@ -3543,26 +3543,26 @@ export default function AdminPortalPage() {
                             </div>
 
                             <div className="space-y-1 sm:col-span-2">
-                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">Company GSTIN</label>
+                              <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap ui-text-meta ui-label">Company GSTIN</label>
                               <input
                                 type="text"
                                 placeholder="e.g. 18AAAAA0000A1Z5"
                                 value={editingGrc.guestGstin || ""}
                                 onChange={(e) => setEditingGrc({ ...editingGrc, guestGstin: e.target.value.toUpperCase() })}
-                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-semibold"
+                                className="w-full h-10 px-3 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors font-semibold ui-font-body ui-text-body ui-field" aria-label="Company GSTIN"
                               />
                             </div>
                           </div>
                         </div>
 
                         {/* CARD 6: ACCOMPANYING CO-GUESTS */}
-                        <div className="rounded-2xl border border-zinc-200/90 dark:border-zinc-800 bg-white dark:bg-[#121215] p-5 lg:p-6 shadow-xs space-y-4">
+                        <div className="rounded-2xl border border-zinc-200/90 dark:border-zinc-800 bg-white dark:bg-[#121215] p-5 lg:p-6 shadow-xs space-y-4 ui-radius-panel ui-shadow-quiet ui-surface">
                           <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 pb-3">
                             <div className="flex items-center gap-2.5">
                               <div className="p-1.5 rounded-lg bg-cyan-50 dark:bg-cyan-950/60 text-cyan-600 dark:text-cyan-400 border border-cyan-200 dark:border-cyan-800/60">
                                 <Users className="h-4 w-4" />
                               </div>
-                              <span className="font-bold text-zinc-900 dark:text-white uppercase tracking-wider text-xs">
+                              <span className="font-bold text-zinc-900 dark:text-white uppercase tracking-wider text-xs ui-weight-medium ui-text-body">
                                 6. Accompanying Co-Guests ({(editingGrc.coGuests || []).length})
                               </span>
                             </div>
@@ -3573,7 +3573,7 @@ export default function AdminPortalPage() {
                                 list.push({ name: "", soDoWo: "", age: "", gender: "Male", relation: "Spouse" });
                                 setEditingGrc({ ...editingGrc, coGuests: list });
                               }}
-                              className="px-3 py-1.5 rounded-lg bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-900 dark:text-white font-bold text-xs flex items-center gap-1.5 transition cursor-pointer"
+                              className="px-3 py-1.5 rounded-lg bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-900 dark:text-white font-bold text-xs flex items-center gap-1.5 transition cursor-pointer ui-weight-medium ui-text-body ui-control"
                             >
                               <Plus className="h-3.5 w-3.5" />
                               <span>Add Companion</span>
@@ -3595,7 +3595,7 @@ export default function AdminPortalPage() {
                                         updated[idx] = { ...updated[idx], name: e.target.value.toUpperCase() };
                                         setEditingGrc({ ...editingGrc, coGuests: updated });
                                       }}
-                                      className="w-full h-9 px-2.5 rounded-lg bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                                      className="w-full h-9 px-2.5 rounded-lg bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors ui-text-body ui-field" aria-label="Companion Name *"
                                     />
                                   </div>
                                   <div className="sm:col-span-2">
@@ -3608,7 +3608,7 @@ export default function AdminPortalPage() {
                                         updated[idx] = { ...updated[idx], age: e.target.value };
                                         setEditingGrc({ ...editingGrc, coGuests: updated });
                                       }}
-                                      className="w-full h-9 px-2 rounded-lg bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                                      className="w-full h-9 px-2 rounded-lg bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors ui-font-body ui-text-body ui-field" aria-label="Age"
                                     />
                                   </div>
                                   <div className="sm:col-span-2">
@@ -3619,7 +3619,7 @@ export default function AdminPortalPage() {
                                         updated[idx] = { ...updated[idx], gender: e.target.value };
                                         setEditingGrc({ ...editingGrc, coGuests: updated });
                                       }}
-                                      className="w-full h-9 px-2 rounded-lg bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                                      className="w-full h-9 px-2 rounded-lg bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors ui-text-body ui-field"
                                     >
                                       <option value="Male">Male</option>
                                       <option value="Female">Female</option>
@@ -3633,7 +3633,7 @@ export default function AdminPortalPage() {
                                         updated[idx] = { ...updated[idx], relation: e.target.value };
                                         setEditingGrc({ ...editingGrc, coGuests: updated });
                                       }}
-                                      className="w-full h-9 px-2 rounded-lg bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                                      className="w-full h-9 px-2 rounded-lg bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors ui-text-body ui-field"
                                     >
                                       <option value="Spouse">Spouse</option>
                                       <option value="Child">Child</option>
@@ -3650,7 +3650,7 @@ export default function AdminPortalPage() {
                                         const updated = editingGrc.coGuests.filter((_: any, i: number) => i !== idx);
                                         setEditingGrc({ ...editingGrc, coGuests: updated });
                                       }}
-                                      className="p-1.5 rounded-lg text-rose-500 hover:text-rose-700 dark:hover:text-rose-300 hover:bg-rose-50 dark:hover:bg-rose-950/50 transition cursor-pointer"
+                                      className="p-1.5 rounded-lg text-rose-500 hover:text-rose-700 dark:hover:text-rose-300 hover:bg-rose-50 dark:hover:bg-rose-950/50 transition cursor-pointer ui-control"
                                     >
                                       <Trash2 className="h-4 w-4" />
                                     </button>
@@ -3659,32 +3659,32 @@ export default function AdminPortalPage() {
                               ))}
                             </div>
                           ) : (
-                            <p className="text-zinc-500 italic text-[11px]">
+                            <p className="text-zinc-500 italic text-[11px] ui-text-meta">
                               No co-guests added. Click "Add Companion" if the guest has family or colleagues sharing the room.
                             </p>
                           )}
                         </div>
 
                         {/* CARD 7: OPERATIONAL STATUS & AUDIT */}
-                        <div className="rounded-2xl border border-zinc-200/90 dark:border-zinc-800 bg-white dark:bg-[#121215] p-5 lg:p-6 shadow-xs space-y-4">
+                        <div className="rounded-2xl border border-zinc-200/90 dark:border-zinc-800 bg-white dark:bg-[#121215] p-5 lg:p-6 shadow-xs space-y-4 ui-radius-panel ui-shadow-quiet ui-surface">
                           <div className="border-b border-zinc-200 dark:border-zinc-800 pb-3 flex items-center gap-2.5">
                             <div className="p-1.5 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800/60">
                               <Shield className="h-4 w-4" />
                             </div>
-                            <span className="font-bold text-zinc-900 dark:text-white uppercase tracking-wider text-xs">
+                            <span className="font-bold text-zinc-900 dark:text-white uppercase tracking-wider text-xs ui-weight-medium ui-text-body">
                               7. Operational Status & Verification
                             </span>
                           </div>
 
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
                             <div className="space-y-1">
-                              <label className="block text-[11px] font-bold text-zinc-700 dark:text-zinc-300 uppercase">
+                              <label className="block text-[11px] font-bold text-zinc-700 dark:text-zinc-300 uppercase ui-text-meta ui-weight-medium ui-label">
                                 Registration Operational Status
                               </label>
                               <select
                                 value={editingGrc.status || "CHECKED_IN"}
                                 onChange={(e) => setEditingGrc({ ...editingGrc, status: e.target.value })}
-                                className="w-full h-10 px-3.5 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                                className="w-full h-10 px-3.5 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors ui-text-body ui-weight-medium ui-field" aria-label="Registration Operational Status"
                               >
                                 <option value="CHECKED_IN">CHECKED_IN (In-House / Active Stay)</option>
                                 <option value="PENDING_REVIEW">PENDING_REVIEW (Digital Kiosk Submission)</option>
@@ -3694,7 +3694,7 @@ export default function AdminPortalPage() {
 
                             {editingGrc.signatureDataUrl && (
                               <div className="p-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 space-y-1">
-                                <span className="text-[10px] font-bold uppercase text-zinc-400 block">Digital Signature On File</span>
+                                <span className="text-[10px] font-bold uppercase text-zinc-400 block ui-text-meta ui-weight-medium">Digital Signature On File</span>
                                 <img
                                   src={editingGrc.signatureDataUrl}
                                   alt="Guest Signature"
@@ -3709,8 +3709,8 @@ export default function AdminPortalPage() {
                     </div>
 
                   {/* 3. STICKY FLOATING BOTTOM ACTION BAR WITH LIVE METRICS */}
-                  <div className="sticky bottom-4 z-20 px-4 sm:px-6 py-3.5 rounded-2xl border border-zinc-200/90 dark:border-zinc-800 bg-white/95 dark:bg-[#121215]/95 backdrop-blur-md flex flex-wrap items-center justify-between gap-4 shadow-xl">
-                    <div className="hidden md:flex items-center gap-3 text-xs font-mono">
+                  <div className="sticky bottom-4 z-20 px-4 sm:px-6 py-3.5 rounded-2xl border border-zinc-200/90 dark:border-zinc-800 bg-white/95 dark:bg-[#121215]/95 backdrop-blur-md flex flex-wrap items-center justify-between gap-4 shadow-xl ui-radius-panel ui-surface">
+                    <div className="hidden md:flex items-center gap-3 text-xs font-mono ui-text-body ui-font-body">
                       <span className="px-2.5 py-1 rounded-lg bg-zinc-100 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 font-semibold">
                         Rooms: <strong>{totalRoomsCount}</strong>
                       </span>
@@ -3731,14 +3731,14 @@ export default function AdminPortalPage() {
                       <button
                         type="button"
                         onClick={() => setEditingGrc(null)}
-                        className="px-4 py-2.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 text-xs font-bold transition cursor-pointer"
+                        className="px-4 py-2.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 text-xs font-bold transition cursor-pointer ui-radius-control ui-text-body ui-weight-medium ui-control"
                       >
                         Cancel / Discard
                       </button>
                       <button
                         type="submit"
                         disabled={grcSaving}
-                        className="px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 font-bold text-white text-xs sm:text-sm transition shadow-md shadow-blue-600/20 flex items-center gap-2 disabled:opacity-50 whitespace-nowrap cursor-pointer"
+                        className="px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 font-bold text-white text-xs sm:text-sm transition shadow-md shadow-blue-600/20 flex items-center gap-2 disabled:opacity-50 whitespace-nowrap cursor-pointer ui-radius-control ui-weight-medium ui-text-body ui-shadow-quiet ui-control"
                       >
                         {grcSaving ? (
                           <>
@@ -3763,69 +3763,69 @@ export default function AdminPortalPage() {
           {/* Archived GRC Backup Snapshot Modal */}
           {selectedArchiveSnapshot && (
             <div className="fixed inset-0 z-50 overflow-y-auto bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
-              <div className="w-full max-w-2xl bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+              <div className="w-full max-w-2xl bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] ui-radius-panel ui-dialog-surface ui-surface">
                 
                 <div className="p-4 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between bg-emerald-50 dark:bg-emerald-950/40">
                   <div className="flex items-center gap-2">
                     <Database className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
                     <div>
-                      <h3 className="font-extrabold text-sm text-zinc-900 dark:text-white">
+                      <h3 className="font-extrabold text-sm text-zinc-900 dark:text-white ui-weight-medium">
                         Permanent GRC Archive Snapshot: {selectedArchiveSnapshot.registrationNo}
                       </h3>
-                      <p className="text-[10px] text-emerald-700 dark:text-emerald-400 font-bold">
+                      <p className="text-[10px] text-emerald-700 dark:text-emerald-400 font-bold ui-text-meta ui-weight-medium">
                         Protected Statutory Backup • Preserved in /prisma/backups/grc_archives
                       </p>
                     </div>
                   </div>
                   <button
                     onClick={() => setSelectedArchiveSnapshot(null)}
-                    className="p-1 rounded-lg text-zinc-400 hover:text-zinc-800 dark:hover:text-white cursor-pointer"
+                    className="p-1 rounded-lg text-zinc-400 hover:text-zinc-800 dark:hover:text-white cursor-pointer ui-control"
                   >
                     <X className="h-4 w-4" />
                   </button>
                 </div>
 
-                <div className="p-5 overflow-y-auto space-y-4 text-xs">
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-3.5 rounded-2xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800">
+                <div className="p-5 overflow-y-auto space-y-4 text-xs ui-text-body">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-3.5 rounded-2xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 ui-radius-panel">
                     <div>
-                      <span className="text-[10px] font-bold uppercase text-zinc-400 block">Guest Full Name</span>
+                      <span className="text-[10px] font-bold uppercase text-zinc-400 block ui-text-meta ui-weight-medium">Guest Full Name</span>
                       <strong className="text-zinc-900 dark:text-white text-sm">{selectedArchiveSnapshot.fullName}</strong>
                     </div>
                     <div>
-                      <span className="text-[10px] font-bold uppercase text-zinc-400 block">Mobile Phone</span>
-                      <span className="font-mono font-bold text-zinc-800 dark:text-zinc-200">{selectedArchiveSnapshot.mobilePhone}</span>
+                      <span className="text-[10px] font-bold uppercase text-zinc-400 block ui-text-meta ui-weight-medium">Mobile Phone</span>
+                      <span className="font-mono font-bold text-zinc-800 dark:text-zinc-200 ui-font-body ui-weight-medium">{selectedArchiveSnapshot.mobilePhone}</span>
                     </div>
                     <div>
-                      <span className="text-[10px] font-bold uppercase text-zinc-400 block">Room Number</span>
+                      <span className="text-[10px] font-bold uppercase text-zinc-400 block ui-text-meta ui-weight-medium">Room Number</span>
                       <strong className="text-blue-600 dark:text-blue-400">Room {selectedArchiveSnapshot.preAssignedRoom || "—"}</strong>
                     </div>
                     <div>
-                      <span className="text-[10px] font-bold uppercase text-zinc-400 block">Age / Gender</span>
+                      <span className="text-[10px] font-bold uppercase text-zinc-400 block ui-text-meta ui-weight-medium">Age / Gender</span>
                       <span>{selectedArchiveSnapshot.age || "—"} yrs • {selectedArchiveSnapshot.gender || "—"}</span>
                     </div>
                     <div>
-                      <span className="text-[10px] font-bold uppercase text-zinc-400 block">ID Document</span>
-                      <span className="font-mono font-bold">{selectedArchiveSnapshot.idDocumentType}: {selectedArchiveSnapshot.idDocumentNumber || "—"}</span>
+                      <span className="text-[10px] font-bold uppercase text-zinc-400 block ui-text-meta ui-weight-medium">ID Document</span>
+                      <span className="font-mono font-bold ui-font-body ui-weight-medium">{selectedArchiveSnapshot.idDocumentType}: {selectedArchiveSnapshot.idDocumentNumber || "—"}</span>
                     </div>
                     <div>
-                      <span className="text-[10px] font-bold uppercase text-zinc-400 block">Nationality</span>
+                      <span className="text-[10px] font-bold uppercase text-zinc-400 block ui-text-meta ui-weight-medium">Nationality</span>
                       <span>{selectedArchiveSnapshot.nationality || "Indian"}</span>
                     </div>
                   </div>
 
-                  <div className="p-3.5 rounded-2xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 space-y-2">
-                    <span className="text-[10px] font-bold uppercase text-zinc-400 block">Address & Police Jurisdiction</span>
+                  <div className="p-3.5 rounded-2xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 space-y-2 ui-radius-panel">
+                    <span className="text-[10px] font-bold uppercase text-zinc-400 block ui-text-meta ui-weight-medium">Address & Police Jurisdiction</span>
                     <div className="font-medium text-zinc-800 dark:text-zinc-200">
                       {selectedArchiveSnapshot.streetAddress || "—"}, {selectedArchiveSnapshot.city || "—"}, {selectedArchiveSnapshot.state || "—"} - {selectedArchiveSnapshot.pinZipCode || "—"}
                     </div>
-                    <div className="text-[11px] text-zinc-500 font-mono">
+                    <div className="text-[11px] text-zinc-500 font-mono ui-text-meta ui-font-body">
                       Arrived From: {selectedArchiveSnapshot.arrivedFrom || "—"} → Going To: {selectedArchiveSnapshot.goingTo || "—"}
                     </div>
                   </div>
 
                   {selectedArchiveSnapshot.signatureDataUrl && (
-                    <div className="p-3.5 rounded-2xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 space-y-1.5">
-                      <span className="text-[10px] font-bold uppercase text-zinc-400 block">Guest Digital Signature</span>
+                    <div className="p-3.5 rounded-2xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 space-y-1.5 ui-radius-panel">
+                      <span className="text-[10px] font-bold uppercase text-zinc-400 block ui-text-meta ui-weight-medium">Guest Digital Signature</span>
                       <img
                         src={selectedArchiveSnapshot.signatureDataUrl}
                         alt="Guest Digital Signature"
@@ -3838,7 +3838,7 @@ export default function AdminPortalPage() {
                     <button
                       type="button"
                       onClick={() => setSelectedArchiveSnapshot(null)}
-                      className="px-4 py-2 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 font-bold text-xs cursor-pointer"
+                      className="px-4 py-2 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 font-bold text-xs cursor-pointer ui-radius-control ui-weight-medium ui-text-body ui-control"
                     >
                       Close Snapshot
                     </button>
@@ -3855,19 +3855,19 @@ export default function AdminPortalPage() {
           TAB CONTENT 3: ROOM RATES & TARIFFS
       ==================================================== */}
       {activeTab === "RATES" && (
-        <div className="bg-white dark:bg-[#111114] border border-zinc-200/90 dark:border-zinc-800 rounded-3xl p-6 space-y-6 shadow-xs">
+        <div className="bg-white dark:bg-[#111114] border border-zinc-200/90 dark:border-zinc-800 rounded-3xl p-6 space-y-6 shadow-xs ui-radius-panel ui-shadow-quiet ui-surface">
           <div>
-            <h2 className="text-base font-extrabold text-zinc-900 dark:text-white flex items-center gap-2">
+            <h2 className="text-base font-extrabold text-zinc-900 dark:text-white flex items-center gap-2 ui-weight-medium ui-section-title">
               <DollarSign className="h-5 w-5 text-blue-600" />
               <span>Room Category Tariffs & Pricing Master</span>
             </h2>
-            <p className="text-xs text-zinc-500 mt-0.5">
+            <p className="text-xs text-zinc-500 mt-0.5 ui-text-body">
               Set the base tariff rate, extra adult charges, and max occupancy for each room type.
             </p>
           </div>
 
           {ratesLoading ? (
-            <div className="py-12 text-center text-zinc-400 font-mono text-xs">
+            <div className="py-12 text-center text-zinc-400 font-mono text-xs ui-font-body ui-text-body">
               Loading room rates...
             </div>
           ) : (
@@ -3876,29 +3876,29 @@ export default function AdminPortalPage() {
                 {ratesList.map((rt) => (
                   <div
                     key={rt.id}
-                    className="p-5 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/70 dark:bg-[#18181b] space-y-4 shadow-xs"
+                    className="p-5 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/70 dark:bg-[#18181b] space-y-4 shadow-xs ui-radius-panel ui-shadow-quiet"
                   >
                     <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 pb-3">
                       <div>
-                        <div className="font-extrabold text-sm text-zinc-900 dark:text-white">
+                        <div className="font-extrabold text-sm text-zinc-900 dark:text-white ui-weight-medium">
                           {rt.name}
                         </div>
-                        <div className="text-[10px] font-mono text-blue-600 dark:text-blue-400 font-bold">
+                        <div className="text-[10px] font-mono text-blue-600 dark:text-blue-400 font-bold ui-text-meta ui-font-body ui-weight-medium">
                           Code: {rt.code} • {rt.roomCount} Rooms Assigned
                         </div>
                       </div>
-                      <span className="px-2 py-0.5 rounded-lg bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 font-mono font-bold text-[10.5px]">
+                      <span className="px-2 py-0.5 rounded-lg bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 font-mono font-bold text-[10.5px] ui-font-body ui-weight-medium ui-text-meta">
                         {rt.bedType}
                       </span>
                     </div>
 
-                    <div className="space-y-3 text-xs">
+                    <div className="space-y-3 text-xs ui-text-body">
                       <div className="space-y-1">
-                        <label className="block text-[11px] font-bold text-zinc-700 dark:text-zinc-300">
+                        <label className="block text-[11px] font-bold text-zinc-700 dark:text-zinc-300 ui-text-meta ui-weight-medium ui-label">
                           Base Tariff per Night (₹) *
                         </label>
                         <div className="relative">
-                          <span className="absolute left-3 top-2 font-mono font-bold text-blue-600 text-xs">₹</span>
+                          <span className="absolute left-3 top-2 font-mono font-bold text-blue-600 text-xs ui-font-body ui-weight-medium ui-text-body">₹</span>
                           <input
                             type="number"
                             value={rt.basePrice}
@@ -3908,14 +3908,14 @@ export default function AdminPortalPage() {
                                 prev.map((item) => (item.id === rt.id ? { ...item, basePrice: val } : item))
                               );
                             }}
-                            className="w-full h-9 pl-7 pr-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 font-mono font-black text-xs text-zinc-900 dark:text-white focus:border-blue-600 focus:outline-none"
+                            className="w-full h-9 pl-7 pr-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 font-mono font-black text-xs text-zinc-900 dark:text-white focus:border-blue-600 focus:outline-none ui-font-body ui-weight-medium ui-text-body ui-field" aria-label="Base Tariff per Night (₹)"
                           />
                         </div>
                       </div>
 
                       <div className="grid grid-cols-2 gap-2">
                         <div className="space-y-1">
-                          <label className="block text-[10.5px] font-bold text-zinc-600 dark:text-zinc-400">
+                          <label className="block text-[10.5px] font-bold text-zinc-600 dark:text-zinc-400 ui-text-meta ui-weight-medium ui-label">
                             Extra Bed / Pax (₹)
                           </label>
                           <input
@@ -3927,12 +3927,12 @@ export default function AdminPortalPage() {
                                 prev.map((item) => (item.id === rt.id ? { ...item, extraAdult: val } : item))
                               );
                             }}
-                            className="w-full h-8 px-2.5 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 font-mono text-xs"
+                            className="w-full h-8 px-2.5 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 font-mono text-xs ui-font-body ui-text-body ui-field" aria-label="Extra Bed / Pax (₹)"
                           />
                         </div>
 
                         <div className="space-y-1">
-                          <label className="block text-[10.5px] font-bold text-zinc-600 dark:text-zinc-400">
+                          <label className="block text-[10.5px] font-bold text-zinc-600 dark:text-zinc-400 ui-text-meta ui-weight-medium ui-label">
                             Max Capacity
                           </label>
                           <input
@@ -3944,12 +3944,12 @@ export default function AdminPortalPage() {
                                 prev.map((item) => (item.id === rt.id ? { ...item, capacity: val } : item))
                               );
                             }}
-                            className="w-full h-8 px-2.5 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 font-mono text-xs"
+                            className="w-full h-8 px-2.5 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 font-mono text-xs ui-font-body ui-text-body ui-field" aria-label="Max Capacity"
                           />
                         </div>
                       </div>
 
-                      <div className="text-[10px] text-zinc-400 font-mono truncate">
+                      <div className="text-[10px] text-zinc-400 font-mono truncate ui-text-meta ui-font-body">
                         Rooms: {rt.roomNumbers || "None"}
                       </div>
                     </div>
@@ -3958,7 +3958,7 @@ export default function AdminPortalPage() {
                       type="button"
                       disabled={ratesSavingId === rt.id}
                       onClick={() => updateRate(rt)}
-                      className="w-full h-9 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition shadow-sm cursor-pointer disabled:opacity-50"
+                      className="w-full h-9 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition shadow-sm cursor-pointer disabled:opacity-50 ui-radius-control ui-weight-medium ui-text-body ui-shadow-quiet ui-control ui-control-sized"
                     >
                       {ratesSavingId === rt.id ? (
                         <>
@@ -3985,13 +3985,13 @@ export default function AdminPortalPage() {
       ==================================================== */}
       {activeTab === "ROOMS" && (
         <div className="space-y-4">
-          <div className="p-5 rounded-3xl bg-white dark:bg-[#111114] border border-zinc-200/90 dark:border-zinc-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xs">
+          <div className="p-5 rounded-3xl bg-white dark:bg-[#111114] border border-zinc-200/90 dark:border-zinc-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xs ui-radius-panel ui-shadow-quiet ui-surface">
             <div>
-              <h2 className="text-base font-extrabold text-zinc-900 dark:text-white flex items-center gap-2">
+              <h2 className="text-base font-extrabold text-zinc-900 dark:text-white flex items-center gap-2 ui-weight-medium ui-section-title">
                 <BedDouble className="h-5 w-5 text-blue-600" />
                 <span>Room Matrix & Inventory Master ({roomsList.length} Rooms)</span>
               </h2>
-              <p className="text-xs text-zinc-500 mt-0.5">
+              <p className="text-xs text-zinc-500 mt-0.5 ui-text-body">
                 Manage room numbers, category assignments, bed types (King/Twin), wings, and operational sellability status.
               </p>
             </div>
@@ -3999,7 +3999,7 @@ export default function AdminPortalPage() {
             <button
               type="button"
               onClick={() => setShowAddRoomModal(true)}
-              className="h-9 px-4 rounded-xl bg-zinc-950 dark:bg-white text-white dark:text-zinc-950 font-black text-xs flex items-center gap-1.5 transition shadow-sm cursor-pointer"
+              className="h-9 px-4 rounded-xl bg-zinc-950 dark:bg-white text-white dark:text-zinc-950 font-black text-xs flex items-center gap-1.5 transition shadow-sm cursor-pointer ui-radius-control ui-weight-medium ui-text-body ui-shadow-quiet ui-control ui-control-sized"
             >
               <Plus className="h-4 w-4" />
               <span>Add New Room</span>
@@ -4007,10 +4007,10 @@ export default function AdminPortalPage() {
           </div>
 
           {/* Rooms Table */}
-          <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#111114] overflow-hidden shadow-xs">
+          <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#111114] overflow-hidden shadow-xs ui-shadow-quiet ui-surface">
             <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse text-xs">
-                <thead className="bg-zinc-50/90 dark:bg-zinc-900/90 text-zinc-500 dark:text-zinc-400 text-[11px] uppercase tracking-wider font-semibold border-b border-zinc-200 dark:border-zinc-800 sticky top-0 z-10 backdrop-blur-xs">
+              <table className="w-full text-left border-collapse text-xs ui-text-body ui-data-table">
+                <thead className="bg-zinc-50/90 dark:bg-zinc-900/90 text-zinc-500 dark:text-zinc-400 text-[11px] uppercase tracking-wider font-semibold border-b border-zinc-200 dark:border-zinc-800 sticky top-0 z-10 backdrop-blur-xs ui-text-meta">
                   <tr>
                     <th className="px-4 py-3 font-semibold whitespace-nowrap">Room No</th>
                     <th className="px-4 py-3 font-semibold whitespace-nowrap">Floor</th>
@@ -4021,7 +4021,7 @@ export default function AdminPortalPage() {
                     <th className="px-4 py-3 font-semibold text-right whitespace-nowrap">Quick Edit</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/60 font-mono">
+                <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/60 font-mono ui-font-body">
                   {roomsLoading ? (
                     <tr>
                       <td colSpan={7} className="py-12 text-center text-zinc-400">
@@ -4031,18 +4031,18 @@ export default function AdminPortalPage() {
                   ) : (
                     roomsList.map((r) => (
                       <tr key={r.id} className="hover:bg-zinc-50/60 dark:hover:bg-zinc-800/40 transition">
-                        <td className="py-3 px-4 font-black text-sm text-zinc-900 dark:text-white">
+                        <td className="py-3 px-4 font-black text-sm text-zinc-900 dark:text-white ui-weight-medium">
                           Room {r.number}
                         </td>
-                        <td className="py-3 px-3 font-bold text-zinc-600 dark:text-zinc-400">
+                        <td className="py-3 px-3 font-bold text-zinc-600 dark:text-zinc-400 ui-weight-medium">
                           Floor {r.floor}
                         </td>
-                        <td className="py-3 px-3 font-sans font-extrabold text-zinc-900 dark:text-zinc-200">
+                        <td className="py-3 px-3 font-sans font-extrabold text-zinc-900 dark:text-zinc-200 ui-weight-medium">
                           {r.roomType?.name || "Standard Room"}
                         </td>
                         <td className="py-3 px-3">
                           <span
-                            className={`px-2 py-0.5 rounded text-[10.5px] font-bold ${
+                            className={`px-2 py-0.5 rounded text-[10.5px] font-bold  ui-text-meta ui-weight-medium ${
                               r.roomType?.bedType?.toLowerCase().includes("twin") || r.roomType?.code?.includes("TWIN")
                                 ? "bg-amber-100 text-amber-900 dark:bg-amber-950/60 dark:text-amber-300"
                                 : "bg-blue-100 text-blue-900 dark:bg-blue-950/60 dark:text-blue-300"
@@ -4054,13 +4054,13 @@ export default function AdminPortalPage() {
                           </span>
                         </td>
                         <td className="py-3 px-3">
-                          <span className="font-bold text-zinc-700 dark:text-zinc-300">
+                          <span className="font-bold text-zinc-700 dark:text-zinc-300 ui-weight-medium">
                             {r.wing || "DELUXE"}
                           </span>
                         </td>
                         <td className="py-3 px-3">
                           <span
-                            className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                            className={`px-2 py-0.5 rounded text-[10px] font-bold  ui-text-meta ui-weight-medium ${
                               r.roomState?.occupancyStatus === "OCCUPIED"
                                 ? "bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300"
                                 : "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300"
@@ -4083,7 +4083,7 @@ export default function AdminPortalPage() {
                               housekeepingStatus: r.roomState?.housekeepingStatus || "CLEAN",
                               sellabilityStatus: r.roomState?.sellabilityStatus || "SELLABLE",
                             })}
-                            className="px-3 py-1 rounded-lg bg-blue-50 hover:bg-blue-600 text-blue-700 hover:text-white dark:bg-blue-950/60 dark:hover:bg-blue-600 dark:text-blue-300 transition font-sans font-bold text-xs cursor-pointer inline-flex items-center gap-1"
+                            className="px-3 py-1 rounded-lg bg-blue-50 hover:bg-blue-600 text-blue-700 hover:text-white dark:bg-blue-950/60 dark:hover:bg-blue-600 dark:text-blue-300 transition font-sans font-bold text-xs cursor-pointer inline-flex items-center gap-1 ui-weight-medium ui-text-body ui-control"
                           >
                             <Edit3 className="h-3 w-3" />
                             <span>Edit Room</span>
@@ -4100,50 +4100,50 @@ export default function AdminPortalPage() {
           {/* Edit Room Modal */}
           {editingRoom && (
             <div className="fixed inset-0 z-50 overflow-y-auto bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
-              <div className="w-full max-w-md bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-3xl shadow-2xl overflow-hidden">
+              <div className="w-full max-w-md bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-3xl shadow-2xl overflow-hidden ui-radius-panel ui-dialog-surface ui-surface">
                 <div className="p-4 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between bg-zinc-50 dark:bg-zinc-900/60">
-                  <h3 className="font-extrabold text-sm text-zinc-900 dark:text-white">
+                  <h3 className="font-extrabold text-sm text-zinc-900 dark:text-white ui-weight-medium">
                     Edit Room {editingRoom.number}
                   </h3>
                   <button
                     onClick={() => setEditingRoom(null)}
-                    className="p-1 text-zinc-400 hover:text-white cursor-pointer"
+                    className="p-1 text-zinc-400 hover:text-white cursor-pointer ui-control"
                   >
                     <X className="h-4 w-4" />
                   </button>
                 </div>
 
-                <form onSubmit={saveRoomEdit} className="p-5 space-y-4 text-xs">
+                <form onSubmit={saveRoomEdit} className="p-5 space-y-4 text-xs ui-text-body">
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1">
-                      <label className="block font-bold uppercase text-[10.5px]">Room Number</label>
+                      <label className="block font-bold uppercase text-[10.5px] ui-weight-medium ui-text-meta ui-label">Room Number</label>
                       <input
                         type="text"
                         required
                         value={editingRoom.number}
                         onChange={(e) => setEditingRoom({ ...editingRoom, number: e.target.value })}
-                        className="w-full h-9 px-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 font-mono font-bold"
+                        className="w-full h-9 px-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 font-mono font-bold ui-radius-control ui-font-body ui-weight-medium ui-field" aria-label="Room Number"
                       />
                     </div>
 
                     <div className="space-y-1">
-                      <label className="block font-bold uppercase text-[10.5px]">Floor</label>
+                      <label className="block font-bold uppercase text-[10.5px] ui-weight-medium ui-text-meta ui-label">Floor</label>
                       <input
                         type="number"
                         required
                         value={editingRoom.floor}
                         onChange={(e) => setEditingRoom({ ...editingRoom, floor: e.target.value })}
-                        className="w-full h-9 px-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 font-mono font-bold"
+                        className="w-full h-9 px-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 font-mono font-bold ui-radius-control ui-font-body ui-weight-medium ui-field" aria-label="Floor"
                       />
                     </div>
                   </div>
 
                   <div className="space-y-1">
-                    <label className="block font-bold uppercase text-[10.5px]">Room Category Type *</label>
+                    <label className="block font-bold uppercase text-[10.5px] ui-weight-medium ui-text-meta ui-label">Room Category Type *</label>
                     <select
                       value={editingRoom.roomTypeId}
                       onChange={(e) => setEditingRoom({ ...editingRoom, roomTypeId: e.target.value })}
-                      className="w-full h-9 px-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 font-bold"
+                      className="w-full h-9 px-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 font-bold ui-radius-control ui-weight-medium ui-field" aria-label="Room Category Type"
                     >
                       {roomTypes.map((rt) => (
                         <option key={rt.id} value={rt.id}>
@@ -4155,11 +4155,11 @@ export default function AdminPortalPage() {
 
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1">
-                      <label className="block font-bold uppercase text-[10.5px]">Wing / Section</label>
+                      <label className="block font-bold uppercase text-[10.5px] ui-weight-medium ui-text-meta ui-label">Wing / Section</label>
                       <select
                         value={editingRoom.wing}
                         onChange={(e) => setEditingRoom({ ...editingRoom, wing: e.target.value })}
-                        className="w-full h-9 px-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 font-bold"
+                        className="w-full h-9 px-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 font-bold ui-radius-control ui-weight-medium ui-field" aria-label="Wing / Section"
                       >
                         <option value="DELUXE">DELUXE</option>
                         <option value="EXECUTIVE">EXECUTIVE</option>
@@ -4168,11 +4168,11 @@ export default function AdminPortalPage() {
                     </div>
 
                     <div className="space-y-1">
-                      <label className="block font-bold uppercase text-[10.5px]">Housekeeping</label>
+                      <label className="block font-bold uppercase text-[10.5px] ui-weight-medium ui-text-meta ui-label">Housekeeping</label>
                       <select
                         value={editingRoom.housekeepingStatus}
                         onChange={(e) => setEditingRoom({ ...editingRoom, housekeepingStatus: e.target.value })}
-                        className="w-full h-9 px-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 font-bold"
+                        className="w-full h-9 px-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 font-bold ui-radius-control ui-weight-medium ui-field" aria-label="Housekeeping"
                       >
                         <option value="CLEAN">CLEAN</option>
                         <option value="DIRTY">DIRTY</option>
@@ -4185,14 +4185,14 @@ export default function AdminPortalPage() {
                     <button
                       type="button"
                       onClick={() => setEditingRoom(null)}
-                      className="px-4 py-2 rounded-xl bg-zinc-100 dark:bg-zinc-800 font-bold cursor-pointer"
+                      className="px-4 py-2 rounded-xl bg-zinc-100 dark:bg-zinc-800 font-bold cursor-pointer ui-radius-control ui-weight-medium ui-control"
                     >
                       Cancel
                     </button>
                     <button
                       type="submit"
                       disabled={roomSaving}
-                      className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold cursor-pointer shadow-md disabled:opacity-50"
+                      className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold cursor-pointer shadow-md disabled:opacity-50 ui-radius-control ui-weight-medium ui-shadow-quiet ui-control"
                     >
                       {roomSaving ? "Saving..." : "Save Room"}
                     </button>
@@ -4205,51 +4205,51 @@ export default function AdminPortalPage() {
           {/* Add Room Modal */}
           {showAddRoomModal && (
             <div className="fixed inset-0 z-50 overflow-y-auto bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
-              <div className="w-full max-w-md bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-3xl shadow-2xl overflow-hidden">
+              <div className="w-full max-w-md bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-3xl shadow-2xl overflow-hidden ui-radius-panel ui-dialog-surface ui-surface">
                 <div className="p-4 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between bg-zinc-50 dark:bg-zinc-900/60">
-                  <h3 className="font-extrabold text-sm text-zinc-900 dark:text-white">
+                  <h3 className="font-extrabold text-sm text-zinc-900 dark:text-white ui-weight-medium">
                     Add New Room to Inventory
                   </h3>
                   <button
                     onClick={() => setShowAddRoomModal(false)}
-                    className="p-1 text-zinc-400 hover:text-white cursor-pointer"
+                    className="p-1 text-zinc-400 hover:text-white cursor-pointer ui-control"
                   >
                     <X className="h-4 w-4" />
                   </button>
                 </div>
 
-                <form onSubmit={createRoom} className="p-5 space-y-4 text-xs">
+                <form onSubmit={createRoom} className="p-5 space-y-4 text-xs ui-text-body">
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1">
-                      <label className="block font-bold uppercase text-[10.5px]">Room Number *</label>
+                      <label className="block font-bold uppercase text-[10.5px] ui-weight-medium ui-text-meta ui-label">Room Number *</label>
                       <input
                         type="text"
                         required
                         placeholder="e.g. 701"
                         value={newRoomForm.number}
                         onChange={(e) => setNewRoomForm({ ...newRoomForm, number: e.target.value })}
-                        className="w-full h-9 px-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 font-mono font-bold"
+                        className="w-full h-9 px-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 font-mono font-bold ui-radius-control ui-font-body ui-weight-medium ui-field" aria-label="Room Number"
                       />
                     </div>
 
                     <div className="space-y-1">
-                      <label className="block font-bold uppercase text-[10.5px]">Floor *</label>
+                      <label className="block font-bold uppercase text-[10.5px] ui-weight-medium ui-text-meta ui-label">Floor *</label>
                       <input
                         type="number"
                         required
                         value={newRoomForm.floor}
                         onChange={(e) => setNewRoomForm({ ...newRoomForm, floor: Number(e.target.value) })}
-                        className="w-full h-9 px-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 font-mono font-bold"
+                        className="w-full h-9 px-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 font-mono font-bold ui-radius-control ui-font-body ui-weight-medium ui-field" aria-label="Floor"
                       />
                     </div>
                   </div>
 
                   <div className="space-y-1">
-                    <label className="block font-bold uppercase text-[10.5px]">Room Category Type *</label>
+                    <label className="block font-bold uppercase text-[10.5px] ui-weight-medium ui-text-meta ui-label">Room Category Type *</label>
                     <select
                       value={newRoomForm.roomTypeId}
                       onChange={(e) => setNewRoomForm({ ...newRoomForm, roomTypeId: e.target.value })}
-                      className="w-full h-9 px-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 font-bold"
+                      className="w-full h-9 px-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 font-bold ui-radius-control ui-weight-medium ui-field" aria-label="Room Category Type"
                     >
                       {roomTypes.map((rt) => (
                         <option key={rt.id} value={rt.id}>
@@ -4260,11 +4260,11 @@ export default function AdminPortalPage() {
                   </div>
 
                   <div className="space-y-1">
-                    <label className="block font-bold uppercase text-[10.5px]">Wing / Section</label>
+                    <label className="block font-bold uppercase text-[10.5px] ui-weight-medium ui-text-meta ui-label">Wing / Section</label>
                     <select
                       value={newRoomForm.wing}
                       onChange={(e) => setNewRoomForm({ ...newRoomForm, wing: e.target.value })}
-                      className="w-full h-9 px-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 font-bold"
+                      className="w-full h-9 px-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 font-bold ui-radius-control ui-weight-medium ui-field" aria-label="Wing / Section"
                     >
                       <option value="DELUXE">DELUXE</option>
                       <option value="EXECUTIVE">EXECUTIVE</option>
@@ -4276,13 +4276,13 @@ export default function AdminPortalPage() {
                     <button
                       type="button"
                       onClick={() => setShowAddRoomModal(false)}
-                      className="px-4 py-2 rounded-xl bg-zinc-100 dark:bg-zinc-800 font-bold cursor-pointer"
+                      className="px-4 py-2 rounded-xl bg-zinc-100 dark:bg-zinc-800 font-bold cursor-pointer ui-radius-control ui-weight-medium ui-control"
                     >
                       Cancel
                     </button>
                     <button
                       type="submit"
-                      className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold cursor-pointer shadow-md"
+                      className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold cursor-pointer shadow-md ui-radius-control ui-weight-medium ui-shadow-quiet ui-control"
                     >
                       Create Room
                     </button>
@@ -4326,13 +4326,13 @@ export default function AdminPortalPage() {
         return (
           <div className="space-y-4">
             {/* Top Header Card */}
-            <div className="p-5 rounded-3xl bg-white dark:bg-[#111114] border border-zinc-200/90 dark:border-zinc-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xs">
+            <div className="p-5 rounded-3xl bg-white dark:bg-[#111114] border border-zinc-200/90 dark:border-zinc-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xs ui-radius-panel ui-shadow-quiet ui-surface">
               <div>
-                <h2 className="text-base font-extrabold text-zinc-900 dark:text-white flex items-center gap-2">
+                <h2 className="text-base font-extrabold text-zinc-900 dark:text-white flex items-center gap-2 ui-weight-medium ui-section-title">
                   <Receipt className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                   <span>Expenses, Petty Cash & Cash Outflows Editor</span>
                 </h2>
-                <p className="text-xs text-zinc-500 mt-0.5">
+                <p className="text-xs text-zinc-500 mt-0.5 ui-text-body">
                   Audit, edit, void, or record operational expense vouchers, vendor payouts, maintenance, and petty cash transactions.
                 </p>
               </div>
@@ -4341,8 +4341,8 @@ export default function AdminPortalPage() {
                 <button
                   type="button"
                   onClick={fetchExpenses}
-                  className="h-9 px-3 rounded-xl bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 font-bold text-xs flex items-center gap-1.5 transition cursor-pointer"
-                  title="Reload expenses"
+                  className="h-9 px-3 rounded-xl bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 font-bold text-xs flex items-center gap-1.5 transition cursor-pointer ui-radius-control ui-weight-medium ui-text-body ui-control ui-control-sized"
+                  title="Reload expenses" aria-label="Reload expenses"
                 >
                   <RefreshCw className={`h-3.5 w-3.5 ${expensesLoading ? "animate-spin" : ""}`} />
                   <span>Refresh</span>
@@ -4351,7 +4351,7 @@ export default function AdminPortalPage() {
                 <button
                   type="button"
                   onClick={handleOpenAddExpense}
-                  className="h-9 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-black text-xs flex items-center gap-1.5 transition shadow-sm cursor-pointer"
+                  className="h-9 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-black text-xs flex items-center gap-1.5 transition shadow-sm cursor-pointer ui-radius-control ui-weight-medium ui-text-body ui-shadow-quiet ui-control ui-control-sized"
                 >
                   <Plus className="h-4 w-4" />
                   <span>Record New Expense</span>
@@ -4361,45 +4361,45 @@ export default function AdminPortalPage() {
 
             {/* 3 KPI Summary Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div className="p-4 rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200/80 dark:border-zinc-800/80 shadow-xs space-y-1">
-                <div className="text-[11px] font-bold uppercase tracking-wider text-zinc-500">
+              <div className="p-4 rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200/80 dark:border-zinc-800/80 shadow-xs space-y-1 ui-radius-panel ui-shadow-quiet ui-surface">
+                <div className="text-[11px] font-bold uppercase tracking-wider text-zinc-500 ui-text-meta ui-weight-medium">
                   Total Expenses Recorded
                 </div>
-                <div className="text-xl sm:text-2xl font-black text-zinc-900 dark:text-white tabular-nums">
+                <div className="text-xl sm:text-2xl font-black text-zinc-900 dark:text-white tabular-nums ui-weight-medium">
                   {formatINR(totalExpensesSum)}
                 </div>
-                <div className="text-[10.5px] text-zinc-400">
+                <div className="text-[10.5px] text-zinc-400 ui-text-meta">
                   {expensesList.length} Total Voucher{expensesList.length === 1 ? "" : "s"}
                 </div>
               </div>
 
-              <div className="p-4 rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200/80 dark:border-zinc-800/80 shadow-xs space-y-1">
-                <div className="text-[11px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">
+              <div className="p-4 rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200/80 dark:border-zinc-800/80 shadow-xs space-y-1 ui-radius-panel ui-shadow-quiet ui-surface">
+                <div className="text-[11px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400 ui-text-meta ui-weight-medium">
                   Front Desk Cash Payouts
                 </div>
-                <div className="text-xl sm:text-2xl font-black text-amber-600 dark:text-amber-400 tabular-nums">
+                <div className="text-xl sm:text-2xl font-black text-amber-600 dark:text-amber-400 tabular-nums ui-weight-medium">
                   {formatINR(cashOutflow)}
                 </div>
-                <div className="text-[10.5px] text-zinc-400">
+                <div className="text-[10.5px] text-zinc-400 ui-text-meta">
                   Deducted from Front Desk Cash Drawer
                 </div>
               </div>
 
-              <div className="p-4 rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200/80 dark:border-zinc-800/80 shadow-xs space-y-1">
-                <div className="text-[11px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">
+              <div className="p-4 rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200/80 dark:border-zinc-800/80 shadow-xs space-y-1 ui-radius-panel ui-shadow-quiet ui-surface">
+                <div className="text-[11px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 ui-text-meta ui-weight-medium">
                   Bank / UPI / Card Outflows
                 </div>
-                <div className="text-xl sm:text-2xl font-black text-blue-600 dark:text-blue-400 tabular-nums">
+                <div className="text-xl sm:text-2xl font-black text-blue-600 dark:text-blue-400 tabular-nums ui-weight-medium">
                   {formatINR(nonCashOutflow)}
                 </div>
-                <div className="text-[10.5px] text-zinc-400">
+                <div className="text-[10.5px] text-zinc-400 ui-text-meta">
                   Paid via Digital / Bank Accounts
                 </div>
               </div>
             </div>
 
             {/* Filter & Search Bar */}
-            <div className="p-3.5 rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200/80 dark:border-zinc-800 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+            <div className="p-3.5 rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200/80 dark:border-zinc-800 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs ui-radius-panel ui-text-body ui-surface">
               <div className="relative w-full sm:w-72">
                 <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-zinc-400" />
                 <input
@@ -4407,7 +4407,7 @@ export default function AdminPortalPage() {
                   placeholder="Search voucher #, payee, desc, ref..."
                   value={expenseSearchQuery}
                   onChange={(e) => setExpenseSearchQuery(e.target.value)}
-                  className="w-full h-9 pl-9 pr-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-xs text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:border-blue-500"
+                  className="w-full h-9 pl-9 pr-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-xs text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:border-blue-500 ui-radius-control ui-text-body ui-field" aria-label="Search voucher #, payee, desc, ref"
                 />
               </div>
 
@@ -4415,7 +4415,7 @@ export default function AdminPortalPage() {
                 <select
                   value={expenseCategoryFilter}
                   onChange={(e) => setExpenseCategoryFilter(e.target.value)}
-                  className="h-9 px-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 font-bold text-zinc-700 dark:text-zinc-300 focus:outline-none focus:border-blue-500 cursor-pointer"
+                  className="h-9 px-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 font-bold text-zinc-700 dark:text-zinc-300 focus:outline-none focus:border-blue-500 cursor-pointer ui-radius-control ui-weight-medium ui-field"
                 >
                   <option value="ALL">All Categories</option>
                   {EXPENSE_CATEGORIES.map((cat) => (
@@ -4428,7 +4428,7 @@ export default function AdminPortalPage() {
                 <select
                   value={expenseMethodFilter}
                   onChange={(e) => setExpenseMethodFilter(e.target.value)}
-                  className="h-9 px-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 font-bold text-zinc-700 dark:text-zinc-300 focus:outline-none focus:border-blue-500 cursor-pointer"
+                  className="h-9 px-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 font-bold text-zinc-700 dark:text-zinc-300 focus:outline-none focus:border-blue-500 cursor-pointer ui-radius-control ui-weight-medium ui-field"
                 >
                   <option value="ALL">All Payment Methods</option>
                   <option value="CASH">Cash Drawer</option>
@@ -4441,10 +4441,10 @@ export default function AdminPortalPage() {
             </div>
 
             {/* Expenses Table */}
-            <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#111114] overflow-hidden shadow-xs">
+            <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#111114] overflow-hidden shadow-xs ui-shadow-quiet ui-surface">
               <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse text-xs">
-                  <thead className="bg-zinc-50/90 dark:bg-zinc-900/90 text-zinc-500 dark:text-zinc-400 text-[11px] uppercase tracking-wider font-semibold border-b border-zinc-200 dark:border-zinc-800 sticky top-0 z-10 backdrop-blur-xs">
+                <table className="w-full text-left border-collapse text-xs ui-text-body ui-data-table">
+                  <thead className="bg-zinc-50/90 dark:bg-zinc-900/90 text-zinc-500 dark:text-zinc-400 text-[11px] uppercase tracking-wider font-semibold border-b border-zinc-200 dark:border-zinc-800 sticky top-0 z-10 backdrop-blur-xs ui-text-meta">
                     <tr>
                       <th className="px-4 py-3 font-semibold whitespace-nowrap">Voucher No</th>
                       <th className="px-4 py-3 font-semibold whitespace-nowrap">Date & Time</th>
@@ -4470,29 +4470,29 @@ export default function AdminPortalPage() {
                           }`}
                         >
                           {/* Voucher No */}
-                          <td className="py-2.5 px-4 font-mono font-bold text-blue-600 dark:text-blue-400">
+                          <td className="py-2.5 px-4 font-mono font-bold text-blue-600 dark:text-blue-400 ui-font-body ui-weight-medium">
                             <span>{exp.voucherNo || "EXP-VOUCHER"}</span>
                             {isVoided && (
-                              <span className="ml-1.5 px-1.5 py-0.2 rounded text-[9px] bg-rose-100 dark:bg-rose-950 text-rose-700 font-bold uppercase no-underline inline-block">
+                              <span className="ml-1.5 px-1.5 py-0.2 rounded text-[9px] bg-rose-100 dark:bg-rose-950 text-rose-700 font-bold uppercase no-underline inline-block ui-text-meta ui-weight-medium">
                                 Voided
                               </span>
                             )}
                           </td>
 
                           {/* Date */}
-                          <td className="py-2.5 px-3 font-mono text-zinc-600 dark:text-zinc-400 text-[11px] whitespace-nowrap">
+                          <td className="py-2.5 px-3 font-mono text-zinc-600 dark:text-zinc-400 text-[11px] whitespace-nowrap ui-font-body ui-text-meta">
                             {exp.paidAt ? new Date(exp.paidAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : exp.businessDate || "-"}
                           </td>
 
                           {/* Category */}
                           <td className="py-2.5 px-3">
-                            <span className="px-2 py-0.5 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 text-[11px] font-bold whitespace-nowrap">
+                            <span className="px-2 py-0.5 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 text-[11px] font-bold whitespace-nowrap ui-text-meta ui-weight-medium">
                               {catLabel}
                             </span>
                           </td>
 
                           {/* Payee */}
-                          <td className="py-2.5 px-3 font-bold text-zinc-900 dark:text-white">
+                          <td className="py-2.5 px-3 font-bold text-zinc-900 dark:text-white ui-weight-medium">
                             {exp.payeeName}
                           </td>
 
@@ -4500,7 +4500,7 @@ export default function AdminPortalPage() {
                           <td className="py-2.5 px-3 text-zinc-600 dark:text-zinc-300 max-w-xs">
                             <div className="truncate">{exp.description}</div>
                             {exp.reference && (
-                              <div className="text-[10px] font-mono text-zinc-400 truncate">
+                              <div className="text-[10px] font-mono text-zinc-400 truncate ui-text-meta ui-font-body">
                                 Ref: {exp.reference}
                               </div>
                             )}
@@ -4508,7 +4508,7 @@ export default function AdminPortalPage() {
 
                           {/* Payment Method */}
                           <td className="py-2.5 px-3">
-                            <span className={`px-2 py-0.5 rounded-md text-[11px] font-semibold border inline-flex items-center gap-1 ${
+                            <span className={`px-2 py-0.5 rounded-md text-[11px] font-semibold border inline-flex items-center gap-1  ui-text-meta ${
                               exp.paymentMethod === "CASH"
                                 ? "bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-800"
                                 : exp.paymentMethod === "UPI"
@@ -4520,7 +4520,7 @@ export default function AdminPortalPage() {
                           </td>
 
                           {/* Amount */}
-                          <td className="py-2.5 px-3 font-mono font-bold text-zinc-900 dark:text-white text-right tabular-nums text-sm">
+                          <td className="py-2.5 px-3 font-mono font-bold text-zinc-900 dark:text-white text-right tabular-nums text-sm ui-font-body ui-weight-medium">
                             {formatINR(exp.totalAmount || exp.amount || 0)}
                           </td>
 
@@ -4529,16 +4529,16 @@ export default function AdminPortalPage() {
                             <button
                               type="button"
                               onClick={() => handleOpenEditExpense(exp)}
-                              className="px-2.5 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/50 dark:hover:bg-blue-900 text-blue-700 dark:text-blue-300 font-bold text-[11px] transition cursor-pointer"
-                              title="Edit Expense Voucher"
+                              className="px-2.5 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/50 dark:hover:bg-blue-900 text-blue-700 dark:text-blue-300 font-bold text-[11px] transition cursor-pointer ui-weight-medium ui-text-meta ui-control"
+                              title="Edit Expense Voucher" aria-label="Edit Expense Voucher"
                             >
                               Edit
                             </button>
                             <button
                               type="button"
                               onClick={() => handleDeleteExpense(exp)}
-                              className="px-2 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/50 dark:hover:bg-rose-900 text-rose-700 dark:text-rose-300 font-bold text-[11px] transition cursor-pointer"
-                              title="Delete Expense Record"
+                              className="px-2 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/50 dark:hover:bg-rose-900 text-rose-700 dark:text-rose-300 font-bold text-[11px] transition cursor-pointer ui-weight-medium ui-text-meta ui-control"
+                              title="Delete Expense Record" aria-label="Delete Expense Record"
                             >
                               Delete
                             </button>
@@ -4561,29 +4561,29 @@ export default function AdminPortalPage() {
 
             {/* Add / Edit Expense Modal */}
             {showAddExpenseModal && (
-              <div className="fixed inset-0 z-50 overflow-y-auto bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
-                <div className="w-full max-w-lg bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-3xl shadow-2xl overflow-hidden">
+              <div className="fixed inset-0 z-50 overflow-y-auto bg-black/80 backdrop-blur-sm flex items-center justify-center p-4  ">
+                <div className="w-full max-w-lg bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-3xl shadow-2xl overflow-hidden ui-radius-panel ui-dialog-surface ui-surface">
                   <div className="p-4 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between bg-zinc-50 dark:bg-zinc-900/60">
                     <div className="flex items-center gap-2">
                       <div className="h-8 w-8 rounded-xl bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 flex items-center justify-center text-blue-600 dark:text-blue-400">
                         <Receipt className="h-4 w-4" />
                       </div>
-                      <h3 className="font-extrabold text-sm text-zinc-900 dark:text-white">
+                      <h3 className="font-extrabold text-sm text-zinc-900 dark:text-white ui-weight-medium">
                         {editingExpense ? `Edit Expense Voucher (${editingExpense.voucherNo})` : "Record New Expense Outflow"}
                       </h3>
                     </div>
                     <button
                       onClick={() => setShowAddExpenseModal(false)}
-                      className="p-1 text-zinc-400 hover:text-white cursor-pointer"
+                      className="p-1 text-zinc-400 hover:text-white cursor-pointer ui-control"
                     >
                       <X className="h-4 w-4" />
                     </button>
                   </div>
 
-                  <form onSubmit={handleSaveExpense} className="p-5 space-y-4 text-xs">
+                  <form onSubmit={handleSaveExpense} className="p-5 space-y-4 text-xs ui-text-body">
                     <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-1">
-                        <label className="block font-bold uppercase text-[10.5px] text-zinc-700 dark:text-zinc-300">
+                        <label className="block font-bold uppercase text-[10.5px] text-zinc-700 dark:text-zinc-300 ui-weight-medium ui-text-meta ui-label">
                           Expense Category *
                         </label>
                         <select
@@ -4598,7 +4598,7 @@ export default function AdminPortalPage() {
                               description: found ? found.defaultDescription : expenseForm.description,
                             });
                           }}
-                          className="w-full h-10 px-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 font-bold text-zinc-900 dark:text-white focus:outline-none focus:border-blue-500"
+                          className="w-full h-10 px-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 font-bold text-zinc-900 dark:text-white focus:outline-none focus:border-blue-500 ui-radius-control ui-weight-medium ui-field" aria-label="Expense Category"
                         >
                           {EXPENSE_CATEGORIES.map((cat) => (
                             <option key={cat.id} value={cat.id}>
@@ -4609,14 +4609,14 @@ export default function AdminPortalPage() {
                       </div>
 
                       <div className="space-y-1">
-                        <label className="block font-bold uppercase text-[10.5px] text-zinc-700 dark:text-zinc-300">
+                        <label className="block font-bold uppercase text-[10.5px] text-zinc-700 dark:text-zinc-300 ui-weight-medium ui-text-meta ui-label">
                           Payment Method *
                         </label>
                         <select
                           required
                           value={expenseForm.paymentMethod}
                           onChange={(e) => setExpenseForm({ ...expenseForm, paymentMethod: e.target.value })}
-                          className="w-full h-10 px-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 font-bold text-zinc-900 dark:text-white focus:outline-none focus:border-blue-500"
+                          className="w-full h-10 px-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 font-bold text-zinc-900 dark:text-white focus:outline-none focus:border-blue-500 ui-radius-control ui-weight-medium ui-field" aria-label="Payment Method"
                         >
                           <option value="CASH">💵 Cash (Front Desk Drawer)</option>
                           <option value="UPI">📱 UPI / QR Code</option>
@@ -4629,7 +4629,7 @@ export default function AdminPortalPage() {
 
                     <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-1">
-                        <label className="block font-bold uppercase text-[10.5px] text-zinc-700 dark:text-zinc-300">
+                        <label className="block font-bold uppercase text-[10.5px] text-zinc-700 dark:text-zinc-300 ui-weight-medium ui-text-meta ui-label">
                           Payee Name / Vendor / Staff *
                         </label>
                         <input
@@ -4638,12 +4638,12 @@ export default function AdminPortalPage() {
                           placeholder="e.g. Ramesh Linens or Electricity Dept"
                           value={expenseForm.payeeName}
                           onChange={(e) => setExpenseForm({ ...expenseForm, payeeName: e.target.value })}
-                          className="w-full h-10 px-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 font-bold text-zinc-900 dark:text-white focus:outline-none focus:border-blue-500"
+                          className="w-full h-10 px-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 font-bold text-zinc-900 dark:text-white focus:outline-none focus:border-blue-500 ui-radius-control ui-weight-medium ui-field" aria-label="Payee Name / Vendor / Staff"
                         />
                       </div>
 
                       <div className="space-y-1">
-                        <label className="block font-bold uppercase text-[10.5px] text-zinc-700 dark:text-zinc-300">
+                        <label className="block font-bold uppercase text-[10.5px] text-zinc-700 dark:text-zinc-300 ui-weight-medium ui-text-meta ui-label">
                           Date & Time *
                         </label>
                         <input
@@ -4651,14 +4651,14 @@ export default function AdminPortalPage() {
                           required
                           value={expenseForm.paidAt}
                           onChange={(e) => setExpenseForm({ ...expenseForm, paidAt: e.target.value })}
-                          className="w-full h-10 px-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 font-mono text-zinc-900 dark:text-white focus:outline-none focus:border-blue-500"
+                          className="w-full h-10 px-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 font-mono text-zinc-900 dark:text-white focus:outline-none focus:border-blue-500 ui-radius-control ui-font-body ui-field" aria-label="Date & Time"
                         />
                       </div>
                     </div>
 
                     <div className="grid grid-cols-3 gap-3">
                       <div className="space-y-1 col-span-2">
-                        <label className="block font-bold uppercase text-[10.5px] text-zinc-700 dark:text-zinc-300">
+                        <label className="block font-bold uppercase text-[10.5px] text-zinc-700 dark:text-zinc-300 ui-weight-medium ui-text-meta ui-label">
                           Net Amount (₹) *
                         </label>
                         <input
@@ -4668,12 +4668,12 @@ export default function AdminPortalPage() {
                           placeholder="0.00"
                           value={expenseForm.amount}
                           onChange={(e) => setExpenseForm({ ...expenseForm, amount: e.target.value })}
-                          className="w-full h-10 px-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 font-mono font-black text-base text-zinc-900 dark:text-white focus:outline-none focus:border-blue-500"
+                          className="w-full h-10 px-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 font-mono font-black text-base text-zinc-900 dark:text-white focus:outline-none focus:border-blue-500 ui-radius-control ui-font-body ui-weight-medium ui-field" aria-label="Net Amount (₹)"
                         />
                       </div>
 
                       <div className="space-y-1 col-span-1">
-                        <label className="block font-bold uppercase text-[10.5px] text-zinc-700 dark:text-zinc-300">
+                        <label className="block font-bold uppercase text-[10.5px] text-zinc-700 dark:text-zinc-300 ui-weight-medium ui-text-meta ui-label">
                           GST / Tax (₹)
                         </label>
                         <input
@@ -4682,13 +4682,13 @@ export default function AdminPortalPage() {
                           placeholder="0.00"
                           value={expenseForm.taxAmount}
                           onChange={(e) => setExpenseForm({ ...expenseForm, taxAmount: e.target.value })}
-                          className="w-full h-10 px-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 font-mono text-zinc-900 dark:text-white focus:outline-none focus:border-blue-500"
+                          className="w-full h-10 px-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 font-mono text-zinc-900 dark:text-white focus:outline-none focus:border-blue-500 ui-radius-control ui-font-body ui-field" aria-label="GST / Tax (₹)"
                         />
                       </div>
                     </div>
 
                     <div className="space-y-1">
-                      <label className="block font-bold uppercase text-[10.5px] text-zinc-700 dark:text-zinc-300">
+                      <label className="block font-bold uppercase text-[10.5px] text-zinc-700 dark:text-zinc-300 ui-weight-medium ui-text-meta ui-label">
                         Description / Purpose *
                       </label>
                       <input
@@ -4697,13 +4697,13 @@ export default function AdminPortalPage() {
                         placeholder="Narration of expense"
                         value={expenseForm.description}
                         onChange={(e) => setExpenseForm({ ...expenseForm, description: e.target.value })}
-                        className="w-full h-10 px-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white focus:outline-none focus:border-blue-500"
+                        className="w-full h-10 px-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white focus:outline-none focus:border-blue-500 ui-radius-control ui-field" aria-label="Description / Purpose"
                       />
                     </div>
 
                     <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-1">
-                        <label className="block font-bold uppercase text-[10.5px] text-zinc-700 dark:text-zinc-300">
+                        <label className="block font-bold uppercase text-[10.5px] text-zinc-700 dark:text-zinc-300 ui-weight-medium ui-text-meta ui-label">
                           Reference / UTR / Cheque #
                         </label>
                         <input
@@ -4711,18 +4711,18 @@ export default function AdminPortalPage() {
                           placeholder="e.g. UTR-98129381 or Bill #102"
                           value={expenseForm.reference}
                           onChange={(e) => setExpenseForm({ ...expenseForm, reference: e.target.value })}
-                          className="w-full h-10 px-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 font-mono text-zinc-900 dark:text-white focus:outline-none focus:border-blue-500"
+                          className="w-full h-10 px-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 font-mono text-zinc-900 dark:text-white focus:outline-none focus:border-blue-500 ui-radius-control ui-font-body ui-field" aria-label="Reference / UTR / Cheque #"
                         />
                       </div>
 
                       <div className="space-y-1">
-                        <label className="block font-bold uppercase text-[10.5px] text-zinc-700 dark:text-zinc-300">
+                        <label className="block font-bold uppercase text-[10.5px] text-zinc-700 dark:text-zinc-300 ui-weight-medium ui-text-meta ui-label">
                           Status
                         </label>
                         <select
                           value={expenseForm.status}
                           onChange={(e) => setExpenseForm({ ...expenseForm, status: e.target.value })}
-                          className="w-full h-10 px-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 font-bold text-zinc-900 dark:text-white focus:outline-none focus:border-blue-500"
+                          className="w-full h-10 px-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 font-bold text-zinc-900 dark:text-white focus:outline-none focus:border-blue-500 ui-radius-control ui-weight-medium ui-field" aria-label="Status"
                         >
                           <option value="PAID">PAID (Settled)</option>
                           <option value="VOIDED">VOIDED (Cancelled)</option>
@@ -4731,7 +4731,7 @@ export default function AdminPortalPage() {
                     </div>
 
                     <div className="space-y-1">
-                      <label className="block font-bold uppercase text-[10.5px] text-zinc-700 dark:text-zinc-300">
+                      <label className="block font-bold uppercase text-[10.5px] text-zinc-700 dark:text-zinc-300 ui-weight-medium ui-text-meta ui-label">
                         Internal Notes / Remarks
                       </label>
                       <input
@@ -4739,7 +4739,7 @@ export default function AdminPortalPage() {
                         placeholder="Optional internal remarks"
                         value={expenseForm.notes}
                         onChange={(e) => setExpenseForm({ ...expenseForm, notes: e.target.value })}
-                        className="w-full h-10 px-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white focus:outline-none focus:border-blue-500"
+                        className="w-full h-10 px-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white focus:outline-none focus:border-blue-500 ui-radius-control ui-field" aria-label="Internal Notes / Remarks"
                       />
                     </div>
 
@@ -4747,14 +4747,14 @@ export default function AdminPortalPage() {
                       <button
                         type="button"
                         onClick={() => setShowAddExpenseModal(false)}
-                        className="px-4 py-2.5 rounded-xl bg-zinc-100 dark:bg-zinc-800 font-bold cursor-pointer hover:bg-zinc-200 dark:hover:bg-zinc-700"
+                        className="px-4 py-2.5 rounded-xl bg-zinc-100 dark:bg-zinc-800 font-bold cursor-pointer hover:bg-zinc-200 dark:hover:bg-zinc-700 ui-radius-control ui-weight-medium ui-control"
                       >
                         Cancel
                       </button>
                       <button
                         type="submit"
                         disabled={expenseSaving}
-                        className="px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold cursor-pointer shadow-md disabled:opacity-50 flex items-center gap-1.5"
+                        className="px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold cursor-pointer shadow-md disabled:opacity-50 flex items-center gap-1.5 ui-radius-control ui-weight-medium ui-shadow-quiet ui-control"
                       >
                         {expenseSaving ? "Saving..." : editingExpense ? "Update Expense" : "Record Expense"}
                       </button>
@@ -4778,54 +4778,54 @@ export default function AdminPortalPage() {
           TAB CONTENT 7: SECURITY & ADMIN CREDENTIALS
       ==================================================== */}
       {activeTab === "SECURITY" && (
-        <div className="bg-white dark:bg-[#111114] border border-zinc-200/90 dark:border-zinc-800 rounded-3xl p-6 space-y-6 shadow-xs">
+        <div className="bg-white dark:bg-[#111114] border border-zinc-200/90 dark:border-zinc-800 rounded-3xl p-6 space-y-6 shadow-xs ui-radius-panel ui-shadow-quiet ui-surface">
           <div className="border-b border-zinc-200 dark:border-zinc-800 pb-4">
-            <h2 className="text-base font-extrabold text-zinc-900 dark:text-white flex items-center gap-2">
+            <h2 className="text-base font-extrabold text-zinc-900 dark:text-white flex items-center gap-2 ui-weight-medium ui-section-title">
               <Shield className="h-5 w-5 text-blue-600" />
               <span>Master Admin Security & Role Governance</span>
             </h2>
-            <p className="text-xs text-zinc-500 mt-0.5">
+            <p className="text-xs text-zinc-500 mt-0.5 ui-text-body">
               Manage system administrator credentials, security audit trail, and access restrictions.
             </p>
           </div>
 
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="p-5 rounded-2xl bg-zinc-50 dark:bg-[#18181b] border border-zinc-200 dark:border-zinc-800 space-y-4">
-              <h3 className="text-xs font-black uppercase tracking-wider text-zinc-900 dark:text-white flex items-center gap-2">
+            <div className="p-5 rounded-2xl bg-zinc-50 dark:bg-[#18181b] border border-zinc-200 dark:border-zinc-800 space-y-4 ui-radius-panel">
+              <h3 className="text-xs font-black uppercase tracking-wider text-zinc-900 dark:text-white flex items-center gap-2 ui-text-body ui-weight-medium">
                 <KeyRound className="h-4 w-4 text-blue-600" />
                 <span>Active Master Admin Account</span>
               </h3>
 
-              <div className="space-y-2 text-xs font-mono">
+              <div className="space-y-2 text-xs font-mono ui-text-body ui-font-body">
                 <div className="flex justify-between py-2 border-b border-zinc-200 dark:border-zinc-800">
                   <span className="text-zinc-500">Username:</span>
-                  <span className="font-bold text-zinc-900 dark:text-white">admin</span>
+                  <span className="font-bold text-zinc-900 dark:text-white ui-weight-medium">admin</span>
                 </div>
                 <div className="flex justify-between py-2 border-b border-zinc-200 dark:border-zinc-800">
                   <span className="text-zinc-500">Master Password:</span>
-                  <span className="font-bold text-zinc-900 dark:text-white">admin@hotelos2026</span>
+                  <span className="font-bold text-zinc-900 dark:text-white ui-weight-medium">admin@hotelos2026</span>
                 </div>
                 <div className="flex justify-between py-2 border-b border-zinc-200 dark:border-zinc-800">
                   <span className="text-zinc-500">Access Scope:</span>
-                  <span className="font-bold text-emerald-600">FULL_UNRESTRICTED</span>
+                  <span className="font-bold text-emerald-600 ui-weight-medium">FULL_UNRESTRICTED</span>
                 </div>
                 <div className="flex justify-between py-2">
                   <span className="text-zinc-500">Database Engine:</span>
-                  <span className="font-bold text-blue-600">SQLite (dev.db)</span>
+                  <span className="font-bold text-blue-600 ui-weight-medium">SQLite (dev.db)</span>
                 </div>
               </div>
             </div>
 
-            <div className="p-5 rounded-2xl bg-zinc-50 dark:bg-[#18181b] border border-zinc-200 dark:border-zinc-800 space-y-3 text-xs">
-              <h3 className="font-black uppercase tracking-wider text-zinc-900 dark:text-white flex items-center gap-2">
+            <div className="p-5 rounded-2xl bg-zinc-50 dark:bg-[#18181b] border border-zinc-200 dark:border-zinc-800 space-y-3 text-xs ui-radius-panel ui-text-body">
+              <h3 className="font-black uppercase tracking-wider text-zinc-900 dark:text-white flex items-center gap-2 ui-weight-medium">
                 <Database className="h-4 w-4 text-blue-600" />
                 <span>Automatic Database Protection</span>
               </h3>
               <p className="text-zinc-500">
-                All changes made in the Master Admin Portal automatically create immutable entries in the compliance audit trail (`AuditLog` table).
+                Review recorded administration changes in the audit trail.
               </p>
-              <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 text-[11px] font-bold">
+              <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 text-[11px] font-bold ui-text-meta ui-weight-medium">
                 ✓ Full database snapshot backups are stored in `/prisma/backups`
               </div>
             </div>

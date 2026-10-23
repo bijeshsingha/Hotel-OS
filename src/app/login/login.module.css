@@ -1,0 +1,39 @@
+.page { min-height: 100svh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px 24px; gap: 28px; background: var(--background, #f5f6f8); color: var(--foreground, #202936); }
+.brand { display: flex; align-items: center; gap: 10px; font-size: 19px; font-weight: 650; letter-spacing: .035em; }
+.brand img { border-radius: 9px; }
+.brandOs { color: var(--muted-foreground); font-size: 12px; font-weight: 500; letter-spacing: 0; }
+.card { width: 100%; max-width: 420px; padding: 32px; border: 1px solid var(--border); border-radius: 12px; background: var(--card); }
+.heading { margin-bottom: 28px; }
+.heading h1 { margin: 0; font-size: 26px; font-weight: 600; line-height: 1.3; letter-spacing: -.035em; }
+.heading p { margin-top: 8px; color: var(--muted-foreground); font-size: 14px; }
+.form { display: flex; flex-direction: column; gap: 22px; }
+.field label { display: block; margin-bottom: 8px; font-size: 13px; font-weight: 500; color: var(--foreground); }
+.page .field input { display: block; width: 100%; height: 46px; padding: 10px 12px; border: 1px solid var(--border); border-color: var(--border) !important; border-radius: 8px; background: var(--card) !important; color: var(--foreground) !important; font-size: 14px !important; line-height: 1.5; }
+.page .field input:focus { border-color: #245dcc !important; outline: 2px solid #245dcc; outline-offset: 2px; box-shadow: none; }
+.page .field input[aria-invalid="true"] { border-color: #bd3045 !important; }
+.page .field input::placeholder { color: var(--muted-foreground) !important; opacity: 1 !important; }
+.inputWrap { position: relative; }
+.page .inputWrap input { padding-right: 48px; }
+.reveal { display: flex; align-items: center; justify-content: center; position: absolute; top: 1px; right: 1px; height: 44px; width: 44px; border-radius: 7px; color: var(--muted-foreground); cursor: pointer; }
+.reveal:hover { background: var(--muted); color: var(--foreground); }
+.hint { color: var(--muted-foreground); font-size: 12px; line-height: 1.7; margin-top: 8px; }
+.submit { min-height: 46px; display: flex; align-items: center; justify-content: center; gap: 9px; width: 100%; border: 1px solid #245dcc; border-radius: 8px; padding: 10px 16px; background: #245dcc; color: white; font-size: 14px; font-weight: 600; cursor: pointer; }
+.submit:hover:not(:disabled) { background: #1c4ba9; }
+.submit:disabled { cursor: wait; opacity: .65; }
+.help { margin-top: 22px; border-bottom: 1px solid var(--border); padding-bottom: 20px; }
+.help summary { padding: 6px 0; cursor: pointer; color: var(--muted-foreground); font-size: 13px; }
+.help p { margin-top: 10px; color: var(--muted-foreground); font-size: 13px; line-height: 1.8; }
+.sessionNote { color: var(--muted-foreground); font-size: 12px; line-height: 1.75; margin-top: 18px; }
+.footer { display: flex; justify-content: center; flex-wrap: wrap; gap: 12px; color: var(--muted-foreground); font-size: 11px; }
+.footer > span { border-left: 1px solid var(--border); padding-left: 12px; }
+.error { display: flex; align-items: flex-start; gap: 9px; padding: 12px; border: 1px solid #edb8c1; border-radius: 8px; background: #fff0f2; color: #9f2438; font-size: 13px; line-height: 1.65; overflow-wrap: anywhere; }
+.error svg { flex-shrink: 0; margin-top: 2px; }
+:global(.dark) .error { background: #432832; color: #ffd2da; border-color: #914052; }
+.page :is(button, summary):focus-visible { outline: 2px solid var(--ring); outline-offset: 3px; }
+.skipLink { position: fixed; top: -80px; left: 16px; z-index: 100; padding: 10px 16px; background: var(--card); border: 2px solid var(--ring); border-radius: 8px; }
+.skipLink:focus { top: 12px; }
+.srOnly { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+.spinner { animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (max-width: 600px) { .page { justify-content: flex-start; padding: 48px 20px 24px; gap: 25px; } .card { padding: 26px 22px; } .page .field input { font-size: 16px !important; } .help summary { min-height: 44px; display: list-item; align-content: center; } }
+@media (prefers-reduced-motion: reduce) { .spinner { animation: none; } }

@@ -1,3 +1,8 @@
+import { reservationReceiptContext } from "./reservation-receipt-context";
+import { reportCashPosition } from "./report-cash";
+import { getStandalonePosReportEntries } from "./report-pos-revenue";
+import { reportDateOf, validateReportRange } from "../reports/report-dates";
+import { summarizeReportLedger, type RecordedTotals } from "../reports/report-ledger";
 import { prisma } from "../db/prisma";
 import { resolveSelectedProperty } from "../config/property-config";
 import { getMidnightDayBoundaries } from "./daily-report-service";
@@ -62,6 +67,7 @@ export interface ExecutiveSummaryMetrics {
 
 export interface RevenueBreakdown {
   categories: {
+    recordedStreams: { room: RecordedTotals; food: RecordedTotals; other: RecordedTotals; adjustments: RecordedTotals };
     roomRevenue: number;
     fbRevenue: number;
     otherRevenue: number;
@@ -284,6 +290,7 @@ export async function getExecutiveReport(
 
   const startDate = params.startDate || businessDate;
   const endDate = params.endDate || businessDate;
+  validateReportRange(startDate, endDate);
 
   // Calculate previous equivalent period
   const startD = new Date(startDate);
@@ -299,13 +306,13 @@ export async function getExecutiveReport(
   const prevEndDate = prevEndD.toISOString().split("T")[0];
 
   // Boundaries for DB range queries
-  const { localStart: curLocalStart, startUtc: curStartUtc } = getMidnightDayBoundaries(startDate);
-  const { localEnd: curLocalEnd, endUtc: curEndUtc } = getMidnightDayBoundaries(endDate);
+  const { localStart: curLocalStart, startUtc: curStartUtc } = getMidnightDayBoundaries(startDate, targetProperty.timezone);
+  const { localEnd: curLocalEnd, endUtc: curEndUtc } = getMidnightDayBoundaries(endDate, targetProperty.timezone);
   const curStart = curLocalStart < curStartUtc ? curLocalStart : curStartUtc;
   const curEnd = curLocalEnd > curEndUtc ? curLocalEnd : curEndUtc;
 
-  const { localStart: prevLocalStart, startUtc: prevStartUtc } = getMidnightDayBoundaries(prevStartDate);
-  const { localEnd: prevLocalEnd, endUtc: prevEndUtc } = getMidnightDayBoundaries(prevEndDate);
+  const { localStart: prevLocalStart, startUtc: prevStartUtc } = getMidnightDayBoundaries(prevStartDate, targetProperty.timezone);
+  const { localEnd: prevLocalEnd, endUtc: prevEndUtc } = getMidnightDayBoundaries(prevEndDate, targetProperty.timezone);
   const prevStart = prevLocalStart < prevStartUtc ? prevLocalStart : prevStartUtc;
   const prevEnd = prevLocalEnd > prevEndUtc ? prevLocalEnd : prevEndUtc;
 
@@ -351,6 +358,10 @@ export async function getExecutiveReport(
 
   const dateList = getRangeDateList(startDate, endDate);
 
+  const activeRoomsAt = (stay: typeof stays[number], instant: Date) => {
+    if (!["IN_HOUSE", "CHECKED_OUT"].includes(stay.status) || stay.arrivalAt > instant || (stay.actualDepartureAt && stay.actualDepartureAt <= instant)) return [];
+    return stay.roomAssignments.filter(a => a.startsAt <= instant && (!a.endsAt || a.endsAt > instant));
+  };
   // Measure occupied room nights across the date range
   let curOccupiedRoomNights = 0;
   const curOccupiedStayIds = new Set<string>();
@@ -358,21 +369,20 @@ export async function getExecutiveReport(
   for (const dateStr of dateList) {
     for (const s of stays) {
       if (s.status === "CANCELLED") continue;
-      const arr = s.arrivalAt.toISOString().split("T")[0];
-      const dep = (s.actualDepartureAt || s.expectedDepartureAt).toISOString().split("T")[0];
+      const arr = reportDateOf(s.arrivalAt, targetProperty.timezone);
+      const dep = reportDateOf(s.actualDepartureAt || s.expectedDepartureAt, targetProperty.timezone);
 
       // Stay active on this night
-      if (dateStr >= arr && dateStr < dep) {
-        curOccupiedRoomNights += s.roomAssignments.length > 0 ? s.roomAssignments.length : 1;
-        curOccupiedStayIds.add(s.id);
-      }
+      const active = activeRoomsAt(s, getMidnightDayBoundaries(dateStr, targetProperty.timezone).endUtc);
+      curOccupiedRoomNights += active.length;
+      if (active.length) curOccupiedStayIds.add(s.id);
     }
   }
 
   // Check-ins & checkouts occurring during the date range
   for (const s of stays) {
-    const arr = s.arrivalAt.toISOString().split("T")[0];
-    const dep = (s.actualDepartureAt || s.expectedDepartureAt).toISOString().split("T")[0];
+    const arr = reportDateOf(s.arrivalAt, targetProperty.timezone);
+    const dep = reportDateOf(s.actualDepartureAt || s.expectedDepartureAt, targetProperty.timezone);
 
     if (arr >= startDate && arr <= endDate) {
       curCheckInsCount++;
@@ -386,7 +396,7 @@ export async function getExecutiveReport(
     }
 
     // Currently in-house as of endDate
-    if (s.status === "IN_HOUSE" || (arr <= endDate && dep > endDate && s.status !== "CHECKED_OUT")) {
+    if (activeRoomsAt(s, curEnd).length) {
       inHouseStaysNow.push(s);
     }
   }
@@ -400,17 +410,15 @@ export async function getExecutiveReport(
   for (const dateStr of prevDateList) {
     for (const s of stays) {
       if (s.status === "CANCELLED") continue;
-      const arr = s.arrivalAt.toISOString().split("T")[0];
-      const dep = (s.actualDepartureAt || s.expectedDepartureAt).toISOString().split("T")[0];
-      if (dateStr >= arr && dateStr < dep) {
-        prevOccupiedRoomNights += s.roomAssignments.length > 0 ? s.roomAssignments.length : 1;
-      }
+      const arr = reportDateOf(s.arrivalAt, targetProperty.timezone);
+      const dep = reportDateOf(s.actualDepartureAt || s.expectedDepartureAt, targetProperty.timezone);
+      prevOccupiedRoomNights += activeRoomsAt(s, getMidnightDayBoundaries(dateStr, targetProperty.timezone).endUtc).length;
     }
   }
 
   for (const s of stays) {
-    const arr = s.arrivalAt.toISOString().split("T")[0];
-    const dep = (s.actualDepartureAt || s.expectedDepartureAt).toISOString().split("T")[0];
+    const arr = reportDateOf(s.arrivalAt, targetProperty.timezone);
+    const dep = reportDateOf(s.actualDepartureAt || s.expectedDepartureAt, targetProperty.timezone);
     if (arr >= prevStartDate && arr <= prevEndDate) prevCheckInsCount++;
     if (dep >= prevStartDate && dep <= prevEndDate) prevCheckOutsCount++;
   }
@@ -420,9 +428,10 @@ export async function getExecutiveReport(
     where: {
       propertyId,
       status: "POSTED",
+      type: { in: ["CHARGE", "ADJUSTMENT"] },
       OR: [
         { serviceDate: { gte: startDate, lte: endDate } },
-        { postedAt: { gte: curStart, lte: curEnd } },
+        { serviceDate: "", postedAt: { gte: curStart, lte: curEnd } },
       ],
     },
   });
@@ -431,60 +440,21 @@ export async function getExecutiveReport(
     where: {
       propertyId,
       status: "POSTED",
+      type: { in: ["CHARGE", "ADJUSTMENT"] },
       OR: [
         { serviceDate: { gte: prevStartDate, lte: prevEndDate } },
-        { postedAt: { gte: prevStart, lte: prevEnd } },
+        { serviceDate: "", postedAt: { gte: prevStart, lte: prevEnd } },
       ],
     },
   });
 
   // Categorize Revenue
-  const categorizeEntries = (entries: typeof curFolioEntries) => {
-    let roomRev = 0;
-    let fbRev = 0;
-    let otherRev = 0;
-    let taxable = 0;
-    let tax = 0;
-    let discounts = 0;
+  const categorizeEntries = summarizeReportLedger;
 
-    for (const entry of entries) {
-      const code = (entry.chargeCode || "").toUpperCase();
-      const desc = (entry.description || "").toUpperCase();
-      const amt = entry.totalAmount;
-      const isNegative = amt < 0;
-
-      if (entry.type === "ADJUSTMENT" || isNegative) {
-        discounts += Math.abs(amt);
-        continue;
-      }
-
-      taxable += entry.taxableAmount || amt;
-      tax += Math.max(0, amt - (entry.taxableAmount || amt));
-
-      if (code.includes("ROOM") || code.includes("TARIFF") || code.includes("BED") || code.includes("PAX")) {
-        roomRev += amt;
-      } else if (code.includes("FOOD") || code.includes("RESTAURANT") || code.includes("BEVERAGE") || code.includes("FB") || desc.includes("DINING")) {
-        fbRev += amt;
-      } else {
-        otherRev += amt;
-      }
-    }
-
-    const netRev = Math.max(0, roomRev + fbRev + otherRev - discounts);
-    return {
-      roomRev,
-      fbRev,
-      otherRev,
-      taxable,
-      tax,
-      discounts,
-      netRev,
-      totalRev: roomRev + fbRev + otherRev,
-    };
-  };
-
-  const curRevenue = categorizeEntries(curFolioEntries);
-  const prevRevenue = categorizeEntries(prevFolioEntries);
+  const curStandalonePos = await getStandalonePosReportEntries(propertyId, targetProperty.timezone, startDate, endDate);
+  const prevStandalonePos = await getStandalonePosReportEntries(propertyId, targetProperty.timezone, prevStartDate, prevEndDate);
+  const curRevenue = categorizeEntries([...curFolioEntries, ...curStandalonePos]);
+  const prevRevenue = categorizeEntries([...prevFolioEntries, ...prevStandalonePos]);
 
   // 4. Fetch Payments & Collections
   const curPayments = await prisma.payment.findMany({
@@ -543,7 +513,9 @@ export async function getExecutiveReport(
   let curTotalCollections = 0;
   const transactionItems: RevenueBreakdown["transactions"] = [];
 
+  const reservationContext = await reservationReceiptContext(curPayments);
   for (const p of curPayments) {
+    const booking = reservationContext.get(p.id);
     const amt = p.amount;
     curTotalCollections += amt;
 
@@ -557,7 +529,7 @@ export async function getExecutiveReport(
     else collectionsByMethod.OTHER += amt;
 
     // Source breakdown
-    let payerName = "Guest";
+    let payerName = booking?.guestName || "Guest";
     let roomOrBookingRef = "-";
     let channel = "DIRECT";
 
@@ -577,10 +549,11 @@ export async function getExecutiveReport(
       if (st.reservationRoom?.reservation) {
         channel = (st.reservationRoom.reservation.source || "DIRECT").toUpperCase();
       }
-      collectionsBySource.GUEST_PAYMENT += amt;
+      if (p.reservationId) collectionsBySource.BOOKING_ADVANCE += amt;
+      else collectionsBySource.GUEST_PAYMENT += amt;
     } else if (p.reservationId) {
       collectionsBySource.BOOKING_ADVANCE += amt;
-      roomOrBookingRef = `Res #${p.reservationId.slice(-6)}`;
+      roomOrBookingRef = booking?.reservationNo || `Res #${p.reservationId.slice(-6)}`;
     } else {
       collectionsBySource.OTHER += amt;
     }
@@ -608,7 +581,7 @@ export async function getExecutiveReport(
       }),
       payerName,
       roomOrBookingRef,
-      category: p.folio ? "Folio Settlement" : p.reservationId ? "Advance Deposit" : "Direct Income",
+      category: p.reservationId ? "Advance Deposit" : p.folio ? "Folio Settlement" : "Direct Income",
       paymentMethod: p.method,
       amount: amt,
       reference: p.reference || "Verified",
@@ -625,7 +598,7 @@ export async function getExecutiveReport(
       status: "PAID",
       OR: [
         { businessDate: { gte: startDate, lte: endDate } },
-        { paidAt: { gte: curStart, lte: curEnd } },
+        { businessDate: "", paidAt: { gte: curStart, lte: curEnd } },
       ],
     },
     orderBy: { paidAt: "desc" },
@@ -637,7 +610,7 @@ export async function getExecutiveReport(
       status: "PAID",
       OR: [
         { businessDate: { gte: prevStartDate, lte: prevEndDate } },
-        { paidAt: { gte: prevStart, lte: prevEnd } },
+        { businessDate: "", paidAt: { gte: prevStart, lte: prevEnd } },
       ],
     },
   });
@@ -786,8 +759,8 @@ export async function getExecutiveReport(
         else otherCharges += e.totalAmount;
       }
 
-      const arrStr = s.arrivalAt.toISOString().split("T")[0];
-      const depStr = (s.actualDepartureAt || s.expectedDepartureAt).toISOString().split("T")[0];
+      const arrStr = reportDateOf(s.arrivalAt, targetProperty.timezone);
+      const depStr = reportDateOf(s.actualDepartureAt || s.expectedDepartureAt, targetProperty.timezone);
       const ageDays = Math.max(0, Math.round((new Date(endDate).getTime() - new Date(arrStr).getTime()) / (1000 * 60 * 60 * 24)));
 
       const roomNumbers = s.roomAssignments.map((ra) => ra.room.number).join(", ") || "Unassigned";
@@ -821,28 +794,29 @@ export async function getExecutiveReport(
   const curOccupancyPct = availableRoomNights > 0 ? (curOccupiedRoomNights / availableRoomNights) * 100 : 0;
   const prevOccupancyPct = prevAvailableRoomNights > 0 ? (prevOccupiedRoomNights / prevAvailableRoomNights) * 100 : 0;
 
-  const curAdr = curOccupiedRoomNights > 0 ? curRevenue.roomRev / curOccupiedRoomNights : 0;
-  const prevAdr = prevOccupiedRoomNights > 0 ? prevRevenue.roomRev / prevOccupiedRoomNights : 0;
+  const curAdr = curOccupiedRoomNights > 0 ? curRevenue.roomBase / curOccupiedRoomNights : 0;
+  const prevAdr = prevOccupiedRoomNights > 0 ? prevRevenue.roomBase / prevOccupiedRoomNights : 0;
 
-  const curRevpar = availableRoomNights > 0 ? curRevenue.roomRev / availableRoomNights : 0;
-  const prevRevpar = prevAvailableRoomNights > 0 ? prevRevenue.roomRev / prevAvailableRoomNights : 0;
+  const curRevpar = availableRoomNights > 0 ? curRevenue.roomBase / availableRoomNights : 0;
+  const prevRevpar = prevAvailableRoomNights > 0 ? prevRevenue.roomBase / prevAvailableRoomNights : 0;
 
   // 9. Cash Position & Drawer Reconciliation
-  const openingCash = targetProperty.openingCashBalance || 0;
-  const cashReceived = collectionsByMethod.CASH || 0;
-  const cashPaidOut = curCashExpenses || 0;
+  const cash = await reportCashPosition(propertyId, curStart, curEnd, targetProperty.openingCashBalance || 0);
+  const openingCash = cash.opening;
+  const cashReceived = cash.received;
+  const cashPaidOut = cash.paid;
   const expectedClosingCash = Math.round((openingCash + cashReceived - cashPaidOut) * 100) / 100;
 
   // 10. Daily Chart Trend Points
   const chartPoints: ExecutiveChartPoint[] = [];
   for (const dateStr of dateList) {
-    const { localStart: ds, localEnd: de, startUtc: su, endUtc: eu } = getMidnightDayBoundaries(dateStr);
+    const { localStart: ds, localEnd: de, startUtc: su, endUtc: eu } = getMidnightDayBoundaries(dateStr, targetProperty.timezone);
     const dayStart = ds < su ? ds : su;
     const dayEnd = de > eu ? de : eu;
 
     // Day revenue
-    const dayEntries = curFolioEntries.filter(
-      (e) => e.serviceDate === dateStr || (e.postedAt >= dayStart && e.postedAt <= dayEnd)
+    const dayEntries = [...curFolioEntries, ...curStandalonePos].filter(
+      (e) => e.serviceDate === dateStr || (!e.serviceDate && e.postedAt >= dayStart && e.postedAt <= dayEnd)
     );
     const dayRev = categorizeEntries(dayEntries);
 
@@ -852,7 +826,7 @@ export async function getExecutiveReport(
 
     // Day expenses
     const dayExpRecords = curExpenses.filter(
-      (e) => e.businessDate === dateStr || (e.paidAt >= dayStart && e.paidAt <= dayEnd)
+      (e) => e.businessDate === dateStr || (!e.businessDate && e.paidAt >= dayStart && e.paidAt <= dayEnd)
     );
     const dayExp = dayExpRecords.reduce((sum, e) => sum + (e.totalAmount || e.amount), 0);
 
@@ -860,16 +834,14 @@ export async function getExecutiveReport(
     let dayRoomsSold = 0;
     for (const s of stays) {
       if (s.status === "CANCELLED") continue;
-      const arr = s.arrivalAt.toISOString().split("T")[0];
-      const dep = (s.actualDepartureAt || s.expectedDepartureAt).toISOString().split("T")[0];
-      if (dateStr >= arr && dateStr < dep) {
-        dayRoomsSold += s.roomAssignments.length > 0 ? s.roomAssignments.length : 1;
-      }
+      const arr = reportDateOf(s.arrivalAt, targetProperty.timezone);
+      const dep = reportDateOf(s.actualDepartureAt || s.expectedDepartureAt, targetProperty.timezone);
+      dayRoomsSold += activeRoomsAt(s, dayEnd).length;
     }
 
     const dayOcc = totalRoomsCount > 0 ? (dayRoomsSold / totalRoomsCount) * 100 : 0;
-    const dayAdr = dayRoomsSold > 0 ? dayRev.roomRev / dayRoomsSold : 0;
-    const dayRevpar = totalRoomsCount > 0 ? dayRev.roomRev / totalRoomsCount : 0;
+    const dayAdr = dayRoomsSold > 0 ? dayRev.roomBase / dayRoomsSold : 0;
+    const dayRevpar = totalRoomsCount > 0 ? dayRev.roomBase / totalRoomsCount : 0;
 
     chartPoints.push({
       date: dateStr,
@@ -985,7 +957,7 @@ export async function getExecutiveReport(
         0
       ),
       inHouseRoomsCount: inHouseStaysNow.reduce(
-        (sum, s) => sum + (s.roomAssignments.length > 0 ? s.roomAssignments.length : 1),
+        (sum, s) => sum + activeRoomsAt(s, curEnd).length,
         0
       ),
       totalRooms: totalRoomsCount,
@@ -1012,13 +984,14 @@ export async function getExecutiveReport(
     },
     revenueAndCollections: {
       categories: {
-        roomRevenue: curRevenue.roomRev,
-        fbRevenue: curRevenue.fbRev,
-        otherRevenue: curRevenue.otherRev,
+        recordedStreams: curRevenue.streams,
+        roomRevenue: curRevenue.streams.room.gross,
+        fbRevenue: curRevenue.streams.food.gross,
+        otherRevenue: curRevenue.streams.other.gross,
         taxableAmount: curRevenue.taxable,
         totalTax: curRevenue.tax,
         discountsAmount: curRevenue.discounts,
-        grossTurnover: curRevenue.totalRev + curRevenue.tax,
+        grossTurnover: curRevenue.grossTurnover,
         netRevenue: curRevenue.netRev,
       },
       collectionsByMethod,

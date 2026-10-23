@@ -1,7 +1,13 @@
+import { authorizeRequest, getApiAccess } from "@/lib/auth/api-access";
 import { NextResponse } from "next/server";
 import { checkInGuest } from "@/lib/domain/pms-service";
+import { toServiceDate } from "@/lib/domain/booking-dates";
 
 export async function POST(request: Request) {
+  const access = await authorizeRequest(request);
+  if (access instanceof Response) return access;
+  request = access.request;
+
   try {
     const body = await request.json();
     const {
@@ -9,10 +15,10 @@ export async function POST(request: Request) {
       reservationId,
       guestData,
       roomId,
-      roomIds, // NEW
-      groupBilling, // NEW
-      roomRates, // NEW
-      roomPax, // NEW: Record<string, { adults?: number; children?: number }>
+      roomIds,
+      groupBilling,
+      roomRates,
+      roomPax,
       arrivalAt,
       expectedDepartureAt,
       adults,
@@ -21,6 +27,7 @@ export async function POST(request: Request) {
       paxF,
       paxC,
       depositAmount,
+      additionalDepositAmount,
       depositMethod,
       depositRef,
       agreedTariff,
@@ -43,22 +50,42 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "No room selected for check-in." }, { status: 400 });
     }
 
+    const effectiveDep = expectedDepartureAt || body.departureDate || body.checkOut;
+    const effectiveArr = arrivalAt || body.arrivalDate || body.checkIn || new Date();
+    const effectiveGuestData = guestData || {
+      name: body.guestName || "Guest",
+      phone: body.guestPhone,
+      email: body.guestEmail,
+    };
+
+    if (!effectiveDep) {
+      return NextResponse.json({ error: "expectedDepartureAt is required." }, { status: 400 });
+    }
+
+    const { property } = getApiAccess(request);
+    const arrDate = toServiceDate(effectiveArr, property.timezone);
+    const depDate = toServiceDate(effectiveDep, property.timezone);
+    if (depDate <= arrDate) {
+      return NextResponse.json({ error: "Departure date must be strictly after arrival date." }, { status: 400 });
+    }
+
     const result = await checkInGuest({
       propertyId,
       reservationId,
-      guestData,
+      guestData: effectiveGuestData,
       roomIds: finalRoomIds,
       groupBilling: groupBilling !== undefined ? groupBilling : true,
-      roomRates, // NEW
-      roomPax, // NEW
-      arrivalAt: arrivalAt ? new Date(arrivalAt) : undefined,
-      expectedDepartureAt: new Date(expectedDepartureAt),
+      roomRates,
+      roomPax,
+      arrivalAt: effectiveArr ? new Date(effectiveArr) : undefined,
+      expectedDepartureAt: new Date(effectiveDep),
       adults: Number(adults) || 2,
       children: Number(children) || 0,
       paxM: paxM !== undefined ? Number(paxM) : undefined,
       paxF: paxF !== undefined ? Number(paxF) : undefined,
       paxC: paxC !== undefined ? Number(paxC) : undefined,
-      depositAmount: Number(depositAmount) || 0,
+      depositAmount: depositAmount === undefined ? 0 : Number(depositAmount),
+      additionalDepositAmount: additionalDepositAmount === undefined ? undefined : Number(additionalDepositAmount),
       depositMethod: depositMethod || "CASH",
       depositRef: depositRef || undefined,
       agreedTariff: agreedTariff !== undefined ? Number(agreedTariff) : undefined,
@@ -78,6 +105,6 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ ...result });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 400 });
+    return NextResponse.json({ error: error.message }, { status: error.statusCode || 400 });
   }
 }

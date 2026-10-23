@@ -185,40 +185,40 @@ export default function HousekeepingPage() {
       {activeTab === "board" && (
         <div className="flex md:grid md:grid-cols-4 gap-3.5 overflow-x-auto snap-x snap-mandatory pb-4 md:pb-0 scrollbar-thin">
           {/* DIRTY */}
-          <div className="rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200/80 dark:border-zinc-800/80 p-4 space-y-3 flex flex-col justify-between shadow-xs min-w-[280px] sm:min-w-[320px] md:min-w-0 snap-center shrink-0 md:shrink">
+          <div className="rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200/80 dark:border-zinc-800/80 p-4 space-y-3 flex flex-col justify-between shadow-xs min-w-[280px] sm:min-w-[320px] md:min-w-0 snap-center shrink-0 md:shrink ui-radius-panel ui-shadow-quiet ui-surface">
             <div>
-              <div className="flex items-center justify-between pb-2.5 border-b border-zinc-100 dark:border-zinc-800 text-xs font-semibold text-amber-700 dark:text-amber-400">
+              <div className="flex items-center justify-between pb-2.5 border-b border-zinc-100 dark:border-zinc-800 text-xs font-semibold text-amber-700 dark:text-amber-400 ui-text-body">
                 <span className="flex items-center gap-1.5">
                   <span className="h-2 w-2 rounded-full bg-amber-500" />
                   Dirty ({dirtyRooms.length})
                 </span>
-                <span className="text-[10px] text-zinc-400 font-medium">Pending</span>
+                <span className="text-[10px] text-zinc-400 font-medium ui-text-meta">Pending</span>
               </div>
 
               <div className="space-y-2.5 mt-3 max-h-[580px] overflow-y-auto pr-1">
                 {dirtyRooms.map((room) => (
                   <div
                     key={room.id}
-                    className="rounded-xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200/80 dark:border-zinc-800 p-3 space-y-2 text-xs shadow-xs"
+                    className="rounded-xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200/80 dark:border-zinc-800 p-3 space-y-2 text-xs shadow-xs ui-text-body ui-shadow-quiet"
                   >
                     <div className="flex items-start justify-between">
                       <div>
-                        <div className="font-bold text-zinc-900 dark:text-white font-mono text-sm">Room {room.number}</div>
-                        <div className="text-xs text-zinc-500 mt-0.5">{room.roomType.name}</div>
+                        <div className="font-bold text-zinc-900 dark:text-white font-mono text-sm ui-weight-medium ui-font-body">Room {room.number}</div>
+                        <div className="text-xs text-zinc-500 mt-0.5 ui-text-body">{room.roomType.name}</div>
                       </div>
-                      <span className="rounded-md bg-zinc-200/70 dark:bg-zinc-800 px-1.5 py-0.5 text-[10px] text-zinc-600 dark:text-zinc-400 font-medium">
+                      <span className="rounded-md bg-zinc-200/70 dark:bg-zinc-800 px-1.5 py-0.5 text-[10px] text-zinc-600 dark:text-zinc-400 font-medium ui-text-meta">
                         Floor {room.floor}
                       </span>
                     </div>
 
-                    <div className="flex items-center justify-between pt-2 border-t border-zinc-200/60 dark:border-zinc-800 text-xs">
+                    <div className="flex items-center justify-between pt-2 border-t border-zinc-200/60 dark:border-zinc-800 text-xs ui-text-body">
                       <span className="text-zinc-500 font-medium">
                         {room.roomState?.occupancyStatus === "OCCUPIED" ? "Stayover" : "Checkout"}
                       </span>
                       <button
                         onClick={() => handleRoomHKState(room.id, "CLEAN")}
                         disabled={actionLoading}
-                        className="rounded-lg bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-800 dark:hover:bg-zinc-700 px-2.5 py-1 text-xs text-white dark:text-zinc-200 font-semibold transition cursor-pointer shadow-xs"
+                        className="rounded-lg bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-800 dark:hover:bg-zinc-700 px-2.5 py-1 text-xs text-white dark:text-zinc-200 font-semibold transition cursor-pointer shadow-xs ui-text-body ui-shadow-quiet ui-control"
                       >
                         Mark Clean →
                       </button>
@@ -226,44 +226,44 @@ export default function HousekeepingPage() {
                   </div>
                 ))}
                 {dirtyRooms.length === 0 && (
-                  <div className="p-8 text-center text-xs text-zinc-400 dark:text-zinc-600 italic">No dirty rooms</div>
+                  <div className="p-8 text-center text-xs text-zinc-400 dark:text-zinc-600 italic ui-text-body">No dirty rooms</div>
                 )}
               </div>
             </div>
           </div>
 
           {/* CLEAN */}
-          <div className="rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200/80 dark:border-zinc-800/80 p-4 space-y-3 flex flex-col justify-between shadow-xs min-w-[280px] sm:min-w-[320px] md:min-w-0 snap-center shrink-0 md:shrink">
+          <div className="rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200/80 dark:border-zinc-800/80 p-4 space-y-3 flex flex-col justify-between shadow-xs min-w-[280px] sm:min-w-[320px] md:min-w-0 snap-center shrink-0 md:shrink ui-radius-panel ui-shadow-quiet ui-surface">
             <div>
-              <div className="flex items-center justify-between pb-2.5 border-b border-zinc-100 dark:border-zinc-800 text-xs font-semibold text-blue-700 dark:text-blue-400">
+              <div className="flex items-center justify-between pb-2.5 border-b border-zinc-100 dark:border-zinc-800 text-xs font-semibold text-blue-700 dark:text-blue-400 ui-text-body">
                 <span className="flex items-center gap-1.5">
                   <span className="h-2 w-2 rounded-full bg-blue-500" />
                   Clean ({cleanRooms.length})
                 </span>
-                <span className="text-[10px] text-zinc-400 font-medium">For Inspect</span>
+                <span className="text-[10px] text-zinc-400 font-medium ui-text-meta">For Inspect</span>
               </div>
 
               <div className="space-y-2.5 mt-3 max-h-[580px] overflow-y-auto pr-1">
                 {cleanRooms.map((room) => (
                   <div
                     key={room.id}
-                    className="rounded-xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200/80 dark:border-zinc-800 p-3 space-y-2 text-xs shadow-xs"
+                    className="rounded-xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200/80 dark:border-zinc-800 p-3 space-y-2 text-xs shadow-xs ui-text-body ui-shadow-quiet"
                   >
                     <div className="flex items-start justify-between">
                       <div>
-                        <div className="font-bold text-zinc-900 dark:text-white font-mono text-sm">Room {room.number}</div>
-                        <div className="text-xs text-zinc-500 mt-0.5">{room.roomType.name}</div>
+                        <div className="font-bold text-zinc-900 dark:text-white font-mono text-sm ui-weight-medium ui-font-body">Room {room.number}</div>
+                        <div className="text-xs text-zinc-500 mt-0.5 ui-text-body">{room.roomType.name}</div>
                       </div>
-                      <span className="rounded-md bg-zinc-200/70 dark:bg-zinc-800 px-1.5 py-0.5 text-[10px] text-zinc-600 dark:text-zinc-400 font-medium">
+                      <span className="rounded-md bg-zinc-200/70 dark:bg-zinc-800 px-1.5 py-0.5 text-[10px] text-zinc-600 dark:text-zinc-400 font-medium ui-text-meta">
                         Floor {room.floor}
                       </span>
                     </div>
 
-                    <div className="flex items-center justify-between pt-2 border-t border-zinc-200/60 dark:border-zinc-800 text-xs">
+                    <div className="flex items-center justify-between pt-2 border-t border-zinc-200/60 dark:border-zinc-800 text-xs ui-text-body">
                       <span className="text-zinc-500 font-medium">Cleaned</span>
                       <button
                         onClick={() => setInspectModal(room)}
-                        className="rounded-lg bg-blue-600 hover:bg-blue-500 text-white px-2.5 py-1 text-xs font-semibold transition cursor-pointer shadow-xs"
+                        className="rounded-lg bg-blue-600 hover:bg-blue-500 text-white px-2.5 py-1 text-xs font-semibold transition cursor-pointer shadow-xs ui-text-body ui-shadow-quiet ui-control"
                       >
                         Inspect
                       </button>
@@ -271,46 +271,46 @@ export default function HousekeepingPage() {
                   </div>
                 ))}
                 {cleanRooms.length === 0 && (
-                  <div className="p-8 text-center text-xs text-zinc-400 dark:text-zinc-600 italic">None awaiting inspection</div>
+                  <div className="p-8 text-center text-xs text-zinc-400 dark:text-zinc-600 italic ui-text-body">None awaiting inspection</div>
                 )}
               </div>
             </div>
           </div>
 
           {/* INSPECTED */}
-          <div className="rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200/80 dark:border-zinc-800/80 p-4 space-y-3 flex flex-col justify-between shadow-xs min-w-[280px] sm:min-w-[320px] md:min-w-0 snap-center shrink-0 md:shrink">
+          <div className="rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200/80 dark:border-zinc-800/80 p-4 space-y-3 flex flex-col justify-between shadow-xs min-w-[280px] sm:min-w-[320px] md:min-w-0 snap-center shrink-0 md:shrink ui-radius-panel ui-shadow-quiet ui-surface">
             <div>
-              <div className="flex items-center justify-between pb-2.5 border-b border-zinc-100 dark:border-zinc-800 text-xs font-semibold text-emerald-700 dark:text-emerald-400">
+              <div className="flex items-center justify-between pb-2.5 border-b border-zinc-100 dark:border-zinc-800 text-xs font-semibold text-emerald-700 dark:text-emerald-400 ui-text-body">
                 <span className="flex items-center gap-1.5">
                   <span className="h-2 w-2 rounded-full bg-emerald-500" />
                   Inspected ({inspectedRooms.length})
                 </span>
-                <span className="text-[10px] text-zinc-400 font-medium">Ready</span>
+                <span className="text-[10px] text-zinc-400 font-medium ui-text-meta">Ready</span>
               </div>
 
               <div className="space-y-2.5 mt-3 max-h-[580px] overflow-y-auto pr-1">
                 {inspectedRooms.map((room) => (
                   <div
                     key={room.id}
-                    className="rounded-xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200/80 dark:border-zinc-800 p-3 space-y-2 text-xs shadow-xs"
+                    className="rounded-xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200/80 dark:border-zinc-800 p-3 space-y-2 text-xs shadow-xs ui-text-body ui-shadow-quiet"
                   >
                     <div className="flex items-start justify-between">
                       <div>
-                        <div className="font-bold text-zinc-900 dark:text-white font-mono text-sm">Room {room.number}</div>
-                        <div className="text-xs text-zinc-500 mt-0.5">{room.roomType.name}</div>
+                        <div className="font-bold text-zinc-900 dark:text-white font-mono text-sm ui-weight-medium ui-font-body">Room {room.number}</div>
+                        <div className="text-xs text-zinc-500 mt-0.5 ui-text-body">{room.roomType.name}</div>
                       </div>
-                      <span className="rounded-md bg-zinc-200/70 dark:bg-zinc-800 px-1.5 py-0.5 text-[10px] text-zinc-600 dark:text-zinc-400 font-medium">
+                      <span className="rounded-md bg-zinc-200/70 dark:bg-zinc-800 px-1.5 py-0.5 text-[10px] text-zinc-600 dark:text-zinc-400 font-medium ui-text-meta">
                         Floor {room.floor}
                       </span>
                     </div>
 
-                    <div className="flex items-center justify-between pt-2 border-t border-zinc-200/60 dark:border-zinc-800 text-xs">
+                    <div className="flex items-center justify-between pt-2 border-t border-zinc-200/60 dark:border-zinc-800 text-xs ui-text-body">
                       <span className="text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
                         <CheckCircle2 className="h-3.5 w-3.5" /> Ready
                       </span>
                       <button
                         onClick={() => handleRoomHKState(room.id, "DIRTY")}
-                        className="text-xs font-medium text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300"
+                        className="text-xs font-medium text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300 ui-text-body ui-control"
                       >
                         Reset
                       </button>
@@ -322,14 +322,14 @@ export default function HousekeepingPage() {
           </div>
 
           {/* OUT OF ORDER */}
-          <div className="rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200/80 dark:border-zinc-800/80 p-4 space-y-3 flex flex-col justify-between shadow-xs min-w-[280px] sm:min-w-[320px] md:min-w-0 snap-center shrink-0 md:shrink">
+          <div className="rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200/80 dark:border-zinc-800/80 p-4 space-y-3 flex flex-col justify-between shadow-xs min-w-[280px] sm:min-w-[320px] md:min-w-0 snap-center shrink-0 md:shrink ui-radius-panel ui-shadow-quiet ui-surface">
             <div>
-              <div className="flex items-center justify-between pb-2.5 border-b border-zinc-100 dark:border-zinc-800 text-xs font-semibold text-rose-700 dark:text-rose-400">
+              <div className="flex items-center justify-between pb-2.5 border-b border-zinc-100 dark:border-zinc-800 text-xs font-semibold text-rose-700 dark:text-rose-400 ui-text-body">
                 <span className="flex items-center gap-1.5">
                   <span className="h-2 w-2 rounded-full bg-rose-500" />
                   Out of Order ({outOfOrderRooms.length})
                 </span>
-                <span className="text-[10px] text-zinc-400 font-medium">Blocked</span>
+                <span className="text-[10px] text-zinc-400 font-medium ui-text-meta">Blocked</span>
               </div>
 
               <div className="space-y-2.5 mt-3 max-h-[580px] overflow-y-auto pr-1">
@@ -338,27 +338,27 @@ export default function HousekeepingPage() {
                   return (
                     <div
                       key={room.id}
-                      className="rounded-xl bg-rose-50/60 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-800/60 p-3 space-y-2 text-xs shadow-xs"
+                      className="rounded-xl bg-rose-50/60 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-800/60 p-3 space-y-2 text-xs shadow-xs ui-text-body ui-shadow-quiet"
                     >
                       <div className="flex items-start justify-between">
                         <div>
-                          <div className="font-bold text-zinc-900 dark:text-white font-mono text-sm">Room {room.number}</div>
-                          <div className="text-xs text-zinc-500 mt-0.5">{room.roomType?.name}</div>
+                          <div className="font-bold text-zinc-900 dark:text-white font-mono text-sm ui-weight-medium ui-font-body">Room {room.number}</div>
+                          <div className="text-xs text-zinc-500 mt-0.5 ui-text-body">{room.roomType?.name}</div>
                         </div>
-                        <span className="rounded-md px-1.5 py-0.5 text-[10px] font-semibold text-rose-700 dark:text-rose-400 bg-rose-100 dark:bg-rose-500/10 border border-rose-200 dark:border-rose-500/20 flex items-center gap-1">
+                        <span className="rounded-md px-1.5 py-0.5 text-[10px] font-semibold text-rose-700 dark:text-rose-400 bg-rose-100 dark:bg-rose-500/10 border border-rose-200 dark:border-rose-500/20 flex items-center gap-1 ui-text-meta">
                           <Wrench className="h-3 w-3" />
                           <span>{activeIssue?.issueNo || "OOO"}</span>
                         </span>
                       </div>
 
-                      <div className="text-xs font-medium text-rose-700 dark:text-rose-300 pt-2 border-t border-rose-200/60 dark:border-rose-900/40">
+                      <div className="text-xs font-medium text-rose-700 dark:text-rose-300 pt-2 border-t border-rose-200/60 dark:border-rose-900/40 ui-text-body">
                         {activeIssue ? (
                           <div className="space-y-1">
                             <div className="font-semibold flex items-center justify-between">
                               <span className="truncate">{activeIssue.assetText ? `${activeIssue.assetText} • ` : ""}{activeIssue.category}</span>
-                              <span className="text-[10px] uppercase px-1.5 py-0.2 rounded bg-rose-200 dark:bg-rose-900 font-semibold shrink-0">{activeIssue.priority}</span>
+                              <span className="text-[10px] uppercase px-1.5 py-0.2 rounded bg-rose-200 dark:bg-rose-900 font-semibold shrink-0 ui-text-meta">{activeIssue.priority}</span>
                             </div>
-                            <p className="text-xs text-rose-700 dark:text-rose-300 line-clamp-2">{activeIssue.description}</p>
+                            <p className="text-xs text-rose-700 dark:text-rose-300 line-clamp-2 ui-text-body">{activeIssue.description}</p>
                           </div>
                         ) : (
                           <span>{room.blocks?.[0]?.reason || "Maintenance repair in progress"}</span>
@@ -376,15 +376,15 @@ export default function HousekeepingPage() {
       {/* TAB 2: TASKS LIST */}
 
       {activeTab === "tasks" && (
-        <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121215] overflow-hidden shadow-xs">
+        <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121215] overflow-hidden shadow-xs ui-shadow-quiet ui-surface">
           <div className="p-4 sm:p-5 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
-            <h2 className="text-xs font-semibold text-zinc-900 dark:text-zinc-100 uppercase tracking-wider">Housekeeping Tasks</h2>
-            <span className="text-xs font-mono text-zinc-500">{tasks.length} Total Tasks</span>
+            <h2 className="text-xs font-semibold text-zinc-900 dark:text-zinc-100 uppercase tracking-wider ui-text-body ui-section-title">Housekeeping Tasks</h2>
+            <span className="text-xs font-mono text-zinc-500 ui-text-body ui-font-body">{tasks.length} Total Tasks</span>
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-zinc-50/90 dark:bg-zinc-900/90 text-zinc-500 dark:text-zinc-400 text-[11px] uppercase font-semibold tracking-wider border-b border-zinc-200 dark:border-zinc-800">
+            <table className="w-full text-left text-xs ui-text-body ui-data-table">
+              <thead className="bg-zinc-50/90 dark:bg-zinc-900/90 text-zinc-500 dark:text-zinc-400 text-[11px] uppercase font-semibold tracking-wider border-b border-zinc-200 dark:border-zinc-800 ui-text-meta">
                 <tr>
                   <th className="px-4 py-3">Room</th>
                   <th className="px-4 py-3">Task</th>
@@ -397,11 +397,11 @@ export default function HousekeepingPage() {
               <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800/80">
                 {tasks.map((task) => (
                   <tr key={task.id} className="hover:bg-zinc-50/80 dark:hover:bg-zinc-900/40 transition">
-                    <td className="px-4 py-3 font-mono font-semibold text-zinc-900 dark:text-zinc-100">Room {task.room.number}</td>
+                    <td className="px-4 py-3 font-mono font-semibold text-zinc-900 dark:text-zinc-100 ui-font-body">Room {task.room.number}</td>
                     <td className="px-4 py-3 text-zinc-700 dark:text-zinc-300 font-medium capitalize">{task.type.replace("_", " ").toLowerCase()}</td>
                     <td className="px-4 py-3">
                       <span
-                        className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-medium border ${
+                        className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-medium border  ui-text-meta ${
                           task.priority === "URGENT" || task.priority === "HIGH"
                             ? "bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400 border-rose-200 dark:border-rose-800/50"
                             : "bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700"
@@ -412,7 +412,7 @@ export default function HousekeepingPage() {
                       </span>
                     </td>
                     <td className="px-4 py-3">
-                      <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-medium bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700">
+                      <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-medium bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 ui-text-meta">
                         <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />
                         <span>{task.status}</span>
                       </span>
@@ -422,7 +422,7 @@ export default function HousekeepingPage() {
                       {task.status === "OPEN" && (
                         <button
                           onClick={() => handleTaskStatus(task.id, "IN_PROGRESS")}
-                          className="h-8 px-3 rounded-md bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-xs text-zinc-800 dark:text-zinc-200 font-medium border border-zinc-200 dark:border-zinc-700 shadow-xs transition cursor-pointer"
+                          className="h-8 px-3 rounded-md bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-xs text-zinc-800 dark:text-zinc-200 font-medium border border-zinc-200 dark:border-zinc-700 shadow-xs transition cursor-pointer ui-text-body ui-shadow-quiet ui-control ui-control-sized"
                         >
                           Start
                         </button>
@@ -430,7 +430,7 @@ export default function HousekeepingPage() {
                       {task.status === "IN_PROGRESS" && (
                         <button
                           onClick={() => handleTaskStatus(task.id, "COMPLETED")}
-                          className="h-8 px-3 rounded-md bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-100 dark:hover:bg-zinc-200 text-white dark:text-zinc-900 text-xs font-medium shadow-xs transition cursor-pointer"
+                          className="h-8 px-3 rounded-md bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-100 dark:hover:bg-zinc-200 text-white dark:text-zinc-900 text-xs font-medium shadow-xs transition cursor-pointer ui-text-body ui-shadow-quiet ui-control ui-control-sized"
                         >
                           Complete
                         </button>
@@ -447,19 +447,19 @@ export default function HousekeepingPage() {
       {/* INSPECTION MODAL */}
       {inspectModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-          <div className="w-full max-w-md rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121215] p-5 shadow-2xl space-y-4">
+          <div className="w-full max-w-md rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121215] p-5 shadow-2xl space-y-4 ui-dialog-surface ui-surface">
             <div className="flex items-center justify-between pb-3 border-b border-zinc-200 dark:border-zinc-800">
-              <h2 className="text-sm font-semibold text-zinc-900 dark:text-white flex items-center gap-2">
+              <h2 className="text-sm font-semibold text-zinc-900 dark:text-white flex items-center gap-2 ui-section-title">
                 <ShieldCheck className="h-4.5 w-4.5 text-blue-600 dark:text-blue-400" />
                 Supervisor Inspection — Room {inspectModal.number}
               </h2>
-              <button onClick={() => setInspectModal(null)} className="text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 cursor-pointer">
+              <button onClick={() => setInspectModal(null)} className="text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 cursor-pointer ui-control">
                 <X className="h-4 w-4" />
               </button>
             </div>
 
-            <div className="space-y-3.5 text-xs">
-              <div className="rounded-lg bg-zinc-50 dark:bg-zinc-900 p-3 border border-zinc-200 dark:border-zinc-800 space-y-1 text-zinc-600 dark:text-zinc-400 shadow-xs">
+            <div className="space-y-3.5 text-xs ui-text-body">
+              <div className="rounded-lg bg-zinc-50 dark:bg-zinc-900 p-3 border border-zinc-200 dark:border-zinc-800 space-y-1 text-zinc-600 dark:text-zinc-400 shadow-xs ui-shadow-quiet">
                 <div className="font-semibold text-zinc-900 dark:text-white">Checklist items:</div>
                 <div>• Linen & bedding inspected</div>
                 <div>• Bathroom sanitised & amenities restocked</div>
@@ -467,13 +467,13 @@ export default function HousekeepingPage() {
               </div>
 
               <div className="space-y-1">
-                <label className="text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider">Defect Note (if failing)</label>
+                <label className="text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider ui-text-meta ui-label">Defect Note (if failing)</label>
                 <input
                   type="text"
                   placeholder="Optional defect note"
                   value={inspectionDefectNote}
                   onChange={(e) => setInspectionDefectNote(e.target.value)}
-                  className="w-full h-9 px-3 rounded-lg bg-white dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-xs shadow-xs"
+                  className="w-full h-9 px-3 rounded-lg bg-white dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors text-xs shadow-xs ui-text-body ui-shadow-quiet ui-field" aria-label="Defect Note (if failing)"
                 />
               </div>
 
@@ -483,7 +483,7 @@ export default function HousekeepingPage() {
                     await handleRoomHKState(inspectModal.id, "DIRTY");
                     setInspectModal(null);
                   }}
-                  className="h-9 px-3.5 rounded-lg bg-zinc-100 hover:bg-rose-50 hover:text-rose-700 dark:bg-zinc-800 dark:hover:bg-rose-950/40 dark:hover:text-rose-300 text-zinc-700 dark:text-zinc-300 font-medium text-xs border border-zinc-200 dark:border-zinc-700 transition cursor-pointer"
+                  className="h-9 px-3.5 rounded-lg bg-zinc-100 hover:bg-rose-50 hover:text-rose-700 dark:bg-zinc-800 dark:hover:bg-rose-950/40 dark:hover:text-rose-300 text-zinc-700 dark:text-zinc-300 font-medium text-xs border border-zinc-200 dark:border-zinc-700 transition cursor-pointer ui-text-body ui-control ui-control-sized"
                 >
                   Fail (Mark Dirty)
                 </button>
@@ -493,7 +493,7 @@ export default function HousekeepingPage() {
                     await handleRoomHKState(inspectModal.id, "INSPECTED");
                     setInspectModal(null);
                   }}
-                  className="h-9 px-4 rounded-lg bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-100 dark:hover:bg-zinc-200 font-medium text-xs text-white dark:text-zinc-900 transition cursor-pointer shadow-xs"
+                  className="h-9 px-4 rounded-lg bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-100 dark:hover:bg-zinc-200 font-medium text-xs text-white dark:text-zinc-900 transition cursor-pointer shadow-xs ui-text-body ui-shadow-quiet ui-control ui-control-sized"
                 >
                   Pass Inspection
                 </button>

@@ -37,7 +37,7 @@ function PMSFrontDeskContent() {
   if (pms.loading && pms.rooms.length === 0) {
     return (
       <div className="flex h-72 items-center justify-center">
-        <div className="flex items-center gap-2 text-xs font-mono text-zinc-500">
+        <div className="flex items-center gap-2 text-xs font-mono text-zinc-500 ui-text-body ui-font-body">
           <div className="h-3 w-3 animate-spin rounded-full border-2 border-zinc-400 border-t-transparent" />
           <span>Loading Front Desk PMS...</span>
         </div>
@@ -46,7 +46,7 @@ function PMSFrontDeskContent() {
   }
 
   return (
-    <div className="space-y-6 max-w-[1700px] mx-auto w-full">
+    <div className="space-y-6 max-w-[1440px] mx-auto w-full">
       {/* 1. Minimal Header with Operational Metrics */}
       <PmsHeader
         propertyName={pms.activeProperty?.displayName}
@@ -322,7 +322,7 @@ export default function PMSPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen bg-zinc-50 dark:bg-[#09090b] text-zinc-500 p-8 font-mono text-xs">
+        <div className="min-h-screen bg-zinc-50 dark:bg-[#09090b] text-zinc-500 p-8 font-mono text-xs ui-font-body ui-text-body">
           Loading Hotel Front Desk PMS...
         </div>
       }

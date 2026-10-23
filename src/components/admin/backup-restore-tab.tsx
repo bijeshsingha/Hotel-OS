@@ -265,22 +265,22 @@ export function BackupRestoreTab({ onNotify }: BackupRestoreTabProps) {
       {/* 1. TOP STATS CARDS & ENGINE STATUS */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Active Database Card */}
-        <div className="p-4 rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200/80 dark:border-zinc-800/80 shadow-xs flex items-center gap-3.5">
+        <div className="p-4 rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200/80 dark:border-zinc-800/80 shadow-xs flex items-center gap-3.5 ui-radius-panel ui-shadow-quiet ui-surface">
           <div className="h-11 w-11 rounded-xl bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 border border-blue-100 dark:border-blue-900/50">
             <HardDrive className="h-5 w-5" />
           </div>
           <div className="min-w-0 flex-1">
-            <div className="text-[11px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
+            <div className="text-[11px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 ui-text-meta ui-weight-medium">
               Active Database
             </div>
-            <div className="text-base font-black text-zinc-900 dark:text-white truncate">
+            <div className="text-base font-black text-zinc-900 dark:text-white truncate ui-weight-medium">
               {dbStats?.filename || "dev.db"}
             </div>
-            <div className="text-xs text-zinc-500 dark:text-zinc-400 font-mono font-medium mt-0.5 flex items-center gap-1.5">
+            <div className="text-xs text-zinc-500 dark:text-zinc-400 font-mono font-medium mt-0.5 flex items-center gap-1.5 ui-text-body ui-font-body">
               <span>{dbStats?.sizeFormatted || "0 B"}</span>
               <span className="text-zinc-300 dark:text-zinc-700">•</span>
               <span className="text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 inline-block animate-pulse" />
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 inline-block " />
                 Live
               </span>
             </div>
@@ -288,54 +288,54 @@ export function BackupRestoreTab({ onNotify }: BackupRestoreTabProps) {
         </div>
 
         {/* Total Snapshots Card */}
-        <div className="p-4 rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200/80 dark:border-zinc-800/80 shadow-xs flex items-center gap-3.5">
+        <div className="p-4 rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200/80 dark:border-zinc-800/80 shadow-xs flex items-center gap-3.5 ui-radius-panel ui-shadow-quiet ui-surface">
           <div className="h-11 w-11 rounded-xl bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0 border border-indigo-100 dark:border-indigo-900/50">
             <Database className="h-5 w-5" />
           </div>
           <div className="min-w-0 flex-1">
-            <div className="text-[11px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
+            <div className="text-[11px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 ui-text-meta ui-weight-medium">
               Total Snapshots
             </div>
-            <div className="text-base font-black text-zinc-900 dark:text-white">
+            <div className="text-base font-black text-zinc-900 dark:text-white ui-weight-medium">
               {counts.all} Files
             </div>
-            <div className="text-xs text-zinc-500 dark:text-zinc-400 font-medium mt-0.5">
+            <div className="text-xs text-zinc-500 dark:text-zinc-400 font-medium mt-0.5 ui-text-body">
               {counts.db} Binary (.db) / {counts.json} JSON
             </div>
           </div>
         </div>
 
         {/* Safety Rollbacks Card */}
-        <div className="p-4 rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200/80 dark:border-zinc-800/80 shadow-xs flex items-center gap-3.5">
+        <div className="p-4 rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200/80 dark:border-zinc-800/80 shadow-xs flex items-center gap-3.5 ui-radius-panel ui-shadow-quiet ui-surface">
           <div className="h-11 w-11 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 border border-emerald-100 dark:border-emerald-900/50">
             <ShieldCheck className="h-5 w-5" />
           </div>
           <div className="min-w-0 flex-1">
-            <div className="text-[11px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
+            <div className="text-[11px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 ui-text-meta ui-weight-medium">
               Pre-Restore Safety
             </div>
-            <div className="text-base font-black text-zinc-900 dark:text-white">
+            <div className="text-base font-black text-zinc-900 dark:text-white ui-weight-medium">
               {counts.safety} Guard Snapshots
             </div>
-            <div className="text-xs text-emerald-600 dark:text-emerald-400 font-medium mt-0.5">
+            <div className="text-xs text-emerald-600 dark:text-emerald-400 font-medium mt-0.5 ui-text-body">
               Zero Data Loss Guard Active
             </div>
           </div>
         </div>
 
         {/* Engine Specification Card */}
-        <div className="p-4 rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200/80 dark:border-zinc-800/80 shadow-xs flex items-center gap-3.5">
+        <div className="p-4 rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200/80 dark:border-zinc-800/80 shadow-xs flex items-center gap-3.5 ui-radius-panel ui-shadow-quiet ui-surface">
           <div className="h-11 w-11 rounded-xl bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0 border border-amber-100 dark:border-amber-900/50">
             <Shield className="h-5 w-5" />
           </div>
           <div className="min-w-0 flex-1">
-            <div className="text-[11px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
+            <div className="text-[11px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 ui-text-meta ui-weight-medium">
               Storage Engine
             </div>
-            <div className="text-base font-black text-zinc-900 dark:text-white">
+            <div className="text-base font-black text-zinc-900 dark:text-white ui-weight-medium">
               SQLite 3.x
             </div>
-            <div className="text-xs text-zinc-500 dark:text-zinc-400 font-medium mt-0.5 truncate" title="prisma/backups">
+            <div className="text-xs text-zinc-500 dark:text-zinc-400 font-medium mt-0.5 truncate ui-text-body" title="prisma/backups">
               Path: prisma/backups
             </div>
           </div>
@@ -343,14 +343,14 @@ export function BackupRestoreTab({ onNotify }: BackupRestoreTabProps) {
       </div>
 
       {/* 2. ACTIONS BAR & CONTROLS */}
-      <div className="bg-white dark:bg-[#111114] border border-zinc-200/80 dark:border-zinc-800/80 rounded-2xl p-4 sm:p-5 shadow-xs space-y-4">
+      <div className="bg-white dark:bg-[#111114] border border-zinc-200/80 dark:border-zinc-800/80 rounded-2xl p-4 sm:p-5 shadow-xs space-y-4 ui-radius-panel ui-shadow-quiet ui-surface">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <h2 className="text-base font-black text-zinc-900 dark:text-white tracking-tight flex items-center gap-2">
+            <h2 className="text-base font-black text-zinc-900 dark:text-white tracking-tight flex items-center gap-2 ui-weight-medium ui-section-title">
               <Database className="h-4.5 w-4.5 text-blue-600 dark:text-blue-400" />
               <span>Database Backups & Disaster Recovery</span>
             </h2>
-            <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+            <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5 ui-text-body">
               Create instant full-system snapshots, export portable backups, or restore previous states with zero risk of data loss.
             </p>
           </div>
@@ -362,15 +362,15 @@ export function BackupRestoreTab({ onNotify }: BackupRestoreTabProps) {
               ref={fileInputRef}
               onChange={handleFileUpload}
               accept=".db"
-              className="hidden"
+              className="hidden ui-field"
             />
 
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
               disabled={uploading}
-              className="h-9 px-3 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 font-semibold text-xs flex items-center gap-1.5 transition cursor-pointer border border-zinc-200/80 dark:border-zinc-700 disabled:opacity-50"
-              title="Upload an existing SQLite database snapshot from another machine"
+              className="h-9 px-3 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 font-semibold text-xs flex items-center gap-1.5 transition cursor-pointer border border-zinc-200/80 dark:border-zinc-700 disabled:opacity-50 ui-radius-control ui-text-body ui-control ui-control-sized"
+              title="Upload an existing SQLite database snapshot from another machine" aria-label="Upload an existing SQLite database snapshot from another machine"
             >
               <Upload className="h-3.5 w-3.5" />
               <span>{uploading ? "Uploading..." : "Upload .db"}</span>
@@ -380,8 +380,8 @@ export function BackupRestoreTab({ onNotify }: BackupRestoreTabProps) {
               type="button"
               onClick={fetchBackups}
               disabled={loading}
-              className="h-9 w-9 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 flex items-center justify-center transition cursor-pointer border border-zinc-200/80 dark:border-zinc-700 disabled:opacity-50"
-              title="Refresh backup catalog"
+              className="h-9 w-9 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 flex items-center justify-center transition cursor-pointer border border-zinc-200/80 dark:border-zinc-700 disabled:opacity-50 ui-radius-control ui-control ui-control-sized"
+              title="Refresh backup catalog" aria-label="Refresh backup catalog"
             >
               <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin text-blue-600" : ""}`} />
             </button>
@@ -389,7 +389,7 @@ export function BackupRestoreTab({ onNotify }: BackupRestoreTabProps) {
             <button
               type="button"
               onClick={() => setShowCreateModal(true)}
-              className="h-9 px-3.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center gap-1.5 transition cursor-pointer shadow-xs"
+              className="h-9 px-3.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center gap-1.5 transition cursor-pointer shadow-xs ui-radius-control ui-weight-medium ui-text-body ui-shadow-quiet ui-control ui-control-sized"
             >
               <Plus className="h-4 w-4" />
               <span>Create Instant Backup</span>
@@ -400,15 +400,15 @@ export function BackupRestoreTab({ onNotify }: BackupRestoreTabProps) {
         {/* Filters & Search */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-3 border-t border-zinc-200/60 dark:border-zinc-800/60">
           {/* Segmented Filter Pills */}
-          <div className="flex items-center gap-1 p-1 rounded-xl bg-zinc-100 dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 text-xs font-semibold overflow-x-auto scrollbar-none">
+          <div className="flex items-center gap-1 p-1 rounded-xl bg-zinc-100 dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 text-xs font-semibold overflow-x-auto scrollbar-none ui-text-body">
             <button
               type="button"
               onClick={() => setFilterType("ALL")}
               className={`px-3 py-1.5 rounded-lg transition cursor-pointer shrink-0 ${
                 filterType === "ALL"
-                  ? "bg-white dark:bg-[#18181b] text-zinc-900 dark:text-white shadow-xs font-bold border border-zinc-200/90 dark:border-zinc-700"
+                  ? "bg-white dark:bg-[#18181b] text-zinc-900 dark:text-white shadow-xs font-bold border border-zinc-200/90 dark:border-zinc-700 ui-shadow-quiet ui-weight-medium"
                   : "text-zinc-500 hover:text-zinc-900 dark:hover:text-white"
-              }`}
+              } ui-control`}
             >
               All Snapshots ({counts.all})
             </button>
@@ -417,9 +417,9 @@ export function BackupRestoreTab({ onNotify }: BackupRestoreTabProps) {
               onClick={() => setFilterType("SQLITE_DB")}
               className={`px-3 py-1.5 rounded-lg transition cursor-pointer shrink-0 ${
                 filterType === "SQLITE_DB"
-                  ? "bg-white dark:bg-[#18181b] text-zinc-900 dark:text-white shadow-xs font-bold border border-zinc-200/90 dark:border-zinc-700"
+                  ? "bg-white dark:bg-[#18181b] text-zinc-900 dark:text-white shadow-xs font-bold border border-zinc-200/90 dark:border-zinc-700 ui-shadow-quiet ui-weight-medium"
                   : "text-zinc-500 hover:text-zinc-900 dark:hover:text-white"
-              }`}
+              } ui-control`}
             >
               Database .db ({counts.db})
             </button>
@@ -428,9 +428,9 @@ export function BackupRestoreTab({ onNotify }: BackupRestoreTabProps) {
               onClick={() => setFilterType("SAFETY_SNAPSHOT")}
               className={`px-3 py-1.5 rounded-lg transition cursor-pointer shrink-0 ${
                 filterType === "SAFETY_SNAPSHOT"
-                  ? "bg-white dark:bg-[#18181b] text-zinc-900 dark:text-white shadow-xs font-bold border border-zinc-200/90 dark:border-zinc-700"
+                  ? "bg-white dark:bg-[#18181b] text-zinc-900 dark:text-white shadow-xs font-bold border border-zinc-200/90 dark:border-zinc-700 ui-shadow-quiet ui-weight-medium"
                   : "text-zinc-500 hover:text-zinc-900 dark:hover:text-white"
-              }`}
+              } ui-control`}
             >
               Safety Guard ({counts.safety})
             </button>
@@ -439,9 +439,9 @@ export function BackupRestoreTab({ onNotify }: BackupRestoreTabProps) {
               onClick={() => setFilterType("JSON_DUMP")}
               className={`px-3 py-1.5 rounded-lg transition cursor-pointer shrink-0 ${
                 filterType === "JSON_DUMP"
-                  ? "bg-white dark:bg-[#18181b] text-zinc-900 dark:text-white shadow-xs font-bold border border-zinc-200/90 dark:border-zinc-700"
+                  ? "bg-white dark:bg-[#18181b] text-zinc-900 dark:text-white shadow-xs font-bold border border-zinc-200/90 dark:border-zinc-700 ui-shadow-quiet ui-weight-medium"
                   : "text-zinc-500 hover:text-zinc-900 dark:hover:text-white"
-              }`}
+              } ui-control`}
             >
               JSON Exports ({counts.json})
             </button>
@@ -455,18 +455,18 @@ export function BackupRestoreTab({ onNotify }: BackupRestoreTabProps) {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search filename or note..."
-              className="w-full h-9 pl-8 pr-3 rounded-xl bg-zinc-50 dark:bg-[#18181b] border border-zinc-200/80 dark:border-zinc-800 text-xs text-zinc-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500 transition font-medium"
+              className="w-full h-9 pl-8 pr-3 rounded-xl bg-zinc-50 dark:bg-[#18181b] border border-zinc-200/80 dark:border-zinc-800 text-xs text-zinc-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500 transition font-medium ui-radius-control ui-text-body ui-field" aria-label="Search filename or note"
             />
           </div>
         </div>
       </div>
 
       {/* 3. BACKUPS CATALOG TABLE */}
-      <div className="bg-white dark:bg-[#111114] border border-zinc-200/80 dark:border-zinc-800/80 rounded-2xl overflow-hidden shadow-xs">
+      <div className="bg-white dark:bg-[#111114] border border-zinc-200/80 dark:border-zinc-800/80 rounded-2xl overflow-hidden shadow-xs ui-radius-panel ui-shadow-quiet ui-surface">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs border-collapse">
+          <table className="w-full text-left text-xs border-collapse ui-text-body ui-data-table">
             <thead>
-              <tr className="bg-zinc-50 dark:bg-[#18181b] border-b border-zinc-200/80 dark:border-zinc-800 text-zinc-500 dark:text-zinc-400 font-mono font-bold uppercase tracking-wider text-[10px]">
+              <tr className="bg-zinc-50 dark:bg-[#18181b] border-b border-zinc-200/80 dark:border-zinc-800 text-zinc-500 dark:text-zinc-400 font-mono font-bold uppercase tracking-wider text-[10px] ui-font-body ui-weight-medium ui-text-meta">
                 <th className="py-3 px-4 min-w-[220px]">Backup Snapshot</th>
                 <th className="py-3 px-4 min-w-[120px]">Category</th>
                 <th className="py-3 px-4 min-w-[90px]">File Size</th>
@@ -487,7 +487,7 @@ export function BackupRestoreTab({ onNotify }: BackupRestoreTabProps) {
                   <td colSpan={5} className="py-12 text-center text-zinc-400">
                     <Database className="h-8 w-8 mx-auto mb-2 text-zinc-300 dark:text-zinc-700" />
                     <p className="font-semibold text-zinc-600 dark:text-zinc-400">No backups found.</p>
-                    <p className="text-[11px] text-zinc-400 mt-0.5">
+                    <p className="text-[11px] text-zinc-400 mt-0.5 ui-text-meta">
                       Click "Create Instant Backup" above to generate your first snapshot.
                     </p>
                   </td>
@@ -525,15 +525,15 @@ export function BackupRestoreTab({ onNotify }: BackupRestoreTabProps) {
                           </div>
 
                           <div className="min-w-0">
-                            <div className="font-mono font-bold text-zinc-900 dark:text-white truncate text-[12px] flex items-center gap-2">
+                            <div className="font-mono font-bold text-zinc-900 dark:text-white truncate text-[12px] flex items-center gap-2 ui-font-body ui-weight-medium">
                               <span>{item.filename}</span>
                               {item.label && (
-                                <span className="text-[10px] font-sans font-semibold px-2 py-0.5 rounded-md bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300">
+                                <span className="text-[10px] font-sans font-semibold px-2 py-0.5 rounded-md bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 ui-text-meta">
                                   {item.label}
                                 </span>
                               )}
                             </div>
-                            <div className="text-[11px] text-zinc-400 font-sans mt-0.5">
+                            <div className="text-[11px] text-zinc-400 font-sans mt-0.5 ui-text-meta">
                               {isPreRestore
                                 ? "Automated rollback point before database restore"
                                 : isDb
@@ -547,17 +547,17 @@ export function BackupRestoreTab({ onNotify }: BackupRestoreTabProps) {
                       {/* Category Badge */}
                       <td className="py-3 px-4 whitespace-nowrap">
                         {isPreRestore ? (
-                          <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60">
+                          <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60 ui-text-meta ui-weight-medium">
                             <ShieldCheck className="h-3 w-3" />
                             Safety Guard
                           </span>
                         ) : isDb ? (
-                          <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-800/60">
+                          <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-800/60 ui-text-meta ui-weight-medium">
                             <Database className="h-3 w-3" />
                             SQLite .db
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-400 border border-purple-200 dark:border-purple-800/60">
+                          <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-400 border border-purple-200 dark:border-purple-800/60 ui-text-meta ui-weight-medium">
                             <FileCode className="h-3 w-3" />
                             JSON Export
                           </span>
@@ -565,13 +565,13 @@ export function BackupRestoreTab({ onNotify }: BackupRestoreTabProps) {
                       </td>
 
                       {/* Size */}
-                      <td className="py-3 px-4 font-mono font-bold text-zinc-700 dark:text-zinc-300 whitespace-nowrap">
+                      <td className="py-3 px-4 font-mono font-bold text-zinc-700 dark:text-zinc-300 whitespace-nowrap ui-font-body ui-weight-medium">
                         {item.sizeFormatted}
                       </td>
 
                       {/* Created Date */}
                       <td className="py-3 px-4 text-zinc-500 dark:text-zinc-400 whitespace-nowrap">
-                        <div className="flex items-center gap-1 text-[11px]">
+                        <div className="flex items-center gap-1 text-[11px] ui-text-meta">
                           <Clock className="h-3 w-3 text-zinc-400" />
                           <span>{new Date(item.createdAt).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}</span>
                         </div>
@@ -584,8 +584,8 @@ export function BackupRestoreTab({ onNotify }: BackupRestoreTabProps) {
                           <button
                             type="button"
                             onClick={() => handleDownload(item.filename)}
-                            className="h-8 px-2.5 rounded-lg bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 font-semibold text-[11px] flex items-center gap-1 transition cursor-pointer border border-zinc-200/80 dark:border-zinc-700"
-                            title="Download backup file to local machine"
+                            className="h-8 px-2.5 rounded-lg bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 font-semibold text-[11px] flex items-center gap-1 transition cursor-pointer border border-zinc-200/80 dark:border-zinc-700 ui-text-meta ui-control ui-control-sized"
+                            title="Download backup file to local machine" aria-label="Download backup file to local machine"
                           >
                             <Download className="h-3.5 w-3.5 text-zinc-500" />
                             <span>Download</span>
@@ -600,8 +600,8 @@ export function BackupRestoreTab({ onNotify }: BackupRestoreTabProps) {
                                 setRestorePassword("");
                                 setRestoreError("");
                               }}
-                              className="h-8 px-2.5 rounded-lg bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/50 dark:hover:bg-amber-900/60 text-amber-700 dark:text-amber-400 font-bold text-[11px] flex items-center gap-1 transition cursor-pointer border border-amber-200 dark:border-amber-800/60"
-                              title="Restore this backup snapshot to active dev.db"
+                              className="h-8 px-2.5 rounded-lg bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/50 dark:hover:bg-amber-900/60 text-amber-700 dark:text-amber-400 font-bold text-[11px] flex items-center gap-1 transition cursor-pointer border border-amber-200 dark:border-amber-800/60 ui-weight-medium ui-text-meta ui-control ui-control-sized"
+                              title="Restore this backup snapshot to active dev.db" aria-label="Restore this backup snapshot to active dev.db"
                             >
                               <RotateCcw className="h-3.5 w-3.5 text-amber-600" />
                               <span>Restore</span>
@@ -613,8 +613,8 @@ export function BackupRestoreTab({ onNotify }: BackupRestoreTabProps) {
                             type="button"
                             onClick={() => handleDelete(item.filename)}
                             disabled={deletingFilename === item.filename}
-                            className="h-8 w-8 rounded-lg bg-zinc-100 hover:bg-red-50 dark:bg-zinc-800 dark:hover:bg-red-950/50 text-zinc-400 hover:text-red-600 dark:hover:text-red-400 flex items-center justify-center transition cursor-pointer border border-zinc-200/80 dark:border-zinc-700 disabled:opacity-50"
-                            title="Delete snapshot"
+                            className="h-8 w-8 rounded-lg bg-zinc-100 hover:bg-red-50 dark:bg-zinc-800 dark:hover:bg-red-950/50 text-zinc-400 hover:text-red-600 dark:hover:text-red-400 flex items-center justify-center transition cursor-pointer border border-zinc-200/80 dark:border-zinc-700 disabled:opacity-50 ui-control ui-control-sized"
+                            title="Delete snapshot" aria-label="Delete snapshot"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>
@@ -632,7 +632,7 @@ export function BackupRestoreTab({ onNotify }: BackupRestoreTabProps) {
       {/* 4. RESTORE CONFIRMATION MODAL */}
       {restoringItem && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 rounded-2xl w-full max-w-lg shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+          <div className="bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 rounded-2xl w-full max-w-lg shadow-xl overflow-hidden    duration-150 ui-radius-panel ui-surface">
             {/* Modal Header */}
             <div className="p-5 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
               <div className="flex items-center gap-2.5">
@@ -640,10 +640,10 @@ export function BackupRestoreTab({ onNotify }: BackupRestoreTabProps) {
                   <AlertTriangle className="h-5 w-5" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-black text-zinc-900 dark:text-white">
+                  <h3 className="text-sm font-black text-zinc-900 dark:text-white ui-weight-medium">
                     Confirm Database Restore
                   </h3>
-                  <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
+                  <p className="text-[11px] text-zinc-500 dark:text-zinc-400 ui-text-meta">
                     Replace active database with selected snapshot
                   </p>
                 </div>
@@ -652,7 +652,7 @@ export function BackupRestoreTab({ onNotify }: BackupRestoreTabProps) {
                 type="button"
                 onClick={() => setRestoringItem(null)}
                 disabled={restoring}
-                className="h-8 w-8 rounded-lg text-zinc-400 hover:text-zinc-700 dark:hover:text-white flex items-center justify-center transition cursor-pointer"
+                className="h-8 w-8 rounded-lg text-zinc-400 hover:text-zinc-700 dark:hover:text-white flex items-center justify-center transition cursor-pointer ui-control ui-control-sized"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -661,20 +661,20 @@ export function BackupRestoreTab({ onNotify }: BackupRestoreTabProps) {
             {/* Modal Body */}
             <form onSubmit={handleExecuteRestore} className="p-5 space-y-4">
               {/* Snapshot Details */}
-              <div className="p-3.5 rounded-xl bg-zinc-50 dark:bg-[#18181b] border border-zinc-200/80 dark:border-zinc-800 space-y-1.5 text-xs">
-                <div className="flex justify-between font-mono">
+              <div className="p-3.5 rounded-xl bg-zinc-50 dark:bg-[#18181b] border border-zinc-200/80 dark:border-zinc-800 space-y-1.5 text-xs ui-text-body">
+                <div className="flex justify-between font-mono ui-font-body">
                   <span className="text-zinc-500">Target Snapshot:</span>
-                  <span className="font-bold text-zinc-900 dark:text-white truncate max-w-[260px]">
+                  <span className="font-bold text-zinc-900 dark:text-white truncate max-w-[260px] ui-weight-medium">
                     {restoringItem.filename}
                   </span>
                 </div>
-                <div className="flex justify-between font-mono">
+                <div className="flex justify-between font-mono ui-font-body">
                   <span className="text-zinc-500">File Size:</span>
-                  <span className="font-bold text-zinc-900 dark:text-white">
+                  <span className="font-bold text-zinc-900 dark:text-white ui-weight-medium">
                     {restoringItem.sizeFormatted}
                   </span>
                 </div>
-                <div className="flex justify-between font-mono">
+                <div className="flex justify-between font-mono ui-font-body">
                   <span className="text-zinc-500">Created:</span>
                   <span className="text-zinc-700 dark:text-zinc-300">
                     {new Date(restoringItem.createdAt).toLocaleString("en-IN")}
@@ -683,28 +683,28 @@ export function BackupRestoreTab({ onNotify }: BackupRestoreTabProps) {
               </div>
 
               {/* Zero Data Loss Guarantee Alert */}
-              <div className="p-3.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/80 text-emerald-800 dark:text-emerald-300 text-xs space-y-1">
-                <div className="font-bold flex items-center gap-1.5">
+              <div className="p-3.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/80 text-emerald-800 dark:text-emerald-300 text-xs space-y-1 ui-text-body">
+                <div className="font-bold flex items-center gap-1.5 ui-weight-medium">
                   <ShieldCheck className="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
                   <span>Mandatory Pre-Restore Safety Snapshot Guaranteed</span>
                 </div>
-                <p className="text-[11px] text-emerald-700 dark:text-emerald-400/90 leading-relaxed pl-5">
-                  Before applying this snapshot, Hotel OS will automatically create an immutable backup of your current active database (`dev.db`). You can rollback at any time if needed.
+                <p className="text-[11px] text-emerald-700 dark:text-emerald-400/90 leading-relaxed pl-5 ui-text-meta">
+                  Before applying this snapshot, Hotel OS creates a backup of the current database. Keep this backup if you need to restore the previous data.
                 </p>
               </div>
 
               {/* Error Box */}
               {restoreError && (
-                <div className="p-3 rounded-xl bg-red-50 dark:bg-red-950/50 border border-red-200 dark:border-red-900 text-red-700 dark:text-red-300 text-xs font-medium">
+                <div className="p-3 rounded-xl bg-red-50 dark:bg-red-950/50 border border-red-200 dark:border-red-900 text-red-700 dark:text-red-300 text-xs font-medium ui-text-body">
                   {restoreError}
                 </div>
               )}
 
               {/* Authorization Password / PIN Input */}
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-zinc-700 dark:text-zinc-300 flex items-center justify-between">
+                <label className="text-xs font-bold text-zinc-700 dark:text-zinc-300 flex items-center justify-between ui-text-body ui-weight-medium ui-label">
                   <span>Super Admin Password or Security PIN</span>
-                  <span className="text-[10px] text-zinc-400 font-normal">Required for authorization</span>
+                  <span className="text-[10px] text-zinc-400 font-normal ui-text-meta">Required for authorization</span>
                 </label>
                 <div className="relative">
                   <input
@@ -718,13 +718,13 @@ export function BackupRestoreTab({ onNotify }: BackupRestoreTabProps) {
                     autoFocus
                     required
                     disabled={restoring}
-                    className="w-full h-10 px-3.5 pr-10 rounded-xl bg-zinc-50 dark:bg-[#18181b] border border-zinc-200/90 dark:border-zinc-800 text-xs text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500 font-mono disabled:opacity-50"
+                    className="w-full h-10 px-3.5 pr-10 rounded-xl bg-zinc-50 dark:bg-[#18181b] border border-zinc-200/90 dark:border-zinc-800 text-xs text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500 font-mono disabled:opacity-50 ui-radius-control ui-text-body ui-font-body ui-field" aria-label="Enter admin password or PIN"
                   />
                   <button
                     type="button"
                     onClick={() => setShowRestorePassword(!showRestorePassword)}
                     tabIndex={-1}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 cursor-pointer"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 cursor-pointer ui-control"
                   >
                     {showRestorePassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
@@ -737,14 +737,14 @@ export function BackupRestoreTab({ onNotify }: BackupRestoreTabProps) {
                   type="button"
                   onClick={() => setRestoringItem(null)}
                   disabled={restoring}
-                  className="h-9 px-4 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 font-semibold text-xs transition cursor-pointer disabled:opacity-50"
+                  className="h-9 px-4 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 font-semibold text-xs transition cursor-pointer disabled:opacity-50 ui-radius-control ui-text-body ui-control ui-control-sized"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={restoring || !restorePassword.trim()}
-                  className="h-9 px-4 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs flex items-center gap-1.5 transition cursor-pointer shadow-xs disabled:opacity-50"
+                  className="h-9 px-4 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs flex items-center gap-1.5 transition cursor-pointer shadow-xs disabled:opacity-50 ui-radius-control ui-weight-medium ui-text-body ui-shadow-quiet ui-control ui-control-sized"
                 >
                   {restoring ? (
                     <>
@@ -767,7 +767,7 @@ export function BackupRestoreTab({ onNotify }: BackupRestoreTabProps) {
       {/* 5. CREATE INSTANT BACKUP MODAL */}
       {showCreateModal && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 rounded-2xl w-full max-w-md shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+          <div className="bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 rounded-2xl w-full max-w-md shadow-xl overflow-hidden    duration-150 ui-radius-panel ui-surface">
             {/* Header */}
             <div className="p-5 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
               <div className="flex items-center gap-2.5">
@@ -775,10 +775,10 @@ export function BackupRestoreTab({ onNotify }: BackupRestoreTabProps) {
                   <Database className="h-5 w-5" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-black text-zinc-900 dark:text-white">
+                  <h3 className="text-sm font-black text-zinc-900 dark:text-white ui-weight-medium">
                     Create Instant Database Snapshot
                   </h3>
-                  <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
+                  <p className="text-[11px] text-zinc-500 dark:text-zinc-400 ui-text-meta">
                     Generate an atomic binary snapshot of dev.db
                   </p>
                 </div>
@@ -787,7 +787,7 @@ export function BackupRestoreTab({ onNotify }: BackupRestoreTabProps) {
                 type="button"
                 onClick={() => setShowCreateModal(false)}
                 disabled={creatingBackup}
-                className="h-8 w-8 rounded-lg text-zinc-400 hover:text-zinc-700 dark:hover:text-white flex items-center justify-center transition cursor-pointer"
+                className="h-8 w-8 rounded-lg text-zinc-400 hover:text-zinc-700 dark:hover:text-white flex items-center justify-center transition cursor-pointer ui-control ui-control-sized"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -796,7 +796,7 @@ export function BackupRestoreTab({ onNotify }: BackupRestoreTabProps) {
             {/* Body */}
             <form onSubmit={handleCreateBackup} className="p-5 space-y-4">
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-zinc-700 dark:text-zinc-300">
+                <label className="text-xs font-bold text-zinc-700 dark:text-zinc-300 ui-text-body ui-weight-medium ui-label">
                   Optional Note / Tag
                 </label>
                 <input
@@ -807,19 +807,19 @@ export function BackupRestoreTab({ onNotify }: BackupRestoreTabProps) {
                   maxLength={50}
                   autoFocus
                   disabled={creatingBackup}
-                  className="w-full h-10 px-3.5 rounded-xl bg-zinc-50 dark:bg-[#18181b] border border-zinc-200/90 dark:border-zinc-800 text-xs text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono disabled:opacity-50"
+                  className="w-full h-10 px-3.5 rounded-xl bg-zinc-50 dark:bg-[#18181b] border border-zinc-200/90 dark:border-zinc-800 text-xs text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono disabled:opacity-50 ui-radius-control ui-text-body ui-font-body ui-field" aria-label="Optional Note / Tag"
                 />
-                <p className="text-[11px] text-zinc-400">
+                <p className="text-[11px] text-zinc-400 ui-text-meta">
                   Appends a descriptive label to the snapshot file for rapid recognition.
                 </p>
               </div>
 
-              <div className="p-3 rounded-xl bg-zinc-50 dark:bg-[#18181b] border border-zinc-200/80 dark:border-zinc-800 text-xs text-zinc-500 dark:text-zinc-400 space-y-1">
+              <div className="p-3 rounded-xl bg-zinc-50 dark:bg-[#18181b] border border-zinc-200/80 dark:border-zinc-800 text-xs text-zinc-500 dark:text-zinc-400 space-y-1 ui-text-body">
                 <div className="font-semibold text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
                   <CheckCircle2 className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                   <span>Dual Snapshot Architecture</span>
                 </div>
-                <p className="text-[11px] leading-relaxed">
+                <p className="text-[11px] leading-relaxed ui-text-meta">
                   Creates both a complete SQLite binary database file (`.db`) and a synchronized structured JSON dump of all core domain tables.
                 </p>
               </div>
@@ -830,14 +830,14 @@ export function BackupRestoreTab({ onNotify }: BackupRestoreTabProps) {
                   type="button"
                   onClick={() => setShowCreateModal(false)}
                   disabled={creatingBackup}
-                  className="h-9 px-4 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 font-semibold text-xs transition cursor-pointer disabled:opacity-50"
+                  className="h-9 px-4 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 font-semibold text-xs transition cursor-pointer disabled:opacity-50 ui-radius-control ui-text-body ui-control ui-control-sized"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={creatingBackup}
-                  className="h-9 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center gap-1.5 transition cursor-pointer shadow-xs disabled:opacity-50"
+                  className="h-9 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center gap-1.5 transition cursor-pointer shadow-xs disabled:opacity-50 ui-radius-control ui-weight-medium ui-text-body ui-shadow-quiet ui-control ui-control-sized"
                 >
                   {creatingBackup ? (
                     <>

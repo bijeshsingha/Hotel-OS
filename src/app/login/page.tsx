@@ -1,333 +1,91 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { AlertCircle, Eye, EyeOff, LoaderCircle } from "lucide-react";
 import { useHotel } from "@/lib/context/hotel-context";
-import {
-  Building2,
-  Lock,
-  User,
-  ShieldCheck,
-  ArrowRight,
-  BedDouble,
-  CheckCircle2,
-  AlertCircle,
-  KeyRound,
-  Layers,
-  Eye,
-  EyeOff,
-} from "lucide-react";
+import { authRequest } from "@/lib/auth/client-request";
+import { APP_VERSION } from "@/lib/app-version";
+import styles from "./login.module.css";
 
 export default function LoginPage() {
   const router = useRouter();
   const { switchUser } = useHotel();
-
+  const usernameInput = useRef<HTMLInputElement>(null);
+  const passwordInput = useRef<HTMLInputElement>(null);
+  const errorMessage = useRef<HTMLDivElement>(null);
+  const submitting = useRef(false);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [rememberMe, setRememberMe] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const [profiles, setProfiles] = useState<any[]>([]);
-  const [loadingProfiles, setLoadingProfiles] = useState(true);
-
-  React.useEffect(() => {
-    async function loadProfiles() {
-      try {
-        const res = await fetch("/api/v1/auth/session");
-        if (res.ok) {
-          const data = await res.json();
-          if (Array.isArray(data?.allUsers)) {
-            setProfiles(data.allUsers);
-          }
-        }
-      } catch (e) {
-        console.error("Failed to load profiles:", e);
-      } finally {
-        setLoadingProfiles(false);
-      }
-    }
-    loadProfiles();
-  }, []);
-
-  const getProfileTheme = (scope: string) => {
-    const s = (scope || "").toLowerCase();
-
-    if (s.includes("ambarish")) {
-      return {
-        badge: "AMBARISH",
-        badgeClass: "bg-amber-500/10 text-amber-300 border-amber-500/30",
-        borderClass: "border-amber-900/40 hover:border-amber-600/60",
-        hoverTitle: "group-hover:text-amber-300",
-        indicatorColor: "text-amber-400",
-        scopeLabel: "● Hotel Ambarish Grand Residency ONLY",
-      };
-    }
-
-    if (s.includes("divine")) {
-      return {
-        badge: "DIVINE VIEW",
-        badgeClass: "bg-blue-500/10 text-blue-300 border-blue-500/30",
-        borderClass: "border-blue-900/40 hover:border-blue-600/60",
-        hoverTitle: "group-hover:text-blue-300",
-        indicatorColor: "text-blue-400",
-        scopeLabel: "● Hotel Divine View ONLY",
-      };
-    }
-
-    return {
-      badge: "ALL HOTELS",
-      badgeClass: "bg-emerald-500/10 text-emerald-300 border-emerald-500/30",
-      borderClass: "border-emerald-900/40 hover:border-emerald-600/60",
-      hoverTitle: "group-hover:text-emerald-300",
-      indicatorColor: "text-emerald-400",
-      scopeLabel: "● Multi-Property Access (All Properties)",
-    };
-  };
-
+  const [invalidField, setInvalidField] = useState<"username" | "password" | null>(null);
   const [showPassword, setShowPassword] = useState(false);
 
-  const handleLoginSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!username.trim()) {
-      setError("Please enter your username.");
+  const handleLoginSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (submitting.current) return;
+    if (!username.trim() || !password.trim()) {
+      const missingUsername = !username.trim();
+      setInvalidField(missingUsername ? "username" : "password");
+      setError(missingUsername ? "Enter your username or email to continue." : "Enter your password or staff PIN to continue.");
+      (missingUsername ? usernameInput : passwordInput).current?.focus();
       return;
     }
-    if (!password.trim()) {
-      setError("Please enter your password or security PIN.");
-      return;
-    }
-
+    submitting.current = true;
     setLoading(true);
     setError(null);
+    setInvalidField(null);
     try {
-      // Verify credentials via auth verify endpoint
-      const res = await fetch("/api/v1/auth/verify", {
+      const { response, data } = await authRequest("/api/v1/auth/verify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          identifier: username.trim(),
-          password: password.trim(),
-        }),
+        body: JSON.stringify({ identifier: username.trim(), password: password.trim() }),
       });
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data?.error || "Invalid username or password / PIN.");
-      }
-
-      switchUser(username.trim());
+      if (!response.ok) throw new Error(data?.error || "Invalid username or password / PIN.");
+      // Confirm the authenticated session before opening the workspace.
+      await switchUser(username.trim());
       router.push("/pms");
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "We couldn't sign you in. Please try again.");
+      // The alert remains available to keyboard users after a failed request.
+      requestAnimationFrame(() => errorMessage.current?.focus());
     } finally {
+      submitting.current = false;
       setLoading(false);
     }
   };
 
-  const handleSelectProfile = (userIdentifier: string) => {
-    setUsername(userIdentifier);
-    setPassword("");
-    setError(null);
-    const input = document.getElementById("login-password-input");
-    if (input) {
-      input.focus();
-    }
-  };
-
   return (
-    <div className="min-h-screen bg-[#070709] bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(120,119,198,0.15),rgba(255,255,255,0))] flex flex-col items-center justify-center p-4 sm:p-6 text-zinc-100 selection:bg-blue-600 selection:text-white">
-      <div className="w-full max-w-md space-y-6">
-        {/* Brand Header */}
-        <div className="text-center space-y-2">
-          <div className="flex justify-center mb-3">
-            <img
-              src="/brand/rovesta-app-icon.png"
-              alt="ROVESTA Logo"
-              className="h-16 w-16 rounded-2xl shadow-2xl shadow-blue-900/30 object-contain border border-blue-500/20"
-            />
+    <div className={styles.page}>
+      <a className={styles.skipLink} href="#login-username-input">Skip to sign in</a>
+      <header className={styles.brand}>
+        <img src="/brand/rovesta-app-icon.png" alt="" width="36" height="36" />
+        <span>ROVESTA <span className={styles.brandOs}>OS</span></span>
+      </header>
+      <section className={styles.card} aria-labelledby="login-heading">
+        <div className={styles.heading}><h1 id="login-heading">Sign in</h1><p>Use your hotel staff account.</p></div>
+        <form onSubmit={handleLoginSubmit} noValidate aria-busy={loading} className={styles.form}>
+          {error && <div id="login-error" ref={errorMessage} tabIndex={-1} role="alert" className={styles.error}><AlertCircle size={18} aria-hidden="true" /><span>{error}</span></div>}
+          <div className={styles.field}>
+            <label htmlFor="login-username-input">Username or email</label>
+            <input ref={usernameInput} id="login-username-input" name="username" type="text" autoComplete="username" autoCapitalize="none" spellCheck={false} required readOnly={loading} placeholder="Enter your username or email" value={username} aria-invalid={invalidField === "username"} aria-describedby={invalidField === "username" ? "login-error" : undefined} onChange={(event) => { setUsername(event.target.value); if (invalidField === "username") { setInvalidField(null); setError(null); } }} />
           </div>
-          <h1 className="text-2xl font-black tracking-tight text-white flex items-center justify-center gap-2">
-            <span>ROVESTA</span>
-            <span className="rounded-lg bg-blue-600/20 px-2 py-0.5 text-xs font-mono font-bold text-blue-400 border border-blue-500/30">
-              OS v1.0
-            </span>
-          </h1>
-          <p className="text-xs text-zinc-400 font-mono">
-            Cloud Hospitality Operating System • Multi-Property Edition
-          </p>
-        </div>
-
-
-        {/* Main Login Card */}
-        <div className="rounded-3xl border border-zinc-800/90 bg-[#111114]/90 backdrop-blur-xl p-6 sm:p-7 shadow-2xl space-y-5">
-          <div className="flex items-center justify-between pb-3 border-b border-zinc-800/80">
-            <div>
-              <h2 className="text-sm font-bold text-white">Staff & Management Sign In</h2>
-              <p className="text-[11px] text-zinc-500 font-mono mt-0.5">
-                Access your designated hotel property terminal
-              </p>
+          <div className={styles.field}>
+            <label htmlFor="login-password-input">Password or staff PIN</label>
+            <div className={styles.inputWrap}>
+              <input ref={passwordInput} id="login-password-input" name="password" type={showPassword ? "text" : "password"} autoComplete="current-password" required readOnly={loading} placeholder="Enter your password or PIN" value={password} aria-invalid={invalidField === "password"} aria-describedby={`password-hint${invalidField === "password" ? " login-error" : ""}`} onChange={(event) => { setPassword(event.target.value); if (invalidField === "password") { setInvalidField(null); setError(null); } }} />
+              <button type="button" className={styles.reveal} onClick={() => setShowPassword((shown) => !shown)} aria-label={showPassword ? "Hide password" : "Show password"} aria-controls="login-password-input">{showPassword ? <EyeOff size={18} aria-hidden="true" /> : <Eye size={18} aria-hidden="true" />}</button>
             </div>
-            <div className="h-8 w-8 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-400">
-              <Lock className="h-4 w-4" />
-            </div>
+            <p id="password-hint" className={styles.hint}>Use your individual password or assigned PIN.</p>
           </div>
-
-          {error && (
-            <div className="rounded-xl bg-rose-500/10 border border-rose-500/30 p-3 text-xs text-rose-300 flex items-center gap-2">
-              <AlertCircle className="h-4 w-4 shrink-0" />
-              <span>{error}</span>
-            </div>
-          )}
-
-          <form onSubmit={handleLoginSubmit} className="space-y-4 text-xs">
-            {/* Username Input */}
-            <div className="space-y-1.5">
-              <label className="text-zinc-300 font-bold block">Username or Email</label>
-              <div className="relative">
-                <User className="absolute left-3 top-3 h-4 w-4 text-zinc-500" />
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. ambarish_frontdesk or bijesh_singha"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  className="w-full rounded-xl bg-zinc-900/90 border border-zinc-700/80 pl-9 pr-3 py-2.5 text-white font-mono placeholder-zinc-500 focus:outline-none focus:border-white transition"
-                />
-              </div>
-            </div>
-
-            {/* Password Input */}
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <label className="text-zinc-300 font-bold block">Password / Security PIN</label>
-                <button
-                  type="button"
-                  onClick={() => setPassword("hotelos@2026")}
-                  className="text-[10px] text-blue-400 hover:text-blue-300 font-mono underline"
-                >
-                  Use Demo Password
-                </button>
-              </div>
-              <div className="relative">
-                <KeyRound className="absolute left-3 top-3 h-4 w-4 text-zinc-500" />
-                <input
-                  id="login-password-input"
-                  type={showPassword ? "text" : "password"}
-                  required
-                  placeholder="Enter password or staff PIN"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full rounded-xl bg-zinc-900/90 border border-zinc-700/80 pl-9 pr-10 py-2.5 text-white font-mono placeholder-zinc-500 focus:outline-none focus:border-white transition"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-3 text-zinc-400 hover:text-zinc-200"
-                >
-                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
-              </div>
-              <p className="text-[10px] text-zinc-500 font-mono">
-                Default credentials: <code className="text-zinc-400 bg-zinc-800 px-1 py-0.5 rounded">hotelos@2026</code> or configured staff PIN
-              </p>
-            </div>
-
-            {/* Remember Me */}
-            <div className="flex items-center justify-between pt-1">
-              <label className="flex items-center gap-2 cursor-pointer text-zinc-400">
-                <input
-                  type="checkbox"
-                  checked={rememberMe}
-                  onChange={(e) => setRememberMe(e.target.checked)}
-                  className="rounded bg-zinc-800 border-zinc-700 text-blue-600 focus:ring-0"
-                />
-                <span>Remember on this terminal</span>
-              </label>
-              <span className="text-zinc-500 text-[11px] font-mono">256-Bit SSL</span>
-            </div>
-
-            {/* Submit Button */}
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full rounded-xl bg-white hover:bg-zinc-200 text-zinc-950 py-3 font-black text-xs sm:text-sm shadow-xl transition flex items-center justify-center gap-2 disabled:opacity-50 active:scale-98"
-            >
-              {loading ? "Authenticating Terminal..." : "Sign In to ROVESTA"}
-              <ArrowRight className="h-4 w-4" />
-            </button>
-          </form>
-
-          {/* Quick Demo Access Buttons */}
-          <div className="pt-4 border-t border-zinc-800/80 space-y-2.5">
-            <div className="text-[10px] font-mono uppercase font-bold text-zinc-500 flex items-center justify-between">
-              <span>Staff Accounts Directory</span>
-              <span className="text-zinc-600">Click to Select</span>
-            </div>
-
-            <div className="space-y-2">
-              {loadingProfiles ? (
-                <div className="space-y-2 py-1">
-                  <div className="h-14 rounded-2xl bg-zinc-900/60 animate-pulse border border-zinc-800/60" />
-                  <div className="h-14 rounded-2xl bg-zinc-900/60 animate-pulse border border-zinc-800/60" />
-                  <div className="h-14 rounded-2xl bg-zinc-900/60 animate-pulse border border-zinc-800/60" />
-                </div>
-              ) : profiles.length > 0 ? (
-                profiles.map((p) => {
-                  const theme = getProfileTheme(p.propertyScope);
-                  const displayUsername = p.username || (p.email ? p.email.split("@")[0] : "user");
-                  return (
-                    <button
-                      key={p.id}
-                      type="button"
-                      onClick={() => handleSelectProfile(displayUsername)}
-                      className={`w-full rounded-2xl bg-zinc-900/80 hover:bg-zinc-800/90 border ${theme.borderClass} p-3 text-left transition flex items-center justify-between group shadow-sm`}
-                    >
-                      <div>
-                        <div className={`font-bold text-white text-xs ${theme.hoverTitle} transition flex items-center gap-1.5`}>
-                          <span>{p.name}</span>
-                          <span className="text-[10px] font-mono text-zinc-400 font-normal">(@{displayUsername})</span>
-                        </div>
-                        <div className={`text-[10px] ${theme.indicatorColor} font-mono mt-0.5`}>
-                          {theme.scopeLabel}
-                        </div>
-                      </div>
-                      <span className={`rounded-md px-2 py-0.5 text-[9px] font-mono font-bold border ${theme.badgeClass}`}>
-                        {theme.badge}
-                      </span>
-                    </button>
-                  );
-                })
-              ) : (
-                <div className="rounded-2xl border border-blue-500/20 bg-blue-950/20 p-4 text-center space-y-2.5">
-                  <div className="h-8 w-8 rounded-xl bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-400 mx-auto">
-                    <Building2 className="h-4 w-4" />
-                  </div>
-                  <div>
-                    <div className="text-xs font-bold text-white">First Time Setup Required</div>
-                    <div className="text-[11px] text-zinc-400 mt-0.5">
-                      No hotel property or staff accounts found in the database.
-                    </div>
-                  </div>
-                  <a
-                    href="/onboarding"
-                    className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs px-4 py-2 transition shadow-md"
-                  >
-                    <span>Start Hotel Onboarding</span>
-                    <ArrowRight className="h-3.5 w-3.5" />
-                  </a>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Footer info */}
-        <div className="text-center text-[11px] text-zinc-600 font-mono space-y-1">
-          <div>GST Rule 46 Compliant • Multi-Property Isolated Tenancy</div>
-          <div>© 2026 ROVESTA. All rights reserved.</div>
-        </div>
-      </div>
+          <button type="submit" disabled={loading} className={styles.submit}>{loading ? <><LoaderCircle size={18} className={styles.spinner} aria-hidden="true" />Signing in…</> : "Sign in"}</button>
+          <span role="status" className={styles.srOnly}>{loading ? "Signing in. Please wait." : ""}</span>
+        </form>
+        <details className={styles.help}><summary>Need help signing in?</summary><p>Ask your hotel owner to check your username or reset your password in <strong>Staff & Roles → Change login</strong>. Your account must be active and have access to a hotel.</p></details>
+        <p className={styles.sessionNote}>Sessions last up to 8 hours. Sign out after using a shared device.</p>
+      </section>
+      <footer className={styles.footer}>ROVESTA OS <span>Version {APP_VERSION}</span></footer>
     </div>
   );
 }

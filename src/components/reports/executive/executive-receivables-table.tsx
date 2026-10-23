@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { AlertCircle, Search, ExternalLink, ShieldAlert, Phone, BedDouble } from "lucide-react";
-import { OutstandingRoomAccount } from "@/lib/domain/executive-report-service";
+import type { OutstandingRoomAccount } from "@/lib/domain/executive-report-service";
 import { formatINR } from "@/lib/gst/calculator";
 
 interface ExecutiveReceivablesTableProps {
@@ -38,7 +38,7 @@ export const ExecutiveReceivablesTable: React.FC<ExecutiveReceivablesTableProps>
   const filteredTotal = filtered.reduce((sum, a) => sum + a.balanceDue, 0);
 
   return (
-    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg overflow-hidden shadow-xs">
+    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg overflow-hidden shadow-xs ui-shadow-quiet">
       {/* Header section with alert summary */}
       <div className="p-4 sm:p-5 border-b border-slate-200 dark:border-slate-800">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -48,29 +48,29 @@ export const ExecutiveReceivablesTable: React.FC<ExecutiveReceivablesTableProps>
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
+                <h3 className="text-base font-bold text-slate-900 dark:text-slate-100 ui-weight-medium">
                   Accounts with Outstanding Balance &gt; {formatINR(threshold)}
                 </h3>
-                <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-rose-100 text-rose-800 dark:bg-rose-900/60 dark:text-rose-200">
+                <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-rose-100 text-rose-800 dark:bg-rose-900/60 dark:text-rose-200 ui-text-meta ui-weight-medium">
                   {totalOverThresholdCount} Accounts
                 </span>
               </div>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 ui-text-body">
                 Audit watch-list of guest folios exceeding ₹5,000 threshold as of report date
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-4 bg-slate-50 dark:bg-slate-800/40 p-2.5 rounded-lg border border-slate-200/60 dark:border-slate-700/60 text-xs">
+          <div className="flex items-center gap-4 bg-slate-50 dark:bg-slate-800/40 p-2.5 rounded-lg border border-slate-200/60 dark:border-slate-700/60 text-xs ui-text-body">
             <div>
-              <span className="text-slate-500 block text-[11px]">Flagged Balance</span>
-              <strong className="text-rose-600 dark:text-rose-400 font-bold text-sm">
+              <span className="text-slate-500 block text-[11px] ui-text-meta">Flagged Balance</span>
+              <strong className="text-rose-600 dark:text-rose-400 font-bold text-sm ui-weight-medium">
                 {formatINR(totalOverThresholdAmount)}
               </strong>
             </div>
             <div className="h-6 w-px bg-slate-200 dark:bg-slate-700" />
             <div>
-              <span className="text-slate-500 block text-[11px]">Total Outstanding (All Rooms)</span>
+              <span className="text-slate-500 block text-[11px] ui-text-meta">Total Outstanding (All Rooms)</span>
               <strong className="text-slate-800 dark:text-slate-200 font-semibold text-sm">
                 {formatINR(totalOutstandingAllRooms)}
               </strong>
@@ -84,33 +84,33 @@ export const ExecutiveReceivablesTable: React.FC<ExecutiveReceivablesTableProps>
             <button
               type="button"
               onClick={() => setStatusFilter("ALL")}
-              className={`px-2.5 py-1 text-xs font-medium rounded transition-colors ${
+              className={`px-2.5 py-1 text-xs font-medium rounded transition-colors  ui-text-body ${
                 statusFilter === "ALL"
                   ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900"
                   : "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300"
-              }`}
+              } ui-control`}
             >
               All ({accounts.length})
             </button>
             <button
               type="button"
               onClick={() => setStatusFilter("IN_HOUSE")}
-              className={`px-2.5 py-1 text-xs font-medium rounded transition-colors ${
+              className={`px-2.5 py-1 text-xs font-medium rounded transition-colors  ui-text-body ${
                 statusFilter === "IN_HOUSE"
                   ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900"
                   : "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300"
-              }`}
+              } ui-control`}
             >
               In-House ({accounts.filter((a) => a.status === "IN_HOUSE").length})
             </button>
             <button
               type="button"
               onClick={() => setStatusFilter("CHECKED_OUT")}
-              className={`px-2.5 py-1 text-xs font-medium rounded transition-colors ${
+              className={`px-2.5 py-1 text-xs font-medium rounded transition-colors  ui-text-body ${
                 statusFilter === "CHECKED_OUT"
                   ? "bg-rose-700 text-white"
                   : "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300"
-              }`}
+              } ui-control`}
             >
               Checked-Out Overdue ({accounts.filter((a) => a.status === "CHECKED_OUT").length})
             </button>
@@ -123,7 +123,7 @@ export const ExecutiveReceivablesTable: React.FC<ExecutiveReceivablesTableProps>
               placeholder="Search room or guest..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-8 pr-3 py-1 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none"
+              className="pl-8 pr-3 py-1 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none ui-text-body ui-field" aria-label="Search room or guest"
             />
           </div>
         </div>
@@ -132,13 +132,13 @@ export const ExecutiveReceivablesTable: React.FC<ExecutiveReceivablesTableProps>
       {/* Table view */}
       <div className="overflow-x-auto">
         {filtered.length === 0 ? (
-          <div className="p-8 text-center text-xs text-slate-500">
+          <div className="p-8 text-center text-xs text-slate-500 ui-text-body">
             {accounts.length === 0
               ? "Healthy portfolio: No room accounts exceed the ₹5,000 outstanding threshold as of this report."
               : "No records found matching current search or status filter."}
           </div>
         ) : (
-          <table className="w-full text-left text-xs border-collapse">
+          <div className="ui-table-scroll"><table className="w-full text-left text-xs border-collapse ui-text-body ui-data-table">
             <thead className="bg-slate-50 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-700">
               <tr>
                 <th className="px-3 py-2.5 font-semibold text-slate-600 dark:text-slate-300">
@@ -182,7 +182,7 @@ export const ExecutiveReceivablesTable: React.FC<ExecutiveReceivablesTableProps>
                   key={acc.id}
                   className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors"
                 >
-                  <td className="px-3 py-2.5 font-bold text-slate-900 dark:text-slate-100">
+                  <td className="px-3 py-2.5 font-bold text-slate-900 dark:text-slate-100 ui-weight-medium">
                     <span className="inline-flex items-center gap-1">
                       <BedDouble className="w-3.5 h-3.5 text-slate-400" />
                       {acc.roomNumber}
@@ -193,7 +193,7 @@ export const ExecutiveReceivablesTable: React.FC<ExecutiveReceivablesTableProps>
                       {acc.guestName}
                     </div>
                     {acc.phone && acc.phone !== "-" && (
-                      <div className="text-[11px] text-slate-400 flex items-center gap-1">
+                      <div className="text-[11px] text-slate-400 flex items-center gap-1 ui-text-meta">
                         <Phone className="w-3 h-3" />
                         {acc.phone}
                       </div>
@@ -201,16 +201,16 @@ export const ExecutiveReceivablesTable: React.FC<ExecutiveReceivablesTableProps>
                   </td>
                   <td className="px-3 py-2.5">
                     {acc.status === "IN_HOUSE" ? (
-                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
+                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 ui-text-meta">
                         In-House
                       </span>
                     ) : (
-                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-semibold bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-400 border border-rose-200 dark:border-rose-800">
+                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-semibold bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-400 border border-rose-200 dark:border-rose-800 ui-text-meta">
                         Checked Out
                       </span>
                     )}
                   </td>
-                  <td className="px-3 py-2.5 text-slate-500 text-[11px]">
+                  <td className="px-3 py-2.5 text-slate-500 text-[11px] ui-text-meta">
                     {acc.stayDates}
                   </td>
                   <td className="px-3 py-2.5 text-right text-slate-700 dark:text-slate-300 font-medium">
@@ -227,7 +227,7 @@ export const ExecutiveReceivablesTable: React.FC<ExecutiveReceivablesTableProps>
                   </td>
                   <td className="px-3 py-2.5 text-center">
                     <span
-                      className={`inline-block px-1.5 py-0.5 rounded text-[11px] font-semibold ${
+                      className={`inline-block px-1.5 py-0.5 rounded text-[11px] font-semibold  ui-text-meta ${
                         acc.ageDays > 7
                           ? "bg-rose-100 text-rose-800 dark:bg-rose-900/60 dark:text-rose-200"
                           : "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300"
@@ -236,7 +236,7 @@ export const ExecutiveReceivablesTable: React.FC<ExecutiveReceivablesTableProps>
                       {acc.ageDays}d
                     </span>
                   </td>
-                  <td className="px-3 py-2.5 text-right font-bold text-rose-600 dark:text-rose-400 text-sm">
+                  <td className="px-3 py-2.5 text-right font-bold text-rose-600 dark:text-rose-400 text-sm ui-weight-medium">
                     {formatINR(acc.balanceDue)}
                   </td>
                   <td className="px-3 py-2.5 text-center">
@@ -251,7 +251,7 @@ export const ExecutiveReceivablesTable: React.FC<ExecutiveReceivablesTableProps>
                 </tr>
               ))}
             </tbody>
-            <tfoot className="bg-slate-50 dark:bg-slate-800/80 border-t border-slate-200 dark:border-slate-700 font-bold">
+            <tfoot className="bg-slate-50 dark:bg-slate-800/80 border-t border-slate-200 dark:border-slate-700 font-bold ui-weight-medium">
               <tr>
                 <td colSpan={9} className="px-3 py-2.5 text-slate-700 dark:text-slate-300">
                   Total Filtered High Receivables ({filtered.length} folios)
@@ -262,7 +262,7 @@ export const ExecutiveReceivablesTable: React.FC<ExecutiveReceivablesTableProps>
                 <td />
               </tr>
             </tfoot>
-          </table>
+          </table></div>
         )}
       </div>
     </div>

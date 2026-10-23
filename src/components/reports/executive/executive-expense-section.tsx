@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { Search, Tag, Wallet, CreditCard, Building2, Receipt } from "lucide-react";
-import { ExpenseReportSection } from "@/lib/domain/executive-report-service";
+import type { ExpenseReportSection } from "@/lib/domain/executive-report-service";
 import { formatINR } from "@/lib/gst/calculator";
 
 interface ExecutiveExpenseSectionProps {
@@ -42,37 +42,37 @@ export const ExecutiveExpenseSection: React.FC<ExecutiveExpenseSectionProps> = (
       {/* Top Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-4">
-          <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+          <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 ui-text-body">
             Total Operating Expenses
           </span>
-          <div className="text-xl font-bold text-slate-900 dark:text-slate-100 mt-1">
+          <div className="text-xl font-bold text-slate-900 dark:text-slate-100 mt-1 ui-weight-medium">
             {formatINR(totalExpenses)}
           </div>
-          <span className="text-[11px] text-slate-400 mt-1 block">
+          <span className="text-[11px] text-slate-400 mt-1 block ui-text-meta">
             {expensesList.length} vouchers recorded in period
           </span>
         </div>
 
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-4">
-          <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+          <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 ui-text-body">
             Petty Cash Payouts
           </span>
-          <div className="text-xl font-bold text-amber-600 dark:text-amber-400 mt-1">
+          <div className="text-xl font-bold text-amber-600 dark:text-amber-400 mt-1 ui-weight-medium">
             {formatINR(cashExpenses)}
           </div>
-          <span className="text-[11px] text-slate-400 mt-1 block">
+          <span className="text-[11px] text-slate-400 mt-1 block ui-text-meta">
             Deducted directly from Cash Drawer
           </span>
         </div>
 
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-4">
-          <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+          <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 ui-text-body">
             Bank, UPI & Non-Cash Expenses
           </span>
-          <div className="text-xl font-bold text-slate-900 dark:text-slate-100 mt-1">
+          <div className="text-xl font-bold text-slate-900 dark:text-slate-100 mt-1 ui-weight-medium">
             {formatINR(nonCashExpenses)}
           </div>
-          <span className="text-[11px] text-slate-400 mt-1 block">
+          <span className="text-[11px] text-slate-400 mt-1 block ui-text-meta">
             Paid via Online / Vendor Account
           </span>
         </div>
@@ -82,12 +82,12 @@ export const ExecutiveExpenseSection: React.FC<ExecutiveExpenseSectionProps> = (
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* By Category */}
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-4">
-          <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">
+          <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3 ui-text-body ui-weight-medium">
             Expenses by Category
           </h4>
-          <div className="space-y-2 text-xs">
+          <div className="space-y-2 text-xs ui-text-body">
             {Object.keys(byCategory).length === 0 ? (
-              <p className="text-slate-400 text-xs">No category breakdown recorded.</p>
+              <p className="text-slate-400 text-xs ui-text-body">No category breakdown recorded.</p>
             ) : (
               Object.entries(byCategory).map(([cat, amt]) => (
                 <div
@@ -108,12 +108,12 @@ export const ExecutiveExpenseSection: React.FC<ExecutiveExpenseSectionProps> = (
 
         {/* By Department / Vendor */}
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-4">
-          <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">
+          <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3 ui-text-body ui-weight-medium">
             Top Vendors & Payees
           </h4>
-          <div className="space-y-2 text-xs">
+          <div className="space-y-2 text-xs ui-text-body">
             {Object.keys(byVendor).length === 0 ? (
-              <p className="text-slate-400 text-xs">No vendor records available.</p>
+              <p className="text-slate-400 text-xs ui-text-body">No vendor records available.</p>
             ) : (
               Object.entries(byVendor)
                 .slice(0, 6)
@@ -136,13 +136,13 @@ export const ExecutiveExpenseSection: React.FC<ExecutiveExpenseSectionProps> = (
       </div>
 
       {/* Itemized Voucher Register */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg overflow-hidden shadow-xs">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg overflow-hidden shadow-xs ui-shadow-quiet">
         <div className="p-4 sm:p-5 border-b border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
+            <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 ui-weight-medium">
               Operating Expense Register
             </h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400">
+            <p className="text-xs text-slate-500 dark:text-slate-400 ui-text-body">
               Audit log of approved expense vouchers incurred during this period
             </p>
           </div>
@@ -155,14 +155,14 @@ export const ExecutiveExpenseSection: React.FC<ExecutiveExpenseSectionProps> = (
                 placeholder="Search payee or voucher..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-8 pr-3 py-1 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none"
+                className="pl-8 pr-3 py-1 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none ui-text-body ui-field" aria-label="Search payee or voucher"
               />
             </div>
 
             <select
               value={categoryFilter}
               onChange={(e) => setCategoryFilter(e.target.value)}
-              className="px-2 py-1 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-slate-700 dark:text-slate-300 focus:outline-none cursor-pointer"
+              className="px-2 py-1 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-slate-700 dark:text-slate-300 focus:outline-none cursor-pointer ui-text-body ui-field"
             >
               <option value="ALL">All Categories</option>
               {Object.keys(byCategory).map((cat) => (
@@ -176,11 +176,11 @@ export const ExecutiveExpenseSection: React.FC<ExecutiveExpenseSectionProps> = (
 
         <div className="overflow-x-auto">
           {filteredExpenses.length === 0 ? (
-            <div className="p-8 text-center text-xs text-slate-500">
+            <div className="p-8 text-center text-xs text-slate-500 ui-text-body">
               No expense vouchers found matching the filter criteria.
             </div>
           ) : (
-            <table className="w-full text-left text-xs border-collapse">
+            <div className="ui-table-scroll"><table className="w-full text-left text-xs border-collapse ui-text-body ui-data-table">
               <thead className="bg-slate-50 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-700">
                 <tr>
                   <th className="px-3 py-2.5 font-semibold text-slate-600 dark:text-slate-300">
@@ -212,7 +212,7 @@ export const ExecutiveExpenseSection: React.FC<ExecutiveExpenseSectionProps> = (
                     key={exp.id}
                     className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors"
                   >
-                    <td className="px-3 py-2 font-mono text-[11px] text-slate-600 dark:text-slate-400">
+                    <td className="px-3 py-2 font-mono text-[11px] text-slate-600 dark:text-slate-400 ui-font-body ui-text-meta">
                       {exp.voucherNo}
                     </td>
                     <td className="px-3 py-2 text-slate-500">{exp.date}</td>
@@ -223,13 +223,13 @@ export const ExecutiveExpenseSection: React.FC<ExecutiveExpenseSectionProps> = (
                       {exp.description}
                     </td>
                     <td className="px-3 py-2">
-                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 ui-text-meta">
                         {exp.category}
                       </span>
                     </td>
                     <td className="px-3 py-2">
                       <span
-                        className={`inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium ${
+                        className={`inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium  ui-text-meta ${
                           exp.paymentMethod === "CASH"
                             ? "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400 border border-amber-200 dark:border-amber-800"
                             : "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300"
@@ -238,13 +238,13 @@ export const ExecutiveExpenseSection: React.FC<ExecutiveExpenseSectionProps> = (
                         {exp.paymentMethod}
                       </span>
                     </td>
-                    <td className="px-3 py-2 font-bold text-slate-900 dark:text-slate-100 text-right">
+                    <td className="px-3 py-2 font-bold text-slate-900 dark:text-slate-100 text-right ui-weight-medium">
                       {formatINR(exp.totalAmount)}
                     </td>
                   </tr>
                 ))}
               </tbody>
-              <tfoot className="bg-slate-50 dark:bg-slate-800/80 border-t border-slate-200 dark:border-slate-700 font-bold">
+              <tfoot className="bg-slate-50 dark:bg-slate-800/80 border-t border-slate-200 dark:border-slate-700 font-bold ui-weight-medium">
                 <tr>
                   <td colSpan={6} className="px-3 py-2 text-slate-700 dark:text-slate-300">
                     Total Filtered Expenses ({filteredExpenses.length} vouchers)
@@ -254,7 +254,7 @@ export const ExecutiveExpenseSection: React.FC<ExecutiveExpenseSectionProps> = (
                   </td>
                 </tr>
               </tfoot>
-            </table>
+            </table></div>
           )}
         </div>
       </div>

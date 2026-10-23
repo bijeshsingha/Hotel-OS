@@ -54,13 +54,13 @@ export default function DashboardPage() {
     return (
       <div className="flex min-h-[400px] flex-col items-center justify-center p-6 text-center">
         <Building2 className="h-10 w-10 text-blue-500 mb-3" />
-        <h2 className="text-base font-bold text-zinc-900 dark:text-white">Setup Required</h2>
-        <p className="text-xs text-zinc-500 max-w-sm mt-1 mb-4">
+        <h2 className="text-base font-bold text-zinc-900 dark:text-white ui-weight-medium ui-section-title">Setup Required</h2>
+        <p className="text-xs text-zinc-500 max-w-sm mt-1 mb-4 ui-text-body">
           No hotel property is configured yet. Redirecting to onboarding...
         </p>
         <a
           href="/onboarding"
-          className="rounded-lg bg-blue-600 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-500 transition"
+          className="rounded-lg bg-blue-600 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-500 transition ui-text-body"
         >
           Launch Onboarding
         </a>
@@ -71,9 +71,9 @@ export default function DashboardPage() {
   if (loading || !data) {
     return (
       <div className="flex h-72 items-center justify-center">
-        <div className="flex items-center gap-2 text-xs font-mono text-zinc-500">
+        <div className="flex items-center gap-2 text-xs font-mono text-zinc-500 ui-text-body ui-font-body">
           <div className="h-3 w-3 animate-spin rounded-full border-2 border-zinc-400 border-t-transparent" />
-          <span>Loading executive metrics & operational pulse...</span>
+          <span>Loading dashboard…</span>
         </div>
       </div>
     );
@@ -92,11 +92,11 @@ export default function DashboardPage() {
   } = data;
 
   return (
-    <div className="space-y-6 max-w-[1700px] mx-auto w-full pb-16">
+    <div className="space-y-6 max-w-[1440px] mx-auto w-full pb-16">
       
       {/* 1. EXECUTIVE COMMAND HEADER */}
       <PageHeader
-        title={activeProperty?.displayName || "Hotel Executive Command Center"}
+        title={activeProperty?.displayName || "Hotel overview"}
         description={`GSTIN: ${data.property?.gstin || "N/A"} • Code: ${activeProperty?.code || "DEFAULT"}`}
         badge="Live Operations"
         badgeVariant="live"
@@ -105,7 +105,7 @@ export default function DashboardPage() {
           <div className="flex items-center gap-2 flex-wrap">
             <button
               onClick={() => setShowEmailModal(true)}
-              className="h-9 px-3.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center gap-2 transition shadow-xs cursor-pointer active:scale-98"
+              className="h-9 px-3.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center gap-2 transition shadow-xs cursor-pointer  ui-radius-control ui-weight-medium ui-text-body ui-shadow-quiet ui-control ui-control-sized"
             >
               <Mail className="h-4 w-4" />
               <span>Email Briefing</span>
@@ -113,7 +113,7 @@ export default function DashboardPage() {
 
             <Link
               href="/night-audit/manager-audit"
-              className="h-9 px-3.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-white font-bold text-xs flex items-center gap-1.5 transition shadow-xs"
+              className="h-9 px-3.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-white font-bold text-xs flex items-center gap-1.5 transition shadow-xs ui-weight-medium ui-text-body ui-shadow-quiet"
             >
               <Moon className="h-3.5 w-3.5 text-amber-400" />
               <span className="hidden sm:inline">Midnight Audit</span>
@@ -122,17 +122,17 @@ export default function DashboardPage() {
         }
         metadata={
           <div className="rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 px-3.5 py-2 text-right shrink-0">
-            <span className="text-zinc-400 text-[10px] block font-bold uppercase tracking-wider">Audit Cutoff</span>
-            <span className="font-bold font-mono text-sm text-amber-600 dark:text-amber-400">03:00 AM</span>
+            <span className="text-zinc-400 text-[10px] block font-bold uppercase tracking-wider ui-text-meta ui-weight-medium">Audit Cutoff</span>
+            <span className="font-bold font-mono text-sm text-amber-600 dark:text-amber-400 ui-weight-medium ui-font-body">03:00 AM</span>
           </div>
         }
       />
 
       {/* 2. QUICK ACTION LAUNCHPAD */}
-      <div className="p-2 sm:p-2.5 rounded-2xl bg-zinc-100/80 dark:bg-zinc-900/60 border border-zinc-200/60 dark:border-zinc-800/60 flex items-center gap-2 overflow-x-auto">
+      <div className="p-2 sm:p-2.5 rounded-2xl bg-zinc-100/80 dark:bg-zinc-900/60 border border-zinc-200/60 dark:border-zinc-800/60 flex items-center gap-2 overflow-x-auto ui-radius-panel">
         <Link
           href="/pms"
-          className="h-9 px-3 rounded-xl bg-white dark:bg-zinc-800 hover:bg-blue-50 dark:hover:bg-blue-950/40 text-zinc-900 dark:text-zinc-100 text-xs font-bold flex items-center gap-1.5 border border-zinc-200 dark:border-zinc-700 shrink-0 transition"
+          className="h-9 px-3 rounded-xl bg-white dark:bg-zinc-800 hover:bg-blue-50 dark:hover:bg-blue-950/40 text-zinc-900 dark:text-zinc-100 text-xs font-bold flex items-center gap-1.5 border border-zinc-200 dark:border-zinc-700 shrink-0 transition ui-text-body ui-weight-medium"
         >
           <PlusCircle className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
           <span>New Check-in / GRC</span>
@@ -140,7 +140,7 @@ export default function DashboardPage() {
 
         <Link
           href="/billing"
-          className="h-9 px-3 rounded-xl bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700/60 text-zinc-900 dark:text-zinc-100 text-xs font-semibold flex items-center gap-1.5 border border-zinc-200 dark:border-zinc-700 shrink-0 transition"
+          className="h-9 px-3 rounded-xl bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700/60 text-zinc-900 dark:text-zinc-100 text-xs font-semibold flex items-center gap-1.5 border border-zinc-200 dark:border-zinc-700 shrink-0 transition ui-text-body ui-surface"
         >
           <Receipt className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
           <span>Guest Folios & Billing</span>
@@ -148,7 +148,7 @@ export default function DashboardPage() {
 
         <Link
           href="/cashier-shift"
-          className="h-9 px-3 rounded-xl bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700/60 text-zinc-900 dark:text-zinc-100 text-xs font-semibold flex items-center gap-1.5 border border-zinc-200 dark:border-zinc-700 shrink-0 transition"
+          className="h-9 px-3 rounded-xl bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700/60 text-zinc-900 dark:text-zinc-100 text-xs font-semibold flex items-center gap-1.5 border border-zinc-200 dark:border-zinc-700 shrink-0 transition ui-text-body ui-surface"
         >
           <Wallet className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
           <span>Cashier Till & Shift Handover</span>
@@ -156,7 +156,7 @@ export default function DashboardPage() {
 
         <Link
           href="/reports"
-          className="h-9 px-3 rounded-xl bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700/60 text-zinc-900 dark:text-zinc-100 text-xs font-semibold flex items-center gap-1.5 border border-zinc-200 dark:border-zinc-700 shrink-0 transition"
+          className="h-9 px-3 rounded-xl bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700/60 text-zinc-900 dark:text-zinc-100 text-xs font-semibold flex items-center gap-1.5 border border-zinc-200 dark:border-zinc-700 shrink-0 transition ui-text-body ui-surface"
         >
           <FileText className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
           <span>Master Reports & Ledgers</span>
@@ -164,7 +164,7 @@ export default function DashboardPage() {
 
         <Link
           href="/housekeeping"
-          className="h-9 px-3 rounded-xl bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700/60 text-zinc-900 dark:text-zinc-100 text-xs font-semibold flex items-center gap-1.5 border border-zinc-200 dark:border-zinc-700 shrink-0 transition"
+          className="h-9 px-3 rounded-xl bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700/60 text-zinc-900 dark:text-zinc-100 text-xs font-semibold flex items-center gap-1.5 border border-zinc-200 dark:border-zinc-700 shrink-0 transition ui-text-body ui-surface"
         >
           <BedDouble className="h-3.5 w-3.5 text-teal-600 dark:text-teal-400" />
           <span>Housekeeping Board</span>

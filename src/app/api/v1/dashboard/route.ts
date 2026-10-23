@@ -1,8 +1,13 @@
+import { authorizeRequest, getApiAccess } from "@/lib/auth/api-access";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { ensurePropertyDateSynchronized } from "@/lib/domain/night-audit-service";
 
 export async function GET(request: Request) {
+  const access = await authorizeRequest(request);
+  if (access instanceof Response) return access;
+  request = access.request;
+
   try {
     const { searchParams } = new URL(request.url);
     const propertyId = searchParams.get("propertyId");
@@ -20,6 +25,7 @@ export async function GET(request: Request) {
         organization: {
           include: {
             properties: {
+              where: { id: { in: getApiAccess(request).properties.map((p) => p.id) } },
               include: {
                 rooms: { where: { active: true } },
                 stays: { where: { status: "IN_HOUSE" } },

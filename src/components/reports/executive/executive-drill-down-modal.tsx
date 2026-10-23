@@ -75,29 +75,29 @@ export const ExecutiveDrillDownModal: React.FC<ExecutiveDrillDownModalProps> = (
       role="dialog"
       aria-modal="true"
       aria-labelledby="drilldown-title"
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-950/60 backdrop-blur-xs animate-in fade-in duration-150"
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-950/60 backdrop-blur-xs   duration-150"
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl w-full max-w-4xl max-h-[85vh] flex flex-col overflow-hidden"
+        className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl w-full max-w-4xl max-h-[85vh] flex flex-col overflow-hidden ui-surface"
       >
         {/* Header */}
         <div className="flex items-start justify-between p-4 sm:p-5 border-b border-slate-200 dark:border-slate-800">
           <div>
             <h2
               id="drilldown-title"
-              className="text-base sm:text-lg font-bold text-slate-900 dark:text-slate-100"
+              className="text-base sm:text-lg font-bold text-slate-900 dark:text-slate-100 ui-weight-medium ui-section-title"
             >
               {config.title}
             </h2>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 ui-text-body">
               {config.subtitle}
             </p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors focus:outline-none focus:ring-2 focus:ring-slate-400"
+            className="p-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors focus:outline-none focus:ring-2 focus:ring-slate-400 ui-control"
             aria-label="Close dialog"
           >
             <X className="w-5 h-5" />
@@ -113,10 +113,10 @@ export const ExecutiveDrillDownModal: React.FC<ExecutiveDrillDownModalProps> = (
               placeholder="Search records..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-9 pr-3 py-1.5 text-xs sm:text-sm bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-400"
+              className="w-full pl-9 pr-3 py-1.5 text-xs sm:text-sm bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-400 ui-text-body ui-field" aria-label="Search records"
             />
           </div>
-          <div className="text-xs text-slate-500 font-medium">
+          <div className="text-xs text-slate-500 font-medium ui-text-body">
             Showing {filteredRows.length} of {config.rows.length} records
           </div>
         </div>
@@ -129,18 +129,18 @@ export const ExecutiveDrillDownModal: React.FC<ExecutiveDrillDownModalProps> = (
               <p className="text-sm font-medium text-slate-600 dark:text-slate-400">
                 No matching records found
               </p>
-              <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
+              <p className="text-xs text-slate-400 dark:text-slate-500 mt-1 ui-text-body">
                 Try adjusting your search criteria.
               </p>
             </div>
           ) : (
-            <table className="w-full text-left text-xs border-collapse">
+            <div className="ui-table-scroll"><table className="w-full text-left text-xs border-collapse ui-text-body ui-data-table">
               <thead className="bg-slate-50 dark:bg-slate-800/80 sticky top-0 border-b border-slate-200 dark:border-slate-700 z-10">
                 <tr>
                   {config.columns.map((col) => (
                     <th
                       key={col.key}
-                      className={`px-3 py-2.5 font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wider text-[11px] ${
+                      className={`px-3 py-2.5 font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wider text-[11px]  ui-text-meta ${
                         col.align === "right"
                           ? "text-right"
                           : col.align === "center"
@@ -176,17 +176,17 @@ export const ExecutiveDrillDownModal: React.FC<ExecutiveDrillDownModalProps> = (
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </table></div>
           )}
         </div>
 
         {/* Footer with summary total */}
         {config.totalLabel && (
           <div className="flex items-center justify-between p-3 sm:p-4 bg-slate-50 dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800">
-            <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">
+            <span className="text-xs font-semibold text-slate-600 dark:text-slate-400 ui-text-body">
               {config.totalLabel}
             </span>
-            <span className="text-sm font-bold text-slate-900 dark:text-slate-100">
+            <span className="text-sm font-bold text-slate-900 dark:text-slate-100 ui-weight-medium">
               {typeof config.totalValue === "number"
                 ? formatINR(config.totalValue)
                 : config.totalValue}

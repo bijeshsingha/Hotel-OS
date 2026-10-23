@@ -1,9 +1,11 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
 import { apiCache } from "@/lib/cache/api-cache";
+import { authRequest } from "@/lib/auth/client-request";
 
 export interface PropertyInfo {
+  timezone?: string;
   id: string;
   code: string;
   displayName: string;
@@ -42,6 +44,8 @@ interface HotelContextType {
     propertyScope?: string;
   }>;
   isLoading: boolean;
+  sessionError: string | null;
+  retrySession: () => Promise<void>;
   isInitialized: boolean | null;
   activeRole: string;
   sidebarCollapsed: boolean;
@@ -51,30 +55,35 @@ interface HotelContextType {
   toggleMobileMenu: () => void;
   setMobileMenuOpen: (open: boolean) => void;
   switchProperty: (propertyId: string) => void;
-  switchUser: (identifier: string) => void;
+  switchUser: (identifier: string) => Promise<void>;
   logout: () => void;
   refreshData: () => Promise<void>;
   triggerRefresh: () => void;
   refreshKey: number;
 }
 
-const INITIAL_USER: UserInfo = {
-  id: "usr_bijesh",
-  name: "Bijesh Singha",
-  username: "bijesh_singha",
-  email: "bijesh.singha@hotelos.in",
-  activeRole: "ORG_OWNER",
-  roleName: "Organization Owner & Super Admin",
-};
 
 const HotelContext = createContext<HotelContextType | undefined>(undefined);
 
+// Browser storage is only a preference; blocked storage must not stop authentication.
+function readPreference(key: string) {
+  try { return localStorage.getItem(key); } catch { return null; }
+}
+function writePreference(key: string, value: string) {
+  try { localStorage.setItem(key, value); } catch { /* Optional preference. */ }
+}
+function removePreference(key: string) {
+  try { localStorage.removeItem(key); } catch { /* Optional preference. */ }
+}
+
 export function HotelProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<UserInfo | null>(INITIAL_USER);
+  const [user, setUser] = useState<UserInfo | null>(null);
   const [activeProperty, setActiveProperty] = useState<PropertyInfo | null>(null);
   const [availableProperties, setAvailableProperties] = useState<PropertyInfo[]>([]);
   const [allUsers, setAllUsers] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [sessionError, setSessionError] = useState<string | null>(null);
+  const sessionRequest = useRef(0);
   const [isInitialized, setIsInitialized] = useState<boolean | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [sidebarCollapsed, setSidebarCollapsedState] = useState(true);
@@ -83,7 +92,7 @@ export function HotelProvider({ children }: { children: React.ReactNode }) {
   // Initialize sidebar collapsed state from localStorage
   useEffect(() => {
     if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("hotel_sidebar_collapsed");
+      const saved = readPreference("hotel_sidebar_collapsed");
       if (saved !== null) {
         setSidebarCollapsedState(saved === "true");
       }
@@ -94,7 +103,7 @@ export function HotelProvider({ children }: { children: React.ReactNode }) {
     setSidebarCollapsedState((prev) => {
       const next = !prev;
       if (typeof window !== "undefined") {
-        localStorage.setItem("hotel_sidebar_collapsed", String(next));
+        writePreference("hotel_sidebar_collapsed", String(next));
       }
       return next;
     });
@@ -103,7 +112,7 @@ export function HotelProvider({ children }: { children: React.ReactNode }) {
   const setSidebarCollapsed = useCallback((collapsed: boolean) => {
     setSidebarCollapsedState(collapsed);
     if (typeof window !== "undefined") {
-      localStorage.setItem("hotel_sidebar_collapsed", String(collapsed));
+      writePreference("hotel_sidebar_collapsed", String(collapsed));
     }
   }, []);
 
@@ -111,19 +120,49 @@ export function HotelProvider({ children }: { children: React.ReactNode }) {
     setMobileMenuOpen((prev) => !prev);
   }, []);
 
-  const fetchSession = useCallback(async (identifier?: string, propId?: string) => {
+  const fetchSession = useCallback(async (identifier?: string, propId?: string, silent = false) => {
+    const requestId = ++sessionRequest.current;
+    const isCurrent = () => sessionRequest.current === requestId;
     try {
-      setIsLoading(true);
+      if (!silent) setIsLoading(true);
+      setSessionError(null);
       const params = new URLSearchParams();
-      if (identifier) params.set("username", identifier);
+      // Identity is determined by the HttpOnly session cookie.
       if (propId) params.set("propertyId", propId);
 
-      const res = await fetch(`/api/v1/auth/session?${params.toString()}`, {
+      let result = await authRequest(`/api/v1/auth/session?${params.toString()}`, {
         cache: "no-store",
         headers: { "Cache-Control": "no-cache" },
       });
-      if (res.ok) {
-        const data = await res.json();
+      if (!isCurrent()) return false;
+      if (result.response.status === 403 && propId) {
+        // A shared terminal may remember a property the newly signed-in user cannot access.
+        result = await authRequest("/api/v1/auth/session", { cache: "no-store" });
+      }
+      if (!isCurrent()) return false;
+      const { response: res, data } = result;
+      if (res.status === 401) {
+        setUser(null);
+        setAllUsers([]);
+        setActiveProperty(null);
+        setAvailableProperties([]);
+        setIsInitialized(true);
+        // An optional public directory must never delay a signed-out redirect.
+        setIsLoading(false);
+        apiCache.invalidate();
+        removePreference("hotel_os_user");
+        removePreference("hotel_os_active_property_data");
+        removePreference("hotel_os_available_properties_data");
+        try {
+          const directory = await authRequest("/api/v1/public/properties", { cache: "no-store" });
+          if (isCurrent() && directory.response.ok) {
+            const properties = Array.isArray(directory.data?.properties) ? directory.data.properties : [];
+            setAvailableProperties(properties);
+            setActiveProperty(properties.find((p: PropertyInfo) => p.id === propId) || properties[0] || null);
+          }
+        } catch { /* The login page remains available if the public directory is offline. */ }
+        return false;
+      } else if (res.ok) {
 
         if (data?.initialized === false) {
           setIsInitialized(false);
@@ -132,97 +171,90 @@ export function HotelProvider({ children }: { children: React.ReactNode }) {
           setAvailableProperties([]);
           setAllUsers([]);
           if (typeof window !== "undefined") {
-            localStorage.removeItem("hotel_os_property");
-            localStorage.removeItem("hotel_os_active_property_data");
-            localStorage.removeItem("hotel_os_available_properties_data");
+            removePreference("hotel_os_property");
+            removePreference("hotel_os_active_property_data");
+            removePreference("hotel_os_available_properties_data");
             if (!window.location.pathname.startsWith("/onboarding")) {
               window.location.href = "/onboarding";
               return;
             }
           }
         } else {
+          if (!data?.user?.id) throw new Error("Hotel OS could not verify your session. Please try again.");
           setIsInitialized(true);
         }
 
         if (data?.user) {
           setUser(data.user);
           if (typeof window !== "undefined" && data.user.username) {
-            localStorage.setItem("hotel_os_user", data.user.username);
+            writePreference("hotel_os_user", data.user.username);
           }
         }
+        setActiveProperty(data.activeProperty || null);
         if (data?.activeProperty) {
-          setActiveProperty(data.activeProperty);
           if (typeof window !== "undefined") {
-            localStorage.setItem("hotel_os_property", data.activeProperty.id);
-            localStorage.setItem("hotel_os_active_property_data", JSON.stringify(data.activeProperty));
+            writePreference("hotel_os_property", data.activeProperty.id);
+            writePreference("hotel_os_active_property_data", JSON.stringify(data.activeProperty));
           }
         }
         if (Array.isArray(data?.availableProperties)) {
           setAvailableProperties(data.availableProperties);
           if (typeof window !== "undefined") {
-            localStorage.setItem("hotel_os_available_properties_data", JSON.stringify(data.availableProperties));
+            writePreference("hotel_os_available_properties_data", JSON.stringify(data.availableProperties));
           }
         }
         if (Array.isArray(data?.allUsers)) setAllUsers(data.allUsers);
+        return Boolean(data?.user?.id);
+      } else {
+        throw new Error("Hotel OS could not verify your access. Please try again.");
       }
-    } catch {
-      // Graceful fallback during dev hot-reloads
+    } catch (error) {
+      if (isCurrent()) setSessionError(error instanceof Error ? error.message : "Unable to check access. Please try again.");
+      return false;
     } finally {
-      setIsLoading(false);
+      if (isCurrent()) setIsLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      try {
-        const savedPropData = localStorage.getItem("hotel_os_active_property_data");
-        if (savedPropData) {
-          const parsed = JSON.parse(savedPropData);
-          if (parsed && parsed.id) setActiveProperty(parsed);
-        }
-        const savedPropsData = localStorage.getItem("hotel_os_available_properties_data");
-        if (savedPropsData) {
-          const parsedList = JSON.parse(savedPropsData);
-          if (Array.isArray(parsedList) && parsedList.length > 0) setAvailableProperties(parsedList);
-        }
-      } catch (e) {
-        console.warn("Failed to parse cached property data:", e);
-      }
-    }
-    const savedUser = typeof window !== "undefined" ? localStorage.getItem("hotel_os_user") : null;
-    const savedProp = typeof window !== "undefined" ? localStorage.getItem("hotel_os_property") : null;
+    const savedUser = typeof window !== "undefined" ? readPreference("hotel_os_user") : null;
+    const savedProp = typeof window !== "undefined" ? readPreference("hotel_os_property") : null;
     fetchSession(savedUser || undefined, savedProp || undefined);
+    return () => { sessionRequest.current++; };
   }, [fetchSession]);
 
   const switchProperty = (propertyId: string) => {
+    apiCache.invalidate();
+    fetchSession(undefined, propertyId).then((verified) => {
+      if (verified) setRefreshKey((k) => k + 1);
+    });
+  };
+
+  const switchUser = async (identifier: string) => {
+    setUser(null);
+    setActiveProperty(null);
+    setAvailableProperties([]);
+    setAllUsers([]);
+    setIsLoading(true);
     if (typeof window !== "undefined") {
-      localStorage.setItem("hotel_os_property", propertyId);
+      writePreference("hotel_os_user", identifier);
     }
     apiCache.invalidate();
-    const targetProp = availableProperties.find((p) => p.id === propertyId);
-    if (targetProp) {
-      setActiveProperty(targetProp);
-      if (typeof window !== "undefined") {
-        localStorage.setItem("hotel_os_active_property_data", JSON.stringify(targetProp));
-      }
-    }
-    fetchSession(user?.username || user?.email, propertyId);
+    const savedProp = typeof window !== "undefined" ? readPreference("hotel_os_property") : null;
+    const verified = await fetchSession(undefined, savedProp || undefined);
+    if (!verified) throw new Error("Sign-in could not be completed. Please try again.");
     setRefreshKey((k) => k + 1);
   };
 
-  const switchUser = (identifier: string) => {
-    if (typeof window !== "undefined") {
-      localStorage.setItem("hotel_os_user", identifier);
-    }
+  const logout = async () => {
+    const { response } = await authRequest("/api/v1/auth/session", { method: "DELETE" });
+    if (!response.ok) throw new Error("Sign out failed. Please try again.");
+    sessionRequest.current++;
     apiCache.invalidate();
-    const savedProp = typeof window !== "undefined" ? localStorage.getItem("hotel_os_property") : null;
-    fetchSession(identifier, savedProp || undefined);
-    setRefreshKey((k) => k + 1);
-  };
-
-  const logout = () => {
+    removePreference("hotel_os_active_property_data");
+    removePreference("hotel_os_available_properties_data");
     if (typeof window !== "undefined") {
-      localStorage.removeItem("hotel_os_user");
+      removePreference("hotel_os_user");
     }
     setUser(null);
     window.location.href = "/login";
@@ -233,8 +265,13 @@ export function HotelProvider({ children }: { children: React.ReactNode }) {
   };
 
   const refreshData = async () => {
-    await fetchSession(user?.username || user?.email, activeProperty?.id);
+    await fetchSession(user?.username || user?.email, activeProperty?.id, true);
     setRefreshKey((k) => k + 1);
+  };
+
+  const retrySession = async () => {
+    const savedProp = readPreference("hotel_os_property");
+    await fetchSession(undefined, savedProp || activeProperty?.id);
   };
 
   return (
@@ -245,8 +282,10 @@ export function HotelProvider({ children }: { children: React.ReactNode }) {
         availableProperties,
         allUsers,
         isLoading,
+        sessionError,
+        retrySession,
         isInitialized,
-        activeRole: user?.activeRole || "ORG_OWNER",
+        activeRole: user?.activeRole || "UNASSIGNED",
         sidebarCollapsed,
         toggleSidebar,
         setSidebarCollapsed,

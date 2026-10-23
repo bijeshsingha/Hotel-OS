@@ -1,18 +1,27 @@
+import { authorizeRequest, getApiAccess } from "@/lib/auth/api-access";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { getNextDocumentNumber } from "@/lib/sequence/generator";
+import { mayPerform } from "@/lib/auth/session";
+import { PERMISSIONS as P } from "@/lib/auth/roles";
 
 export async function GET(request: Request) {
+  const access = await authorizeRequest(request);
+  if (access instanceof Response) return access;
+  request = access.request;
+
   try {
     const { searchParams } = new URL(request.url);
     const propertyId = searchParams.get("propertyId");
+    const context = getApiAccess(request);
+    const canManageIssues = await mayPerform(context.user, context.property.id, context.property.organizationId, P.MAINT_MANAGE);
 
     if (!propertyId) {
       return NextResponse.json({ error: "propertyId is required" }, { status: 400 });
     }
 
     const issues = await prisma.maintenanceIssue.findMany({
-      where: { propertyId },
+      where: { propertyId, ...(!canManageIssues ? { assigneeId: context.user.id } : {}) },
       include: {
         room: { include: { roomType: true, roomState: true } },
         events: { orderBy: { happenedAt: "desc" } },
@@ -27,6 +36,10 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const access = await authorizeRequest(request);
+  if (access instanceof Response) return access;
+  request = access.request;
+
   try {
     const body = await request.json();
     const {
@@ -118,9 +131,15 @@ export async function POST(request: Request) {
 }
 
 export async function PATCH(request: Request) {
+  const access = await authorizeRequest(request);
+  if (access instanceof Response) return access;
+  request = access.request;
+
   try {
     const body = await request.json();
     const { issueId, status, resolution, blockRoom, actorId } = body;
+    const context = getApiAccess(request);
+    const canReleaseRoom = await mayPerform(context.user, context.property.id, context.property.organizationId, P.ROOM_BLOCK);
 
     if (!issueId) {
       return NextResponse.json({ error: "issueId is required" }, { status: 400 });
@@ -155,7 +174,7 @@ export async function PATCH(request: Request) {
     }
 
     // If marked RESOLVED or CLOSED, resolve room blocks & unblock room
-    if (["RESOLVED", "VERIFIED", "CLOSED"].includes(status)) {
+    if (["RESOLVED", "VERIFIED", "CLOSED"].includes(status) && canReleaseRoom) {
       await prisma.roomBlock.updateMany({
         where: { maintenanceIssueId: issueId },
         data: {

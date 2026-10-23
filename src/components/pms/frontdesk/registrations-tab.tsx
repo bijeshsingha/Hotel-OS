@@ -96,13 +96,13 @@ export function RegistrationsTab({
   });
 
   return (
-    <div className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-[#121215] overflow-hidden space-y-4">
+    <div className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-[#121215] overflow-hidden space-y-4 ui-radius-panel ui-surface">
       {/* Header */}
       <div className="p-4 sm:p-5 border-b border-zinc-200/80 dark:border-zinc-800 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2.5">
             <FileText className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-            <h2 className="text-base font-bold text-zinc-950 dark:text-zinc-50">
+            <h2 className="text-base font-bold text-zinc-950 dark:text-zinc-50 ui-weight-medium ui-section-title">
               Guest Registration Cards (GRC Register)
             </h2>
           </div>
@@ -113,14 +113,14 @@ export function RegistrationsTab({
 
         {/* Source Switcher: Desk Entries vs Digital Self Check-In */}
         <div className="flex flex-wrap items-center gap-2">
-          <div className="flex items-center bg-zinc-100 dark:bg-zinc-800/80 p-1 rounded-xl text-xs font-semibold">
+          <div className="flex items-center bg-zinc-100 dark:bg-zinc-800/80 p-1 rounded-xl text-xs font-semibold ui-text-body">
             <button
               onClick={() => setSourceFilter("ALL")}
               className={`px-3 py-1.5 rounded-lg transition cursor-pointer ${
                 sourceFilter === "ALL"
-                  ? "bg-white dark:bg-zinc-900 text-zinc-950 dark:text-white font-bold shadow-xs"
+                  ? "bg-white dark:bg-zinc-900 text-zinc-950 dark:text-white font-bold shadow-xs ui-weight-medium ui-shadow-quiet"
                   : "text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200"
-              }`}
+              } ui-control`}
             >
               All Records ({registrations.length})
             </button>
@@ -128,23 +128,23 @@ export function RegistrationsTab({
               onClick={() => setSourceFilter("DESK")}
               className={`px-3 py-1.5 rounded-lg transition cursor-pointer flex items-center gap-1.5 ${
                 sourceFilter === "DESK"
-                  ? "bg-white dark:bg-zinc-900 text-zinc-950 dark:text-white font-bold shadow-xs"
+                  ? "bg-white dark:bg-zinc-900 text-zinc-950 dark:text-white font-bold shadow-xs ui-weight-medium ui-shadow-quiet"
                   : "text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200"
-              }`}
+              } ui-control`}
             >
               <span>Desk Entries</span>
-              <span className="font-mono text-[11px] opacity-75">({deskCount})</span>
+              <span className="font-mono text-[11px] opacity-75 ui-font-body ui-text-meta">({deskCount})</span>
             </button>
             <button
               onClick={() => setSourceFilter("DIGITAL")}
               className={`px-3 py-1.5 rounded-lg transition cursor-pointer flex items-center gap-1.5 ${
                 sourceFilter === "DIGITAL"
-                  ? "bg-white dark:bg-zinc-900 text-blue-600 dark:text-blue-400 font-bold shadow-xs"
+                  ? "bg-white dark:bg-zinc-900 text-blue-600 dark:text-blue-400 font-bold shadow-xs ui-weight-medium ui-shadow-quiet"
                   : "text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200"
-              }`}
+              } ui-control`}
             >
               <span>Digital Self Check-In</span>
-              <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-blue-100 dark:bg-blue-950/80 text-blue-700 dark:text-blue-300 font-bold">
+              <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-blue-100 dark:bg-blue-950/80 text-blue-700 dark:text-blue-300 font-bold ui-text-meta ui-weight-medium">
                 {digitalCount}
               </span>
             </button>
@@ -155,14 +155,14 @@ export function RegistrationsTab({
       {/* Sub-Filters and Search */}
       <div className="px-4 sm:px-5 flex flex-col md:flex-row md:items-center justify-between gap-3">
         {/* Status Pills */}
-        <div className="flex flex-wrap items-center gap-1.5 text-xs font-medium">
+        <div className="flex flex-wrap items-center gap-1.5 text-xs font-medium ui-text-body">
           <button
             onClick={() => setStatusFilter("ALL")}
             className={`px-2.5 py-1 rounded-lg transition cursor-pointer ${
               statusFilter === "ALL"
-                ? "bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 font-bold"
+                ? "bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 font-bold ui-weight-medium"
                 : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700"
-            }`}
+            } ui-control`}
           >
             All Statuses
           </button>
@@ -170,9 +170,9 @@ export function RegistrationsTab({
             onClick={() => setStatusFilter("IN_HOUSE")}
             className={`px-2.5 py-1 rounded-lg transition cursor-pointer flex items-center gap-1 ${
               statusFilter === "IN_HOUSE"
-                ? "bg-emerald-600 text-white font-bold"
+                ? "bg-emerald-600 text-white font-bold ui-weight-medium"
                 : "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/40"
-            }`}
+            } ui-control`}
           >
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
             <span>Checked In ({inHouseCount})</span>
@@ -181,9 +181,9 @@ export function RegistrationsTab({
             onClick={() => setStatusFilter("CHECKED_OUT")}
             className={`px-2.5 py-1 rounded-lg transition cursor-pointer flex items-center gap-1 ${
               statusFilter === "CHECKED_OUT"
-                ? "bg-zinc-700 text-white dark:bg-zinc-300 dark:text-zinc-900 font-bold"
+                ? "bg-zinc-700 text-white dark:bg-zinc-300 dark:text-zinc-900 font-bold ui-weight-medium"
                 : "bg-zinc-100 text-zinc-600 dark:bg-zinc-800/80 dark:text-zinc-400"
-            }`}
+            } ui-control`}
           >
             <span>Checked Out ({checkedOutCount})</span>
           </button>
@@ -192,11 +192,11 @@ export function RegistrationsTab({
               onClick={() => setStatusFilter("PENDING_REVIEW")}
               className={`px-2.5 py-1 rounded-lg transition cursor-pointer flex items-center gap-1 ${
                 statusFilter === "PENDING_REVIEW"
-                  ? "bg-amber-500 text-white font-bold"
+                  ? "bg-amber-500 text-white font-bold ui-weight-medium"
                   : "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400 border border-amber-200 dark:border-amber-800/40"
-              }`}
+              } ui-control`}
             >
-              <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
+              <span className="h-1.5 w-1.5 rounded-full bg-amber-500 " />
               <span>Pending Review ({pendingCount})</span>
             </button>
           )}
@@ -210,12 +210,12 @@ export function RegistrationsTab({
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search guest, mobile, GRC #, room..."
-            className="w-full h-9 pl-9 pr-8 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs sm:text-sm text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:border-blue-500"
+            className="w-full h-9 pl-9 pr-8 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs sm:text-sm text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:border-blue-500 ui-radius-control ui-text-body ui-field" aria-label="Search guest, mobile, GRC #, room"
           />
           {search && (
             <button
               onClick={() => setSearch("")}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 cursor-pointer"
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 cursor-pointer ui-control"
             >
               <X className="h-3.5 w-3.5" />
             </button>
@@ -225,12 +225,12 @@ export function RegistrationsTab({
 
       {/* Notice for Digital Self Check-In if empty and selected */}
       {sourceFilter === "DIGITAL" && digitalCount === 0 && (
-        <div className="mx-4 sm:mx-5 p-4 rounded-xl border border-blue-200 dark:border-blue-900/40 bg-blue-50/50 dark:bg-blue-950/20 text-xs sm:text-sm text-blue-900 dark:text-blue-200 space-y-1">
-          <div className="font-bold flex items-center gap-1.5">
+        <div className="mx-4 sm:mx-5 p-4 rounded-xl border border-blue-200 dark:border-blue-900/40 bg-blue-50/50 dark:bg-blue-950/20 text-xs sm:text-sm text-blue-900 dark:text-blue-200 space-y-1 ui-text-body">
+          <div className="font-bold flex items-center gap-1.5 ui-weight-medium">
             <Laptop className="h-4 w-4 text-blue-600 dark:text-blue-400" />
             <span>Digital Self Check-In is currently in setup</span>
           </div>
-          <p className="text-blue-800 dark:text-blue-300 text-xs">
+          <p className="text-blue-800 dark:text-blue-300 text-xs ui-text-body">
             All current check-in records are manual front-desk entries. When the guest self-service kiosk or online check-in portal is activated, incoming self-registered guest submissions will appear in this tab for instant verification.
           </p>
         </div>
@@ -238,8 +238,8 @@ export function RegistrationsTab({
 
       {/* Table */}
       <div className="overflow-x-auto">
-        <table className="w-full text-left text-sm whitespace-nowrap">
-          <thead className="bg-zinc-50/80 dark:bg-zinc-900/60 border-b border-zinc-200/80 dark:border-zinc-800 text-zinc-500 dark:text-zinc-400 font-semibold text-xs uppercase tracking-wider">
+        <table className="w-full text-left text-sm whitespace-nowrap ui-data-table">
+          <thead className="bg-zinc-50/80 dark:bg-zinc-900/60 border-b border-zinc-200/80 dark:border-zinc-800 text-zinc-500 dark:text-zinc-400 font-semibold text-xs uppercase tracking-wider ui-text-body">
             <tr>
               <th className="px-5 py-3.5">Status</th>
               <th className="px-5 py-3.5">GRC #</th>
@@ -262,7 +262,7 @@ export function RegistrationsTab({
                 <tr key={reg.id} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors">
                   <td className="px-5 py-4">
                     <span
-                      className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full ${
+                      className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full  ui-text-body ${
                         isPending
                           ? "bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-200 dark:border-amber-800/50"
                           : isCheckedIn
@@ -278,7 +278,7 @@ export function RegistrationsTab({
                       {isPending ? "Pending Review" : isCheckedIn ? "Checked In" : "Checked Out"}
                     </span>
                   </td>
-                  <td className="px-5 py-4 font-mono text-zinc-950 dark:text-zinc-50 font-bold text-sm">
+                  <td className="px-5 py-4 font-mono text-zinc-950 dark:text-zinc-50 font-bold text-sm ui-font-body ui-weight-medium">
                     {reg.registrationNo || `GRC-${reg.id.slice(-6).toUpperCase()}`}
                   </td>
                   <td className="px-5 py-4">
@@ -287,25 +287,25 @@ export function RegistrationsTab({
                     </div>
                     <div className="flex items-center gap-1.5 mt-0.5">
                       {isEffectiveSignature(reg.signatureDataUrl) ? (
-                        <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
+                        <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-600 dark:text-emerald-400 ui-text-meta">
                           <CheckCircle className="h-3 w-3" />
                           <span>Signed</span>
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 text-[11px] font-medium text-zinc-400 dark:text-zinc-500">
+                        <span className="inline-flex items-center gap-1 text-[11px] font-medium text-zinc-400 dark:text-zinc-500 ui-text-meta">
                           <Clock className="h-3 w-3" />
                           <span>Unsigned</span>
                         </span>
                       )}
                     </div>
                   </td>
-                  <td className="px-4 py-4 font-mono text-zinc-500 text-sm">{reg.mobilePhone || "N/A"}</td>
-                  <td className="px-4 py-4 font-mono font-bold text-zinc-950 dark:text-zinc-50 text-base">
+                  <td className="px-4 py-4 font-mono text-zinc-500 text-sm ui-font-body">{reg.mobilePhone || "N/A"}</td>
+                  <td className="px-4 py-4 font-mono font-bold text-zinc-950 dark:text-zinc-50 text-base ui-font-body ui-weight-medium">
                     {room}
                   </td>
                   <td className="px-4 py-4">
                     <span
-                      className={`text-xs font-semibold px-2 py-0.5 rounded-md ${
+                      className={`text-xs font-semibold px-2 py-0.5 rounded-md  ui-text-body ${
                         isDigital
                           ? "bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 border border-blue-200 dark:border-blue-800/50"
                           : "bg-zinc-100 text-zinc-600 dark:bg-zinc-800/80 dark:text-zinc-400"
@@ -314,15 +314,15 @@ export function RegistrationsTab({
                       {isDigital ? "Digital Self Check-In" : "Front Desk Intake"}
                     </span>
                   </td>
-                  <td className="px-4 py-4 font-mono text-zinc-500 text-sm">
+                  <td className="px-4 py-4 font-mono text-zinc-500 text-sm ui-font-body">
                     {formatCheckInDate(reg.arrivalDateTime, reg.createdAt)}
                   </td>
                   <td className="px-5 py-4 text-right space-x-2">
                     {/* Real GRC Printable Modal Trigger */}
                     <button
                       onClick={() => onPrintGrc(reg)}
-                      className="h-8 px-2.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 text-xs font-medium inline-flex items-center gap-1.5 transition shadow-2xs cursor-pointer select-none"
-                      title="View Official Guest Registration Card"
+                      className="h-8 px-2.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 text-xs font-medium inline-flex items-center gap-1.5 transition shadow-2xs cursor-pointer select-none ui-text-body ui-shadow-quiet ui-control ui-control-sized"
+                      title="View Official Guest Registration Card" aria-label="View Official Guest Registration Card"
                     >
                       <Printer className="h-3.5 w-3.5 text-zinc-500 dark:text-zinc-400" />
                       <span>View GRC</span>
@@ -331,12 +331,12 @@ export function RegistrationsTab({
                     {/* Details or Review Modal */}
                     <button
                       onClick={() => onReview(reg)}
-                      className={`h-8 px-2.5 rounded-lg text-xs font-medium inline-flex items-center gap-1.5 transition cursor-pointer shadow-2xs select-none ${
+                      className={`h-8 px-2.5 rounded-lg text-xs font-medium inline-flex items-center gap-1.5 transition cursor-pointer shadow-2xs select-none  ui-text-body ui-shadow-quiet ${
                         isPending
                           ? "bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-zinc-100 dark:hover:bg-white dark:text-zinc-900"
                           : "border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300"
-                      }`}
-                      title={isPending ? "Review and Complete Check-In" : "View Record Details"}
+                      } ui-control`}
+                      title={isPending ? "Review and Complete Check-In" : "View Record Details"} aria-label={isPending ? "Review and Complete Check-In" : "View Record Details"}
                     >
                       <ShieldCheck className="h-3.5 w-3.5" />
                       <span>{isPending ? "Review" : "Details"}</span>

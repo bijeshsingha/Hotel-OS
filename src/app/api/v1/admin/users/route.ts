@@ -1,17 +1,25 @@
+import { authorizeRequest, getApiAccess } from "@/lib/auth/api-access";
 import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
-import { hashPassword } from "@/lib/auth/password";
+import { hashPassword, isPasswordHash } from "@/lib/auth/password";
+import { reservedLoginHandles } from "@/lib/auth/identity";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export async function GET(request: Request) {
+  const access = await authorizeRequest(request);
+  if (access instanceof Response) return access;
+  request = access.request;
+
   try {
     const [users, roles, properties] = await Promise.all([
       prisma.user.findMany({
+        where: { memberships: { some: { organizationId: getApiAccess(request).property.organizationId } } },
         include: {
           memberships: {
+            where: { organizationId: getApiAccess(request).property.organizationId },
             include: {
               organization: true,
               propertyGrants: {
@@ -29,6 +37,7 @@ export async function GET(request: Request) {
         orderBy: { name: "asc" },
       }),
       prisma.property.findMany({
+        where: { organizationId: getApiAccess(request).property.organizationId },
         select: {
           id: true,
           code: true,
@@ -43,7 +52,7 @@ export async function GET(request: Request) {
     const formattedUsers = users.map((u) => {
       const membership = u.memberships[0] || null;
       const grants = membership?.propertyGrants || [];
-      const primaryRole = grants[0]?.role || null;
+      const primaryRole = grants.find((grant) => grant.role?.code === "ORG_OWNER")?.role || grants[0]?.role || null;
 
       let propertyScope = "None Assigned";
       if (grants.length === 1) {
@@ -66,6 +75,8 @@ export async function GET(request: Request) {
         rawEmail: u.email,
         phone: u.phone || "",
         status: u.status,
+        hasPassword: isPasswordHash(u.passwordHash),
+        hasPin: isPasswordHash(u.pin),
         lastLoginAt: u.lastLoginAt,
         createdAt: u.createdAt,
         role: primaryRole?.code || "UNASSIGNED",
@@ -87,6 +98,7 @@ export async function GET(request: Request) {
       users: formattedUsers,
       roles,
       properties,
+      reservedUsernames: reservedLoginHandles(),
     });
   } catch (error: any) {
     return NextResponse.json({ error: error.message || "Failed to fetch users" }, { status: 500 });
@@ -94,6 +106,10 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const access = await authorizeRequest(request);
+  if (access instanceof Response) return access;
+  request = access.request;
+
   try {
     const body = await request.json();
     const {
@@ -108,6 +124,10 @@ export async function POST(request: Request) {
       pin,
       password,
     } = body;
+
+    if ((!password?.trim() && !pin?.trim()) || (password?.trim() && password.trim().length < 12) || (pin?.trim() && !/^\d{6,12}$/.test(pin.trim()))) {
+      return NextResponse.json({ error: "Set a password of at least 12 characters or a PIN of 6–12 digits." }, { status: 400 });
+    }
 
     const rawHandle = (username || handle || email || "").trim();
     if (!name?.trim() || !rawHandle) {
@@ -146,7 +166,7 @@ export async function POST(request: Request) {
     }
 
     // Resolve Properties
-    const allProps = await prisma.property.findMany();
+    const allProps = await prisma.property.findMany({ where: { organizationId: getApiAccess(request).property.organizationId } });
     if (allProps.length === 0) {
       return NextResponse.json({ error: "No properties found. Please onboard a hotel first." }, { status: 400 });
     }
@@ -171,7 +191,7 @@ export async function POST(request: Request) {
       status: "ACTIVE",
     };
     if (clientSupportsPin) {
-      newUserData.pin = pin?.trim() || null;
+      newUserData.pin = pin?.trim() ? hashPassword(pin.trim()) : null;
     }
     if (clientSupportsPasswordHash) {
       newUserData.passwordHash = password?.trim() ? hashPassword(password.trim()) : null;
@@ -224,10 +244,10 @@ export async function POST(request: Request) {
     // If running client did not support pin/passwordHash natively, attempt raw SQL update if table has the columns
     if (!clientSupportsPin && pin?.trim()) {
       try {
-        await prisma.$executeRawUnsafe(`UPDATE "User" SET "pin" = $1 WHERE "id" = $2;`, pin.trim(), newUser.id);
+        await prisma.$executeRawUnsafe(`UPDATE "User" SET "pin" = $1 WHERE "id" = $2;`, hashPassword(pin.trim()), newUser.id);
       } catch {
         try {
-          await prisma.$executeRawUnsafe(`UPDATE User SET pin = ? WHERE id = ?;`, pin.trim(), newUser.id);
+          await prisma.$executeRawUnsafe(`UPDATE User SET pin = ? WHERE id = ?;`, hashPassword(pin.trim()), newUser.id);
         } catch {}
       }
     }
@@ -244,7 +264,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       success: true,
-      user: newUser,
+      user: { id: newUser.id, name: newUser.name, email: newUser.email, status: newUser.status },
       message: `Staff member ${newUser.name} created successfully.`,
     });
   } catch (error: any) {

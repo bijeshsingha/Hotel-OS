@@ -75,17 +75,17 @@ export function RoomInspectDrawer({
   return (
     <div
       onClick={onClose}
-      className="fixed inset-0 z-50 flex justify-end bg-black/40 backdrop-blur-xs transition-opacity animate-in fade-in"
+      className="fixed inset-0 z-50 flex justify-end bg-black/40 backdrop-blur-xs transition-opacity  "
     >
       <div
-        className="w-full max-w-lg h-full bg-white dark:bg-[#121215] border-l border-zinc-200/80 dark:border-zinc-800 shadow-2xl flex flex-col justify-between overflow-y-auto"
+        className="w-full max-w-lg h-full bg-white dark:bg-[#121215] border-l border-zinc-200/80 dark:border-zinc-800 shadow-2xl flex flex-col justify-between overflow-y-auto ui-dialog-surface"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div>
           <div className="p-5 sm:p-6 border-b border-zinc-200/80 dark:border-zinc-800 flex items-center justify-between">
             <div>
-              <div className="text-3xl font-extrabold font-mono text-zinc-950 dark:text-zinc-50">
+              <div className="text-3xl font-extrabold font-mono text-zinc-950 dark:text-zinc-50 ui-value-large ui-weight-medium ui-font-body">
                 Room {room.number}
               </div>
               <div className="text-sm text-zinc-500 font-medium mt-0.5">
@@ -94,7 +94,7 @@ export function RoomInspectDrawer({
             </div>
             <button
               onClick={onClose}
-              className="p-2 rounded-xl text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer"
+              className="p-2 rounded-xl text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer ui-radius-control ui-control"
             >
               <X className="h-5 w-5" />
             </button>
@@ -103,18 +103,18 @@ export function RoomInspectDrawer({
           {/* Details Body */}
           <div className="p-5 sm:p-6 space-y-5 text-sm">
             {/* Status Strip: Clean unboxed presentation */}
-            <div className="grid grid-cols-3 gap-3 p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200/70 dark:border-zinc-800">
+            <div className="grid grid-cols-3 gap-3 p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200/70 dark:border-zinc-800 ui-radius-panel">
               <div>
-                <span className="text-zinc-400 block text-xs uppercase font-bold tracking-wider mb-0.5">Occupancy</span>
-                <span className="font-bold text-zinc-900 dark:text-zinc-100 text-base">
+                <span className="text-zinc-400 block text-xs uppercase font-bold tracking-wider mb-0.5 ui-text-body ui-weight-medium">Occupancy</span>
+                <span className="font-bold text-zinc-900 dark:text-zinc-100 text-base ui-weight-medium">
                   {isOccupied ? "Occupied" : "Vacant"}
                 </span>
               </div>
 
               <div>
-                <span className="text-zinc-400 block text-xs uppercase font-bold tracking-wider mb-0.5">Housekeeping</span>
+                <span className="text-zinc-400 block text-xs uppercase font-bold tracking-wider mb-0.5 ui-text-body ui-weight-medium">Housekeeping</span>
                 <span
-                  className={`font-bold text-base ${
+                  className={`font-bold text-base  ui-weight-medium ${
                     hkStatus === "CLEAN"
                       ? "text-emerald-600 dark:text-emerald-400"
                       : "text-amber-600 dark:text-amber-400"
@@ -125,8 +125,8 @@ export function RoomInspectDrawer({
               </div>
 
               <div>
-                <span className="text-zinc-400 block text-xs uppercase font-bold tracking-wider mb-0.5">Daily Tariff</span>
-                <span className="font-mono font-bold text-zinc-900 dark:text-zinc-100 text-base">
+                <span className="text-zinc-400 block text-xs uppercase font-bold tracking-wider mb-0.5 ui-text-body ui-weight-medium">Daily Tariff</span>
+                <span className="font-mono font-bold text-zinc-900 dark:text-zinc-100 text-base ui-font-body ui-weight-medium">
                   ₹{room.roomType?.basePrice || room.roomType?.baseRate || 3200}
                 </span>
               </div>
@@ -134,13 +134,13 @@ export function RoomInspectDrawer({
 
             {/* Resident Guest Profile if occupied */}
             {isOccupied && activeStay ? (
-              <div className="space-y-4 p-5 rounded-2xl border border-blue-200 dark:border-blue-900/40 bg-blue-50/40 dark:bg-blue-950/20">
+              <div className="space-y-4 p-5 rounded-2xl border border-blue-200 dark:border-blue-900/40 bg-blue-50/40 dark:bg-blue-950/20 ui-radius-panel">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 font-bold text-base text-zinc-950 dark:text-zinc-50">
+                  <div className="flex items-center gap-2 font-bold text-base text-zinc-950 dark:text-zinc-50 ui-weight-medium">
                     <User className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                     <span>{guest?.name || "In-House Guest"}</span>
                   </div>
-                  <span className="text-zinc-500 font-mono text-sm font-semibold">
+                  <span className="text-zinc-500 font-mono text-sm font-semibold ui-font-body">
                     {activeStay.adults || 1} Pax
                   </span>
                 </div>
@@ -156,8 +156,8 @@ export function RoomInspectDrawer({
 
                 <div className="grid grid-cols-2 gap-3 pt-3 border-t border-blue-200/60 dark:border-blue-900/40 text-sm">
                   <div>
-                    <span className="text-zinc-400 block text-xs uppercase font-bold tracking-wider mb-0.5">Check-In</span>
-                    <span className="font-mono font-semibold text-zinc-800 dark:text-zinc-200">
+                    <span className="text-zinc-400 block text-xs uppercase font-bold tracking-wider mb-0.5 ui-text-body ui-weight-medium">Check-In</span>
+                    <span className="font-mono font-semibold text-zinc-800 dark:text-zinc-200 ui-font-body">
                       {activeStay.arrivalAt
                         ? new Date(activeStay.arrivalAt).toLocaleDateString("en-IN", {
                             day: "numeric",
@@ -169,8 +169,8 @@ export function RoomInspectDrawer({
                   </div>
 
                   <div>
-                    <span className="text-zinc-400 block text-xs uppercase font-bold tracking-wider mb-0.5">Expected Departure</span>
-                    <span className="font-mono font-semibold text-zinc-800 dark:text-zinc-200">
+                    <span className="text-zinc-400 block text-xs uppercase font-bold tracking-wider mb-0.5 ui-text-body ui-weight-medium">Expected Departure</span>
+                    <span className="font-mono font-semibold text-zinc-800 dark:text-zinc-200 ui-font-body">
                       {activeStay.expectedDepartureAt
                         ? new Date(activeStay.expectedDepartureAt).toLocaleDateString("en-IN", {
                             day: "numeric",
@@ -185,9 +185,9 @@ export function RoomInspectDrawer({
                 {/* Folio Balance & Direct Action */}
                 <div className="pt-4 border-t border-blue-200/60 dark:border-blue-900/40 flex items-center justify-between">
                   <div>
-                    <span className="text-zinc-400 block text-xs uppercase font-bold tracking-wider mb-0.5">Folio Balance</span>
+                    <span className="text-zinc-400 block text-xs uppercase font-bold tracking-wider mb-0.5 ui-text-body ui-weight-medium">Folio Balance</span>
                     <span
-                      className={`text-lg font-bold font-mono tabular-nums ${
+                      className={`text-lg font-bold font-mono tabular-nums  ui-weight-medium ui-font-body ${
                         folioBalance > 0.5
                           ? "text-rose-600 dark:text-rose-400"
                           : "text-emerald-600 dark:text-emerald-400"
@@ -202,7 +202,7 @@ export function RoomInspectDrawer({
                       onClose();
                       onOpenFolio(activeStay, room);
                     }}
-                    className="h-10 px-4 rounded-xl bg-zinc-950 hover:bg-zinc-800 dark:bg-white dark:hover:bg-zinc-100 text-white dark:text-zinc-950 font-semibold text-sm flex items-center gap-2 transition cursor-pointer shadow-xs"
+                    className="h-10 px-4 rounded-xl bg-zinc-950 hover:bg-zinc-800 dark:bg-white dark:hover:bg-zinc-100 text-white dark:text-zinc-950 font-semibold text-sm flex items-center gap-2 transition cursor-pointer shadow-xs ui-radius-control ui-shadow-quiet ui-control ui-control-sized"
                   >
                     <Receipt className="h-4 w-4" />
                     <span>View Folio</span>
@@ -210,14 +210,14 @@ export function RoomInspectDrawer({
                 </div>
               </div>
             ) : (
-              <div className="p-6 text-center rounded-2xl bg-zinc-50 dark:bg-zinc-900 text-zinc-500 space-y-3">
+              <div className="p-6 text-center rounded-2xl bg-zinc-50 dark:bg-zinc-900 text-zinc-500 space-y-3 ui-radius-panel">
                 <p className="text-sm">This room is currently vacant and available.</p>
                 <button
                   onClick={() => {
                     onClose();
                     onQuickCheckIn(room);
                   }}
-                  className="h-10 px-5 rounded-xl bg-zinc-950 hover:bg-zinc-800 dark:bg-white dark:hover:bg-zinc-100 text-white dark:text-zinc-950 font-semibold text-sm transition cursor-pointer shadow-xs"
+                  className="h-10 px-5 rounded-xl bg-zinc-950 hover:bg-zinc-800 dark:bg-white dark:hover:bg-zinc-100 text-white dark:text-zinc-950 font-semibold text-sm transition cursor-pointer shadow-xs ui-radius-control ui-shadow-quiet ui-control ui-control-sized"
                 >
                   Start Check-In
                 </button>
@@ -235,7 +235,7 @@ export function RoomInspectDrawer({
                   onClose();
                   onOpenMoveModal(activeStay, room);
                 }}
-                className="h-10 rounded-xl border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-800 dark:text-zinc-200 font-semibold text-sm flex items-center justify-center gap-2 transition cursor-pointer"
+                className="h-10 rounded-xl border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-800 dark:text-zinc-200 font-semibold text-sm flex items-center justify-center gap-2 transition cursor-pointer ui-radius-control ui-control ui-control-sized"
               >
                 <ArrowRightLeft className="h-4 w-4" />
                 <span>Move Room</span>
@@ -247,7 +247,7 @@ export function RoomInspectDrawer({
                     onClose();
                     onPrintGrc(matchingGrc);
                   }}
-                  className="h-10 rounded-xl border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-800 dark:text-zinc-200 font-semibold text-sm flex items-center justify-center gap-2 transition cursor-pointer"
+                  className="h-10 rounded-xl border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-800 dark:text-zinc-200 font-semibold text-sm flex items-center justify-center gap-2 transition cursor-pointer ui-radius-control ui-control ui-control-sized"
                 >
                   <Printer className="h-4 w-4" />
                   <span>Print GRC</span>
@@ -256,7 +256,7 @@ export function RoomInspectDrawer({
 
               <button
                 onClick={(e) => onDirectCheckout(activeStay.id, e, room.id, room.number)}
-                className="col-span-2 h-10 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-semibold text-sm flex items-center justify-center gap-2 transition cursor-pointer shadow-xs"
+                className="col-span-2 h-10 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-semibold text-sm flex items-center justify-center gap-2 transition cursor-pointer shadow-xs ui-radius-control ui-shadow-quiet ui-control ui-control-sized"
               >
                 <LogOut className="h-4 w-4" />
                 <span>Check-Out Guest</span>
@@ -265,7 +265,7 @@ export function RoomInspectDrawer({
           ) : (
             <button
               onClick={() => onToggleHK(room.id, hkStatus)}
-              className="w-full h-10 rounded-xl border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-800 dark:text-zinc-200 font-semibold text-sm flex items-center justify-center gap-2 transition cursor-pointer"
+              className="w-full h-10 rounded-xl border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-800 dark:text-zinc-200 font-semibold text-sm flex items-center justify-center gap-2 transition cursor-pointer ui-radius-control ui-control ui-control-sized"
             >
               {hkStatus === "CLEAN" ? <RotateCcw className="h-4 w-4 text-zinc-500" /> : <Check className="h-4 w-4 text-emerald-600" />}
               <span>{hkStatus === "CLEAN" ? "Mark Dirty / Turnover" : "Mark Clean & Ready"}</span>

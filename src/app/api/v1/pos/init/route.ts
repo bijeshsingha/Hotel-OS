@@ -1,7 +1,14 @@
+import { authorizeRequest, getApiAccess } from "@/lib/auth/api-access";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
+import { mayPerform } from "@/lib/auth/session";
+import { PERMISSIONS as P } from "@/lib/auth/roles";
 
 export async function GET(request: Request) {
+  const access = await authorizeRequest(request);
+  if (access instanceof Response) return access;
+  request = access.request;
+
   try {
     const { searchParams } = new URL(request.url);
     const propertyParam =
@@ -11,6 +18,7 @@ export async function GET(request: Request) {
       searchParams.get("propertyId");
 
     const allProperties = await prisma.property.findMany({
+      where: { id: { in: getApiAccess(request).properties.map((property) => property.id) } },
       select: { id: true, code: true, displayName: true, legalName: true, address: true, phone: true, stateCode: true },
       orderBy: { createdAt: "asc" },
     });
@@ -26,6 +34,11 @@ export async function GET(request: Request) {
       matchedProperty = allProperties.find((p) => p.code === "GUW-01") || allProperties[0];
     }
     const propertyId = matchedProperty?.id || "";
+    const { user, property: permittedProperty } = getApiAccess(request);
+    const [canViewGuests, canViewFolios] = await Promise.all([
+      mayPerform(user, permittedProperty.id, permittedProperty.organizationId, P.GUEST_PII_VIEW),
+      mayPerform(user, permittedProperty.id, permittedProperty.organizationId, P.FOLIO_VIEW),
+    ]);
 
     const property = await prisma.property.findUnique({
       where: { id: propertyId },
@@ -146,10 +159,10 @@ export async function GET(request: Request) {
         roomType: room.roomType?.name || "Standard",
         isOccupied: Boolean(activeAssign && stay?.status === "IN_HOUSE"),
         stayId: stay?.id || null,
-        guestName: guest?.name || null,
-        guestPhone: guest?.phone || null,
+        guestName: canViewGuests ? guest?.name || null : null,
+        guestPhone: canViewGuests ? guest?.phone || null : null,
         folioId: folio?.id || null,
-        folioBalance: folioBalance,
+        folioBalance: canViewFolios ? folioBalance : null,
       };
     });
 

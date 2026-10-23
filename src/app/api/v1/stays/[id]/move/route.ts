@@ -1,3 +1,4 @@
+import { authorizeRequest, getApiAccess } from "@/lib/auth/api-access";
 import { NextResponse } from "next/server";
 import { moveRoom } from "@/lib/domain/pms-service";
 
@@ -5,6 +6,10 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const access = await authorizeRequest(request);
+  if (access instanceof Response) return access;
+  request = access.request;
+
   try {
     const { id: stayId } = await params;
     const body = await request.json();
@@ -27,7 +32,7 @@ export async function POST(
       targetRoomId,
       reason,
       rateHandling,
-      customRate,
+      customRate: customRate !== undefined && customRate !== null && customRate !== "" ? Number(customRate) : undefined,
       actorId,
       transferCreditAmount: transferCreditAmount !== undefined ? Number(transferCreditAmount) : undefined,
       transferRemarks,

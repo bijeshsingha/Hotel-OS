@@ -36,6 +36,8 @@ import {
 } from "@/data";
 import { normalizeGuestName } from "@/lib/domain/name-utils";
 import { CompanySelector } from "./company-selector";
+import { reservationAdvancePreview } from "@/lib/domain/reservation-advance";
+import { getReservationRateTerms } from "@/lib/domain/reservation-pricing";
 
 interface GrcIntakeModalProps {
   isOpen: boolean;
@@ -56,6 +58,7 @@ export function GrcIntakeModal({
   initialRoomId,
   initialReservation,
 }: GrcIntakeModalProps) {
+  const bookedAdvance = reservationAdvancePreview(initialReservation?.deposits || []);
   // Method Switcher: "PHYSICAL_ENTRY" vs "QR_DIGITAL"
   const [activeMethod, setActiveMethod] = useState<"PHYSICAL_ENTRY" | "QR_DIGITAL">("PHYSICAL_ENTRY");
   const [loading, setLoading] = useState(false);
@@ -183,11 +186,13 @@ export function GrcIntakeModal({
         const totalAdults = Number(initialReservation.adults) || (roomsList[0]?.adults ?? 2);
         const totalChildren = Number(initialReservation.children) || (roomsList[0]?.children ?? 0);
         const firstRoom = roomsList[0] || {};
-        const totalDeposit = initialReservation.deposits?.reduce((s: number, d: any) => s + (d.originalAmount || d.payment?.amount || 0), 0) || (initialReservation.deposits?.[0]?.payment?.amount || 0);
+        const reservationRateTerms = getReservationRateTerms(firstRoom);
         const assigned = firstRoom.assignedRoomId || initialRoomId;
         const resolvedRoomId = assigned || (rooms.find((r) => r.roomState?.occupancyStatus === "VACANT" && (!firstRoom.roomTypeId || r.roomTypeId === firstRoom.roomTypeId))?.id || "");
         const targetRoomObj = rooms.find((r) => r.id === resolvedRoomId);
-        const defaultRate = targetRoomObj?.roomType?.basePrice ? String(targetRoomObj.roomType.basePrice) : (firstRoom.ratePerNight ? String(firstRoom.ratePerNight) : "3200");
+        const defaultRate = reservationRateTerms
+          ? String(reservationRateTerms.ratePerNight)
+          : targetRoomObj?.roomType?.basePrice ? String(targetRoomObj.roomType.basePrice) : (firstRoom.ratePerNight ? String(firstRoom.ratePerNight) : "3200");
         const defaultExtraRate = targetRoomObj?.roomType?.extraAdult ? String(targetRoomObj.roomType.extraAdult) : "500";
 
         setFormData((prev) => ({
@@ -207,9 +212,11 @@ export function GrcIntakeModal({
             [resolvedRoomId]: { adults: totalAdults, children: totalChildren }
           } : {},
           referralChannel: initialReservation.source || "DIRECT",
-          depositAmount: String(totalDeposit),
+          depositAmount: "0",
           roomId: resolvedRoomId,
           agreedTariff: defaultRate,
+          isRateInclusive: reservationRateTerms?.isRateInclusive ?? prev.isRateInclusive,
+          isComplimentary: reservationRateTerms ? reservationRateTerms.ratePerNight === 0 : prev.isComplimentary,
           extraBedRate: defaultExtraRate,
           additionalRoomIds: [],
           roomRates: {},
@@ -490,6 +497,7 @@ export function GrcIntakeModal({
           checkoutType: formData.checkoutType,
           gracePeriodMinutes: formData.gracePeriodMinutes !== undefined ? Number(formData.gracePeriodMinutes) : 0,
           depositAmount: Number(formData.depositAmount) || 0,
+          additionalDepositAmount: Number(formData.depositAmount) || 0,
           depositMethod: formData.paymentMethod || "CASH",
           depositRef: formData.transactionRef?.trim() || undefined,
           extraBeds: (Number(formData.extraPaxCount) || 0) + formData.additionalRoomIds.reduce((acc, id) => acc + (Number(formData.roomExtraPax?.[id]) || 0), 0),
@@ -557,16 +565,16 @@ export function GrcIntakeModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 bg-zinc-100 dark:bg-[#09090b] flex flex-col h-screen w-screen overflow-hidden animate-in fade-in duration-150">
+    <div className="fixed inset-0 z-50 bg-zinc-100 dark:bg-[#09090b] flex flex-col h-screen w-screen overflow-hidden   duration-150">
       
       {/* Full-Width Sticky Top Header */}
-      <header className="w-full border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#111114] px-6 lg:px-10 py-3 flex items-center justify-between shrink-0 shadow-xs z-20">
+      <header className="w-full border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#111114] px-6 lg:px-10 py-3 flex items-center justify-between shrink-0 shadow-xs z-20 ui-shadow-quiet">
         <div className="flex items-center gap-3">
           <button
             type="button"
             onClick={onClose}
-            className="h-9 px-3.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 hover:bg-zinc-100 dark:bg-zinc-900 dark:hover:bg-zinc-800 text-xs font-bold text-zinc-700 dark:text-zinc-300 flex items-center gap-2 transition cursor-pointer shadow-xs"
-            title="Return to Front Desk"
+            className="h-9 px-3.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 hover:bg-zinc-100 dark:bg-zinc-900 dark:hover:bg-zinc-800 text-xs font-bold text-zinc-700 dark:text-zinc-300 flex items-center gap-2 transition cursor-pointer shadow-xs ui-radius-control ui-text-body ui-weight-medium ui-shadow-quiet ui-control ui-control-sized"
+            title="Return to Front Desk" aria-label="Return to Front Desk"
           >
             <ArrowLeft className="h-4 w-4" />
             <span>Back to Room Rack</span>
@@ -576,10 +584,10 @@ export function GrcIntakeModal({
             <UserPlus className="h-4 w-4" />
           </div>
           <div>
-            <h2 className="text-base sm:text-lg font-black text-zinc-900 dark:text-white tracking-tight flex items-center gap-2">
+            <h2 className="text-base sm:text-lg font-black text-zinc-900 dark:text-white tracking-tight flex items-center gap-2 ui-weight-medium ui-section-title">
               <span>Guest Check-In & GRC Intake</span>
             </h2>
-            <p className="text-[11px] text-zinc-500 dark:text-zinc-400 font-mono">
+            <p className="text-[11px] text-zinc-500 dark:text-zinc-400 font-mono ui-text-meta ui-font-body">
               {activeProperty?.displayName || "Hotel"} {activeProperty?.code ? `• ${activeProperty.code}` : ""}
             </p>
           </div>
@@ -591,11 +599,11 @@ export function GrcIntakeModal({
             <button
               type="button"
               onClick={() => setActiveMethod("PHYSICAL_ENTRY")}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer  ui-text-body ui-weight-medium ${
                 activeMethod === "PHYSICAL_ENTRY"
-                  ? "bg-blue-600 text-white shadow-xs font-black"
+                  ? "bg-blue-600 text-white shadow-xs font-black ui-shadow-quiet ui-weight-medium"
                   : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
-              }`}
+              } ui-control`}
             >
               <FileText className="h-3.5 w-3.5" />
               <span>Physical GRC Entry</span>
@@ -604,11 +612,11 @@ export function GrcIntakeModal({
             <button
               type="button"
               onClick={() => setActiveMethod("QR_DIGITAL")}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer  ui-text-body ui-weight-medium ${
                 activeMethod === "QR_DIGITAL"
-                  ? "bg-blue-600 text-white shadow-xs font-black"
+                  ? "bg-blue-600 text-white shadow-xs font-black ui-shadow-quiet ui-weight-medium"
                   : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
-              }`}
+              } ui-control`}
             >
               <QrCode className="h-3.5 w-3.5" />
               <span>Digital QR Kiosk</span>
@@ -618,8 +626,8 @@ export function GrcIntakeModal({
           <button
             type="button"
             onClick={onClose}
-            className="p-2 rounded-xl text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition cursor-pointer"
-            title="Close (Esc)"
+            className="p-2 rounded-xl text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition cursor-pointer ui-radius-control ui-control"
+            title="Close (Esc)" aria-label="Close (Esc)"
           >
             <X className="h-5 w-5" />
           </button>
@@ -629,20 +637,20 @@ export function GrcIntakeModal({
       {/* METHOD 1: PHYSICAL GRC DATA ENTRY FORM */}
       {activeMethod === "PHYSICAL_ENTRY" && (
         <form onSubmit={handleSubmit} noValidate className="flex-1 flex flex-col overflow-hidden">
-          <div className="flex-1 overflow-y-auto w-full px-6 lg:px-12 py-6 space-y-6 text-xs max-w-[1700px] mx-auto">
+          <div className="flex-1 overflow-y-auto w-full px-6 lg:px-12 py-6 space-y-6 text-xs max-w-[1440px] mx-auto ui-text-body">
             
             {/* 1. ROOM ASSIGNMENT & STAY SCHEDULE */}
-            <div className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-[#111114] p-5 sm:p-6 space-y-5 shadow-xs">
+            <div className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-[#111114] p-5 sm:p-6 space-y-5 shadow-xs ui-radius-panel ui-shadow-quiet ui-surface">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-100 dark:border-zinc-800/80 pb-3">
                 <div className="flex items-center gap-2.5">
                   <div className="h-7 w-7 rounded-lg bg-blue-50 dark:bg-blue-600/20 border border-blue-200 dark:border-blue-500/30 flex items-center justify-center text-blue-600 dark:text-blue-400">
                     <Building2 className="h-4 w-4" />
                   </div>
                   <div>
-                    <span className="font-extrabold text-zinc-900 dark:text-white uppercase tracking-wider text-xs">
+                    <span className="font-extrabold text-zinc-900 dark:text-white uppercase tracking-wider text-xs ui-weight-medium ui-text-body">
                       1. Room Assignment & Stay Schedule
                     </span>
-                    <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
+                    <p className="text-[11px] text-zinc-500 dark:text-zinc-400 ui-text-meta">
                       Configure check-in parameters, stay duration, dining inclusions, and room guest allocations.
                     </p>
                   </div>
@@ -650,7 +658,7 @@ export function GrcIntakeModal({
 
                 {selectedRoom && (
                   <div className="flex items-center gap-2">
-                    <span className="text-[11px] font-mono text-zinc-700 dark:text-zinc-300 font-semibold bg-zinc-100 dark:bg-zinc-800/80 px-2.5 py-1 rounded-lg border border-zinc-200 dark:border-zinc-700">
+                    <span className="text-[11px] font-mono text-zinc-700 dark:text-zinc-300 font-semibold bg-zinc-100 dark:bg-zinc-800/80 px-2.5 py-1 rounded-lg border border-zinc-200 dark:border-zinc-700 ui-text-meta ui-font-body">
                       Floor {selectedRoom.floor} • {selectedRoom.roomType?.bedType || "King Bed"}
                       {formData.additionalRoomIds.length > 0 && ` • +${formData.additionalRoomIds.length} Extra Room${formData.additionalRoomIds.length > 1 ? "s" : ""}`}
                     </span>
@@ -662,7 +670,7 @@ export function GrcIntakeModal({
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 {/* 1. Select Primary Room */}
                 <div className="space-y-1.5">
-                  <label className="block font-bold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] tracking-wide">
+                  <label className="block font-bold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] tracking-wide ui-weight-medium ui-text-meta ui-label">
                     Select Primary Room *
                   </label>
                   <select
@@ -685,7 +693,7 @@ export function GrcIntakeModal({
                         },
                       }));
                     }}
-                    className="w-full h-10 px-3 rounded-xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs font-mono font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer shadow-xs"
+                    className="w-full h-10 px-3 rounded-xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs font-mono font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors cursor-pointer shadow-xs ui-radius-control ui-text-body ui-font-body ui-weight-medium ui-shadow-quiet ui-field" aria-label="Select Primary Room"
                   >
                     <option value="">-- Choose Vacant Room --</option>
                     {rooms
@@ -704,10 +712,10 @@ export function GrcIntakeModal({
                 {/* 2. Check-In Date & Time (Paired container) */}
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between">
-                    <label className="font-bold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] tracking-wide">
+                    <label className="font-bold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] tracking-wide ui-weight-medium ui-text-meta ui-label">
                       Check-In Date & Time *
                     </label>
-                    <span className="text-[10px] text-zinc-400 font-mono">🔒 Today</span>
+                    <span className="text-[10px] text-zinc-400 font-mono ui-text-meta ui-font-body">🔒 Today</span>
                   </div>
                   <div className="grid grid-cols-2 gap-2">
                     <input
@@ -715,23 +723,23 @@ export function GrcIntakeModal({
                       disabled
                       readOnly
                       value={formData.arrivalDate}
-                      className="w-full h-10 px-2.5 rounded-xl bg-zinc-100 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400 font-mono text-xs cursor-not-allowed select-none font-bold"
-                      title="Check-in date is locked to the current business day"
+                      className="w-full h-10 px-2.5 rounded-xl bg-zinc-100 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400 font-mono text-xs cursor-not-allowed select-none font-bold ui-radius-control ui-font-body ui-text-body ui-weight-medium ui-field"
+                      title="Check-in date is locked to the current business day" aria-label="Check-in date is locked to the current business day"
                     />
                     <input
                       type="time"
                       required
                       value={formData.arrivalTime}
                       onChange={(e) => setFormData({ ...formData, arrivalTime: e.target.value })}
-                      className="w-full h-10 px-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer shadow-xs"
-                      title="Arrival Time"
+                      className="w-full h-10 px-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors cursor-pointer shadow-xs ui-radius-control ui-font-body ui-text-body ui-weight-medium ui-shadow-quiet ui-field"
+                      title="Arrival Time" aria-label="Arrival Time"
                     />
                   </div>
                 </div>
 
                 {/* 3. Expected Departure Date */}
                 <div className="space-y-1.5">
-                  <label className="block font-bold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] tracking-wide">
+                  <label className="block font-bold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] tracking-wide ui-weight-medium ui-text-meta ui-label">
                     Expected Departure *
                   </label>
                   <input
@@ -740,21 +748,21 @@ export function GrcIntakeModal({
                     min={formData.arrivalDate || new Date().toISOString().split("T")[0]}
                     value={formData.departureDate}
                     onChange={(e) => setFormData({ ...formData, departureDate: e.target.value })}
-                    className="w-full h-10 px-3 rounded-xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer shadow-xs"
+                    className="w-full h-10 px-3 rounded-xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors cursor-pointer shadow-xs ui-radius-control ui-font-body ui-text-body ui-weight-medium ui-shadow-quiet ui-field" aria-label="Expected Departure"
                   />
                 </div>
 
                 {/* 4. Checkout Billing & Grace Period */}
                 <div className="space-y-1.5">
-                  <label className="block font-bold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] tracking-wide">
+                  <label className="block font-bold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] tracking-wide ui-weight-medium ui-text-meta ui-label">
                     Checkout Billing & Grace *
                   </label>
                   <div className="grid grid-cols-2 gap-2">
                     <select
                       value={formData.checkoutType}
                       onChange={(e: any) => setFormData({ ...formData, checkoutType: e.target.value })}
-                      className="w-full h-10 px-2 rounded-xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer shadow-xs truncate"
-                      title="Checkout Billing Cycle"
+                      className="w-full h-10 px-2 rounded-xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors cursor-pointer shadow-xs truncate ui-radius-control ui-text-body ui-shadow-quiet ui-field"
+                      title="Checkout Billing Cycle" aria-label="Checkout Billing & Grace"
                     >
                       <option value="FIXED_TIME">Std 11:00 AM</option>
                       <option value="24_HOURS">24-Hour Cycle</option>
@@ -763,8 +771,8 @@ export function GrcIntakeModal({
                     <select
                       value={formData.gracePeriodMinutes}
                       onChange={(e: any) => setFormData({ ...formData, gracePeriodMinutes: e.target.value })}
-                      className="w-full h-10 px-2 rounded-xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer shadow-xs truncate"
-                      title="Grace Period Window"
+                      className="w-full h-10 px-2 rounded-xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors cursor-pointer shadow-xs truncate ui-radius-control ui-text-body ui-shadow-quiet ui-field"
+                      title="Grace Period Window" aria-label="Checkout Billing & Grace"
                     >
                       <option value="0">0h Grace</option>
                       <option value="60">1h Grace</option>
@@ -785,23 +793,23 @@ export function GrcIntakeModal({
                 {/* 1. Total Adults (Read-Only Aggregate from Room Matrix) */}
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between">
-                    <label className="font-bold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] tracking-wide">
+                    <label className="font-bold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] tracking-wide ui-weight-medium ui-text-meta ui-label">
                       Total Adults
                     </label>
-                    <span className="text-[10px] text-blue-600 dark:text-blue-400 font-bold bg-blue-50 dark:bg-blue-500/10 px-1.5 py-0.5 rounded border border-blue-200 dark:border-blue-500/20">
+                    <span className="text-[10px] text-blue-600 dark:text-blue-400 font-bold bg-blue-50 dark:bg-blue-500/10 px-1.5 py-0.5 rounded border border-blue-200 dark:border-blue-500/20 ui-text-meta ui-weight-medium">
                       Auto-Calculated
                     </span>
                   </div>
                   <div 
-                    className="w-full h-10 px-3 rounded-xl bg-zinc-100/90 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-white font-mono text-xs font-bold flex items-center justify-between shadow-xs select-none cursor-default"
+                    className="w-full h-10 px-3 rounded-xl bg-zinc-100/90 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-white font-mono text-xs font-bold flex items-center justify-between shadow-xs select-none cursor-default ui-font-body ui-text-body ui-weight-medium ui-shadow-quiet"
                     title="Total Adults is auto-calculated from the assigned guests in each room below."
                   >
                     <span className="flex items-center gap-1.5">
                       <span className="text-sm">👥</span>
-                      <span className="font-black text-sm">{calculatedTotalAdults}</span>
-                      <span className="text-[11px] font-medium text-zinc-600 dark:text-zinc-300">{calculatedTotalAdults === 1 ? "Adult" : "Adults"}</span>
+                      <span className="font-black text-sm ui-weight-medium">{calculatedTotalAdults}</span>
+                      <span className="text-[11px] font-medium text-zinc-600 dark:text-zinc-300 ui-text-meta">{calculatedTotalAdults === 1 ? "Adult" : "Adults"}</span>
                     </span>
-                    <span className="text-[10px] font-sans font-semibold text-zinc-500 dark:text-zinc-400 bg-zinc-200/70 dark:bg-zinc-700/60 px-1.5 py-0.5 rounded">
+                    <span className="text-[10px] font-sans font-semibold text-zinc-500 dark:text-zinc-400 bg-zinc-200/70 dark:bg-zinc-700/60 px-1.5 py-0.5 rounded ui-text-meta">
                       {allSelectedRoomsList.length} {allSelectedRoomsList.length === 1 ? "Room" : "Rooms"}
                     </span>
                   </div>
@@ -810,10 +818,10 @@ export function GrcIntakeModal({
                 {/* 2. Children (Free) */}
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between">
-                    <label className="font-bold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] tracking-wide">
+                    <label className="font-bold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] tracking-wide ui-weight-medium ui-text-meta ui-label">
                       Children
                     </label>
-                    <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold bg-emerald-50 dark:bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-200 dark:border-emerald-500/20">
+                    <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold bg-emerald-50 dark:bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-200 dark:border-emerald-500/20 ui-text-meta ui-weight-medium">
                       Free (₹0)
                     </span>
                   </div>
@@ -823,19 +831,19 @@ export function GrcIntakeModal({
                     min="0"
                     value={formData.children}
                     onChange={(e) => setFormData({ ...formData, children: e.target.value })}
-                    className="w-full h-10 px-3 rounded-xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all shadow-xs"
+                    className="w-full h-10 px-3 rounded-xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors shadow-xs ui-radius-control ui-font-body ui-text-body ui-weight-medium ui-shadow-quiet ui-field"
                   />
                 </div>
 
                 {/* 3. Meal Plan */}
                 <div className="space-y-1.5">
-                  <label className="block font-bold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] tracking-wide">
+                  <label className="block font-bold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] tracking-wide ui-weight-medium ui-text-meta ui-label">
                     Meal Plan
                   </label>
                   <select
                     value={formData.mealPlan}
                     onChange={(e) => setFormData({ ...formData, mealPlan: e.target.value })}
-                    className="w-full h-10 px-3 rounded-xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer shadow-xs"
+                    className="w-full h-10 px-3 rounded-xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors cursor-pointer shadow-xs ui-radius-control ui-text-body ui-shadow-quiet ui-field" aria-label="Meal Plan"
                   >
                     <option value="EP">EP (Room Only)</option>
                     <option value="CP">CP (Continental Plan - Breakfast)</option>
@@ -846,27 +854,27 @@ export function GrcIntakeModal({
 
                 {/* 4. Kitchen Dining */}
                 <div className="space-y-1.5">
-                  <label className="block font-bold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] tracking-wide">
+                  <label className="block font-bold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] tracking-wide ui-weight-medium ui-text-meta ui-label">
                     Kitchen Dining
                   </label>
                   <div className="flex items-center gap-2">
                     <select
                       value={formData.kitchenDining || "NO"}
                       onChange={(e: any) => setFormData({ ...formData, kitchenDining: e.target.value })}
-                      className="w-full h-10 px-3 rounded-xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer shadow-xs"
+                      className="w-full h-10 px-3 rounded-xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors cursor-pointer shadow-xs ui-radius-control ui-text-body ui-shadow-quiet ui-field" aria-label="Kitchen Dining"
                     >
                       <option value="NO">No Dining</option>
                       <option value="YES">Dining Included</option>
                     </select>
                     {formData.kitchenDining === "YES" && (
                       <div className="relative w-32 shrink-0">
-                        <span className="absolute left-2.5 top-2.5 text-xs text-zinc-400 font-bold font-mono">₹</span>
+                        <span className="absolute left-2.5 top-2.5 text-xs text-zinc-400 font-bold font-mono ui-text-body ui-weight-medium ui-font-body">₹</span>
                         <input
                           type="number"
                           placeholder="Fixed Rate"
                           value={formData.diningFixedRate || ""}
                           onChange={(e) => setFormData({ ...formData, diningFixedRate: e.target.value })}
-                          className="w-full h-10 pl-6 pr-2 rounded-xl bg-white dark:bg-zinc-900 border border-amber-400 dark:border-amber-600 text-zinc-900 dark:text-white font-mono text-xs font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all shadow-xs"
+                          className="w-full h-10 pl-6 pr-2 rounded-xl bg-white dark:bg-zinc-900 border border-amber-400 dark:border-amber-600 text-zinc-900 dark:text-white font-mono text-xs font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors shadow-xs ui-radius-control ui-font-body ui-text-body ui-weight-medium ui-shadow-quiet ui-surface ui-field" aria-label="Fixed Rate"
                         />
                       </div>
                     )}
@@ -875,7 +883,7 @@ export function GrcIntakeModal({
 
                 {/* 5. Gender Demographics (Optional) */}
                 <div className="space-y-1.5">
-                  <label className="block font-bold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] tracking-wide">
+                  <label className="block font-bold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] tracking-wide ui-weight-medium ui-text-meta ui-label">
                     Gender Split (Optional)
                   </label>
                   <div className="grid grid-cols-2 gap-2">
@@ -885,7 +893,7 @@ export function GrcIntakeModal({
                       min="0"
                       value={formData.paxM}
                       onChange={(e) => setFormData({ ...formData, paxM: e.target.value })}
-                      className="w-full h-10 px-3 rounded-xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all shadow-xs"
+                      className="w-full h-10 px-3 rounded-xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors shadow-xs ui-radius-control ui-font-body ui-text-body ui-shadow-quiet ui-field" aria-label="Gender Split (Optional)"
                     />
                     <input
                       type="number"
@@ -893,7 +901,7 @@ export function GrcIntakeModal({
                       min="0"
                       value={formData.paxF}
                       onChange={(e) => setFormData({ ...formData, paxF: e.target.value })}
-                      className="w-full h-10 px-3 rounded-xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all shadow-xs"
+                      className="w-full h-10 px-3 rounded-xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors shadow-xs ui-radius-control ui-font-body ui-text-body ui-shadow-quiet ui-field" aria-label="Gender Split (Optional)"
                     />
                   </div>
                 </div>
@@ -905,11 +913,11 @@ export function GrcIntakeModal({
                 const isEarlyBird = hour >= 5 && hour < 11;
                 if (!isEarlyBird) return null;
                 return (
-                  <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-700/60 flex items-center gap-2.5 text-xs text-amber-900 dark:text-amber-200 shadow-xs">
+                  <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-700/60 flex items-center gap-2.5 text-xs text-amber-900 dark:text-amber-200 shadow-xs ui-text-body ui-shadow-quiet">
                     <span className="text-base">🌟</span>
                     <div>
-                      <strong className="font-bold">Early Bird Check-In Included:</strong>
-                      <span className="ml-1 text-[11.5px] text-amber-800 dark:text-amber-300">
+                      <strong className="font-bold ui-weight-medium">Early Bird Check-In Included:</strong>
+                      <span className="ml-1 text-[11.5px] text-amber-800 dark:text-amber-300 ui-text-meta">
                         Arrival between 5:00 AM and 11:00 AM is included at no extra charge. Stay valid until Standard Check-Out on departure date.
                       </span>
                     </div>
@@ -950,17 +958,17 @@ export function GrcIntakeModal({
                     {/* Header bar above matrix */}
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-1">
                       <div className="flex items-center gap-2">
-                        <span className="text-xs font-black uppercase tracking-wider text-zinc-900 dark:text-white">
+                        <span className="text-xs font-black uppercase tracking-wider text-zinc-900 dark:text-white ui-text-body ui-weight-medium">
                           Room & Occupancy Allocation Matrix
                         </span>
-                        <span className="px-2 py-0.5 rounded-full text-[11px] font-bold font-mono bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700">
+                        <span className="px-2 py-0.5 rounded-full text-[11px] font-bold font-mono bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 ui-text-meta ui-weight-medium ui-font-body">
                           {totalRoomsCount} {totalRoomsCount === 1 ? "Room" : "Rooms"}
                         </span>
                       </div>
 
                       {/* Capacity status pill */}
                       <div className="flex items-center gap-2">
-                        <span className={`px-3 py-1 rounded-xl text-xs font-bold font-mono border flex items-center gap-1.5 shadow-xs ${
+                        <span className={`px-3 py-1 rounded-xl text-xs font-bold font-mono border flex items-center gap-1.5 shadow-xs  ui-text-body ui-weight-medium ui-font-body ui-shadow-quiet ${
                           isBeyondMaxPhysicalLimit
                             ? "bg-rose-100 dark:bg-rose-950/60 border-rose-300 dark:border-rose-700 text-rose-800 dark:text-rose-200"
                             : isOverCapacity
@@ -985,9 +993,9 @@ export function GrcIntakeModal({
 
                     {/* Table Matrix */}
                     <div className="overflow-x-auto rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/30">
-                      <table className="w-full text-left text-xs border-collapse">
+                      <table className="w-full text-left text-xs border-collapse ui-text-body ui-data-table">
                         <thead>
-                          <tr className="border-b border-zinc-200 dark:border-zinc-800 bg-zinc-100/70 dark:bg-zinc-900/80 text-[11px] font-bold uppercase tracking-wider text-zinc-600 dark:text-zinc-400">
+                          <tr className="border-b border-zinc-200 dark:border-zinc-800 bg-zinc-100/70 dark:bg-zinc-900/80 text-[11px] font-bold uppercase tracking-wider text-zinc-600 dark:text-zinc-400 ui-text-meta ui-weight-medium">
                             <th className="py-2.5 px-4">Room</th>
                             <th className="py-2.5 px-4">Category & Bedding</th>
                             <th className="py-2.5 px-4">Nightly Tariff</th>
@@ -1007,10 +1015,10 @@ export function GrcIntakeModal({
                               <tr className="bg-white dark:bg-[#111114] hover:bg-zinc-50/80 dark:hover:bg-zinc-900/40 transition-colors">
                                 <td className="py-3 px-4">
                                   <div className="flex items-center gap-2">
-                                    <span className="px-2.5 py-1 rounded-lg bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-300 font-bold font-mono text-xs border border-blue-200 dark:border-blue-800">
+                                    <span className="px-2.5 py-1 rounded-lg bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-300 font-bold font-mono text-xs border border-blue-200 dark:border-blue-800 ui-weight-medium ui-font-body ui-text-body">
                                       Room {primaryRoom.number}
                                     </span>
-                                    <span className="text-[10px] font-bold uppercase tracking-wider bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 px-1.5 py-0.5 rounded border border-zinc-200 dark:border-zinc-700">
+                                    <span className="text-[10px] font-bold uppercase tracking-wider bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 px-1.5 py-0.5 rounded border border-zinc-200 dark:border-zinc-700 ui-text-meta ui-weight-medium">
                                       Primary
                                     </span>
                                   </div>
@@ -1020,31 +1028,31 @@ export function GrcIntakeModal({
                                   <div className="font-semibold text-zinc-900 dark:text-zinc-100">
                                     {primaryRoom.roomType?.name || "Standard Room"}
                                   </div>
-                                  <div className="text-[11px] text-zinc-500 font-mono">
+                                  <div className="text-[11px] text-zinc-500 font-mono ui-text-meta ui-font-body">
                                     Floor {primaryRoom.floor} • {primaryRoom.roomType?.bedType || "King Bed"}
                                   </div>
                                 </td>
 
                                 <td className="py-3 px-4">
                                   <div className="flex items-center gap-1.5">
-                                    <span className="text-zinc-400 font-mono text-xs">₹</span>
+                                    <span className="text-zinc-400 font-mono text-xs ui-font-body ui-text-body">₹</span>
                                     <input
                                       type="number"
                                       disabled={formData.isComplimentary}
                                       value={formData.isComplimentary ? "0" : formData.agreedTariff}
                                       onChange={(e) => setFormData({ ...formData, agreedTariff: e.target.value })}
-                                      className="w-24 h-8 px-2 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 font-mono font-bold text-xs text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 disabled:opacity-50 shadow-xs"
-                                      placeholder="Tariff"
+                                      className="w-24 h-8 px-2 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 font-mono font-bold text-xs text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 disabled:opacity-50 shadow-xs ui-font-body ui-weight-medium ui-text-body ui-shadow-quiet ui-field"
+                                      placeholder="Tariff" aria-label="Tariff"
                                     />
                                     <button
                                       type="button"
                                       onClick={() => setFormData((prev) => ({ ...prev, isComplimentary: !prev.isComplimentary }))}
-                                      className={`px-2 py-1 rounded-lg text-[11px] font-bold transition flex items-center gap-1 cursor-pointer border ${
+                                      className={`px-2 py-1 rounded-lg text-[11px] font-bold transition flex items-center gap-1 cursor-pointer border  ui-text-meta ui-weight-medium ${
                                         formData.isComplimentary
                                           ? "bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800"
                                           : "bg-zinc-50 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border-zinc-200 dark:border-zinc-700 hover:text-emerald-700"
-                                      }`}
-                                      title="Toggle complimentary stay"
+                                      } ui-control`}
+                                      title="Toggle complimentary stay" aria-label="Toggle complimentary stay"
                                     >
                                       <span>🎁</span>
                                       <span>{formData.isComplimentary ? "Comp" : "Comp"}</span>
@@ -1056,22 +1064,22 @@ export function GrcIntakeModal({
                                   <div className="flex items-center justify-center gap-3">
                                     {/* Adults */}
                                     <div className="flex items-center gap-1.5">
-                                      <span className="text-[11px] text-zinc-500 font-medium">Adults:</span>
+                                      <span className="text-[11px] text-zinc-500 font-medium ui-text-meta">Adults:</span>
                                       <div className="flex items-center bg-zinc-100 dark:bg-zinc-800 p-0.5 rounded-lg border border-zinc-200 dark:border-zinc-700">
                                         <button
                                           type="button"
                                           onClick={() => updateRoomPax(primaryRoom.id, "adults", Math.max(1, pAdults - 1))}
-                                          className="h-6 w-6 rounded-md bg-white dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-700 active:scale-90 text-zinc-700 dark:text-zinc-200 flex items-center justify-center transition shadow-xs cursor-pointer"
+                                          className="h-6 w-6 rounded-md bg-white dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-700  text-zinc-700 dark:text-zinc-200 flex items-center justify-center transition shadow-xs cursor-pointer ui-shadow-quiet ui-control"
                                         >
                                           <Minus className="h-3 w-3 stroke-[2.5]" />
                                         </button>
-                                        <span className="font-mono font-bold text-xs text-zinc-900 dark:text-white px-2 min-w-[20px] text-center select-none">
+                                        <span className="font-mono font-bold text-xs text-zinc-900 dark:text-white px-2 min-w-[20px] text-center select-none ui-font-body ui-weight-medium ui-text-body">
                                           {pAdults}
                                         </span>
                                         <button
                                           type="button"
                                           onClick={() => updateRoomPax(primaryRoom.id, "adults", pAdults + 1)}
-                                          className="h-6 w-6 rounded-md bg-white dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-700 active:scale-90 text-zinc-700 dark:text-zinc-200 flex items-center justify-center transition shadow-xs cursor-pointer"
+                                          className="h-6 w-6 rounded-md bg-white dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-700  text-zinc-700 dark:text-zinc-200 flex items-center justify-center transition shadow-xs cursor-pointer ui-shadow-quiet ui-control"
                                         >
                                           <Plus className="h-3 w-3 stroke-[2.5]" />
                                         </button>
@@ -1080,22 +1088,22 @@ export function GrcIntakeModal({
 
                                     {/* Kids */}
                                     <div className="flex items-center gap-1.5">
-                                      <span className="text-[11px] text-zinc-500 font-medium">Kids:</span>
+                                      <span className="text-[11px] text-zinc-500 font-medium ui-text-meta">Kids:</span>
                                       <div className="flex items-center bg-zinc-100 dark:bg-zinc-800 p-0.5 rounded-lg border border-zinc-200 dark:border-zinc-700">
                                         <button
                                           type="button"
                                           onClick={() => updateRoomPax(primaryRoom.id, "children", Math.max(0, pKids - 1))}
-                                          className="h-6 w-6 rounded-md bg-white dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-700 active:scale-90 text-zinc-700 dark:text-zinc-200 flex items-center justify-center transition shadow-xs cursor-pointer"
+                                          className="h-6 w-6 rounded-md bg-white dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-700  text-zinc-700 dark:text-zinc-200 flex items-center justify-center transition shadow-xs cursor-pointer ui-shadow-quiet ui-control"
                                         >
                                           <Minus className="h-3 w-3 stroke-[2.5]" />
                                         </button>
-                                        <span className="font-mono font-bold text-xs text-zinc-900 dark:text-white px-2 min-w-[20px] text-center select-none">
+                                        <span className="font-mono font-bold text-xs text-zinc-900 dark:text-white px-2 min-w-[20px] text-center select-none ui-font-body ui-weight-medium ui-text-body">
                                           {pKids}
                                         </span>
                                         <button
                                           type="button"
                                           onClick={() => updateRoomPax(primaryRoom.id, "children", pKids + 1)}
-                                          className="h-6 w-6 rounded-md bg-white dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-700 active:scale-90 text-zinc-700 dark:text-zinc-200 flex items-center justify-center transition shadow-xs cursor-pointer"
+                                          className="h-6 w-6 rounded-md bg-white dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-700  text-zinc-700 dark:text-zinc-200 flex items-center justify-center transition shadow-xs cursor-pointer ui-shadow-quiet ui-control"
                                         >
                                           <Plus className="h-3 w-3 stroke-[2.5]" />
                                         </button>
@@ -1113,11 +1121,11 @@ export function GrcIntakeModal({
                                           const cur = Number(formData.extraPaxCount) || 0;
                                           setFormData((prev) => ({ ...prev, extraPaxCount: Math.max(0, cur - 1) }));
                                         }}
-                                        className="h-6 w-6 rounded-md bg-white dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-700 active:scale-90 text-zinc-700 dark:text-zinc-200 flex items-center justify-center transition shadow-xs cursor-pointer"
+                                        className="h-6 w-6 rounded-md bg-white dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-700  text-zinc-700 dark:text-zinc-200 flex items-center justify-center transition shadow-xs cursor-pointer ui-shadow-quiet ui-control"
                                       >
                                         <Minus className="h-3 w-3 stroke-[2.5]" />
                                       </button>
-                                      <span className="font-mono font-bold text-xs text-zinc-900 dark:text-white px-2 min-w-[20px] text-center select-none">
+                                      <span className="font-mono font-bold text-xs text-zinc-900 dark:text-white px-2 min-w-[20px] text-center select-none ui-font-body ui-weight-medium ui-text-body">
                                         {pExtraPax}
                                       </span>
                                       <button
@@ -1126,13 +1134,13 @@ export function GrcIntakeModal({
                                           const cur = Number(formData.extraPaxCount) || 0;
                                           setFormData((prev) => ({ ...prev, extraPaxCount: cur + 1 }));
                                         }}
-                                        className="h-6 w-6 rounded-md bg-white dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-700 active:scale-90 text-zinc-700 dark:text-zinc-200 flex items-center justify-center transition shadow-xs cursor-pointer"
+                                        className="h-6 w-6 rounded-md bg-white dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-700  text-zinc-700 dark:text-zinc-200 flex items-center justify-center transition shadow-xs cursor-pointer ui-shadow-quiet ui-control"
                                       >
                                         <Plus className="h-3 w-3 stroke-[2.5]" />
                                       </button>
                                     </div>
                                     {pExtraPax > 0 && (
-                                      <span className="text-[10px] font-mono font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/60 px-1.5 py-0.5 rounded border border-amber-200 dark:border-amber-800">
+                                      <span className="text-[10px] font-mono font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/60 px-1.5 py-0.5 rounded border border-amber-200 dark:border-amber-800 ui-text-meta ui-font-body ui-weight-medium">
                                         +₹{pExtraPax * primaryExtraRate}
                                       </span>
                                     )}
@@ -1140,7 +1148,7 @@ export function GrcIntakeModal({
                                 </td>
 
                                 <td className="py-3 px-4 text-right">
-                                  <span className="text-[11px] font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 rounded border border-blue-200 dark:border-blue-800">
+                                  <span className="text-[11px] font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 rounded border border-blue-200 dark:border-blue-800 ui-text-meta ui-weight-medium">
                                     Primary Stay
                                   </span>
                                 </td>
@@ -1168,10 +1176,10 @@ export function GrcIntakeModal({
                               <tr key={id} className="bg-white dark:bg-[#111114] hover:bg-zinc-50/80 dark:hover:bg-zinc-900/40 transition-colors">
                                 <td className="py-3 px-4">
                                   <div className="flex items-center gap-2">
-                                    <span className="px-2.5 py-1 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 font-bold font-mono text-xs border border-zinc-200 dark:border-zinc-700">
+                                    <span className="px-2.5 py-1 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 font-bold font-mono text-xs border border-zinc-200 dark:border-zinc-700 ui-weight-medium ui-font-body ui-text-body">
                                       Room {r?.number}
                                     </span>
-                                    <span className="text-[10px] font-bold uppercase tracking-wider bg-purple-50 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 px-1.5 py-0.5 rounded border border-purple-200 dark:border-purple-800">
+                                    <span className="text-[10px] font-bold uppercase tracking-wider bg-purple-50 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 px-1.5 py-0.5 rounded border border-purple-200 dark:border-purple-800 ui-text-meta ui-weight-medium">
                                       Group
                                     </span>
                                   </div>
@@ -1181,14 +1189,14 @@ export function GrcIntakeModal({
                                   <div className="font-semibold text-zinc-900 dark:text-zinc-100">
                                     {r?.roomType?.name || "Standard Room"}
                                   </div>
-                                  <div className="text-[11px] text-zinc-500 font-mono">
+                                  <div className="text-[11px] text-zinc-500 font-mono ui-text-meta ui-font-body">
                                     Floor {r?.floor} • {r?.roomType?.bedType || "Twin Bed"}
                                   </div>
                                 </td>
 
                                 <td className="py-3 px-4">
                                   <div className="flex items-center gap-1.5">
-                                    <span className="text-zinc-400 font-mono text-xs">₹</span>
+                                    <span className="text-zinc-400 font-mono text-xs ui-font-body ui-text-body">₹</span>
                                     <input
                                       type="number"
                                       disabled={isRoomComp}
@@ -1199,8 +1207,8 @@ export function GrcIntakeModal({
                                           roomRates: { ...prev.roomRates, [id]: e.target.value },
                                         }))
                                       }
-                                      className="w-24 h-8 px-2 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 font-mono font-bold text-xs text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 disabled:opacity-50 shadow-xs"
-                                      placeholder="Tariff"
+                                      className="w-24 h-8 px-2 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 font-mono font-bold text-xs text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 disabled:opacity-50 shadow-xs ui-font-body ui-weight-medium ui-text-body ui-shadow-quiet ui-field"
+                                      placeholder="Tariff" aria-label="Tariff"
                                     />
                                     <button
                                       type="button"
@@ -1215,12 +1223,12 @@ export function GrcIntakeModal({
                                           };
                                         });
                                       }}
-                                      className={`px-2 py-1 rounded-lg text-[11px] font-bold transition flex items-center gap-1 cursor-pointer border ${
+                                      className={`px-2 py-1 rounded-lg text-[11px] font-bold transition flex items-center gap-1 cursor-pointer border  ui-text-meta ui-weight-medium ${
                                         isRoomComp
                                           ? "bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800"
                                           : "bg-zinc-50 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border-zinc-200 dark:border-zinc-700 hover:text-emerald-700"
-                                      }`}
-                                      title="Toggle complimentary stay"
+                                      } ui-control`}
+                                      title="Toggle complimentary stay" aria-label="Toggle complimentary stay"
                                     >
                                       <span>🎁</span>
                                       <span>{isRoomComp ? "Comp" : "Comp"}</span>
@@ -1232,22 +1240,22 @@ export function GrcIntakeModal({
                                   <div className="flex items-center justify-center gap-3">
                                     {/* Adults */}
                                     <div className="flex items-center gap-1.5">
-                                      <span className="text-[11px] text-zinc-500 font-medium">Adults:</span>
+                                      <span className="text-[11px] text-zinc-500 font-medium ui-text-meta">Adults:</span>
                                       <div className="flex items-center bg-zinc-100 dark:bg-zinc-800 p-0.5 rounded-lg border border-zinc-200 dark:border-zinc-700">
                                         <button
                                           type="button"
                                           onClick={() => updateRoomPax(id, "adults", Math.max(1, assignedAdults - 1))}
-                                          className="h-6 w-6 rounded-md bg-white dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-700 active:scale-90 text-zinc-700 dark:text-zinc-200 flex items-center justify-center transition shadow-xs cursor-pointer"
+                                          className="h-6 w-6 rounded-md bg-white dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-700  text-zinc-700 dark:text-zinc-200 flex items-center justify-center transition shadow-xs cursor-pointer ui-shadow-quiet ui-control"
                                         >
                                           <Minus className="h-3 w-3 stroke-[2.5]" />
                                         </button>
-                                        <span className="font-mono font-bold text-xs text-zinc-900 dark:text-white px-2 min-w-[20px] text-center select-none">
+                                        <span className="font-mono font-bold text-xs text-zinc-900 dark:text-white px-2 min-w-[20px] text-center select-none ui-font-body ui-weight-medium ui-text-body">
                                           {assignedAdults}
                                         </span>
                                         <button
                                           type="button"
                                           onClick={() => updateRoomPax(id, "adults", assignedAdults + 1)}
-                                          className="h-6 w-6 rounded-md bg-white dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-700 active:scale-90 text-zinc-700 dark:text-zinc-200 flex items-center justify-center transition shadow-xs cursor-pointer"
+                                          className="h-6 w-6 rounded-md bg-white dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-700  text-zinc-700 dark:text-zinc-200 flex items-center justify-center transition shadow-xs cursor-pointer ui-shadow-quiet ui-control"
                                         >
                                           <Plus className="h-3 w-3 stroke-[2.5]" />
                                         </button>
@@ -1256,22 +1264,22 @@ export function GrcIntakeModal({
 
                                     {/* Kids */}
                                     <div className="flex items-center gap-1.5">
-                                      <span className="text-[11px] text-zinc-500 font-medium">Kids:</span>
+                                      <span className="text-[11px] text-zinc-500 font-medium ui-text-meta">Kids:</span>
                                       <div className="flex items-center bg-zinc-100 dark:bg-zinc-800 p-0.5 rounded-lg border border-zinc-200 dark:border-zinc-700">
                                         <button
                                           type="button"
                                           onClick={() => updateRoomPax(id, "children", Math.max(0, assignedKids - 1))}
-                                          className="h-6 w-6 rounded-md bg-white dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-700 active:scale-90 text-zinc-700 dark:text-zinc-200 flex items-center justify-center transition shadow-xs cursor-pointer"
+                                          className="h-6 w-6 rounded-md bg-white dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-700  text-zinc-700 dark:text-zinc-200 flex items-center justify-center transition shadow-xs cursor-pointer ui-shadow-quiet ui-control"
                                         >
                                           <Minus className="h-3 w-3 stroke-[2.5]" />
                                         </button>
-                                        <span className="font-mono font-bold text-xs text-zinc-900 dark:text-white px-2 min-w-[20px] text-center select-none">
+                                        <span className="font-mono font-bold text-xs text-zinc-900 dark:text-white px-2 min-w-[20px] text-center select-none ui-font-body ui-weight-medium ui-text-body">
                                           {assignedKids}
                                         </span>
                                         <button
                                           type="button"
                                           onClick={() => updateRoomPax(id, "children", assignedKids + 1)}
-                                          className="h-6 w-6 rounded-md bg-white dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-700 active:scale-90 text-zinc-700 dark:text-zinc-200 flex items-center justify-center transition shadow-xs cursor-pointer"
+                                          className="h-6 w-6 rounded-md bg-white dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-700  text-zinc-700 dark:text-zinc-200 flex items-center justify-center transition shadow-xs cursor-pointer ui-shadow-quiet ui-control"
                                         >
                                           <Plus className="h-3 w-3 stroke-[2.5]" />
                                         </button>
@@ -1292,11 +1300,11 @@ export function GrcIntakeModal({
                                             roomExtraPax: { ...(prev.roomExtraPax || {}), [id]: Math.max(0, cur - 1) },
                                           }));
                                         }}
-                                        className="h-6 w-6 rounded-md bg-white dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-700 active:scale-90 text-zinc-700 dark:text-zinc-200 flex items-center justify-center transition shadow-xs cursor-pointer"
+                                        className="h-6 w-6 rounded-md bg-white dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-700  text-zinc-700 dark:text-zinc-200 flex items-center justify-center transition shadow-xs cursor-pointer ui-shadow-quiet ui-control"
                                       >
                                         <Minus className="h-3 w-3 stroke-[2.5]" />
                                       </button>
-                                      <span className="font-mono font-bold text-xs text-zinc-900 dark:text-white px-2 min-w-[20px] text-center select-none">
+                                      <span className="font-mono font-bold text-xs text-zinc-900 dark:text-white px-2 min-w-[20px] text-center select-none ui-font-body ui-weight-medium ui-text-body">
                                         {roomPaxCount}
                                       </span>
                                       <button
@@ -1308,13 +1316,13 @@ export function GrcIntakeModal({
                                             roomExtraPax: { ...(prev.roomExtraPax || {}), [id]: cur + 1 },
                                           }));
                                         }}
-                                        className="h-6 w-6 rounded-md bg-white dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-700 active:scale-90 text-zinc-700 dark:text-zinc-200 flex items-center justify-center transition shadow-xs cursor-pointer"
+                                        className="h-6 w-6 rounded-md bg-white dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-700  text-zinc-700 dark:text-zinc-200 flex items-center justify-center transition shadow-xs cursor-pointer ui-shadow-quiet ui-control"
                                       >
                                         <Plus className="h-3 w-3 stroke-[2.5]" />
                                       </button>
                                     </div>
                                     {roomPaxCount > 0 && (
-                                      <span className="text-[10px] font-mono font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/60 px-1.5 py-0.5 rounded border border-amber-200 dark:border-amber-800">
+                                      <span className="text-[10px] font-mono font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/60 px-1.5 py-0.5 rounded border border-amber-200 dark:border-amber-800 ui-text-meta ui-font-body ui-weight-medium">
                                         +₹{roomPaxCount * roomExtraRate}
                                       </span>
                                     )}
@@ -1348,8 +1356,8 @@ export function GrcIntakeModal({
                                         };
                                       })
                                     }
-                                    className="p-1.5 text-zinc-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-colors cursor-pointer"
-                                    title="Remove Room"
+                                    className="p-1.5 text-zinc-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-colors cursor-pointer ui-control"
+                                    title="Remove Room" aria-label="Remove Room"
                                   >
                                     <X className="w-4 h-4" />
                                   </button>
@@ -1394,7 +1402,7 @@ export function GrcIntakeModal({
                               });
                             }
                           }}
-                          className="w-full h-9 px-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-800 dark:text-zinc-200 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer shadow-xs"
+                          className="w-full h-9 px-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-800 dark:text-zinc-200 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors cursor-pointer shadow-xs ui-radius-control ui-text-body ui-font-body ui-shadow-quiet ui-field"
                         >
                           <option value="">+ Add Vacant Room (Group Booking)...</option>
                           {rooms
@@ -1413,14 +1421,14 @@ export function GrcIntakeModal({
                       </div>
 
                       {formData.additionalRoomIds.length > 0 && (
-                        <label className="flex items-center gap-2 cursor-pointer bg-blue-50/70 dark:bg-blue-950/30 px-3 py-1.5 rounded-xl border border-blue-200 dark:border-blue-900/60 shadow-xs">
+                        <label className="flex items-center gap-2 cursor-pointer bg-blue-50/70 dark:bg-blue-950/30 px-3 py-1.5 rounded-xl border border-blue-200 dark:border-blue-900/60 shadow-xs ui-shadow-quiet ui-label">
                           <input
                             type="checkbox"
                             checked={formData.groupBilling}
                             onChange={(e) => setFormData({ ...formData, groupBilling: e.target.checked })}
-                            className="w-4 h-4 rounded bg-white dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700 text-blue-600 focus:ring-blue-500/50 cursor-pointer"
+                            className="w-4 h-4 rounded bg-white dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700 text-blue-600 focus:ring-blue-500/50 cursor-pointer ui-field"
                           />
-                          <span className="text-xs font-bold text-blue-900 dark:text-blue-300">
+                          <span className="text-xs font-bold text-blue-900 dark:text-blue-300 ui-text-body ui-weight-medium">
                             Consolidate Master Folio (Single invoice for all {formData.additionalRoomIds.length + 1} rooms)
                           </span>
                         </label>
@@ -1432,14 +1440,14 @@ export function GrcIntakeModal({
             </div>
 
             {/* 2. PRIMARY GUEST DOSSIER */}
-            <div className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-[#111114] p-5 sm:p-6 space-y-4 shadow-xs">
+            <div className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-[#111114] p-5 sm:p-6 space-y-4 shadow-xs ui-radius-panel ui-shadow-quiet ui-surface">
               <div className="border-b border-zinc-100 dark:border-zinc-800 pb-2 flex items-center justify-between">
-                <span className="font-bold text-zinc-900 dark:text-white uppercase tracking-wider flex items-center gap-2 text-xs">
+                <span className="font-bold text-zinc-900 dark:text-white uppercase tracking-wider flex items-center gap-2 text-xs ui-weight-medium ui-text-body">
                   <Users className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
                   2. Primary Guest Profile (From Physical GRC Card)
                 </span>
                 {isLookingUpPhone && (
-                  <span className="text-[10px] text-blue-600 dark:text-blue-400 font-mono animate-pulse flex items-center gap-1">
+                  <span className="text-[10px] text-blue-600 dark:text-blue-400 font-mono  flex items-center gap-1 ui-text-meta ui-font-body">
                     <Clock className="h-3 w-3 animate-spin" /> Looking up guest profile...
                   </span>
                 )}
@@ -1447,26 +1455,26 @@ export function GrcIntakeModal({
 
               {/* Repeat Customer Detected Badge */}
               {repeatGuest && (
-                <div className="p-3 rounded-2xl bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-amber-500/5 border border-amber-300 dark:border-amber-700/70 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs animate-in fade-in slide-in-from-top-2">
+                <div className="p-3 rounded-2xl bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-amber-500/5 border border-amber-300 dark:border-amber-700/70 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs   slide-in-from-top-2 ui-radius-panel ui-shadow-quiet">
                   <div className="flex items-center gap-3">
-                    <div className="h-9 w-9 rounded-xl bg-amber-500 text-white flex items-center justify-center font-black text-sm shadow-xs shrink-0">
+                    <div className="h-9 w-9 rounded-xl bg-amber-500 text-white flex items-center justify-center font-black text-sm shadow-xs shrink-0 ui-weight-medium ui-shadow-quiet">
                       ⭐
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className="font-extrabold text-xs text-amber-950 dark:text-amber-100">
+                        <span className="font-extrabold text-xs text-amber-950 dark:text-amber-100 ui-weight-medium ui-text-body">
                           Returning Guest: {repeatGuest.fullName}
                         </span>
-                        <span className="rounded px-2 py-0.5 text-[10px] font-bold font-mono uppercase bg-amber-200 dark:bg-amber-900 text-amber-900 dark:text-amber-200">
+                        <span className="rounded px-2 py-0.5 text-[10px] font-bold font-mono uppercase bg-amber-200 dark:bg-amber-900 text-amber-900 dark:text-amber-200 ui-text-meta ui-weight-medium ui-font-body">
                           {repeatGuest.pastStaysCount} Past {repeatGuest.pastStaysCount === 1 ? "Stay" : "Stays"}
                         </span>
                         {repeatGuest.vipStatus && (
-                          <span className="rounded px-2 py-0.5 text-[10px] font-bold uppercase bg-purple-100 dark:bg-purple-900/60 text-purple-800 dark:text-purple-300">
+                          <span className="rounded px-2 py-0.5 text-[10px] font-bold uppercase bg-purple-100 dark:bg-purple-900/60 text-purple-800 dark:text-purple-300 ui-text-meta ui-weight-medium">
                             VIP Guest
                           </span>
                         )}
                       </div>
-                      <p className="text-[11px] text-amber-800/90 dark:text-amber-300/80 font-medium mt-0.5">
+                      <p className="text-[11px] text-amber-800/90 dark:text-amber-300/80 font-medium mt-0.5 ui-text-meta">
                         Profile, address & ID details auto-populated from stay history
                         {repeatGuest.city ? ` (${repeatGuest.city}, ${repeatGuest.state})` : ""}
                         {repeatGuest.companyName ? ` • Company: ${repeatGuest.companyName}` : ""}
@@ -1477,7 +1485,7 @@ export function GrcIntakeModal({
                     <button
                       type="button"
                       onClick={() => setRepeatGuest(null)}
-                      className="text-[11px] text-amber-800 dark:text-amber-400 hover:underline font-semibold"
+                      className="text-[11px] text-amber-800 dark:text-amber-400 hover:underline font-semibold ui-text-meta ui-control"
                     >
                       Dismiss
                     </button>
@@ -1487,7 +1495,7 @@ export function GrcIntakeModal({
 
               <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
                 <div className="space-y-1">
-                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">Mobile Phone *</label>
+                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap ui-text-meta ui-label">Mobile Phone *</label>
                   <div className="relative flex items-center">
                     <input
                       type="tel"
@@ -1495,10 +1503,10 @@ export function GrcIntakeModal({
                       placeholder="e.g. 9864341211"
                       value={formData.mobilePhone}
                       onChange={(e) => handlePhoneChange(e.target.value)}
-                      className="w-full h-10 px-3 pr-8 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                      className="w-full h-10 px-3 pr-8 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors ui-font-body ui-text-body ui-weight-medium ui-field" aria-label="Mobile Phone"
                     />
                     {repeatGuest && (
-                      <span className="absolute right-2.5 text-emerald-500 text-xs" title="Repeat Customer Auto-Filled">
+                      <span className="absolute right-2.5 text-emerald-500 text-xs ui-text-body" title="Repeat Customer Auto-Filled">
                         ✓
                       </span>
                     )}
@@ -1506,11 +1514,11 @@ export function GrcIntakeModal({
                 </div>
 
                 <div className="space-y-1">
-                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">Title</label>
+                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap ui-text-meta ui-label">Title</label>
                   <select
                     value={formData.title}
                     onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                    className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                    className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors ui-text-body ui-field" aria-label="Title"
                   >
                     <option value="Mr.">Mr.</option>
                     <option value="Mrs.">Mrs.</option>
@@ -1521,41 +1529,41 @@ export function GrcIntakeModal({
                 </div>
 
                 <div className="space-y-1 sm:col-span-2">
-                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">Guest Full Name *</label>
+                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap ui-text-meta ui-label">Guest Full Name *</label>
                   <input
                     type="text"
                     required
                     placeholder="e.g. Suman Roy, Vikash Kumar"
                     value={formData.fullName}
                     onChange={(e) => setFormData({ ...formData, fullName: e.target.value.toUpperCase() })}
-                    className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-bold text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                    className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-bold text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors ui-weight-medium ui-text-body ui-field" aria-label="Guest Full Name"
                   />
                 </div>
 
                 <div className="space-y-1 sm:col-span-2">
-                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">Father / Spouse Name</label>
+                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap ui-text-meta ui-label">Father / Spouse Name</label>
                   <input
                     type="text"
                     placeholder="S/O, D/O, W/O"
                     value={formData.fatherSpouseName}
                     onChange={(e) => setFormData({ ...formData, fatherSpouseName: e.target.value.toUpperCase() })}
-                    className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                    className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors ui-text-body ui-field" aria-label="Father / Spouse Name"
                   />
                 </div>
 
                 <div className="space-y-1 sm:col-span-2">
-                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">Alternate Phone</label>
+                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap ui-text-meta ui-label">Alternate Phone</label>
                   <input
                     type="tel"
                     placeholder="Optional phone"
                     value={formData.alternatePhone}
                     onChange={(e) => setFormData({ ...formData, alternatePhone: e.target.value })}
-                    className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                    className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors ui-font-body ui-text-body ui-field" aria-label="Alternate Phone"
                   />
                 </div>
 
                 <div className="space-y-1">
-                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">Age (Years) *</label>
+                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap ui-text-meta ui-label">Age (Years) *</label>
                   <input
                     type="number"
                     min="1"
@@ -1563,16 +1571,16 @@ export function GrcIntakeModal({
                     placeholder="Age"
                     value={formData.age}
                     onChange={(e) => setFormData({ ...formData, age: e.target.value })}
-                    className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                    className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors ui-font-body ui-text-body ui-field" aria-label="Age (Years)"
                   />
                 </div>
 
                 <div className="space-y-1">
-                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">Gender *</label>
+                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap ui-text-meta ui-label">Gender *</label>
                   <select
                     value={formData.gender}
                     onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
-                    className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                    className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors ui-text-body ui-field" aria-label="Gender"
                   >
                     <option value="Male">Male</option>
                     <option value="Female">Female</option>
@@ -1581,7 +1589,7 @@ export function GrcIntakeModal({
                 </div>
 
                 <div className="space-y-1">
-                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">Nationality *</label>
+                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap ui-text-meta ui-label">Nationality *</label>
                   <select
                     required
                     value={formData.nationality}
@@ -1594,7 +1602,7 @@ export function GrcIntakeModal({
                         idType: val === "Indian" ? "AADHAAR" : "PASSPORT",
                       });
                     }}
-                    className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                    className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors ui-text-body ui-field" aria-label="Nationality"
                   >
                     <option value="Indian">Indian</option>
                     <option value="Foreign">Foreign</option>
@@ -1602,24 +1610,24 @@ export function GrcIntakeModal({
                 </div>
 
                 <div className="space-y-1 sm:col-span-2">
-                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">Email Address</label>
+                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap ui-text-meta ui-label">Email Address</label>
                   <input
                     type="email"
                     placeholder="guest@example.com"
                     value={formData.email}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                    className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors ui-text-body ui-field" aria-label="Email Address"
                   />
                 </div>
 
                 <div className="space-y-1">
-                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">Profession / Occupation</label>
+                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap ui-text-meta ui-label">Profession / Occupation</label>
                   <input
                     type="text"
                     placeholder="e.g. Business Executive"
                     value={formData.profession}
                     onChange={(e) => setFormData({ ...formData, profession: e.target.value })}
-                    className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                    className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors ui-text-body ui-field" aria-label="Profession / Occupation"
                   />
                 </div>
               </div>
@@ -1627,15 +1635,15 @@ export function GrcIntakeModal({
 
             {/* MANDATORY FOREIGN NATIONAL SECTION (FORM C) - SHOWN IF FOREIGN */}
             {formData.nationality === "Foreign" && (
-              <div className="rounded-xl border border-blue-200 dark:border-blue-500/30 bg-blue-50 dark:bg-blue-950/10 p-4 space-y-3.5 animate-in fade-in shadow-xs">
+              <div className="rounded-xl border border-blue-200 dark:border-blue-500/30 bg-blue-50 dark:bg-blue-950/10 p-4 space-y-3.5   shadow-xs ui-shadow-quiet">
                 <div className="flex items-center justify-between border-b border-blue-200 dark:border-zinc-800 pb-2">
                   <div className="flex items-center gap-2">
                     <Globe className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                    <span className="font-bold text-zinc-900 dark:text-white uppercase tracking-wider text-xs">
+                    <span className="font-bold text-zinc-900 dark:text-white uppercase tracking-wider text-xs ui-weight-medium ui-text-body">
                       Foreign National Form C Details (Mandatory for Foreign Guests)
                     </span>
                   </div>
-                  <span className="text-[10px] font-mono text-blue-800 dark:text-blue-400 bg-blue-100 dark:bg-blue-500/10 border border-blue-300 dark:border-blue-500/30 px-2 py-0.5 rounded font-bold">
+                  <span className="text-[10px] font-mono text-blue-800 dark:text-blue-400 bg-blue-100 dark:bg-blue-500/10 border border-blue-300 dark:border-blue-500/30 px-2 py-0.5 rounded font-bold ui-text-meta ui-font-body ui-weight-medium">
                     Govt Form C Compliance
                   </span>
                 </div>
@@ -1643,7 +1651,7 @@ export function GrcIntakeModal({
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
                   {/* Row 1: Passport & Citizenship */}
                   <div className="space-y-1">
-                    <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">
+                    <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap ui-text-meta ui-label">
                       Country of Citizenship *
                     </label>
                     <input
@@ -1659,12 +1667,12 @@ export function GrcIntakeModal({
                           foreignDetails: { ...formData.foreignDetails, countryOfCitizenship: val },
                         });
                       }}
-                      className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                      className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors ui-text-body ui-field" aria-label="Country of Citizenship"
                     />
                   </div>
 
                   <div className="space-y-1">
-                    <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">
+                    <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap ui-text-meta ui-label">
                       Passport Number *
                     </label>
                     <input
@@ -1678,12 +1686,12 @@ export function GrcIntakeModal({
                           foreignDetails: { ...formData.foreignDetails, passportNo: e.target.value },
                         })
                       }
-                      className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono font-bold text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                      className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono font-bold text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors ui-font-body ui-weight-medium ui-text-body ui-field" aria-label="Passport Number"
                     />
                   </div>
 
                   <div className="space-y-1">
-                    <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">
+                    <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap ui-text-meta ui-label">
                       Passport Issue Place & Date *
                     </label>
                     <input
@@ -1697,13 +1705,13 @@ export function GrcIntakeModal({
                           foreignDetails: { ...formData.foreignDetails, datePlaceOfIssue: e.target.value },
                         })
                       }
-                      className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                      className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors ui-text-body ui-field" aria-label="Passport Issue Place & Date"
                     />
                   </div>
 
                   {/* Row 2: Visa & Arrival Record */}
                   <div className="space-y-1">
-                    <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">
+                    <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap ui-text-meta ui-label">
                       Visa / Permit Number *
                     </label>
                     <input
@@ -1717,12 +1725,12 @@ export function GrcIntakeModal({
                           foreignDetails: { ...formData.foreignDetails, restrictedPermitNo: e.target.value },
                         })
                       }
-                      className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                      className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors ui-font-body ui-text-body ui-field" aria-label="Visa / Permit Number"
                     />
                   </div>
 
                   <div className="space-y-1">
-                    <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">
+                    <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap ui-text-meta ui-label">
                       Date of Arrival in India *
                     </label>
                     <input
@@ -1735,12 +1743,12 @@ export function GrcIntakeModal({
                           foreignDetails: { ...formData.foreignDetails, dateOfArrivalInIndia: e.target.value },
                         })
                       }
-                      className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                      className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors ui-font-body ui-text-body ui-field" aria-label="Date of Arrival in India"
                     />
                   </div>
 
                   <div className="space-y-1">
-                    <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">
+                    <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap ui-text-meta ui-label">
                       Port / City of Entry in India
                     </label>
                     <input
@@ -1753,13 +1761,13 @@ export function GrcIntakeModal({
                           foreignDetails: { ...formData.foreignDetails, portOfEntry: e.target.value },
                         })
                       }
-                      className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                      className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors ui-text-body ui-field" aria-label="Port / City of Entry in India"
                     />
                   </div>
 
                   {/* Row 3: Stay Details & Itinerary */}
                   <div className="space-y-1">
-                    <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">
+                    <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap ui-text-meta ui-label">
                       Stay Duration in India (Days)
                     </label>
                     <input
@@ -1773,12 +1781,12 @@ export function GrcIntakeModal({
                           foreignDetails: { ...formData.foreignDetails, proposedDurationOfStay: e.target.value },
                         })
                       }
-                      className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                      className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors ui-font-body ui-text-body ui-field" aria-label="Stay Duration in India (Days)"
                     />
                   </div>
 
                   <div className="space-y-1">
-                    <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">
+                    <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap ui-text-meta ui-label">
                       Employed in India?
                     </label>
                     <select
@@ -1789,7 +1797,7 @@ export function GrcIntakeModal({
                           foreignDetails: { ...formData.foreignDetails, employedInIndia: e.target.value },
                         })
                       }
-                      className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                      className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors ui-text-body ui-field" aria-label="Employed in India?"
                     >
                       <option value="No">No</option>
                       <option value="Yes">Yes</option>
@@ -1797,7 +1805,7 @@ export function GrcIntakeModal({
                   </div>
 
                   <div className="space-y-1">
-                    <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">
+                    <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap ui-text-meta ui-label">
                       Next Destination
                     </label>
                     <input
@@ -1810,7 +1818,7 @@ export function GrcIntakeModal({
                           foreignDetails: { ...formData.foreignDetails, nextDestination: e.target.value },
                         })
                       }
-                      className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                      className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors ui-text-body ui-field" aria-label="Next Destination"
                     />
                   </div>
                 </div>
@@ -1818,9 +1826,9 @@ export function GrcIntakeModal({
             )}
 
             {/* 3. RESIDENTIAL ADDRESS */}
-            <div className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-[#111114] p-5 sm:p-6 space-y-4 shadow-xs">
+            <div className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-[#111114] p-5 sm:p-6 space-y-4 shadow-xs ui-radius-panel ui-shadow-quiet ui-surface">
               <div className="border-b border-zinc-100 dark:border-zinc-800 pb-2">
-                <span className="font-bold text-zinc-900 dark:text-white uppercase tracking-wider flex items-center gap-2 text-xs">
+                <span className="font-bold text-zinc-900 dark:text-white uppercase tracking-wider flex items-center gap-2 text-xs ui-weight-medium ui-text-body">
                   <MapPin className="h-4 w-4 text-amber-600 dark:text-amber-400" />
                   3. Residential Address
                 </span>
@@ -1828,77 +1836,77 @@ export function GrcIntakeModal({
 
               <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
                 <div className="space-y-1 sm:col-span-2">
-                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">Street / House Address</label>
+                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap ui-text-meta ui-label">Street / House Address</label>
                   <input
                     type="text"
                     placeholder="Flat / Building / Road / Locality"
                     value={formData.streetAddress}
                     onChange={(e) => setFormData({ ...formData, streetAddress: e.target.value.toUpperCase() })}
-                    className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                    className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors ui-text-body ui-field" aria-label="Street / House Address"
                   />
                 </div>
 
                 <div className="space-y-1">
-                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">Police Station</label>
+                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap ui-text-meta ui-label">Police Station</label>
                   <input
                     type="text"
                     placeholder="Local P.S."
                     value={formData.policeStation}
                     onChange={(e) => setFormData({ ...formData, policeStation: e.target.value.toUpperCase() })}
-                    className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                    className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors ui-text-body ui-field" aria-label="Police Station"
                   />
                 </div>
 
                 <div className="space-y-1">
-                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">City</label>
+                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap ui-text-meta ui-label">City</label>
                   <input
                     type="text"
                     placeholder="e.g. Guwahati / Kolkata"
                     value={formData.city}
                     onChange={(e) => setFormData({ ...formData, city: e.target.value.toUpperCase() })}
-                    className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                    className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors ui-text-body ui-field" aria-label="City"
                   />
                 </div>
 
                 <div className="space-y-1">
-                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">State</label>
+                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap ui-text-meta ui-label">State</label>
                   <input
                     type="text"
                     placeholder="e.g. Assam"
                     value={formData.state}
                     onChange={(e) => setFormData({ ...formData, state: e.target.value.toUpperCase() })}
-                    className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                    className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors ui-text-body ui-field" aria-label="State"
                   />
                 </div>
 
                 <div className="space-y-1">
-                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">PIN / Zip Code</label>
+                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap ui-text-meta ui-label">PIN / Zip Code</label>
                   <input
                     type="text"
                     placeholder="e.g. 781008"
                     value={formData.pinZipCode}
                     onChange={(e) => setFormData({ ...formData, pinZipCode: e.target.value })}
-                    className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                    className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors ui-font-body ui-text-body ui-field" aria-label="PIN / Zip Code"
                   />
                 </div>
 
                 <div className="space-y-1 sm:col-span-2">
-                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">Country</label>
+                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap ui-text-meta ui-label">Country</label>
                   <input
                     type="text"
                     placeholder="e.g. India"
                     value={formData.country}
                     onChange={(e) => setFormData({ ...formData, country: e.target.value })}
-                    className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                    className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors ui-text-body ui-field" aria-label="Country"
                   />
                 </div>
               </div>
             </div>
 
             {/* 4. TRAVEL & ID VERIFICATION */}
-            <div className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-[#111114] p-5 sm:p-6 space-y-4 shadow-xs">
+            <div className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-[#111114] p-5 sm:p-6 space-y-4 shadow-xs ui-radius-panel ui-shadow-quiet ui-surface">
               <div className="border-b border-zinc-100 dark:border-zinc-800 pb-2">
-                <span className="font-bold text-zinc-900 dark:text-white uppercase tracking-wider flex items-center gap-2 text-xs">
+                <span className="font-bold text-zinc-900 dark:text-white uppercase tracking-wider flex items-center gap-2 text-xs ui-weight-medium ui-text-body">
                   <Compass className="h-4 w-4 text-cyan-600 dark:text-cyan-400" />
                   4. Travel Details, ID Proof & Vehicle
                 </span>
@@ -1906,33 +1914,33 @@ export function GrcIntakeModal({
 
               <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
                 <div className="space-y-1">
-                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">Arrived From</label>
+                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap ui-text-meta ui-label">Arrived From</label>
                   <input
                     type="text"
                     placeholder="e.g. Kolkata, Delhi"
                     value={formData.arrivedFrom}
                     onChange={(e) => setFormData({ ...formData, arrivedFrom: e.target.value.toUpperCase() })}
-                    className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                    className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors ui-text-body ui-field" aria-label="Arrived From"
                   />
                 </div>
 
                 <div className="space-y-1">
-                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">Going To</label>
+                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap ui-text-meta ui-label">Going To</label>
                   <input
                     type="text"
                     placeholder="e.g. Shillong, Home"
                     value={formData.goingTo}
                     onChange={(e) => setFormData({ ...formData, goingTo: e.target.value.toUpperCase() })}
-                    className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                    className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors ui-text-body ui-field" aria-label="Going To"
                   />
                 </div>
 
                 <div className="space-y-1">
-                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">Purpose of Visit</label>
+                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap ui-text-meta ui-label">Purpose of Visit</label>
                   <select
                     value={formData.purposeOfVisit}
                     onChange={(e) => setFormData({ ...formData, purposeOfVisit: e.target.value })}
-                    className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer font-medium"
+                    className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors cursor-pointer font-medium ui-text-body ui-field" aria-label="Purpose of Visit"
                   >
                     {PURPOSE_OF_VISIT_OPTIONS.map((opt) => (
                       <option key={opt.id} value={opt.label}>
@@ -1943,22 +1951,22 @@ export function GrcIntakeModal({
                 </div>
 
                 <div className="space-y-1">
-                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">Vehicle Number</label>
+                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap ui-text-meta ui-label">Vehicle Number</label>
                   <input
                     type="text"
                     placeholder="e.g. AS 01 EX 1234"
                     value={formData.vehicleNumber}
                     onChange={(e) => setFormData({ ...formData, vehicleNumber: e.target.value.toUpperCase() })}
-                    className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                    className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors ui-font-body ui-text-body ui-field" aria-label="Vehicle Number"
                   />
                 </div>
 
                 <div className="space-y-1">
-                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">ID Document Type</label>
+                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap ui-text-meta ui-label">ID Document Type</label>
                   <select
                     value={formData.idType}
                     onChange={(e) => setFormData({ ...formData, idType: e.target.value })}
-                    className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer"
+                    className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors cursor-pointer ui-text-body ui-field" aria-label="ID Document Type"
                   >
                     {ID_PROOF_TYPES.map((id) => (
                       <option key={id.id} value={id.id}>
@@ -1969,20 +1977,20 @@ export function GrcIntakeModal({
                 </div>
 
                 <div className="space-y-1">
-                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">ID Number / Last 4</label>
+                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap ui-text-meta ui-label">ID Number / Last 4</label>
                   <input
                     type="text"
                     placeholder="e.g. 4521 or full ID"
                     value={formData.idLast4}
                     onChange={(e) => setFormData({ ...formData, idLast4: e.target.value.toUpperCase() })}
-                    className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                    className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors ui-font-body ui-text-body ui-field" aria-label="ID Number / Last 4"
                   />
                 </div>
 
                 <div className="space-y-1 sm:col-span-2">
-                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap flex items-center justify-between">
+                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap flex items-center justify-between ui-text-meta ui-label">
                     <span>Company / Travel Agent Master</span>
-                    <span className="text-[10px] text-blue-600 dark:text-blue-400 font-mono font-bold">24+ Directory</span>
+                    <span className="text-[10px] text-blue-600 dark:text-blue-400 font-mono font-bold ui-text-meta ui-font-body ui-weight-medium">24+ Directory</span>
                   </label>
                   <CompanySelector
                     value={formData.companyName}
@@ -2011,29 +2019,29 @@ export function GrcIntakeModal({
                 </div>
 
                 <div className="space-y-1">
-                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">Company GSTIN</label>
+                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap ui-text-meta ui-label">Company GSTIN</label>
                   <input
                     type="text"
                     placeholder="e.g. 18AAAAA0000A1Z5"
                     value={formData.guestGstin}
                     onChange={(e) => setFormData({ ...formData, guestGstin: e.target.value.toUpperCase() })}
-                    className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-semibold"
+                    className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors font-semibold ui-font-body ui-text-body ui-field" aria-label="Company GSTIN"
                   />
                 </div>
               </div>
             </div>
 
             {/* 5. ACCOMPANYING CO-GUESTS */}
-            <div className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-[#111114] p-5 sm:p-6 space-y-4 shadow-xs">
+            <div className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-[#111114] p-5 sm:p-6 space-y-4 shadow-xs ui-radius-panel ui-shadow-quiet ui-surface">
               <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-2">
-                <span className="font-bold text-zinc-900 dark:text-white uppercase tracking-wider flex items-center gap-2 text-xs">
+                <span className="font-bold text-zinc-900 dark:text-white uppercase tracking-wider flex items-center gap-2 text-xs ui-weight-medium ui-text-body">
                   <Users className="h-4 w-4 text-cyan-600 dark:text-cyan-400" />
                   5. Accompanying Co-Guests ({formData.coGuests.length})
                 </span>
                 <button
                   type="button"
                   onClick={handleAddCoGuest}
-                  className="px-3 py-1 rounded-lg bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 text-zinc-900 dark:text-white font-bold text-[11px] flex items-center gap-1 transition shadow-xs"
+                  className="px-3 py-1 rounded-lg bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 text-zinc-900 dark:text-white font-bold text-[11px] flex items-center gap-1 transition shadow-xs ui-weight-medium ui-text-meta ui-shadow-quiet ui-control"
                 >
                   <Plus className="h-3.5 w-3.5" />
                   <span>Add Companion</span>
@@ -2043,7 +2051,7 @@ export function GrcIntakeModal({
               {formData.coGuests.length > 0 ? (
                 <div className="space-y-2">
                   {formData.coGuests.map((cg, idx) => (
-                    <div key={idx} className="grid grid-cols-1 sm:grid-cols-12 gap-2 bg-white dark:bg-zinc-900/60 p-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 items-center shadow-xs">
+                    <div key={idx} className="grid grid-cols-1 sm:grid-cols-12 gap-2 bg-white dark:bg-zinc-900/60 p-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 items-center shadow-xs ui-shadow-quiet ui-surface">
                       <div className="sm:col-span-4">
                         <input
                           type="text"
@@ -2051,7 +2059,7 @@ export function GrcIntakeModal({
                           placeholder="Companion Name *"
                           value={cg.name}
                           onChange={(e) => handleCoGuestChange(idx, "name", e.target.value.toUpperCase())}
-                          className="w-full h-9 px-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                          className="w-full h-9 px-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors ui-text-body ui-field" aria-label="Companion Name *"
                         />
                       </div>
                       <div className="sm:col-span-2">
@@ -2060,14 +2068,14 @@ export function GrcIntakeModal({
                           placeholder="Age"
                           value={cg.age}
                           onChange={(e) => handleCoGuestChange(idx, "age", e.target.value)}
-                          className="w-full h-9 px-2 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                          className="w-full h-9 px-2 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors ui-font-body ui-text-body ui-field" aria-label="Age"
                         />
                       </div>
                       <div className="sm:col-span-2">
                         <select
                           value={cg.gender}
                           onChange={(e) => handleCoGuestChange(idx, "gender", e.target.value)}
-                          className="w-full h-9 px-2 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                          className="w-full h-9 px-2 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors ui-text-body ui-field"
                         >
                           <option value="Male">Male</option>
                           <option value="Female">Female</option>
@@ -2077,7 +2085,7 @@ export function GrcIntakeModal({
                         <select
                           value={cg.relation}
                           onChange={(e) => handleCoGuestChange(idx, "relation", e.target.value)}
-                          className="w-full h-9 px-2 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                          className="w-full h-9 px-2 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors ui-text-body ui-field"
                         >
                           <option value="Spouse">Spouse</option>
                           <option value="Child">Child</option>
@@ -2091,7 +2099,7 @@ export function GrcIntakeModal({
                         <button
                           type="button"
                           onClick={() => handleRemoveCoGuest(idx)}
-                          className="p-1.5 rounded-lg text-rose-500 hover:text-white hover:bg-rose-600 transition"
+                          className="p-1.5 rounded-lg text-rose-500 hover:text-white hover:bg-rose-600 transition ui-control"
                         >
                           <Trash2 className="h-4 w-4" />
                         </button>
@@ -2100,16 +2108,16 @@ export function GrcIntakeModal({
                   ))}
                 </div>
               ) : (
-                <p className="text-zinc-500 italic text-[11px]">
+                <p className="text-zinc-500 italic text-[11px] ui-text-meta">
                   No co-guests added. Click "Add Companion" if the guest has family or colleagues sharing the room.
                 </p>
               )}
             </div>
 
             {/* 6. ADVANCE PAYMENT & SETTLEMENT */}
-            <div className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-[#111114] p-5 sm:p-6 space-y-4 shadow-xs">
+            <div className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-[#111114] p-5 sm:p-6 space-y-4 shadow-xs ui-radius-panel ui-shadow-quiet ui-surface">
               <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-2 flex-wrap gap-2">
-                <span className="font-bold text-zinc-900 dark:text-white uppercase tracking-wider flex items-center gap-2 text-xs">
+                <span className="font-bold text-zinc-900 dark:text-white uppercase tracking-wider flex items-center gap-2 text-xs ui-weight-medium ui-text-body">
                   <CreditCard className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
                   {formData.additionalRoomIds.length > 0
                     ? `6. Primary Room (Room ${primaryRoom?.number || ""}) Tariff, Complimentary & Deposit`
@@ -2117,7 +2125,7 @@ export function GrcIntakeModal({
                 </span>
 
                 {/* Complimentary Room Option */}
-                <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-emerald-800 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 px-2.5 py-1 rounded-lg border border-emerald-200 dark:border-emerald-800">
+                <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-emerald-800 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 px-2.5 py-1 rounded-lg border border-emerald-200 dark:border-emerald-800 ui-text-body ui-weight-medium ui-label">
                   <input
                     type="checkbox"
                     checked={formData.isComplimentary}
@@ -2129,7 +2137,7 @@ export function GrcIntakeModal({
                         agreedTariff: checked ? "0" : (prev.agreedTariff === "0" ? String(primaryRoom?.roomType?.basePrice || 3200) : prev.agreedTariff),
                       }));
                     }}
-                    className="w-4 h-4 rounded text-emerald-600 cursor-pointer"
+                    className="w-4 h-4 rounded text-emerald-600 cursor-pointer ui-field"
                   />
                   <span>🎁 {formData.additionalRoomIds.length > 0 ? `Room ${primaryRoom?.number || "1"} Complimentary (₹0)` : "Complimentary Room (₹0 Free Stay)"}</span>
                 </label>
@@ -2137,10 +2145,10 @@ export function GrcIntakeModal({
 
               {/* Multi-Room Tariff Summary Breakdown */}
               {formData.additionalRoomIds.length > 0 && (
-                <div className="p-3 rounded-xl bg-white dark:bg-zinc-900 border border-blue-200 dark:border-blue-800/60 space-y-2 text-xs">
-                  <div className="font-bold text-zinc-800 dark:text-zinc-200 flex items-center justify-between flex-wrap gap-2">
+                <div className="p-3 rounded-xl bg-white dark:bg-zinc-900 border border-blue-200 dark:border-blue-800/60 space-y-2 text-xs ui-text-body ui-surface">
+                  <div className="font-bold text-zinc-800 dark:text-zinc-200 flex items-center justify-between flex-wrap gap-2 ui-weight-medium">
                     <span>Group Booking Room Tariffs Breakdown:</span>
-                    <span className="font-mono text-blue-600 dark:text-blue-400 font-black">
+                    <span className="font-mono text-blue-600 dark:text-blue-400 font-black ui-font-body ui-weight-medium">
                       Total Daily: ₹{
                         (formData.isComplimentary ? 0 : (Number(formData.agreedTariff) || Number(primaryRoom?.roomType?.basePrice) || 3200)) +
                         formData.additionalRoomIds.reduce((sum, rid) => {
@@ -2155,8 +2163,8 @@ export function GrcIntakeModal({
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
                     <div className="p-2 rounded-lg bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 flex items-center justify-between">
-                      <span className="font-bold text-zinc-700 dark:text-zinc-300">Room {primaryRoom?.number} (Primary):</span>
-                      <span className={`font-mono font-bold ${formData.isComplimentary ? "text-emerald-600 dark:text-emerald-400" : "text-zinc-900 dark:text-white"}`}>
+                      <span className="font-bold text-zinc-700 dark:text-zinc-300 ui-weight-medium">Room {primaryRoom?.number} (Primary):</span>
+                      <span className={`font-mono font-bold  ui-font-body ui-weight-medium ${formData.isComplimentary ? "text-emerald-600 dark:text-emerald-400" : "text-zinc-900 dark:text-white"}`}>
                         {formData.isComplimentary ? "🎁 Comp (₹0)" : `₹${formData.agreedTariff || primaryRoom?.roomType?.basePrice || 3200}`}
                       </span>
                     </div>
@@ -2167,8 +2175,8 @@ export function GrcIntakeModal({
                       const rateDisplay = isComp ? "🎁 Comp (₹0)" : `₹${rateVal !== undefined && rateVal !== "" ? rateVal : (rObj?.roomType?.basePrice || 3200)}`;
                       return (
                         <div key={rid} className="p-2 rounded-lg bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 flex items-center justify-between">
-                          <span className="font-bold text-zinc-700 dark:text-zinc-300">Room {rObj?.number}:</span>
-                          <span className={`font-mono font-bold ${isComp ? "text-emerald-600 dark:text-emerald-400" : "text-zinc-900 dark:text-white"}`}>
+                          <span className="font-bold text-zinc-700 dark:text-zinc-300 ui-weight-medium">Room {rObj?.number}:</span>
+                          <span className={`font-mono font-bold  ui-font-body ui-weight-medium ${isComp ? "text-emerald-600 dark:text-emerald-400" : "text-zinc-900 dark:text-white"}`}>
                             {rateDisplay}
                           </span>
                         </div>
@@ -2181,82 +2189,89 @@ export function GrcIntakeModal({
               <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
                 <div className="space-y-1">
                   <div className="flex items-center justify-between">
-                    <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">
+                    <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap ui-text-meta ui-label">
                       {formData.additionalRoomIds.length > 0
                         ? `Primary Rate (Room ${primaryRoom?.number || ""}) (₹)`
                         : "Agreed Room Rate (₹)"}
                     </label>
                   </div>
                   <div className="relative flex items-center">
-                    <span className="absolute left-3 text-zinc-400 font-bold font-mono text-xs">₹</span>
+                    <span className="absolute left-3 text-zinc-400 font-bold font-mono text-xs ui-weight-medium ui-font-body ui-text-body">₹</span>
                     <input
                       type="number"
                       placeholder={formData.isComplimentary ? "0 (Complimentary)" : "Enter custom rate"}
                       disabled={formData.isComplimentary}
                       value={formData.isComplimentary ? "0" : formData.agreedTariff}
                       onChange={(e) => setFormData({ ...formData, agreedTariff: e.target.value })}
-                      className="w-full h-10 pl-7 pr-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-blue-700 dark:text-blue-400 font-mono font-bold text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all disabled:opacity-60 disabled:bg-zinc-100 dark:disabled:bg-zinc-800"
+                      className="w-full h-10 pl-7 pr-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-blue-700 dark:text-blue-400 font-mono font-bold text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors disabled:opacity-60 disabled:bg-zinc-100 dark:disabled:bg-zinc-800 ui-font-body ui-weight-medium ui-field"
                     />
                   </div>
                 </div>
 
                 {/* GST Inclusion / Exclusion Toggle */}
                 <div className="space-y-1">
-                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">
+                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap ui-text-meta ui-label">
                     GST Tax Treatment
                   </label>
                   <div className="flex items-center bg-zinc-200/80 dark:bg-zinc-800 p-1 rounded-xl border border-zinc-300 dark:border-zinc-700 h-10">
                     <button
                       type="button"
                       onClick={() => setFormData({ ...formData, isRateInclusive: true })}
-                      className={`flex-1 h-full rounded-lg text-xs font-bold transition flex items-center justify-center gap-1 cursor-pointer ${
+                      className={`flex-1 h-full rounded-lg text-xs font-bold transition flex items-center justify-center gap-1 cursor-pointer  ui-text-body ui-weight-medium ${
                         formData.isRateInclusive
-                          ? "bg-white dark:bg-zinc-900 text-blue-700 dark:text-blue-400 shadow-xs border border-zinc-200 dark:border-zinc-700"
+                          ? "bg-white dark:bg-zinc-900 text-blue-700 dark:text-blue-400 shadow-xs border border-zinc-200 dark:border-zinc-700 ui-shadow-quiet"
                           : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900"
-                      }`}
-                      title="Room rate already includes GST"
+                      } ui-control`}
+                      title="Room rate already includes GST" aria-label="Room rate already includes GST"
                     >
                       <span>Incl. GST</span>
                     </button>
                     <button
                       type="button"
                       onClick={() => setFormData({ ...formData, isRateInclusive: false })}
-                      className={`flex-1 h-full rounded-lg text-xs font-bold transition flex items-center justify-center gap-1 cursor-pointer ${
+                      className={`flex-1 h-full rounded-lg text-xs font-bold transition flex items-center justify-center gap-1 cursor-pointer  ui-text-body ui-weight-medium ${
                         !formData.isRateInclusive
-                          ? "bg-white dark:bg-zinc-900 text-amber-700 dark:text-amber-400 shadow-xs border border-zinc-200 dark:border-zinc-700"
+                          ? "bg-white dark:bg-zinc-900 text-amber-700 dark:text-amber-400 shadow-xs border border-zinc-200 dark:border-zinc-700 ui-shadow-quiet"
                           : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900"
-                      }`}
-                      title="GST tax is added on top of the base rate"
+                      } ui-control`}
+                      title="GST tax is added on top of the base rate" aria-label="GST tax is added on top of the base rate"
                     >
                       <span>+Tax Extra</span>
                     </button>
                   </div>
                 </div>
 
+                {initialReservation && (
+                  <div className="col-span-full rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-950 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-100">
+                    <strong>Reservation advance already collected: ₹{bookedAdvance.amount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</strong>
+                    {bookedAdvance.receiptNos.length > 0 && <div className="text-xs mt-1">Receipt: {bookedAdvance.receiptNos.join(", ")}</div>}
+                    <div className="text-xs mt-1">This receipt will carry into the guest folio. Enter only any additional money collected now below.</div>
+                  </div>
+                )}
                 <div className="space-y-1">
-                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">
-                    Advance Deposit (₹)
+                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap ui-text-meta ui-label">
+                    {initialReservation ? "Additional collection now (₹)" : "Advance Deposit (₹)"}
                   </label>
                   <div className="relative flex items-center">
-                    <span className="absolute left-3 text-emerald-500 font-bold font-mono text-xs">₹</span>
+                    <span className="absolute left-3 text-emerald-500 font-bold font-mono text-xs ui-weight-medium ui-font-body ui-text-body">₹</span>
                     <input
                       type="number"
                       placeholder="0"
                       value={formData.depositAmount}
                       onChange={(e) => setFormData({ ...formData, depositAmount: e.target.value })}
-                      className="w-full h-10 pl-7 pr-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-emerald-700 dark:text-emerald-400 font-mono font-bold text-sm focus:border-emerald-500 focus:outline-none"
+                      className="w-full h-10 pl-7 pr-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-emerald-700 dark:text-emerald-400 font-mono font-bold text-sm focus:border-emerald-500 focus:outline-none ui-font-body ui-weight-medium ui-field" aria-label={initialReservation ? "Additional collection now (₹)" : "Advance Deposit (₹)"} min="0" step="0.01"
                     />
                   </div>
                 </div>
 
                 <div className="space-y-1">
-                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">
+                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap ui-text-meta ui-label">
                     Payment Mode
                   </label>
                   <select
                     value={formData.paymentMethod}
                     onChange={(e) => setFormData({ ...formData, paymentMethod: e.target.value })}
-                    className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-bold text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                    className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-bold text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors ui-weight-medium ui-text-body ui-field" aria-label="Payment Mode"
                   >
                     <option value="UPI">UPI / QR Code</option>
                     <option value="CASH">Cash Drawer</option>
@@ -2267,7 +2282,7 @@ export function GrcIntakeModal({
                 </div>
 
                 <div className="space-y-1">
-                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap">
+                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase text-[11px] whitespace-nowrap ui-text-meta ui-label">
                     Transaction / UTR / PO Ref
                   </label>
                   <input
@@ -2275,13 +2290,13 @@ export function GrcIntakeModal({
                     placeholder="e.g. UTR/98127391 or PO-2026"
                     value={formData.transactionRef}
                     onChange={(e) => setFormData({ ...formData, transactionRef: e.target.value.toUpperCase() })}
-                    className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                    className="w-full h-10 px-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors ui-font-body ui-text-body ui-field" aria-label="Transaction / UTR / PO Ref"
                   />
                 </div>
               </div>
 
               {formData.paymentMethod === "DIRECT_BILL" && (
-                <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-700/60 text-xs text-amber-900 dark:text-amber-200 flex items-center gap-2">
+                <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-700/60 text-xs text-amber-900 dark:text-amber-200 flex items-center gap-2 ui-text-body">
                   <Building2 className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
                   <span>
                     Billing will be posted to Company Ledger:{" "}
@@ -2297,19 +2312,19 @@ export function GrcIntakeModal({
           {/* Docked Sticky Bottom Actions Bar */}
           <div className="border-t border-zinc-200 dark:border-zinc-800 bg-white/95 dark:bg-[#111114]/95 backdrop-blur-md px-6 lg:px-12 py-3 flex items-center justify-between shrink-0 shadow-lg z-20">
             <div className="flex items-center gap-3">
-              <div className="h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse hidden sm:block" />
-              <div className="text-xs text-zinc-600 dark:text-zinc-400 font-medium">
-                <span className="font-bold text-zinc-900 dark:text-white font-mono">
+              <div className="h-2.5 w-2.5 rounded-full bg-emerald-500  hidden sm:block" />
+              <div className="text-xs text-zinc-600 dark:text-zinc-400 font-medium ui-text-body">
+                <span className="font-bold text-zinc-900 dark:text-white font-mono ui-weight-medium ui-font-body">
                   Room {primaryRoom?.number || "-"}
                   {formData.additionalRoomIds.length > 0 && ` (+${formData.additionalRoomIds.length} group room${formData.additionalRoomIds.length > 1 ? "s" : ""})`}
                 </span>
                 <span className="mx-2 text-zinc-300 dark:text-zinc-700">•</span>
-                <span className="font-mono">
+                <span className="font-mono ui-font-body">
                   {calculatedTotalAdults} Adults{Number(formData.children) > 0 ? `, ${formData.children} Children` : ""}
                 </span>
                 <span className="mx-2 text-zinc-300 dark:text-zinc-700">•</span>
-                <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
-                  Advance: ₹{formData.depositAmount || 0}
+                <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400 ui-font-body ui-weight-medium">
+                  {initialReservation ? `Already paid: ₹${bookedAdvance.amount.toLocaleString("en-IN")} · New: ₹${formData.depositAmount || 0}` : `Advance: ₹${formData.depositAmount || 0}`}
                 </span>
               </div>
             </div>
@@ -2318,14 +2333,14 @@ export function GrcIntakeModal({
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 text-xs font-bold transition cursor-pointer"
+                className="px-4 py-2.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 text-xs font-bold transition cursor-pointer ui-radius-control ui-text-body ui-weight-medium ui-control"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={loading}
-                className="px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 font-bold text-white text-xs sm:text-sm transition shadow-md shadow-blue-600/20 flex items-center gap-2 disabled:opacity-50 whitespace-nowrap cursor-pointer"
+                className="px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 font-bold text-white text-xs sm:text-sm transition shadow-md shadow-blue-600/20 flex items-center gap-2 disabled:opacity-50 whitespace-nowrap cursor-pointer ui-radius-control ui-weight-medium ui-text-body ui-shadow-quiet ui-control"
               >
                 <CheckCircle2 className="h-4 w-4 shrink-0" />
                 <span>{loading ? "Checking In..." : "Complete Check-In"}</span>
@@ -2338,23 +2353,23 @@ export function GrcIntakeModal({
       {/* METHOD 2: DIGITAL QR KIOSK / GUEST SELF CHECK-IN */}
       {activeMethod === "QR_DIGITAL" && (
         <div className="flex-1 overflow-y-auto flex items-center justify-center p-6">
-          <div className="p-8 rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200/80 dark:border-zinc-800/80 space-y-5 shadow-lg max-w-md w-full text-center">
-            <div className="h-16 w-16 rounded-2xl bg-blue-50 dark:bg-blue-600/20 border border-blue-200 dark:border-blue-500/30 flex items-center justify-center text-blue-600 dark:text-blue-400 mx-auto shadow-inner">
+          <div className="p-8 rounded-2xl bg-white dark:bg-[#111114] border border-zinc-200/80 dark:border-zinc-800/80 space-y-5 shadow-lg max-w-md w-full text-center ui-radius-panel ui-surface">
+            <div className="h-16 w-16 rounded-2xl bg-blue-50 dark:bg-blue-600/20 border border-blue-200 dark:border-blue-500/30 flex items-center justify-center text-blue-600 dark:text-blue-400 mx-auto shadow-inner ui-radius-panel">
               <QrCode className="h-8 w-8" />
             </div>
 
             <div>
-              <h3 className="text-base font-bold text-zinc-900 dark:text-white">Contactless Guest Self Check-In</h3>
-              <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+              <h3 className="text-base font-bold text-zinc-900 dark:text-white ui-weight-medium">Contactless Guest Self Check-In</h3>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 ui-text-body">
                 Guests can scan this QR code on their smartphone to fill out their GRC, upload ID photos, and sign digitally before reaching the counter.
               </p>
             </div>
 
-            <div className="p-4 bg-white rounded-2xl max-w-[200px] mx-auto shadow-md border border-zinc-200 dark:border-zinc-700">
+            <div className="p-4 bg-white rounded-2xl max-w-[200px] mx-auto shadow-md border border-zinc-200 dark:border-zinc-700 ui-radius-panel ui-shadow-quiet ui-surface">
               {/* Visual QR Code Display */}
               <div className="aspect-square bg-zinc-950 rounded-xl flex flex-col items-center justify-center p-3 text-white">
                 <QrCode className="h-28 w-28 text-white" />
-                <span className="text-[9px] font-mono text-zinc-400 mt-1 uppercase font-bold tracking-widest">
+                <span className="text-[9px] font-mono text-zinc-400 mt-1 uppercase font-bold tracking-widest ui-text-meta ui-font-body ui-weight-medium">
                   SCAN TO CHECK-IN
                 </span>
               </div>
@@ -2364,7 +2379,7 @@ export function GrcIntakeModal({
               <button
                 type="button"
                 onClick={handleCopyKioskLink}
-                className="px-4 py-2 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-xs font-bold text-zinc-800 dark:text-zinc-200 inline-flex items-center gap-1.5 transition cursor-pointer"
+                className="px-4 py-2 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-xs font-bold text-zinc-800 dark:text-zinc-200 inline-flex items-center gap-1.5 transition cursor-pointer ui-radius-control ui-text-body ui-weight-medium ui-control"
               >
                 {copiedLink ? <Check className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" /> : <Copy className="h-3.5 w-3.5 text-zinc-500 dark:text-zinc-400" />}
                 <span>{copiedLink ? "Link Copied" : "Copy Kiosk Link"}</span>
@@ -2374,7 +2389,7 @@ export function GrcIntakeModal({
                 href={activeProperty?.code ? `/checkin?property=${encodeURIComponent(activeProperty.code)}` : activeProperty?.id ? `/checkin?propertyId=${activeProperty.id}` : "/checkin"}
                 target="_blank"
                 rel="noreferrer"
-                className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-xs font-bold text-white inline-flex items-center gap-1.5 transition shadow"
+                className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-xs font-bold text-white inline-flex items-center gap-1.5 transition shadow ui-text-body ui-weight-medium"
               >
                 <span>Open Kiosk Portal ↗</span>
               </a>
